@@ -10,12 +10,6 @@
             environment: "#elf-env",
         },
         {
-            name: "startup",
-            url: "fuchsia-boot:///startup#meta/startup.cm",
-            startup: "eager",
-            environment: "#elf-env",
-        },
-        {
             name: "elf_runner",
             url: "fuchsia-builtin://#elf_runner.cm",
         },
@@ -124,21 +118,6 @@
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#elf_runner",
-        },
-        {
-            protocol: "fuchsia.component.Binder",
-            from: "#core",
-            as: "fuchsia.component.CoreBinder",
-            to: "#startup",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#bootstrap",
-            to: "#startup",
         },
 
         // The LogSink capability comes from an ELF component, but running ELF components

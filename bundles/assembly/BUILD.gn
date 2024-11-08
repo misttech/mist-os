@@ -124,7 +124,6 @@ assembly_input_bundle("embeddable") {
     "//src/bringup/bin/critical-services:package",
     "//src/diagnostics/archivist:package",
     "//src/power/shutdown-shim:package",
-    "//src/sys/startup:package",
   ]
 
   compiled_packages = [
@@ -860,7 +859,10 @@ assembly_input_bundle("partitioning_tools") {
 # All children in `/core` receive InspectSink and LogSink.
 #
 assembly_input_bundle("core_realm") {
-  bootfs_packages = [ "//src/sys/pkg/bin/pkg-cache" ]
+  bootfs_packages = [
+    "//src/sys/pkg/bin/pkg-cache",
+    "//src/sys/startup:package",
+  ]
   base_packages = [
     # This is a required dependency of pkg-cache
     "//src/sys/pkg/bin/system-update-committer",

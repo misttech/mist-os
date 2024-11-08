@@ -9,8 +9,29 @@
             environment: "#core-env",
             on_terminate: "reboot",
         },
+        {
+            name: "startup",
+            url: "fuchsia-boot:///startup#meta/startup.cm",
+            startup: "eager",
+            environment: "#elf-env",
+        },
     ],
     offer: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "#core",
+            as: "fuchsia.component.CoreBinder",
+            to: "#startup",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#bootstrap",
+            to: "#startup",
+        },
         {
             config: [
                 "fuchsia.bluetooth.LegacyPairing",
