@@ -205,7 +205,7 @@ pub async fn dump_annotations(data_provider_proxy: DataProviderProxy) -> Result<
         .get_annotations(&params)
         .await
         .map_err(|e| bug!("Could not get the annotations from the target: {e:?}"))?
-        .annotations
+        .annotations2
         .ok_or(bug!("Received empty annotations."))?;
 
     Ok(format_annotations(annotations))
@@ -393,7 +393,7 @@ mod test {
             annotation!("hardware.board.name", "default-board"),
             annotation!("build.is_debug", "false"),
         ];
-        let annotations = Annotations { annotations: Some(annotation_vec), ..Default::default() };
+        let annotations = Annotations { annotations2: Some(annotation_vec), ..Default::default() };
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
         let output = dump_annotations(data_provider_proxy).await?;
