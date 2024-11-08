@@ -19,11 +19,12 @@
 
     # TODO(169395837): Somehow gRPC symbols cannot be found on Android.
     # Keep using static linking for now.
-    # In windows and mac use static linking.
+    # In windows, mac and iOS use static linking.
     # Use static linking on Chrome OS as a workaround for the symbol lookup
     # error(crbug/1241330) due to a gRPC version mismatch between what Chrome
     # uses and what CrOS provides.
-    grpc_use_static_linking = is_android || is_win || is_chromeos || is_mac
+    grpc_use_static_linking =
+        is_android || is_win || is_chromeos || is_mac || is_ios
   }
 
   if (defined(is_fuchsia_tree) && is_fuchsia_tree) {
@@ -43,7 +44,7 @@
       "./src/core/ext/upb-generated",
       "./src/core/ext/upbdefs-generated",
       "./third_party/cares",
-      "//third_party/cares",
+      "//third_party/cares/include",
       "./third_party/upb",
       "./third_party/xxhash",
       "//third_party/abseil-cpp",
@@ -91,8 +92,10 @@
   }
 
   config("grpc_config_private") {
+    # TODO(b/311287092): Clean up the code and remove this list.
     cflags = [
       "-Wno-c++98-compat-extra-semi",
+      "-Wno-deprecated-copy",
       "-Wno-enum-enum-conversion",
       "-Wno-extra-semi",
       "-Wno-float-conversion",
@@ -100,6 +103,7 @@
       "-Wno-implicit-float-conversion",
       "-Wno-implicit-int-conversion",
       "-Wno-implicit-int-float-conversion",
+      "-Wno-newline-eof",
       "-Wno-shadow",
       "-Wno-shorten-64-to-32",
       "-Wno-sign-compare",
@@ -110,7 +114,16 @@
       "-Wno-unreachable-code-break",
       "-Wno-unreachable-code-return",
       "-Wno-unused-variable",
+
+      # TODO(https://fxbug.dev/42063413): Remove after integrating
+      # https://github.com/grpc/grpc/pull/31306
+      "-Wno-thread-safety-analysis",
     ]
+
+    # TODO(b/260740023): Remove when gRPC has CFI checks enabled.
+    if (is_chromeos) {
+      cflags += [ "-fno-sanitize=cfi-derived-cast,cfi-unrelated-cast" ]
+    }
   }
 
   template("grpc_so") {
@@ -160,9 +173,13 @@
     out_sources = []
     repeated1 = []
     repeated2 = []
+    repeated3 = []
+    repeated4 = []
     out_sources_basenames = set()
     repeated1_basenames = set()
     repeated2_basenames = set()
+    repeated3_basenames = set()
+    repeated4_basenames = set()
     for s in sources:
       basename = os.path.basename(s)
       ext = os.path.splitext(basename)
@@ -170,9 +187,17 @@
         out_sources.append(s)
         continue
       if basename in out_sources_basenames:
-        if basename in repeated1_basenames:
-          # If there is a basename that appears more than 3 times,
+        if basename in repeated3_basenames:
+          # If there is a basename that appears more than 5 times,
           # we need to create more GN targets for it
+          assert(s not in repeated4_basenames)
+          repeated4_basenames.add(basename)
+          repeated4.append(s)
+        elif basename in repeated2_basenames:
+          assert(s not in repeated3_basenames)
+          repeated3_basenames.add(basename)
+          repeated3.append(s)
+        elif basename in repeated1_basenames:
           assert(s not in repeated2_basenames)
           repeated2_basenames.add(basename)
           repeated2.append(s)
@@ -182,7 +207,8 @@
       else:
         out_sources_basenames.add(basename)
         out_sources.append(s)
-    return (gn_sort(out_sources), gn_sort(repeated1), gn_sort(repeated2))
+    return (gn_sort(out_sources), gn_sort(repeated1), gn_sort(repeated2),
+            gn_sort(repeated3), gn_sort(repeated4))
 
   def is_xds_source(s):
     file_names = [
@@ -218,8 +244,6 @@
       if s == './src/core/lib/gpr/wrap_memcpy.cc':
         out_sources.append('# gRPC memcpy wrapping logic isn\'t useful here.')
         out_sources.append('# See https://crbug.com/661171')
-        out_sources.append('# "{}",'.format(s))
-      elif s == './src/core/lib/gprpp/status_helper.cc':
         out_sources.append('# "{}",'.format(s))
       elif s == './src/core/lib/matchers/matchers.cc':
         # matchers are disabled to reduce binary size
@@ -338,13 +362,15 @@
           sources.append(os.path.join(root, f))
     return ["./" + s for s in sources]
 
-  cares_sources = glob.glob('third_party/cares/cares/*.h')+ \
-    glob.glob('third_party/cares/cares/*.c')
-  cares_sources = gn_sort(["//third_party/cares/" + os.path.basename(s) for s in cares_sources])
+  cares_sources = glob.glob('third_party/cares/cares/include/*.h') + \
+    glob.glob('third_party/cares/cares/src/lib/*.c')
+  # cares is only used in chromecast. Use chromium/src/third_party/cares in chromecast
+  cares_sources = gn_sort([s.replace('third_party/cares/cares', '//third_party/cares')
+                           for s in cares_sources])
   cares_sources = [s for s in cares_sources if s not in (
-    '//third_party/cares/ahost.c',
-    '//third_party/cares/adig.c',
-    '//third_party/cares/acountry.c')]
+    '//third_party/cares/cares/src/lib/ahost.c',
+    '//third_party/cares/cares/src/lib/adig.c',
+    '//third_party/cares/cares/src/lib/acountry.c')]
 
   %>\
   <%doc>
@@ -401,18 +427,22 @@
     sources = adjust_srcs(sources)
     sources = [f for f in sources if f not in upb_sources]
     sources = strip_sources(sources)
-    (sources, repeated1, repeated2) = find_repeated(sources)
+    (sources, repeated1, repeated2, repeated3, repeated4) = find_repeated(sources)
     deps = [d for d in deps if d not in (':gpr', ':grpc')]
     cc_lib_name = 'grpc++_cc'
     h_lib_name = 'grpc++_h'
     repeated_lib_name1 = 'grpc++_repeated1'
     repeated_lib_name2 = 'grpc++_repeated2'
+    repeated_lib_name3 = 'grpc++_repeated3'
+    repeated_lib_name4 = 'grpc++_repeated4'
     other_deps = deps[:]
     other_deps.append(":{}".format(h_lib_name))
     deps_so = [
       ':{}'.format(cc_lib_name),
       ':{}'.format(repeated_lib_name1),
       ':{}'.format(repeated_lib_name2),
+      ':{}'.format(repeated_lib_name3),
+      ':{}'.format(repeated_lib_name4),
     ]
     public_deps_so = [
       ':{}'.format(h_lib_name),
@@ -439,6 +469,8 @@
 
   ${cc_library_internal(repeated_lib_name1, '', repeated1, other_deps, extra_stuff, extra_configs)}
   ${cc_library_internal(repeated_lib_name2, '', repeated2, other_deps, extra_stuff, extra_configs)}
+  ${cc_library_internal(repeated_lib_name3, '', repeated3, other_deps, extra_stuff, extra_configs)}
+  ${cc_library_internal(repeated_lib_name4, '', repeated4, other_deps, extra_stuff, extra_configs)}
   </%def>\
   <%def name="cc_library(lib, indent, is_host)">\
   <%
@@ -446,7 +478,9 @@
       sources = strip_sources(sources)
       repeated_lib_name1 = "{}_repeated1".format(lib.name)
       repeated_lib_name2 = "{}_repeated2".format(lib.name)
-      (sources, repeated1, repeated2) = find_repeated(sources)
+      repeated_lib_name3 = "{}_repeated3".format(lib.name)
+      repeated_lib_name4 = "{}_repeated4".format(lib.name)
+      (sources, repeated1, repeated2, repeated3, repeated4) = find_repeated(sources)
       extra_configs = [':grpc_config_private']
       extra_stuff = []
       target_type = 'source_set'
@@ -458,6 +492,10 @@
         deps.append(":{}".format(repeated_lib_name1))
       if repeated2:
         deps.append(":{}".format(repeated_lib_name2))
+      if repeated3:
+        deps.append(":{}".format(repeated_lib_name3))
+      if repeated4:
+        deps.append(":{}".format(repeated_lib_name4))
     %>\
   ${cc_library_internal(lib.name, indent, sources, deps, extra_stuff, extra_configs)}
     % if repeated1:
@@ -472,6 +510,19 @@
   # that. Moving them to another target.
   ${cc_library_internal(repeated_lib_name2, indent, repeated2, repeated_deps, extra_stuff, extra_configs)}
     % endif
+    % if repeated3:
+
+  # There are some .cc files that are in multiple places. GN doesn't like
+  # that. Moving them to another target.
+  ${cc_library_internal(repeated_lib_name3, indent, repeated3, repeated_deps, extra_stuff, extra_configs)}
+    % endif
+    % if repeated4:
+
+  # There are some .cc files that are in multiple places. GN doesn't like
+  # that. Moving them to another target.
+  ${cc_library_internal(repeated_lib_name4, indent, repeated4, repeated_deps, extra_stuff, extra_configs)}
+    % endif
+
   </%def>\
   <%def name="cc_library_internal(name, indent, sources, lib_deps, extra_stuff, extra_configs)">\
   <%
@@ -564,6 +615,7 @@
     ]
 
     if (enable_grpc_ares) {
+      include_dirs = [ "//third_party/cares/include" ]
       sources += [
   % for src in cares_sources:
         "${src}",
