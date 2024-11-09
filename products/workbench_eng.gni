@@ -36,6 +36,9 @@
 use_bazel_images_only = true
 bazel_product_bundle_prefix = "//products/workbench:workbench_eng"
 
+extra_bazel_assembly_targets =
+    [ "//build/bazel/assembly/assembly_outputs:verifications" ]
+
 fxfs_blob = true
 
 # BEGIN: Baseline eng support

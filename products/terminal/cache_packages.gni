@@ -1,0 +1,72 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# A temporary gni file to share the list of terminal cache packages.
+
+terminal_cache_packages = [
+  "//src/ui/bin/terminal",
+  "//src/ui/bin/tiles-session",
+
+  # Used to mock out display hardware in UI integration tests.
+  "//src/graphics/display/testing/fake-coordinator-connector",
+
+  # Add validator package for use in tests.
+  # TODO(https://fxbug.dev/42077782): Remove once we support packages in the
+  # SDK.
+  "//src/diagnostics/validator/inspect:validator",
+
+  # Add test validation packages for use in tests.
+  # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK
+  # and we want to put this in the SDK.
+  "//src/tests/fidl/dynsuite/client_suite/harness",
+  "//src/tests/fidl/dynsuite/server_suite/harness",
+
+  # Fake services needed by Chromium tests until subpackages are supported OOT
+  # and fakes are provided with the SDK. See crbug.com/1326674.
+  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
+  "//src/developer/build_info/testing:fake-build-info",
+
+  # archivist-for-embedding is needed by
+  # WebEngineIntegrationLoggingTest.SetJavaScriptLogLevel_DEBUG.
+  # TODO(crbug.com/1451376): Move it to a peer group as appropriate.
+  "//src/diagnostics/archivist:archivist-for-embedding",
+  "//src/testing/fidl/intl_property_manager",
+
+  # A font provider with built-in font file assets.
+  # TODO(crbug.com/1408597): Once OOT fakes are available, this can be turned
+  # into a hermetic component, or a subpackage.
+  "//src/fonts:fonts_hermetic_for_test",
+
+  # A font provider without built-in font file assets.
+  "//src/fonts:fonts_configurable_for_test",
+
+  # Add Test UI Stack for use in tests.
+  # TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to
+  # subpackages.
+  "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack",
+  "//src/ui/testing/test_ui_stack:test-ui-stack",
+
+  # Add FIDL compatibility test harneses for SDK customers to use until these
+  # are in the SDK for subpackaging
+  #
+  # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK
+  # and we want to put this in the SDK.
+  "//src/tests/fidl/compatibility:fidl-compatibility-array-harness_pkg",
+  "//src/tests/fidl/compatibility:fidl-compatibility-minimal-harness_pkg",
+  "//src/tests/fidl/compatibility:fidl-compatibility-struct-harness_pkg",
+  "//src/tests/fidl/compatibility:fidl-compatibility-table-harness_pkg",
+  "//src/tests/fidl/compatibility:fidl-compatibility-union-harness_pkg",
+  "//src/tests/fidl/compatibility:fidl-compatibility-vector-harness_pkg",
+  "//src/tests/fidl/compatibility/cpp",
+  "//src/tests/fidl/compatibility/hlcpp",
+  "//src/tests/fidl/compatibility/llcpp",
+  "//src/tests/fidl/compatibility/go",
+  "//src/tests/fidl/compatibility/rust",
+]
+
+terminal_cache_package_bazel_inputs = []
+foreach(pkg, terminal_cache_packages) {
+  terminal_cache_package_bazel_inputs +=
+      [ get_label_info(pkg, "label_no_toolchain") + ".bazel_input" ]
+}
