@@ -48,7 +48,6 @@ ffx_tool("ffx_profiler") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
-  sdk_category = "internal"
   data_deps = [ "//tools/symbolizer" ]
 }
 
