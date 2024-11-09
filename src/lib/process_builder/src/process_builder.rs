@@ -996,10 +996,7 @@ mod tests {
 
     fn create_test_util_builder() -> Result<ProcessBuilder, Error> {
         const TEST_UTIL_BIN: &'static str = "/pkg/bin/process_builder_test_util";
-        let file = fdio::open_fd_deprecated(
-            TEST_UTIL_BIN,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
+        let file = fdio::open_fd(TEST_UTIL_BIN, fio::PERM_READABLE | fio::PERM_EXECUTABLE)?;
         let vmo = fdio::get_vmo_exec_from_file(&file)?;
         let job = fuchsia_runtime::job_default();
 
@@ -1648,10 +1645,7 @@ mod tests {
     #[test]
     async fn start_static_pie_binary() -> Result<(), Error> {
         const TEST_BIN: &'static str = "/pkg/bin/static_pie_test_util";
-        let file = fdio::open_fd_deprecated(
-            TEST_BIN,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
+        let file = fdio::open_fd(TEST_BIN, fio::PERM_READABLE | fio::PERM_EXECUTABLE)?;
         let vmo = fdio::get_vmo_exec_from_file(&file)?;
         let job = fuchsia_runtime::job_default();
 
