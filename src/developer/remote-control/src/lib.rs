@@ -154,7 +154,11 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
-                responder.send(zx::MonotonicInstant::get().into_nanos())?;
+                responder.send(zx::MonotonicInstant::get())?;
+                Ok(())
+            }
+            rcs::RemoteControlRequest::GetBootTime { responder } => {
+                responder.send(zx::BootInstant::get())?;
                 Ok(())
             }
             rcs::RemoteControlRequest::_UnknownMethod { ordinal, .. } => {

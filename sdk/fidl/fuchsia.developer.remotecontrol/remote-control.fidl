@@ -70,6 +70,12 @@ open protocol RemoteControl {
 
     // Gets the current monotonic time in nanoseconds.
     strict GetTime() -> (struct {
-        time int64;
+        time zx.InstantMono;
+    });
+
+    // Gets the current boot time in nanoseconds.
+    @available(added=NEXT)
+    strict GetBootTime() -> (struct {
+        time zx.InstantBoot;
     });
 };

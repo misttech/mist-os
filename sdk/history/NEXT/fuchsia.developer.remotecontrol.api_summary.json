@@ -190,6 +190,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControl.GetBootTime",
+        "strictness": "strict",
+        "ordinal": "6156542741721882301",
+        "direction": "two_way",
+        "response": "fuchsia.developer.remotecontrol/RemoteControlGetBootTimeResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.developer.remotecontrol/RemoteControl.GetTime",
         "strictness": "strict",
         "ordinal": "3857600393440097421",
@@ -277,6 +285,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.developer.remotecontrol/RemoteControlEchoStringResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlGetBootTimeResponse.time",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlGetBootTimeResponse"
     },
     {
         "kind": "struct/member",

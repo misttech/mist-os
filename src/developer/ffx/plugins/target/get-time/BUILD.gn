@@ -17,5 +17,8 @@ ffx_plugin("ffx_target_get_time") {
     "//src/developer/ffx/lib/fho:lib",
     "//third_party/rust_crates:async-trait",
   ]
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+  ]
 }
