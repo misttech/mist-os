@@ -161,9 +161,12 @@ zx_status_t LoadElf(const zx::vmar& vmar, const zx::vmo& vmo, uintptr_t& base, u
   LoadInfo load_info;
   elfldltl::RemoteVmarLoader loader{vmar};
   if (auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-          diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>())) {
+          diag, file,
+          elfldltl::ContainerArrayFromFile<
+              elfldltl::StdContainer<std::vector>::Container<elfldltl::Elf<>::Phdr>>(
+              diag, "impossible"))) {
     auto& [ehdr, phdrs_result] = *headers;
-    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result.get();
+    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
     if (elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())) &&
         loader.Load(diag, load_info, vmo.borrow())) {
       ZX_ASSERT(status == ZX_OK);

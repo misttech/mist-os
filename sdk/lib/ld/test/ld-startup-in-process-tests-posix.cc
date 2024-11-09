@@ -170,7 +170,7 @@ void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
   ASSERT_NO_FATAL_FAILURE(Load(std::exchange(executable_fd, {}), result));
 
   // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
-  cpp20::span phdrs = result->phdrs.get();
+  cpp20::span phdrs = result->phdrs;
 
   // This non-template lambda gets called with the vaddr, offset, and filesz of
   // each segment.  It's called by the generic lambda passed to VisitSegments.

@@ -70,7 +70,7 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
               result->info.vaddr_start() + result->loader.load_bias());
 
     auto diag = elfldltl::testing::ExpectOkDiagnostics();
-    std::span<const Phdr> phdrs = result->phdrs.get();
+    std::span<const Phdr> phdrs = result->phdrs;
     std::optional<Phdr> ph;
     std::optional<Phdr> relro_phdr;
     elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph),

@@ -14,8 +14,6 @@
 #include <span>
 #include <tuple>
 
-#include <fbl/alloc_checker.h>
-
 namespace elfldltl {
 
 // Various interfaces require a File or Memory type to access data structures.
@@ -94,76 +92,37 @@ namespace elfldltl {
 // but other implementations need one.  A few common convenience Allocator
 // implementations are provided here.
 
-// This is an implementation of the Allocator API for File::ReadArrayFromFile
-// that uses plain `new (alloc_checker) T[count]`.  Its return value object
-// owns the data via `std::unique_ptr<T[]>` or equivalent type given as the
-// optional second template parameter.  The optional third and later template
-// arguments can be used to work with a custom `operator new[]` that takes
-// additional arguments of those types; those arguments must be passed to the
-// constructor and will be passed by reference before the implicit
-// fbl::AllocChecker argument in `new (args..., alloc_checker) T[count]`.
-template <typename T, typename Ptr = std::unique_ptr<T[]>, typename... Args>
-class NewArrayFromFile {
- public:
-  class Result {
-   public:
-    constexpr Result() = default;
-    Result(const Result&) = delete;
-    constexpr Result(Result&&) noexcept = default;
-
-    constexpr explicit Result(Ptr ptr, size_t size) : ptr_(std::move(ptr)), size_(size) {}
-
-    Result& operator=(const Result&) noexcept = delete;
-    constexpr Result& operator=(Result&&) noexcept = default;
-
-    constexpr std::span<T> get() const { return {ptr_.get(), size_}; }
-
-    constexpr std::span<T> release() { return {ptr_.release(), size_}; }
-
-    constexpr explicit operator bool() const { return ptr_ != nullptr; }
-
-    constexpr operator std::span<T>() const { return get(); }
-
-    constexpr operator std::span<const T>() const { return get(); }
-
-   private:
-    Ptr ptr_;
-    size_t size_ = 0;
-  };
-
-  constexpr explicit NewArrayFromFile(Args... args) : args_{std::forward<Args>(args)...} {}
-
-  constexpr NewArrayFromFile(NewArrayFromFile&&) = default;
-
-  constexpr NewArrayFromFile& operator=(NewArrayFromFile&&) = default;
-
-  std::optional<Result> operator()(size_t size) const {
-    return std::apply(std::bind_front(New, size), args_);
-  }
-
- private:
-  static std::optional<Result> New(size_t size, Args&... args) {
-    // Uninitialized a la C++20 std::make_unique_for_overwrite.
-    fbl::AllocChecker ac;
-    T* ptr = new (args..., ac) T[size];
-    if (!ac.check()) [[unlikely]] {
-      return std::nullopt;
-    }
-    return Result{Ptr(ptr), size};
-  }
-
-  std::tuple<Args...> args_;
-};
-
 // This is the stub implementation of the Allocator API that can be used with
 // DirectMemory or other implementations that never call it.
 template <typename T>
 struct NoArrayFromFile {
-  // Reuse the Result type that has the right API.  It will never be returned.
-  using Result = typename NewArrayFromFile<T>::Result;
+  // Define a Result type that has the right API.  It will never be returned.
+  struct Result {
+    constexpr explicit(false) operator std::span<const T>() const { return {}; }
+    constexpr explicit(false) operator std::span<T>() { return {}; }
+  };
 
   constexpr std::optional<Result> operator()(size_t size) const { return std::nullopt; }
 };
+
+// This returns an Allocator API object File::ReadArrayFromFile that uses a
+// Container API instantiation (see <lib/elfldltl/container.h>).  The explicit
+// template parameter should be a specific ...::Container<T> instantiation to
+// be used with ReadArrayFromFile<T> (which should already meet the Allocator
+// API's return value requirement of being coercible to std::span<T> as
+// contiguous containers do).  Note that this uses Container::resize and then
+// overwrites the default-constructed contents, so it's not best suited for
+// optimized use cases that should avoid the redundant default construction.
+template <class Container, class Diagnostics>
+constexpr auto ContainerArrayFromFile(Diagnostics& diag, std::string_view error) {
+  return [&diag, error](size_t size) -> std::optional<Container> {
+    std::optional<Container> result{std::in_place};
+    if (!result->resize(diag, error, size)) [[unlikely]] {
+      return std::nullopt;
+    }
+    return result;
+  };
+}
 
 // This is an implementation of the Allocator API for File::ReadArrayFromFile
 // that uses a fixed buffer inside the object (i.e. on the stack).  It simply

@@ -152,7 +152,7 @@ class LoadTests : public ::testing::Test {
 
   struct LoadResult {
     Loader loader;
-    typename elfldltl::NewArrayFromFile<Phdr>::Result phdrs;
+    std::vector<Phdr> phdrs;
     Addr phoff;
     Addr entry;
     LoadInfo info;
@@ -172,12 +172,14 @@ class LoadTests : public ::testing::Test {
     auto diag = ExpectOkDiagnostics();
     auto file = Traits::MakeFile(Traits::LoadFileArgument(test_lib), diag);
 
-    auto headers =
-        elfldltl::LoadHeadersFromFile<Elf>(diag, file, elfldltl::NewArrayFromFile<Phdr>());
+    auto headers = elfldltl::LoadHeadersFromFile<Elf>(
+        diag, file,
+        elfldltl::ContainerArrayFromFile<elfldltl::StdContainer<std::vector>::Container<Phdr>>(
+            diag, "impossible"));
     ASSERT_TRUE(headers);
     auto& [ehdr, phdrs_result] = *headers;
 
-    ASSERT_TRUE(phdrs_result);
+    ASSERT_FALSE(phdrs_result.empty());
     result = LoadResult{
         .loader = Traits::MakeLoader(std::forward<LoaderArgs>(loader_args)...),
         .phdrs = std::move(phdrs_result),
@@ -185,7 +187,7 @@ class LoadTests : public ::testing::Test {
         .entry = ehdr.entry,
     };
 
-    std::span<const Phdr> phdrs = result->phdrs.get();
+    std::span<const Phdr> phdrs = result->phdrs;
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs,
                                       result->info.GetPhdrObserver(result->loader.page_size()),
                                       PhdrStackObserver<Elf>{result->stack_size}));
