@@ -130,6 +130,9 @@ config("compiler") {
         # x18 is reserved in the Fuchsia ABI so it can be used
         # for things like -fsanitize=shadow-call-stack.
         cflags += [ "-ffixed-x18" ]
+      } else if (current_cpu == "x64") {
+        # GCC will overalign data by default, but there's no need for that.
+        cflags += [ "-malign-data=abi" ]
       }
     } else {
       # gcc defaults to enabling sized deallocation >= c++14; clang does not.
