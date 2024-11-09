@@ -117,6 +117,11 @@ config("compiler") {
         ldflags += [ "-Wl,-z,separate-code" ]
       }
 
+      # This is the default in LLD, available in BFD, but not in Gold.
+      if (linker == "bfd") {
+        ldflags += [ "-Wl,-z,pack-relative-relocs" ]
+      }
+
       # In the Clang toolchain assembly files with no explicit marker don't
       # cause the presumption of executable stack as they do in GCC.
       ldflags += [ "-Wl,-z,noexecstack" ]
