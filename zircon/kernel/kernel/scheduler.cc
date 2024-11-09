@@ -1057,7 +1057,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
     } else {
       const SchedUtilization utilization = ep.deadline.utilization;
       const SchedUtilization scaled_utilization_a = utilization * a.scale_up_factor;
-      const SchedUtilization scaled_utilization_b = utilization * a.scale_up_factor;
+      const SchedUtilization scaled_utilization_b = utilization * b.scale_up_factor;
 
       ktl::pair a_pair{scaled_utilization_a, a_predicted_queue_time_ns};
       ktl::pair b_pair{scaled_utilization_b, b_predicted_queue_time_ns};
