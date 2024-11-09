@@ -37,6 +37,13 @@ struct MsdConnection* msd_device_create_connection(struct MsdDevice* device, uin
 
 void msd_connection_release(struct MsdConnection* connection);
 
+magma_status_t msd_connection_map_buffer(struct MsdConnection* msd_connection,
+                                         struct MsdBuffer* msd_buffer, uint64_t gpu_va,
+                                         uint64_t offset, uint64_t length, uint64_t flags);
+
+void msd_connection_release_buffer(struct MsdConnection* msd_connection,
+                                   struct MsdBuffer* msd_buffer);
+
 struct MsdBuffer* msd_driver_import_buffer(magma_handle_t buffer_handle, uint64_t client_id);
 
 void msd_buffer_release(struct MsdBuffer* msd_buffer);
