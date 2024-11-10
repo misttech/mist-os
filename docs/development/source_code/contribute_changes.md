@@ -69,14 +69,12 @@ To create a change in Gerrit, do the following:
    ```posix-terminal
    fx format-code
    ```
-*** note
-**Warning:**
-If you encounter error messages similar to the following when executing `fx format-code`.
 
-`initCloneNs():382 mount('/', '/', NULL, MS_REC|MS_PRIVATE, NULL): Permission denied`
-
-These errors are caused by the system's AppArmor configuration, please see [permission errors on Ubuntu 24.x systems][permission-errors-on-Ubuntu-24.x-systems]{:.external} for a workaround.
-***
+   Note: On some Ubuntu 24.x systems, you may see an error like
+   `initCloneNs():382 mount('/', '/', NULL, MS_REC|MS_PRIVATE, NULL): Permission denied`
+   when executing `fx format-code`. These errors are caused by the system's
+   AppArmor configuration. For a workaround, see
+   [permission errors on Ubuntu 24.x systems][permission-errors-on-Ubuntu-24.x-systems]{:.external}.
 
 1. Add the updated files:
 
@@ -163,7 +161,7 @@ After creating a change, to upload a patch to your change, do the following:
 
 1. Create or edit files in the same branch.
 
-1. Format modified or newly added code.
+1. Format the files that you have updated:
 
    ```posix-terminal
    fx format-code
@@ -204,7 +202,7 @@ When Gerrit warns you of merge conflicts in your change, do the following:
    git add <files_with_resolved_conflicts>
    ```
 
-1. Format code.
+1. Format the files:
 
    ```posix-terminal
    fx format-code
