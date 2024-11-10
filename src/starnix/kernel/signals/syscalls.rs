@@ -206,7 +206,7 @@ pub fn sys_rt_sigsuspend(
         .wait_with_temporary_mask(locked, mask, |locked, current_task| {
             waiter.wait(locked, current_task)
         })
-        .map_eintr(errno!(ERESTARTNOHAND))
+        .map_eintr(|| errno!(ERESTARTNOHAND))
 }
 
 pub fn sys_rt_sigtimedwait(
@@ -738,7 +738,7 @@ fn wait_on_pid(
         if !options.block {
             return Ok(None);
         }
-        waiter.wait(locked, current_task).map_eintr(errno!(ERESTARTSYS))?;
+        waiter.wait(locked, current_task).map_eintr(|| errno!(ERESTARTSYS))?;
     }
 }
 

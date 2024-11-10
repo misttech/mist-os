@@ -180,12 +180,12 @@ pub const ERESTART_RESTARTBLOCK: ErrnoCode = ErrnoCode(516);
 /// An extension trait for `Result<T, Errno>`.
 pub trait ErrnoResultExt<T> {
     /// Maps `Err(EINTR)` to the specified errno.
-    fn map_eintr(self, errno: Errno) -> Result<T, Errno>;
+    fn map_eintr(self, make_errno: impl Fn() -> Errno) -> Result<T, Errno>;
 }
 
 impl<T> ErrnoResultExt<T> for Result<T, Errno> {
-    fn map_eintr(self, errno: Errno) -> Result<T, Errno> {
-        self.map_err(|err| if err == EINTR { errno } else { err })
+    fn map_eintr(self, make_errno: impl Fn() -> Errno) -> Result<T, Errno> {
+        self.map_err(|err| if err == EINTR { make_errno() } else { err })
     }
 }
 
