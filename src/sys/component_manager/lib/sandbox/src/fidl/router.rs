@@ -5,7 +5,6 @@
 use crate::fidl::RemotableCapability;
 use crate::{Capability, CapabilityBound, Dict, DirEntry, Request, Router, RouterResponse};
 use fidl::AsHandleRef;
-use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo};
@@ -89,24 +88,23 @@ pub fn dict_routers_to_dir_entry(scope: &ExecutionScope, dict: &Dict) -> Dict {
                 Capability::Dictionary(dict_routers_to_dir_entry(scope, &dict))
             }
             Capability::ConnectorRouter(router) => Capability::DirEntry(DirEntry::new(
-                router.into_directory_entry(fio::DirentType::Service, scope.clone(), |_| None),
+                router.into_directory_entry(fio::DirentType::Service, scope.clone()),
             )),
             Capability::DictionaryRouter(router) => {
                 Capability::DirEntry(DirEntry::new(router.into_directory_entry(
                     // TODO: Should we convert the DirEntry to a Directory here?
                     fio::DirentType::Service,
                     scope.clone(),
-                    |_| None,
                 )))
             }
             Capability::DirEntryRouter(router) => {
                 Capability::DirEntry(DirEntry::new(router.into_directory_entry(
-                    // TODO: This assumes the DirEntry type is Service. Unfortunately, with the
-                    // current API there is no good way to get the DirEntry type in advance.
-                    // This problem should go away once we revamp or remove DirEntry.
+                    // TODO(https://fxbug.dev/340891837): This assumes the DirEntry type is
+                    // Service. Unfortunately, with the current API there is no good way to get the
+                    // DirEntry type in advance. This problem should go away once we revamp or
+                    // remove DirEntry.
                     fio::DirentType::Service,
                     scope.clone(),
-                    |_| None,
                 )))
             }
             other => other,
@@ -120,26 +118,20 @@ impl<T: CapabilityBound + Clone> Router<T>
 where
     Capability: From<T>,
 {
-    pub fn into_directory_entry<F>(
+    pub fn into_directory_entry(
         self,
         entry_type: fio::DirentType,
         scope: ExecutionScope,
-        errors_fn: F,
-    ) -> Arc<dyn DirectoryEntry>
-    where
-        for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
-    {
-        struct RouterEntry<T: CapabilityBound, F: 'static + Send + Sync> {
+    ) -> Arc<dyn DirectoryEntry> {
+        struct RouterEntry<T: CapabilityBound> {
             router: Router<T>,
             entry_type: fio::DirentType,
             scope: ExecutionScope,
-            errors_fn: F,
         }
 
-        impl<T: CapabilityBound + Clone, F: 'static + Send + Sync> DirectoryEntry for RouterEntry<T, F>
+        impl<T: CapabilityBound + Clone> DirectoryEntry for RouterEntry<T>
         where
             Capability: From<T>,
-            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             fn open_entry(
                 self: Arc<Self>,
@@ -151,16 +143,15 @@ where
             }
         }
 
-        impl<T: CapabilityBound, F: 'static + Send + Sync> GetEntryInfo for RouterEntry<T, F> {
+        impl<T: CapabilityBound> GetEntryInfo for RouterEntry<T> {
             fn entry_info(&self) -> EntryInfo {
                 EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
             }
         }
 
-        impl<T: CapabilityBound + Clone, F: 'static + Send + Sync> DirectoryEntryAsync for RouterEntry<T, F>
+        impl<T: CapabilityBound + Clone> DirectoryEntryAsync for RouterEntry<T>
         where
             Capability: From<T>,
-            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             async fn open_entry_async(
                 self: Arc<Self>,
@@ -194,20 +185,17 @@ where
                             }
                             cap => cap,
                         };
-                        match capability.try_into_directory_entry() {
+                        match capability.try_into_directory_entry(self.scope.clone()) {
                             Ok(open) => return open.open_entry(open_request),
                             Err(_) => RouterError::NotSupported,
                         }
                     }
                     Err(error) => error, // Routing failed (e.g. broken route).
                 };
-                if let Some(fut) = (self.errors_fn)(&error) {
-                    fut.await;
-                }
                 Err(error.as_zx_status())
             }
         }
 
-        Arc::new(RouterEntry { router: self.clone(), entry_type, scope, errors_fn })
+        Arc::new(RouterEntry { router: self.clone(), entry_type, scope })
     }
 }

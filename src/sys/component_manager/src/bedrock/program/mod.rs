@@ -13,7 +13,6 @@ use futures::channel::oneshot;
 use futures::future::{BoxFuture, Either};
 use futures::FutureExt;
 use serve_processargs::NamespaceBuilder;
-use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
@@ -34,10 +33,6 @@ pub struct Program {
     /// runner must either serve the server endpoint, or drop it to avoid
     /// blocking any consumers indefinitely.
     runtime_dir: fio::DirectoryProxy,
-
-    /// The scope in which the namespace is run. component_manager will use this to
-    /// gracefully shutdown the namespace when the component is stopped.
-    namespace_scope: ExecutionScope,
 }
 
 /// Everything about a stopped execution.
@@ -105,7 +100,6 @@ impl Program {
         start_info: StartInfo,
         escrowed_state: EscrowedState,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
-        namespace_scope: ExecutionScope,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
@@ -116,7 +110,7 @@ impl Program {
 
         runner.start(start_info, server_end);
         let controller = ComponentController::new(controller, Some(diagnostics_sender));
-        Ok(Program { controller, runtime_dir, namespace_scope })
+        Ok(Program { controller, runtime_dir })
     }
 
     /// Gets the runtime directory of the program.
@@ -163,8 +157,6 @@ impl Program {
                 self.kill_with_timeout(kill_timer).await
             }
         }?;
-        self.namespace_scope.shutdown();
-        self.namespace_scope.wait().await;
         let FinalizedProgram { escrow_request } = self.finalize();
         Ok(StopConclusion { disposition, escrow_request })
     }
@@ -237,7 +229,7 @@ impl Program {
         let controller = ComponentController::new(controller.into_proxy().unwrap(), None);
         let (runtime_dir, _runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        Program { controller, runtime_dir, namespace_scope: ExecutionScope::new() }
+        Program { controller, runtime_dir }
     }
 }
 
@@ -318,7 +310,7 @@ pub struct StartInfo {
 }
 
 impl StartInfo {
-    pub fn into_fidl(
+    fn into_fidl(
         self,
         escrowed_state: EscrowedState,
         runtime_server_end: ServerEnd<fio::DirectoryMarker>,

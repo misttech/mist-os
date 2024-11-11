@@ -8,6 +8,7 @@ use fidl::endpoints::ClientEnd;
 use futures::channel::mpsc;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 impl DirConnector {
@@ -23,7 +24,10 @@ impl DirConnector {
 }
 
 impl crate::RemotableCapability for DirConnector {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        _scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Err(ConversionError::NotSupported)
     }
 }

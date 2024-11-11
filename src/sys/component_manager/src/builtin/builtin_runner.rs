@@ -552,7 +552,8 @@ impl ElfRunnerProgram {
     /// Serves requests coming from `outgoing_dir` using `self.output`.
     fn serve_outgoing(&self, outgoing_dir: ServerEnd<fio::DirectoryMarker>) {
         let output = self.output.clone();
-        let dir_entry = DirEntry::new(output.try_into_directory_entry().unwrap());
+        let dir_entry =
+            DirEntry::new(output.try_into_directory_entry(self.execution_scope.clone()).unwrap());
         dir_entry.open(
             self.execution_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
@@ -1058,7 +1059,7 @@ mod tests {
         // This way we can monitor when that program is running.
         let (ch1, ch2) = zx::Channel::create();
         let (not_found, _) = channel::mpsc::unbounded();
-        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found);
+        let mut namespace = NamespaceBuilder::new(scope, not_found);
         namespace
             .add_entry(
                 Capability::Directory(Directory::new(pkg)),
@@ -1102,7 +1103,6 @@ mod tests {
             start_info,
             EscrowedState::outgoing_dir_closed(),
             diagnostics_sender,
-            ExecutionScope::new(),
         )
         .unwrap();
 

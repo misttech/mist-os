@@ -28,7 +28,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
 
-pub use bedrock::{RouteRequest as BedrockRouteRequest, UseRouteRequest as BedrockUseRouteRequest};
+pub use bedrock::RouteRequest as BedrockRouteRequest;
 
 #[async_trait]
 pub trait Route {

@@ -594,7 +594,7 @@ pub mod tests {
         assert_eq!(route_counter.count(), 0);
 
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
-        conn.try_into_directory_entry()
+        conn.try_into_directory_entry(scope.clone())
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),
@@ -644,7 +644,7 @@ pub mod tests {
         };
 
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
-        conn.try_into_directory_entry()
+        conn.try_into_directory_entry(scope.clone())
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),

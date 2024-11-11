@@ -40,6 +40,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::TempDir;
 use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use {
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
@@ -81,6 +82,7 @@ pub struct RoutingTestBuilder {
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
     child_policy: ChildPolicyAllowlists,
     configs: Vec<(String, ConfigValuesData)>,
+    scope_factory: Option<Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>>,
 }
 
 impl RoutingTestBuilder {
@@ -101,6 +103,7 @@ impl RoutingTestBuilder {
             debug_capability_policy: HashMap::new(),
             child_policy: ChildPolicyAllowlists::default(),
             configs: Vec::new(),
+            scope_factory: None,
         }
     }
 
@@ -165,6 +168,16 @@ impl RoutingTestBuilder {
         recv: oneshot::Receiver<()>,
     ) -> Self {
         self.blockers.push((name, (send, recv)));
+        self
+    }
+
+    /// Set a custom execution scope on components. This is useful for tests that wish
+    /// to directly control the execution of scoped tasks.
+    pub fn set_scope_factory(
+        mut self,
+        f: impl Fn() -> ExecutionScope + Send + Sync + 'static,
+    ) -> Self {
+        self.scope_factory = Some(Box::new(f));
         self
     }
 
@@ -312,6 +325,9 @@ impl RoutingTest {
         }
         for (name, runner) in builder.builtin_runners.clone() {
             env_builder = env_builder.add_runner(name, runner);
+        }
+        if let Some(f) = builder.scope_factory {
+            env_builder = env_builder.set_scope_factory(f);
         }
         let builtin_environment =
             env_builder.build().await.expect("builtin environment setup failed");

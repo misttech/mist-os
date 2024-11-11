@@ -345,6 +345,10 @@ impl NamespacePath {
         Self(RelativePath::dot())
     }
 
+    pub fn is_root(&self) -> bool {
+        self.0.is_dot()
+    }
+
     /// Splits the path according to `"/"`.
     pub fn split(&self) -> Vec<Name> {
         self.0.split()
@@ -376,6 +380,10 @@ impl NamespacePath {
     /// The last path segment, or None.
     pub fn basename(&self) -> Option<&Name> {
         self.0.basename()
+    }
+
+    pub fn pop_front(&mut self) -> Option<Name> {
+        self.0.pop_front()
     }
 }
 
@@ -528,6 +536,10 @@ impl Path {
 
     pub fn extend(&mut self, other: RelativePath) {
         self.0.extend(other);
+    }
+
+    pub fn push(&mut self, other: Name) {
+        self.0.push(other);
     }
 }
 
@@ -690,6 +702,14 @@ impl RelativePath {
 
     pub fn push(&mut self, segment: Name) {
         self.segments.push(segment);
+    }
+
+    pub fn pop_front(&mut self) -> Option<Name> {
+        if self.segments.is_empty() {
+            None
+        } else {
+            Some(self.segments.remove(0))
+        }
     }
 }
 

@@ -9,6 +9,7 @@ use fidl::handle::Channel;
 use futures::channel::mpsc;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 impl Connector {
@@ -28,7 +29,10 @@ impl Connector {
 }
 
 impl crate::RemotableCapability for Connector {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        _scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {
             let _ = self.send_channel(server_end.into_zx_channel().into());
         }))

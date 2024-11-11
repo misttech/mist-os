@@ -3,12 +3,28 @@
 // found in the LICENSE file.
 
 use crate::fidl::router;
-use crate::{DirEntry, Router, RouterResponse};
+use crate::{ConversionError, DirEntry, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
-use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
-impl crate::RemotableCapability for Router<DirEntry> {}
+impl crate::RemotableCapability for Router<DirEntry> {
+    fn try_into_directory_entry(
+        self,
+        scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Ok(self.into_directory_entry(
+            // TODO(https://fxbug.dev/340891837): This assumes the DirEntry type is Service.
+            // Unfortunately, with the current API there is no good way to get the DirEntry type in
+            // advance. This problem should go away once we revamp or remove DirEntry.
+            fio::DirentType::Service,
+            scope,
+        ))
+    }
+}
 
 impl From<Router<DirEntry>> for fsandbox::Capability {
     fn from(router: Router<DirEntry>) -> Self {

@@ -14,6 +14,7 @@ use futures::lock::Mutex;
 use moniker::Moniker;
 use std::collections::HashMap;
 use std::sync::Arc;
+use vfs::execution_scope::ExecutionScope;
 
 /// The ModelContext provides the API boundary between the Model and Realms. It
 /// defines what parts of the Model or authoritative state about the tree we
@@ -26,6 +27,7 @@ pub struct ModelContext {
     framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
     instance_registry: Arc<InstanceRegistry>,
     config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
+    pub scope_factory: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
 }
 
 impl ModelContext {
@@ -33,7 +35,12 @@ impl ModelContext {
     pub fn new(
         runtime_config: Arc<RuntimeConfig>,
         instance_registry: Arc<InstanceRegistry>,
+        #[cfg(test)] scope_factory: Option<Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>>,
     ) -> Result<Self, ModelError> {
+        #[cfg(not(test))]
+        let scope_factory = Box::new(|| ExecutionScope::new());
+        #[cfg(test)]
+        let scope_factory = scope_factory.unwrap_or_else(|| Box::new(|| ExecutionScope::new()));
         Ok(Self {
             component_id_index: match &runtime_config.component_id_index_path {
                 Some(path) => component_id_index::Index::from_fidl_file(&path)?,
@@ -45,6 +52,7 @@ impl ModelContext {
             framework_capabilities: Mutex::new(None),
             instance_registry,
             config_developer_overrides: Mutex::new(HashMap::new()),
+            scope_factory,
         })
     }
 
@@ -52,7 +60,7 @@ impl ModelContext {
     pub fn new_for_test() -> Self {
         let runtime_config = Arc::new(RuntimeConfig::default());
         let instance_registry = InstanceRegistry::new();
-        Self::new(runtime_config, instance_registry).unwrap()
+        Self::new(runtime_config, instance_registry, None).unwrap()
     }
 
     /// Returns the runtime policy checker for the model.

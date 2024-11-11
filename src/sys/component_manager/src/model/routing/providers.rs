@@ -110,7 +110,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             }
         };
         let entry = capability
-            .try_into_directory_entry()
+            .try_into_directory_entry(source.execution_scope.clone())
             .map_err(OpenError::DoesNotSupportOpen)
             .map_err(RouterError::from)?;
         entry.open_entry(open_request).map_err(|err| CapabilityProviderError::VfsOpenError(err))

@@ -59,9 +59,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_connector_into_open() {
         let (receiver, sender) = Connector::new();
-        let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
+        let dir_entry = DirEntry::new(sender.try_into_directory_entry(scope.clone()).unwrap());
+        let (client_end, server_end) = Channel::create();
         dir_entry.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
@@ -75,9 +75,9 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let (receiver, sender) = Connector::new();
-        let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
+        let dir_entry = DirEntry::new(sender.try_into_directory_entry(scope.clone()).unwrap());
+        let (client_end, server_end) = Channel::create();
         dir_entry.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());
@@ -100,9 +100,9 @@ mod tests {
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
-        let dir_entry = DirEntry::new(dict.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
+        let dir_entry = DirEntry::new(dict.try_into_directory_entry(scope.clone()).unwrap());
+        let (client_end, server_end) = Channel::create();
         dir_entry.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
         let msg = receiver.receive().await.unwrap();
@@ -121,9 +121,9 @@ mod tests {
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
-        let dir_entry = DirEntry::new(dict.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
+        let dir_entry = DirEntry::new(dict.try_into_directory_entry(scope.clone()).unwrap());
+        let (client_end, server_end) = Channel::create();
         dir_entry.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());

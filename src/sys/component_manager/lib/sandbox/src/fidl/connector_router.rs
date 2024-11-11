@@ -3,12 +3,22 @@
 // found in the LICENSE file.
 
 use crate::fidl::router;
-use crate::{Connector, Router, RouterResponse};
+use crate::{Connector, ConversionError, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
-use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
-impl crate::RemotableCapability for Router<Connector> {}
+impl crate::RemotableCapability for Router<Connector> {
+    fn try_into_directory_entry(
+        self,
+        scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Ok(self.into_directory_entry(fio::DirentType::Service, scope))
+    }
+}
 
 impl From<Router<Connector>> for fsandbox::Capability {
     fn from(router: Router<Connector>) -> Self {

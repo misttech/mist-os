@@ -9,21 +9,24 @@ use ::routing::capability_source::ComponentCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::rights::Rights;
 use ::routing::RouteRequest;
+use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDecl, UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl,
 };
+use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use router_error::Explain;
-use sandbox::{Capability, DirEntry, Directory};
+use sandbox::{Capability, DirConnectable, DirConnector, DirEntry};
 use std::sync::Arc;
 use tracing::*;
 use vfs::directory::entry::{
-    serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
 
 pub trait RouteRequestExt {
-    fn into_capability(self, target: &Arc<ComponentInstance>) -> Capability;
+    fn into_capability(self, target: &Arc<ComponentInstance>) -> Option<Capability>;
 }
 
 enum UseDirectoryOrStorage {
@@ -41,8 +44,8 @@ impl From<UseDirectoryOrStorage> for RouteRequest {
 }
 
 impl RouteRequestExt for RouteRequest {
-    fn into_capability(self, target: &Arc<ComponentInstance>) -> Capability {
-        match self {
+    fn into_capability(self, target: &Arc<ComponentInstance>) -> Option<Capability> {
+        let cap = match self {
             Self::UseService(decl) => use_service(decl, target),
             Self::UseDirectory(decl) => {
                 use_directory_or_storage(UseDirectoryOrStorage::Directory(decl), target)
@@ -68,10 +71,9 @@ impl RouteRequestExt for RouteRequest {
                 let cap = ComponentCapability::Expose(ExposeDecl::Directory(e.clone()));
                 expose_any(self, target, cap.type_name())
             }
-            _ => {
-                panic!("Capability conversion is not supported for {:?}", self);
-            }
-        }
+            _ => return None,
+        };
+        Some(cap)
     }
 }
 
@@ -168,6 +170,7 @@ fn use_directory_or_storage(
     // devfs attempts to open the directory as a service, which is not what is desired here.
     let flags = flags | fio::OpenFlags::DIRECTORY;
 
+    #[derive(Debug)]
     struct RouteDirectory {
         target: WeakComponentInstance,
         request: RouteRequest,
@@ -218,18 +221,44 @@ fn use_directory_or_storage(
         }
     }
 
-    // Serve this directory on the component's execution scope rather than the namespace execution
-    // scope so that requests don't block block namespace teardown, but they will block component
-    // destruction.
-    Directory::new(
-        serve_directory(
-            Arc::new(RouteDirectory { request: request.into(), target: target.as_weak() }),
-            &target.execution_scope.clone(),
-            flags,
-        )
-        .unwrap(),
-    )
-    .into()
+    #[derive(Debug)]
+    struct DirectorySender {
+        dir_entry: Arc<RouteDirectory>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+    }
+
+    #[async_trait]
+    impl DirConnectable for DirectorySender {
+        fn send(&self, server: ServerEnd<fio::DirectoryMarker>) -> Result<(), ()> {
+            // Serve this directory on the component's execution scope rather than the namespace
+            // execution scope so that requests don't block namespace teardown, but they will block
+            // component destruction.
+            let flags = self.flags;
+            flags
+                .to_object_request(server)
+                .handle(|object_request| {
+                    Ok(self.dir_entry.clone().open_entry(OpenRequest::new(
+                        self.scope.clone(),
+                        flags,
+                        vfs::path::Path::dot(),
+                        object_request,
+                    )))
+                })
+                .unwrap()
+                .map_err(|_| ())?;
+            Ok(())
+        }
+    }
+
+    // This needs to be a DirConnector, and not Directory, because Directory does not implement Clone
+    // correctly.
+    //
+    // Specifically, if a Directory is cloned and the Directory contained a channel, the clone
+    // will not carry over the epitaph.
+    let scope = target.execution_scope.clone();
+    let dir_entry = Arc::new(RouteDirectory { request: request.into(), target: target.as_weak() });
+    DirConnector::new_sendable(DirectorySender { dir_entry, scope, flags }).into()
 }
 
 fn use_event_stream(decl: UseEventStreamDecl, target: &Arc<ComponentInstance>) -> Capability {
