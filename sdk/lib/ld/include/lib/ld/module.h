@@ -8,12 +8,12 @@
 #include <lib/elfldltl/init-fini.h>
 #include <lib/elfldltl/link-map-list.h>
 #include <lib/elfldltl/symbol.h>
-#include <lib/stdcompat/span.h>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
+#include <span>
 #include <type_traits>
 
 #include "abi.h"

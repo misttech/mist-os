@@ -5,12 +5,12 @@
 #ifndef LIB_LD_REMOTE_DYNAMIC_LINKER_H_
 #define LIB_LD_REMOTE_DYNAMIC_LINKER_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/vmar.h>
 
 #include <algorithm>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <type_traits>
 
 #include "abi.h"

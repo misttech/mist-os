@@ -7,11 +7,11 @@
 
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/ld/log-zircon.h>
-#include <lib/stdcompat/functional.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
+#include <functional>
 #include <string_view>
 
 #include "startup-load.h"

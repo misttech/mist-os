@@ -53,8 +53,8 @@ TEST(LdTests, AbiTypes) {
   EXPECT_THAT(storage, testing::Each(testing::Eq(std::byte(0))));
 }
 
-constexpr Module MakeModule(uint32_t modid, const char* name, cpp20::span<const std::byte> build_id,
-                            Abi::Addr load_addr, cpp20::span<const Abi::Phdr> phdrs,
+constexpr Module MakeModule(uint32_t modid, const char* name, std::span<const std::byte> build_id,
+                            Abi::Addr load_addr, std::span<const Abi::Phdr> phdrs,
                             bool symbols_visible, const Module* next, const Module* prev) {
   Module result;
   result.symbolizer_modid = modid;

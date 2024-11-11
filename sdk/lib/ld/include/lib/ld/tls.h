@@ -5,8 +5,7 @@
 #ifndef LIB_LD_TLS_H_
 #define LIB_LD_TLS_H_
 
-#include <lib/stdcompat/bit.h>
-
+#include <bit>
 #include <cstddef>
 
 #include "abi.h"
@@ -132,15 +131,15 @@ constexpr ptrdiff_t TlsInitialExecOffset(const typename abi::Abi<Elf, AbiTraits>
                                          typename Elf::size_type modid) {
   // The offset is stored as unsigned, but is actually signed.
   const size_t offset = abi.static_tls_offsets[modid - 1];
-  return cpp20::bit_cast<ptrdiff_t>(offset);
+  return std::bit_cast<ptrdiff_t>(offset);
 }
 
 // Populate a static TLS segment for the given module in one thread.  The size
 // of the segment must match .tls_size().
 template <class Module>
-constexpr void TlsModuleInit(const Module& module, cpp20::span<std::byte> segment,
+constexpr void TlsModuleInit(const Module& module, std::span<std::byte> segment,
                              bool known_zero = false) {
-  cpp20::span<const std::byte> initial_data = module.tls_initial_data;
+  std::span<const std::byte> initial_data = module.tls_initial_data;
   if (!initial_data.empty()) {
     memcpy(segment.data(), initial_data.data(), initial_data.size());
   }
@@ -156,14 +155,14 @@ constexpr void TlsModuleInit(const Module& module, cpp20::span<std::byte> segmen
 // (which may be at the end of the span for x86 negative TLS offsets).
 template <class Elf, class AbiTraits>
 inline void TlsInitialExecDataInit(const typename abi::Abi<Elf, AbiTraits>& abi,
-                                   cpp20::span<std::byte> block, ptrdiff_t tp_offset,
+                                   std::span<std::byte> block, ptrdiff_t tp_offset,
                                    bool known_zero = false) {
   using size_type = typename Elf::size_type;
   for (size_t i = 0; i < abi.static_tls_modules.size(); ++i) {
     const auto& module = abi.static_tls_modules[i];
     const size_type modid = static_cast<size_type>(i + 1);
     const ptrdiff_t offset = TlsInitialExecOffset(abi, modid);
-    cpp20::span segment = block.subspan(tp_offset + offset, module.tls_size());
+    std::span segment = block.subspan(tp_offset + offset, module.tls_size());
     TlsModuleInit(module, segment, known_zero);
   }
 }

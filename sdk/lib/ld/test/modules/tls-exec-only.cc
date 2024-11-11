@@ -6,7 +6,8 @@
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
 #include <lib/ld/tls.h>
-#include <lib/stdcompat/bit.h>
+
+#include <bit>
 
 #include "ensure-test-thread-pointer.h"
 #include "test-start.h"
@@ -40,9 +41,8 @@ constexpr size_t kExpectedSize =
 // that `tls_data` will be first in the PT_TLS layout, and the checks above
 // verified that it's no bigger than we expect to hold just those two so we can
 // expect that `tls_data` is at the start and `tls_bss` immediately follows it.
-constexpr ptrdiff_t kTpOffsetForData = cpp20::bit_cast<ptrdiff_t>(kExpectedOffset);
-constexpr ptrdiff_t kTpOffsetForBss =
-    cpp20::bit_cast<ptrdiff_t>(kExpectedOffset + sizeof(tls_data));
+constexpr ptrdiff_t kTpOffsetForData = std::bit_cast<ptrdiff_t>(kExpectedOffset);
+constexpr ptrdiff_t kTpOffsetForBss = std::bit_cast<ptrdiff_t>(kExpectedOffset + sizeof(tls_data));
 
 }  // namespace
 

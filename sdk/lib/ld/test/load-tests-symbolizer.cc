@@ -4,7 +4,8 @@
 
 #include <lib/ld/abi.h>
 #include <lib/ld/testing/test-elf-object.h>
-#include <lib/stdcompat/string_view.h>
+
+#include <string_view>
 
 #include "load-tests.h"
 
@@ -68,7 +69,7 @@ TYPED_TEST(LdLoadTests, DISABLED_SymbolizerMarkup) {
   // There should be at least one module line and one mmap line per module.
   EXPECT_GE(log_lines.size(), 2u * 5u);
 
-  auto next_line = [left = cpp20::span{log_lines}](bool skip_mmap = false) mutable  //
+  auto next_line = [left = std::span{log_lines}](bool skip_mmap = false) mutable  //
       -> std::optional<std::string_view> {
     std::string_view line;
     do {
@@ -81,7 +82,7 @@ TYPED_TEST(LdLoadTests, DISABLED_SymbolizerMarkup) {
       // If skip_mmap is true, we just saw a module line for a module whose
       // segment details we don't know, so just expect to see some number of
       // mmap lines for it before the next module we're looking for.
-    } while (skip_mmap && cpp20::starts_with(line, "{{{mmap:"sv));
+    } while (skip_mmap && line.starts_with("{{{mmap:"sv));
     return line;
   };
 
@@ -171,8 +172,8 @@ TYPED_TEST(LdLoadTests, DISABLED_SymbolizerMarkup) {
   ASSERT_THAT(module_line, ::testing::Optional(
                                ::testing::StartsWith("{{{module:"s + std::to_string(idx) + ':')));
   if (!TestFixture::kTestExecutableNeedsVdso &&
-      !cpp20::starts_with(*module_line, "{{{module:"s + std::to_string(idx) + ':' +
-                                            std::string{ld::abi::Abi<>::kSoname.str()})) {
+      !module_line->starts_with("{{{module:"s + std::to_string(idx) + ':' +
+                                std::string{ld::abi::Abi<>::kSoname.str()})) {
     // This must be the vDSO.  The ld.so module will be after it.  We don't
     // know what the vDSO's mmap lines should look like, so just skip them all.
     ++idx;

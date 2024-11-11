@@ -77,7 +77,7 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
 }
 
 ld::Debugdata::Deferred PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
-                                        cpp20::span<const std::byte> build_id) {
+                                        std::span<const std::byte> build_id) {
 #if HAVE_LLVM_PROFDATA
   auto error = [&diag](zx_status_t status, auto&&... args) -> ld::Debugdata::Deferred {
     diag.SystemError(std::forward<decltype(args)>(args)..., elfldltl::ZirconError{status});
@@ -99,7 +99,7 @@ ld::Debugdata::Deferred PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar
     if (status != ZX_OK) {
       return error(status, "cannot map llvm-profdata VMO of ", size, " bytes");
     }
-    cpp20::span vmo_data{reinterpret_cast<std::byte*>(ptr), size};
+    std::span vmo_data{reinterpret_cast<std::byte*>(ptr), size};
 
     // Now fill the VMO and redirect the instrumentation to update its data.
     auto live_data = profdata.WriteFixedData(vmo_data);

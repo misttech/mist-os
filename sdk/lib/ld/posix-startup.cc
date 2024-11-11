@@ -6,7 +6,6 @@
 #include <lib/elfldltl/posix.h>
 #include <lib/elfldltl/unique-fd.h>
 #include <lib/ld/memory.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/posix.h>
 #include <sys/mman.h>
@@ -16,6 +15,7 @@
 #include <cassert>
 #include <cerrno>
 #include <cstring>
+#include <string_view>
 
 #include "allocator.h"
 #include "bootstrap.h"
@@ -71,7 +71,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     __builtin_trap();
   }
 
-  cpp20::span phdrs{reinterpret_cast<const Phdr*>(phdr), phnum};
+  std::span phdrs{reinterpret_cast<const Phdr*>(phdr), phnum};
 
   auto no_phdrs = [&diag]() { diag.FormatError("no PT_PHDR in preloaded main executable!"); };
 
@@ -207,7 +207,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // Check for the LD_DEBUG environment variable.
   for (char** ep = startup.envp; *ep; ++ep) {
     std::string_view str = *ep;
-    if (str.size() > kLdDebugPrefix.size() && cpp20::starts_with(str, kLdDebugPrefix)) {
+    if (str.size() > kLdDebugPrefix.size() && str.starts_with(kLdDebugPrefix)) {
       startup.ld_debug = true;
       break;
     }

@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 #include <lib/processargs/processargs.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zircon-internal/unique-backtrace.h>
+
+#include <string_view>
 
 #include "zircon.h"
 
@@ -19,7 +20,7 @@ constexpr std::string_view kLdDebugPrefixFirst = kLdDebugPrefix.substr(1);
 constexpr bool HasLdDebug(std::string_view env) {
   // This should be constexpr, but substr isn't until C++20.
   std::string_view debug;
-  if (cpp20::starts_with(env, kLdDebugPrefixFirst)) {
+  if (env.starts_with(kLdDebugPrefixFirst)) {
     debug = env.substr(kLdDebugPrefixFirst.size());
   } else if (size_t found = env.find(kLdDebugPrefix); found != std::string_view::npos) {
     debug = env.substr(found + kLdDebugPrefix.size());

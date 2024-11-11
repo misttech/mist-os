@@ -13,10 +13,7 @@ library_headers("headers") {
   testonly = true
 
   headers = [ "lib/ld/testing/test-elf-object.h" ]
-  public_deps = [
-    "//sdk/lib/stdcompat",
-    "//src/lib/elfldltl",
-  ]
+  public_deps = [ "//src/lib/elfldltl" ]
   if (is_fuchsia) {
     headers += [
       "lib/ld/testing/mock-debugdata.h",
@@ -58,7 +55,6 @@ static_library("ld-testing") {
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fdio",
-      "//sdk/lib/stdcompat",
       "//src/lib/elfldltl/testing",
       "//src/storage/lib/vfs/cpp",
       "//third_party/googletest:gtest",

@@ -9,7 +9,8 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/soname.h>
-#include <lib/stdcompat/bit.h>
+
+#include <bit>
 
 #include "abi.h"
 #include "load.h"
@@ -156,7 +157,7 @@ class DecodedModule : public DecodedModuleBase {
   // data read via the Memory object.  Additional observers can be passed as
   // for ld::DecodeModuleDynamic, and the return value is the same as that.
   template <class Diagnostics, class Memory, class... Observers>
-  constexpr fit::result<bool, cpp20::span<const Dyn>> DecodeDynamic(
+  constexpr fit::result<bool, std::span<const Dyn>> DecodeDynamic(
       Diagnostics& diag, Memory&& memory, const std::optional<Phdr>& dyn_phdr,
       Observers&&... observers) {
     auto decode = [&](auto&&... more) {
@@ -183,7 +184,7 @@ class DecodedModule : public DecodedModuleBase {
     module().tls_modid = modid;
 
     size_type alignment = std::max<size_type>(tls_phdr.align, 1);
-    if (!cpp20::has_single_bit(alignment)) [[unlikely]] {
+    if (!std::has_single_bit(alignment)) [[unlikely]] {
       if (!diag.FormatError(PhdrError::kBadAlignment)) {
         return false;
       }

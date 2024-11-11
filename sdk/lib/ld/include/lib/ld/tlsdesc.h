@@ -287,7 +287,7 @@ class StaticTlsDescResolver {
     }
     return {
         .function = GetHook(TlsdescRuntime::kUndefinedWeakAddend),
-        .value = cpp20::bit_cast<size_type>(addend),
+        .value = std::bit_cast<size_type>(addend),
     };
   }
 

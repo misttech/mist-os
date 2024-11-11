@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/testing/diagnostics.h>
-#include <lib/stdcompat/string_view.h>
 
+#include <string_view>
 #include <utility>
 
 #include "load-tests.h"

@@ -29,8 +29,8 @@
 #include <lib/elfldltl/svr4-abi.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/elfldltl/tls-layout.h>
-#include <lib/stdcompat/span.h>
 
+#include <span>
 #include <string_view>
 
 namespace ld::abi {
@@ -49,7 +49,7 @@ struct Abi {
   using Ptr = elfldltl::AbiPtr<T, Elf, AbiTraits>;
 
   // Members in Abi and inner types use Span<T> in place of std::span<T>.
-  template <typename T, size_t N = cpp20::dynamic_extent>
+  template <typename T, size_t N = std::dynamic_extent>
   using Span = elfldltl::AbiSpan<T, N, Elf, AbiTraits>;
 
   // This is a shorthand for instantiating the elfldltl types that take Elf and

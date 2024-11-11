@@ -156,10 +156,7 @@ library_headers("abi-headers") {
     "lib/ld/tls.h",
   ]
 
-  public_deps = [
-    "//sdk/lib/stdcompat",
-    "//src/lib/elfldltl:headers",
-  ]
+  public_deps = [ "//src/lib/elfldltl:headers" ]
 }
 
 # This provides the __tls_get_addr ABI symbol used by TLS GD accesses when
@@ -325,7 +322,6 @@ source_set("zircon.headers") {
   public_deps = [
     ":ld-log-zircon.headers",
     ":startup-load",
-    "//sdk/lib/stdcompat",
     "//src/lib/elfldltl",
   ]
 }
@@ -382,7 +378,6 @@ shared_library("ld-startup") {
     deps += [
       ":fuchsia-debugdata",
       ":zircon",
-      "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
       "//zircon/kernel/lib/arch",

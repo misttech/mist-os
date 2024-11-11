@@ -82,7 +82,7 @@ struct ModulePhdrInfo {
 // similar things that find data via p_vaddr.
 template <class Elf = elfldltl::Elf<>, class Diagnostics, typename... PhdrObservers>
 constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
-    Diagnostics& diag, cpp20::span<const typename Elf::Phdr> phdrs,
+    Diagnostics& diag, std::span<const typename Elf::Phdr> phdrs,
     PhdrObservers&&... phdr_observers) {
   ModulePhdrInfo<Elf> result;
   if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(result.dyn_phdr),
@@ -99,7 +99,7 @@ constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
 // dynamic section observers can be passed to include in the same scan.
 template <class Elf = elfldltl::Elf<>, class Diagnostics, class Memory,
           typename... DynamicObservers>
-constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDynamic(
+constexpr fit::result<bool, std::span<const typename Elf::Dyn>> DecodeModuleDynamic(
     AbiModule<Elf>& module, Diagnostics& diag, Memory& memory,
     const std::optional<typename Elf::Phdr>& dyn_phdr, DynamicObservers&&... dynamic_observers) {
   using Dyn = const typename Elf::Dyn;
@@ -122,7 +122,7 @@ constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDy
                          elfldltl::FileAddress{dyn_phdr->vaddr}),
     };
   }
-  cpp20::span<const Dyn> dyn = *read_dyn;
+  std::span<const Dyn> dyn = *read_dyn;
 
   module.link_map.ld = dyn.data();
 

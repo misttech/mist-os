@@ -6,7 +6,6 @@
 
 #include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/fdio/fd.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
@@ -19,6 +18,7 @@
 #include <filesystem>
 #include <functional>
 #include <numeric>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -158,7 +158,7 @@ void TestProcessArgs::PackBootstrap(zx::unowned_channel bootstrap_sender,
   };
 
   uint32_t* info = reinterpret_cast<uint32_t*>(buffer.get() + info_off);
-  cpp20::span strings{
+  std::span strings{
       buffer.get() + args_off,
       args_size + env_size + names_size,
   };

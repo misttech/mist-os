@@ -40,13 +40,13 @@ inline constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
 
 struct BootstrapModule {
   abi::Abi<>::Module& module;
-  cpp20::span<const elfldltl::Elf<>::Dyn> dyn;
+  std::span<const elfldltl::Elf<>::Dyn> dyn;
 };
 
 inline BootstrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
-                                             cpp20::span<const elfldltl::Elf<>::Dyn> dyn,
+                                             std::span<const elfldltl::Elf<>::Dyn> dyn,
                                              size_t vaddr_start, size_t vaddr_size, size_t bias,
-                                             cpp20::span<const elfldltl::Elf<>::Phdr> phdrs) {
+                                             std::span<const elfldltl::Elf<>::Phdr> phdrs) {
   module.link_map.addr = bias;
   module.link_map.ld = dyn.data();
   module.vaddr_start = vaddr_start;
@@ -105,7 +105,7 @@ inline BootstrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_
       0);
 
   const Ehdr& ehdr = *memory.ReadFromFile<Ehdr>(0);
-  const cpp20::span phdrs =
+  const std::span phdrs =
       *memory.ReadArrayFromFile<Phdr>(ehdr.phoff, elfldltl::NoArrayFromFile<Phdr>{}, ehdr.phnum);
 
   size_type vaddr_start, vaddr_size;
@@ -115,7 +115,7 @@ inline BootstrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_
       elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
       PhdrMemoryBuildIdObserver(memory, vdso));
 
-  const cpp20::span dyn = *memory.ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->memsz);
+  const std::span dyn = *memory.ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->memsz);
   elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(vdso.symbols));
 
   const size_type bias = reinterpret_cast<uintptr_t>(vdso_base) - vaddr_start;
@@ -139,7 +139,7 @@ inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>:
   using Dyn = elfldltl::Elf<>::Dyn;
 
   auto memory = elfldltl::Self<>::Memory();
-  const cpp20::span phdrs = elfldltl::Self<>::Phdrs();
+  const std::span phdrs = elfldltl::Self<>::Phdrs();
 
   // We want this object to be in bss to reduce the amount of data pages which
   // need COW.  In general the only data/bss we want should be part of
@@ -163,7 +163,7 @@ inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>:
 
   const uintptr_t bias = elfldltl::Self<>::LoadBias();
   const uintptr_t start = memory.base() + bias;
-  cpp20::span dyn = elfldltl::Self<>::Dynamic();
+  std::span dyn = elfldltl::Self<>::Dynamic();
 
   self.symbols =
       elfldltl::LinkStaticPieWithVdso(elfldltl::Self<>(), diag, vdso.symbols, vdso.link_map.addr);

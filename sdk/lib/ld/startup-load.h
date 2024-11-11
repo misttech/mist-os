@@ -67,7 +67,7 @@ class TlsDescResolver {
     }
     return {
         .function = kRuntimeUndefinedWeakAddend,
-        .value = cpp20::bit_cast<size_type>(addend),
+        .value = std::bit_cast<size_type>(addend),
     };
   }
 
@@ -109,7 +109,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                            fbl::DoublyLinkedListable<StartupLoadModule<Loader>*> {
  public:
   using List = fbl::DoublyLinkedList<StartupLoadModule*>;
-  using PreloadedModulesList = std::pair<List, cpp20::span<const Dyn>>;
+  using PreloadedModulesList = std::pair<List, std::span<const Dyn>>;
 
   using NeededCountObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
 
@@ -182,7 +182,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   // If a module is constructed manually rather than by Load, this points it at
   // its PT_DYNAMIC segment in memory.
-  void set_dynamic(cpp20::span<const Dyn> dynamic) { dynamic_ = dynamic; }
+  void set_dynamic(std::span<const Dyn> dynamic) { dynamic_ = dynamic; }
 
   void Relocate(Diagnostics& diag, const List& modules) {
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
@@ -246,7 +246,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
  private:
-  void Preload(Diagnostics& diag, Module& module, cpp20::span<const Dyn> dynamic) {
+  void Preload(Diagnostics& diag, Module& module, std::span<const Dyn> dynamic) {
     decoded().set_module(module);
     dynamic_ = dynamic;
 
@@ -419,8 +419,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
         result = {array, max_tls_modid};
       };
 
-      cpp20::span<TlsModule> tls_modules;
-      cpp20::span<Addr> tls_offsets;
+      std::span<TlsModule> tls_modules;
+      std::span<Addr> tls_offsets;
       new_array(tls_modules);
       new_array(tls_offsets);
 
@@ -443,7 +443,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   Loader loader_;  // Must be initialized by constructor.
-  cpp20::span<const Dyn> dynamic_;
+  std::span<const Dyn> dynamic_;
 };
 
 }  // namespace ld
