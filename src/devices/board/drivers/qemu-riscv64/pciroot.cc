@@ -95,7 +95,7 @@ zx_status_t QemuRiscv64Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* i
     zxlogf(WARNING, "couldn't duplicate ecam handle: %s", zx_status_get_string(status));
   }
 
-  info->ecam_vmo = ecam.release();
+  info->cam = {.vmo = ecam.release(), .is_extended = true};
   return ZX_OK;
 }
 

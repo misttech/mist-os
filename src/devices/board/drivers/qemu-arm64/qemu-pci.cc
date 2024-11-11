@@ -105,7 +105,7 @@ zx_status_t QemuArm64::PciAdd() {
     return status;
   }
 
-  ctx.info.ecam_vmo = ecam_vmo.release();
+  ctx.info.cam = {.vmo = ecam_vmo.release(), .is_extended = true};
   status = QemuArm64Pciroot::Create(&pci_root_host_, ctx, parent_, name.data());
   if (status != ZX_OK) {
     return status;

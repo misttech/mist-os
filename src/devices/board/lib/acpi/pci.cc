@@ -374,13 +374,13 @@ zx_status_t pci_init_segment_and_ecam(zx_device_t* parent, acpi::Acpi* acpi, ACP
     // The range from start_bus_num to end_bus_num is inclusive.
     size_t ecam_size = (pinfo.end_bus_num - pinfo.start_bus_num + 1) * PCIE_ECAM_BYTES_PER_BUS;
     zx_paddr_t vmo_base = mcfg_alloc.address + (pinfo.start_bus_num * PCIE_ECAM_BYTES_PER_BUS);
-    status =
-        zx_vmo_create_physical(get_mmio_resource(parent), vmo_base, ecam_size, &pinfo.ecam_vmo);
+    status = zx_vmo_create_physical(get_mmio_resource(parent), vmo_base, ecam_size, &pinfo.cam.vmo);
     if (status != ZX_OK) {
       zxlogf(ERROR, "couldn't create VMO for ecam, mmio cfg will not work: %s!",
              zx_status_get_string(status));
       return status;
     }
+    pinfo.cam.is_extended = true;
   }
 
   if (zxlog_level_enabled(DEBUG)) {
@@ -388,7 +388,7 @@ zx_status_t pci_init_segment_and_ecam(zx_device_t* parent, acpi::Acpi* acpi, ACP
     log.AppendPrintf("%s { acpi_obj(%p), bus range: %u:%u, segment: %u", dev_ctx->name,
                      dev_ctx->acpi_object, pinfo.start_bus_num, pinfo.end_bus_num,
                      pinfo.segment_group);
-    if (pinfo.ecam_vmo != ZX_HANDLE_INVALID) {
+    if (pinfo.cam.vmo != ZX_HANDLE_INVALID) {
       log.AppendPrintf(", ecam base: %#" PRIxPTR, mcfg_alloc.address);
     }
     log.AppendPrintf(" }");

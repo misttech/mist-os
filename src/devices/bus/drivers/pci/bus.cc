@@ -50,8 +50,8 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   // A PCI bus should have an ecam, but they are not mandatory per spec depending on the
   // platform tables offered to us.
   std::optional<fdf::MmioBuffer> ecam;
-  if (info.ecam_vmo != ZX_HANDLE_INVALID) {
-    if (auto result = pci::Bus::MapEcam(zx::vmo(info.ecam_vmo)); result.is_ok()) {
+  if (info.cam.vmo != ZX_HANDLE_INVALID) {
+    if (auto result = pci::Bus::MapEcam(zx::vmo(info.cam.vmo)); result.is_ok()) {
       ecam = std::move(result.value());
     } else {
       return result.status_value();
@@ -124,16 +124,16 @@ zx_status_t Bus::Initialize() {
 
 // Maps a vmo as an mmio_buffer to be used as this Bus driver's ECAM region
 // for config space access.
-zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo ecam_vmo) {
+zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo cam_vmo) {
   size_t size;
-  zx_status_t status = ecam_vmo.get_size(&size);
+  zx_status_t status = cam_vmo.get_size(&size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "couldn't get ecam vmo size: %d!", status);
     return zx::error(status);
   }
 
   zx::result<fdf::MmioBuffer> result =
-      fdf::MmioBuffer::Create(0, size, std::move(ecam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+      fdf::MmioBuffer::Create(0, size, std::move(cam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (result.is_error()) {
     zxlogf(ERROR, "couldn't map ecam vmo: %s!", result.status_string());
     return result.take_error();
