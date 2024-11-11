@@ -77,7 +77,6 @@ TEST_F(DeviceBuilderTest, TestDeviceCreated) {
   // legacy composites or composite node specs.
   ASSERT_EQ(root().child_count(), 1);
   auto non_composite = root().GetLatestChild();
-  ASSERT_TRUE(non_composite->GetProperties().empty());
   ASSERT_TRUE(non_composite->GetStringProperties().empty());
   ASSERT_STREQ(non_composite->name(), kDeviceName);
 }

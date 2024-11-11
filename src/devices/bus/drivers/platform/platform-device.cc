@@ -35,16 +35,6 @@
 
 namespace {
 
-zx::result<zx_device_prop_t> ConvertToDeviceProperty(
-    const fuchsia_driver_framework::NodeProperty& property) {
-  if (property.key().Which() != fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  return zx::ok(zx_device_prop_t{static_cast<uint16_t>(property.key().int_value().value()), 0,
-                                 property.value().int_value().value()});
-}
-
 zx::result<zx_device_str_prop_t> ConvertToDeviceStringProperty(
     const fuchsia_driver_framework::NodeProperty& property) {
   if (property.key().Which() != fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue) {
@@ -374,7 +364,6 @@ zx_status_t PlatformDevice::Start() {
     }
   }
 
-  std::vector<zx_device_prop_t> dev_props;
   std::vector<zx_device_str_prop_t> dev_str_props{
       ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, vid_),
       ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID, pid_),
@@ -383,8 +372,9 @@ zx_status_t PlatformDevice::Start() {
   };
   if (node_.properties().has_value()) {
     for (auto& prop : node_.properties().value()) {
-      if (auto dev_prop = ConvertToDeviceProperty(prop); dev_prop.is_ok()) {
-        dev_props.emplace_back(dev_prop.value());
+      if (prop.key().Which() == fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
+        zxlogf(WARNING, "Node '%s' has unsupported property integer-key %u.", name,
+               prop.key().int_value().value());
       } else if (auto dev_str_prop = ConvertToDeviceStringProperty(prop); dev_str_prop.is_ok()) {
         dev_str_props.emplace_back(dev_str_prop.value());
       } else {
