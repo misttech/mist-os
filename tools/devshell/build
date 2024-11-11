@@ -116,6 +116,15 @@ else
   }
 fi
 
+function count-ninja-log-lines {
+  NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
+  if [[ -f "${NINJA_LOG_FILE}" ]]; then
+    echo "$(wc -l <"${NINJA_LOG_FILE}" 2>/dev/null)"
+  else
+    echo 0
+  fi
+}
+
 function main {
   local switches=() fuchsia_targets=() ninja_switches=()
   local log_file is_logging fint_params_path
@@ -458,6 +467,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
       ninja_targets=("${fuchsia_targets[@]}")
     fi
 
+    local -i target_count=0
     if [[ -n "${run_ninja_build}" ]]; then
       # Write the list of Ninja targets to the build directory. See
       # `//build/api/client last_ninja_artifacts` command.
@@ -484,8 +494,11 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
       fi
     fi
 
+    local -i ninja_log_line_count_before="$(count-ninja-log-lines)"
     (fx-run-ninja "${is_logging}" "$PREBUILT_NINJA" -C "${FUCHSIA_BUILD_DIR}" \
       "${ninja_switches[@]}" "${ninja_targets[@]}")
+    local -i ninja_log_line_count_after="$(count-ninja-log-lines)"
+    target_count="$(( ninja_log_line_count_after - ninja_log_line_count_before))"
 
   fi
 
@@ -496,7 +509,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   fi
 
   declare -r end_time="${EPOCHREALTIME/./}"
-  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" &
+  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${target_count}" &
   exit-with-message
 }
 
