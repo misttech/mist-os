@@ -4,8 +4,6 @@
 
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Context as _, Result};
-use async_io::Async;
-use async_net::UdpSocket;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{DaemonEvent, TryIntoTargetEventInfo, WireTrafficType};
 use ffx_target::Description;
@@ -20,6 +18,7 @@ use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::num::NonZeroU16;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
+use tokio::net::UdpSocket;
 use zerocopy::SplitByteSlice;
 
 /// Zedboot discovery port (must be a nonzero u16)
@@ -223,7 +222,7 @@ fn make_listen_socket(listen_addr: SocketAddr) -> Result<UdpSocket> {
         }
     }
     .into();
-    Ok(Async::new(socket)?.into())
+    Ok(UdpSocket::from_std(socket)?)
 }
 
 async fn make_sender_socket(addr: SocketAddr) -> Result<UdpSocket> {
@@ -240,7 +239,8 @@ async fn make_sender_socket(addr: SocketAddr) -> Result<UdpSocket> {
         socket
     }
     .into();
-    let result: UdpSocket = Async::new(socket)?.into();
+
+    let result: UdpSocket = UdpSocket::from_std(socket)?;
     result.connect(addr).await.context("connect to remote address")?;
     Ok(result)
 }
