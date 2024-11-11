@@ -18,5 +18,10 @@
             storage: "tmp",
             path: "/tmp",
         },
+        {
+            directory: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
     ],
 }

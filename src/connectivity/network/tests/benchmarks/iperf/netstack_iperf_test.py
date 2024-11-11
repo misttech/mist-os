@@ -355,6 +355,23 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         )
         result_files = [str(path) for path in dir.rglob(f"iperf_client_*.json")]
         asserts.assert_equal(len(result_files), flows)
+        for path in result_files:
+            # We want only the last JSON object (starts with a line with
+            # just an opening brace) in the client output as there may be
+            # output from failed attempts to start the client.
+            with open(path, "r") as file:
+                lines = file.readlines()
+            found_last_object = False
+            for i in range(len(lines) - 1, -1, -1):
+                if lines[i].strip() == "{":
+                    found_last_object = True
+                    with open(path, "w") as file:
+                        file.writelines(lines[i::])
+                    break
+            asserts.assert_true(
+                found_last_object,
+                "client JSON output should have a line with only {",
+            )
         return result_files
 
     def _run_ethernet_tests(
