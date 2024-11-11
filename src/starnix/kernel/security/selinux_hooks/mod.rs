@@ -276,7 +276,7 @@ pub(super) fn fs_node_init_on_create(
         FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
             let current_task_sid = current_task.read().security_state.attrs.current_sid;
             if fs_use_type == FsUseType::Task {
-                // TODO: https://fxbug.dev/355180447 - verify that this is how fs_use_task is
+                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
                 // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
                 (current_task_sid, None)
             } else {
@@ -287,7 +287,7 @@ pub(super) fn fs_node_init_on_create(
                         parent_sid,
                         file_class_from_file_mode(new_node.info().mode)?,
                     )
-                    // TODO: https://fxbug.dev/355180447 - is EPERM right here? What does it mean
+                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
                     .map_err(|_| errno!(EPERM))?;
                 let xattr = (fs_use_type == FsUseType::Xattr)
@@ -668,12 +668,12 @@ where
     };
 
     // If the "mountpoint"-labeling is used by this filesystem then setting labels is not supported.
-    // TODO: - Is re-labeling of "genfscon" nodes allowed?
+    // TODO: https://fxbug.dev/377915469 - Is re-labeling of "genfscon" nodes allowed?
     if fs_label.scheme == FileSystemLabelingScheme::Mountpoint {
         return error!(ENOTSUP);
     }
 
-    // TODO: - Lock the `fs_node` security label here, to ensure consistency.
+    // TODO: https://fxbug.dev/367585803 - Lock the `fs_node` security label here, to ensure consistency.
 
     // Verify that the requested modification is permitted by the loaded policy.
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
