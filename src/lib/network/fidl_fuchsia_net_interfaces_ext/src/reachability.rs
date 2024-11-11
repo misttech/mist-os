@@ -151,7 +151,7 @@ pub async fn wait_for_reachability(
 mod tests {
     use super::*;
 
-    use crate::PREFERRED_FOREVER;
+    use crate::{PositiveMonotonicInstant, PreferredLifetimeInfo};
 
     use anyhow::Context as _;
     use futures::FutureExt as _;
@@ -175,28 +175,36 @@ mod tests {
                     addr: Some(IPV4_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    preferred_lifetime_info: Some(
+                        PreferredLifetimeInfo::preferred_forever().into(),
+                    ),
                     __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV4_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    preferred_lifetime_info: Some(
+                        PreferredLifetimeInfo::preferred_forever().into(),
+                    ),
                     __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    preferred_lifetime_info: Some(
+                        PreferredLifetimeInfo::preferred_forever().into(),
+                    ),
                     __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    preferred_lifetime_info: Some(
+                        PreferredLifetimeInfo::preferred_forever().into(),
+                    ),
                     __source_breaking: Default::default(),
                 },
             ]),
@@ -211,10 +219,8 @@ mod tests {
         const ID: u64 = 1;
         const ASSIGNED_ADDR: Address = Address {
             addr: IPV4_GLOBAL,
-            valid_until: zx::ZX_TIME_INFINITE,
-            preferred_lifetime_info: fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
-                zx::ZX_TIME_INFINITE,
-            ),
+            valid_until: PositiveMonotonicInstant::INFINITE_FUTURE,
+            preferred_lifetime_info: PreferredLifetimeInfo::preferred_forever(),
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         };
         // These combinations are not globally routable.

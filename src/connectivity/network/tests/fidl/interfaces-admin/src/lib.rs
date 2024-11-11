@@ -177,7 +177,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
             Item = Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
         >,
         if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
-        want_valid_until: zx::sys::zx_time_t,
+        want_valid_until: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant,
     ) -> Result<(), anyhow::Error> {
         fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
             event_stream,
@@ -202,9 +202,13 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
         .await
         .map_err(Into::into)
     }
-    wait_for_lifetimes(event_stream.by_ref(), &mut if_state, zx::sys::ZX_TIME_INFINITE)
-        .await
-        .expect("failed to observe address with default (infinite) lifetimes");
+    wait_for_lifetimes(
+        event_stream.by_ref(),
+        &mut if_state,
+        fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+    )
+    .await
+    .expect("failed to observe address with default (infinite) lifetimes");
 
     let no_interest_event_stream = {
         let (watcher, server) =
@@ -261,11 +265,16 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     );
 
     {
-        const VALID_UNTIL: zx::sys::zx_time_t = 123_000_000_000;
+        const VALID_UNTIL: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant =
+            const_unwrap::const_unwrap_option(
+                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(
+                    123_000_000_000,
+                ),
+            );
         addr_state_provider
             .update_address_properties(&fidl_fuchsia_net_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
-                valid_lifetime_end: Some(VALID_UNTIL),
+                valid_lifetime_end: Some(VALID_UNTIL.into_nanos()),
                 ..Default::default()
             })
             .await
@@ -308,7 +317,10 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
         .await
         .expect("install endpoint into Netstack");
 
-    const VALID_UNTIL: zx::sys::zx_time_t = 123_000_000_000;
+    const VALID_UNTIL: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant =
+        const_unwrap::const_unwrap_option(
+            fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::from_nanos(123_000_000_000),
+        );
 
     const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("2001:0db8::1/64");
     let _addr_state_provider = interfaces::add_address_wait_assigned(
@@ -316,7 +328,7 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
         ADDR,
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
             initial_properties: Some(fidl_fuchsia_net_interfaces_admin::AddressProperties {
-                valid_lifetime_end: Some(VALID_UNTIL),
+                valid_lifetime_end: Some(VALID_UNTIL.into_nanos()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -2569,10 +2581,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                             fnet_interfaces::AddressAssignmentState::Assigned
                         );
                         if addr == *address {
-                            assert_eq!(
-                                zx::MonotonicInstant::from_nanos(got_valid_until),
-                                valid_until
-                            );
+                            assert_eq!(zx::MonotonicInstant::from(got_valid_until), valid_until);
                             true
                         } else {
                             false

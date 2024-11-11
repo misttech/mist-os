@@ -1725,8 +1725,9 @@ pub(crate) mod testutil {
     ) -> fnet_interfaces::Address {
         fnet_interfaces_ext::Address {
             addr,
-            valid_until: zx::sys::ZX_TIME_INFINITE,
-            preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+            valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+            preferred_lifetime_info: fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(
+            ),
             assignment_state,
         }
         .into()
@@ -1788,15 +1789,17 @@ mod tests {
         let addresses = vec![
             fnet_interfaces_ext::Address {
                 addr: TEST_V4_ADDR,
-                valid_until: i64::MAX,
+                valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
                 assignment_state: AddressAssignmentState::Assigned,
-                preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+                preferred_lifetime_info:
+                    fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
             },
             fnet_interfaces_ext::Address {
                 addr: TEST_V6_ADDR,
-                valid_until: i64::MAX,
+                valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
                 assignment_state: AddressAssignmentState::Assigned,
-                preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+                preferred_lifetime_info:
+                    fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
             },
         ];
         create_interface(id, name, port_class, online, addresses)

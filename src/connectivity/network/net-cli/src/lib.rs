@@ -2658,10 +2658,9 @@ mod tests {
                 .map(|(addr, assignment_state)| finterfaces_ext::Address {
                     addr,
                     assignment_state,
-                    valid_until: zx_types::ZX_TIME_INFINITE,
-                    preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
-                        zx_types::ZX_TIME_INFINITE,
-                    ),
+                    valid_until: finterfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                    preferred_lifetime_info:
+                        finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                 })
                 .collect(),
             has_default_ipv4_route: false,
@@ -2949,14 +2948,15 @@ mac               -
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: fidl_subnet!("192.168.0.1/24"),
-                        valid_until: std::time::Duration::from_millis(2500)
-                            .as_nanos()
-                            .try_into()
-                            .unwrap(),
+                        valid_until: i64::try_from(
+                            std::time::Duration::from_millis(2500).as_nanos(),
+                        )
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
                         assignment_state: finterfaces::AddressAssignmentState::Tentative,
-                        preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
-                            zx_types::ZX_TIME_INFINITE,
-                        ),
+                        preferred_lifetime_info:
+                            finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                     }],
                     has_default_ipv4_route: false,
                     has_default_ipv6_route: true,
@@ -2971,11 +2971,10 @@ mac               -
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: fidl_subnet!("2001:db8::1/64"),
-                        valid_until: i64::MAX,
+                        valid_until: finterfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
                         assignment_state: finterfaces::AddressAssignmentState::Unavailable,
-                        preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
-                            zx_types::ZX_TIME_INFINITE,
-                        ),
+                        preferred_lifetime_info:
+                            finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                     }],
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: true,

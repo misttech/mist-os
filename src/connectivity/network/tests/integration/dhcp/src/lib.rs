@@ -32,7 +32,6 @@ use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use sockaddr::{IntoSockAddr as _, TryToSockaddrLl as _};
 use test_case::test_case;
-use zx_types::zx_time_t;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -152,7 +151,7 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
         // lease. It will take lease_length/2 duration for the client to renew its address
         // and trigger the subsequent interface changed event.
         if client_renews {
-            let _: zx_time_t = annotate(
+            let _: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant = annotate(
                 assert_interface_assigned_addr(
                     client_realm,
                     expected_acquired,
@@ -210,12 +209,12 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
 async fn assert_interface_assigned_addr(
     client_realm: &netemul::TestRealm<'_>,
     expected_acquired: fidl_fuchsia_net::Subnet,
-    filter_valid_until: impl Fn(zx_time_t) -> bool,
+    filter_valid_until: impl Fn(fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant) -> bool,
     event_stream: impl futures::Stream<
         Item = std::result::Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
     >,
     mut properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
-) -> zx_time_t {
+) -> fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant {
     let valid_until = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream,
         &mut properties,

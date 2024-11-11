@@ -59,19 +59,19 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                             addresses: vec![
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("127.0.0.1/8"),
-                                    valid_until: zx::sys::ZX_TIME_INFINITE,
-                                    preferred_lifetime_info: fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::PreferredUntil(
-                                        zx::sys::ZX_TIME_INFINITE
-                                    ),
+                                    valid_until:
+                                        fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                                    preferred_lifetime_info:
+                                        fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                                     assignment_state:
                                         fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("::1/128"),
-                                    valid_until: zx::sys::ZX_TIME_INFINITE,
-                                    preferred_lifetime_info: fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::PreferredUntil(
-                                        zx::sys::ZX_TIME_INFINITE
-                                    ),
+                                    valid_until:
+                                        fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                                    preferred_lifetime_info:
+                                        fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                                     assignment_state:
                                         fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
@@ -101,8 +101,10 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                     // link-local addresses that can't be predicted.
                     addresses.contains(&fidl_fuchsia_net_interfaces_ext::Address {
                         addr: *addr,
-                        valid_until: zx::sys::ZX_TIME_INFINITE,
-                        preferred_lifetime_info: fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
+                        valid_until:
+                            fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                        preferred_lifetime_info:
+                            fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                         assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                     }) && *online
                         && name == rhs_name
@@ -268,16 +270,18 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
                     addresses: vec![
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("127.0.0.1/8"),
-                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            valid_until:
+                                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
                             preferred_lifetime_info:
-                                fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
+                                fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                         },
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("::1/128"),
-                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            valid_until:
+                                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
                             preferred_lifetime_info:
-                                fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
+                                fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                         },
                     ],
@@ -1226,10 +1230,10 @@ async fn addresses_while_offline<N: Netstack>(
                  assignment_state,
                  preferred_lifetime_info,
              }| {
-                assert_eq!(valid_until, zx::sys::ZX_TIME_INFINITE);
+                assert!(valid_until.is_infinite());
                 assert_eq!(
                     preferred_lifetime_info,
-                    fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER
+                    fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever()
                 );
                 assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 addr == want
@@ -1516,8 +1520,9 @@ async fn watcher<N: Netstack>(name: &str) {
         .cloned()
         .chain(std::iter::once(fidl_fuchsia_net_interfaces_ext::Address {
             addr: subnet,
-            valid_until: zx::sys::ZX_TIME_INFINITE,
-            preferred_lifetime_info: fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
+            valid_until: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+            preferred_lifetime_info:
+                fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }))
         .collect();

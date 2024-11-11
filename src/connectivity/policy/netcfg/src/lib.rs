@@ -3483,8 +3483,9 @@ mod tests {
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
         fnet_interfaces_ext::Address {
             addr,
-            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
-            preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+            valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+            preferred_lifetime_info: fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(
+            ),
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }
         .into()
