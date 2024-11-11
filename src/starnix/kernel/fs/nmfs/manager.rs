@@ -47,6 +47,7 @@ struct NetworkManagerInner {
     removed_networks: SeenSentData,
     attempted_reconnects: u64,
     successful_reconnects: u64,
+    no_events_to_replay: u64,
 }
 
 #[derive(Unit, Default)]
@@ -359,7 +360,7 @@ impl NetworkManager {
     //
     // An error will be returned on the first event that is not
     // transmitted successfully.
-    pub(crate) fn replay_network_events(&self) -> Result<(), NetworkManagerError> {
+    pub(crate) fn replay_network_events(&self) -> Result<usize, NetworkManagerError> {
         let mut inner_guard = self.lock();
         let mut inner = inner_guard.as_mut();
 
@@ -373,6 +374,7 @@ impl NetworkManager {
                 None => None,
             })
             .collect();
+        let mut num_events = fidl_events.len();
 
         // This cannot be combined with the above statements due to
         // this block needing mutable access to `inner`.
@@ -385,11 +387,12 @@ impl NetworkManager {
         })?;
 
         if let Some(id) = inner.default_id {
+            num_events += 1;
             self.fidl_set_default_network_id(Some(id))?;
             inner.default_ids_set.sent += 1;
         }
 
-        Ok(())
+        Ok(num_events)
     }
 
     // Call `set_default` on `StarnixNetworks`.
@@ -522,8 +525,18 @@ async fn reconnect_to_proxy_loop(
                 }
 
                 match handle.0.replay_network_events() {
-                    Ok(()) => {
-                        log_info!("Successfully reconnected to socketproxy and replayed events");
+                    Ok(0) => {
+                        log_info!("There were no events to replay to the socketproxy.");
+                        // Reset `reconnect_delay` to the initial delay period.
+                        {
+                            let mut inner_guard = handle.0.lock();
+                            let mut inner = inner_guard.as_mut();
+                            inner.no_events_to_replay += 1;
+                        }
+                    }
+                    Ok(num_events) => {
+                        log_info!("Successfully reconnected to socketproxy and \
+                            replayed {num_events:?} events");
                         // On success, reset `reconnect_delay` to the initial delay period.
                         reconnect_delay = zx::MonotonicDuration::from_seconds(0);
                         {
@@ -893,7 +906,7 @@ mod tests {
 
         // If there aren't any networks in the Manager, replay should succeed
         // even if the socketproxy isn't initialized.
-        assert_matches!(manager.0.replay_network_events(), Ok(()));
+        assert_matches!(manager.0.replay_network_events(), Ok(0));
 
         // Manually insert a network to simulate this network
         // already existing in the Manager.
@@ -1400,7 +1413,8 @@ mod tests {
         let manager = &setup_proxy(inspector.root(), results, None).0;
 
         // If there aren't any networks in the Manager, replay should succeed.
-        assert_matches!(manager.replay_network_events(), Ok(()));
+        // This should trigger an increment to the `no_events_to_replay` node.
+        assert_matches!(manager.replay_network_events(), Ok(0 /* number of updates sent */));
 
         // Manually insert the networks to simulate these networks
         // already existing in the Manager.
@@ -1418,7 +1432,7 @@ mod tests {
 
         let replay_result = manager.replay_network_events();
         match last_event_result {
-            Ok(_) => assert_matches!(replay_result, Ok(())),
+            Ok(_) => assert_matches!(replay_result, Ok(3 /* number of updates sent */)),
             Err(_) => assert_matches!(
                 replay_result,
                 Err(NetworkManagerError::SetDefault(
@@ -1519,6 +1533,7 @@ mod tests {
             nmfs: contains {
                 attempted_reconnects: 1u64,
                 successful_reconnects: 1u64,
+                no_events_to_replay: 0u64,
                 added_networks: {
                     seen: 1u64,
                     sent: 2u64,
@@ -1526,6 +1541,66 @@ mod tests {
                 default_ids_set: {
                     seen: 1u64,
                     sent: 1u64,
+                },
+            },
+        });
+
+        while assertion.run(&inspector.get_diagnostics_hierarchy()).is_err() {
+            // Loop until the other thread updates the inspect values
+        }
+    }
+
+    // This test requires 3 threads. One for the main thread, one for mocking
+    // the proxy responses, and one for handling the socketproxy reconnection.
+    // Similar to `replay_network_events_with_reconnect_thread`, but
+    // specifically tests the case where reconnection was attempted and no
+    // networks are present to communicate to the socketproxy.
+    #[::fuchsia::test(threads = 3)]
+    async fn replay_network_events_with_reconnect_thread_no_events_to_replay() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let results: Vec<Result<(), NetworkManagerError>> = vec![
+            // Network added to Manager and socketproxy.
+            Ok(()),
+            // Network set as default in Manager, but socketproxy responds
+            // with an error, triggering a reconnect to reset the state.
+            Err(NetworkManagerError::Remove(fnp_socketproxy::NetworkRegistryRemoveError::NotFound)),
+        ];
+        let (initiate_reconnect_sender, initiate_reconnect_receiver) = mpsc::channel(1);
+        let manager = setup_proxy(inspector.root(), results, Some(initiate_reconnect_sender));
+        spawn_reconnection_thread_for_test(manager.clone(), initiate_reconnect_receiver);
+        let manager = &manager.0;
+
+        // Add a network.
+        let network_id = 1;
+        let network = test_network_message_from_id(network_id);
+        assert_matches!(manager.add_network(network.clone()), Ok(()));
+        assert_data_tree!(inspector, root: {
+            nmfs: contains {
+                added_networks: {
+                    seen: 1u64,
+                    sent: 1u64,
+                },
+            },
+        });
+
+        // Remove the network and act like it isn't known to the socketproxy.
+        // This will initiate a reconnect to the proxy and the state to be reset.
+        let _removed_network = manager.remove_network(network_id);
+
+        // During this period `replay_network_events()` should be called from
+        // another thread and the inspect values should be updated.
+        // Use `TreeAssertion` instead of a macro to query the inspect tree in
+        // a loop without triggering an error and failing the test.
+        let assertion = tree_assertion!(root: {
+            nmfs: contains {
+                no_events_to_replay: 1u64,
+                added_networks: {
+                    seen: 1u64,
+                    sent: 1u64,
+                },
+                removed_networks: {
+                    seen: 1u64,
+                    sent: 0u64,
                 },
             },
         });
