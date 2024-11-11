@@ -491,3 +491,32 @@ fn optional_converter() {
         Example { num: None, ..Default::default() }
     );
 }
+
+#[test]
+fn generics() {
+    #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+    struct Wrapper(u32);
+
+    impl From<u32> for Wrapper {
+        fn from(value: u32) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Wrapper> for u32 {
+        fn from(Wrapper(value): Wrapper) -> Self {
+            value
+        }
+    }
+
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    struct Valid<T: From<u32> + Into<u32>> {
+        num: T,
+    }
+
+    assert_matches!(
+        Valid::<Wrapper>::try_from(Example { num: Some(10), ..Default::default() }),
+        Ok(Valid { num: Wrapper(10) })
+    );
+}

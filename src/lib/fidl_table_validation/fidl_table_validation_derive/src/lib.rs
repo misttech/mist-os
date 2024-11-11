@@ -34,7 +34,7 @@ pub fn validate_fidl_table(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let input: DeriveInput = syn::parse(input).unwrap();
     match input.data {
         Data::Struct(DataStruct { fields: syn::Fields::Named(fields), .. }) => {
-            match impl_valid_fidl_table(&input.ident, fields.named, &input.attrs) {
+            match impl_valid_fidl_table(&input.ident, &input.generics, fields.named, &input.attrs) {
                 Ok(v) => v.into(),
                 Err(e) => e.to_compile_error().into(),
             }
@@ -370,6 +370,7 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
 
 fn impl_valid_fidl_table(
     name: &Ident,
+    generics: &Generics,
     fields: Punctuated<Field, Comma>,
     attrs: &[Attribute],
 ) -> Result<TokenStream> {
@@ -525,6 +526,7 @@ fn impl_valid_fidl_table(
 
     let missing_error_doc = format!("Missing fields in `{}`.", fidl_table_type);
     let error_doc = format!("Errors validating `{}`.", fidl_table_type);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     Ok(quote!(
         #[doc = #missing_error_doc]
         #[derive(Debug, Clone, Copy, PartialEq)]
@@ -564,7 +566,7 @@ fn impl_valid_fidl_table(
 
         #custom_validator_error_from_impl
 
-        impl std::convert::TryFrom<#fidl_table_path> for #name {
+        impl #impl_generics std::convert::TryFrom<#fidl_table_path> for #name #ty_generics #where_clause {
             type Error = #error_type_name;
             fn try_from(src: #fidl_table_path) -> std::result::Result<Self, Self::Error> {
                 use ::fidl_table_validation::Validate;
@@ -577,8 +579,8 @@ fn impl_valid_fidl_table(
             }
         }
 
-        impl std::convert::From<#name> for #fidl_table_path {
-            fn from(src: #name) -> #fidl_table_path {
+        impl #impl_generics std::convert::From<#name #ty_generics> for #fidl_table_path #where_clause {
+            fn from(src: #name #ty_generics) -> #fidl_table_path {
                 Self {
                     #field_intos
                     #fidl_table_construct_trailing
