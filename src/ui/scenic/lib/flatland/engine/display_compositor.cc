@@ -37,6 +37,9 @@ namespace {
 // Debugging color used to highlight images that have gone through the GPU rendering path.
 const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
 
+const fuchsia_hardware_display::EventId kInvalidEventId = {
+    fuchsia_hardware_display_types::kInvalidDispId};
+
 // Returns an image type that describes the tiling format used for buffer with
 // this pixel format. The values are display driver specific and not documented
 // in the display coordinator FIDL API.
@@ -277,12 +280,6 @@ DisplayCompositor::~DisplayCompositor() {
         FX_LOGS(ERROR) << "Failed to call FIDL ReleaseEvent on wait event ("
                        << event_data.wait_id.value() << "): " << result.error_value();
       }
-
-      result = display_coordinator_->ReleaseEvent(event_data.signal_id);
-      if (result.is_error()) {
-        FX_LOGS(ERROR) << "Failed to call FIDL ReleaseEvent on signal event ("
-                       << event_data.signal_id.value() << "): " << result.error_value();
-      }
     }
   }
 
@@ -504,8 +501,6 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
       FX_LOGS(ERROR) << "Failed to call FIDL ReleaseImage method: " << result.error_value();
     }
   }
-
-  image_event_map_.erase(image_id);
 }
 
 fuchsia_hardware_display::LayerId DisplayCompositor::CreateDisplayLayer() {
@@ -550,22 +545,6 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     return false;
   }
 
-  for (uint32_t i = 0; i < num_images; i++) {
-    const allocation::GlobalImageId image_id = data.images[i].identifier;
-    if (image_event_map_.find(image_id) == image_event_map_.end()) {
-      image_event_map_[image_id] = NewImageEventData();
-    } else {
-      // If the event is not signaled, image must still be in use by the display and cannot be used
-      // again.
-      const auto status =
-          image_event_map_[image_id].signal_event.wait_one(ZX_EVENT_SIGNALED, zx::time(), nullptr);
-      if (status != ZX_OK) {
-        return false;
-      }
-    }
-    pending_images_in_config_.push_back(image_id);
-  }
-
   // We only set as many layers as needed for the images we have.
   SetDisplayLayers(data.display_id, std::vector<fuchsia_hardware_display::LayerId>(
                                         layers.begin(), layers.begin() + num_images));
@@ -574,11 +553,9 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
-        static const scenic_impl::DisplayEventId kInvalidEventId = {
-            {.value = fuchsia_hardware_display_types::kInvalidDispId}};
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
                         /*wait_id*/ kInvalidEventId,
-                        /*signal_id*/ image_event_map_[image_id].signal_id);
+                        /*signal_id*/ kInvalidEventId);
       } else {
         return false;
       }
@@ -747,7 +724,6 @@ void DisplayCompositor::DiscardConfig() {
   FX_DCHECK(display_coordinator_.is_valid());
 
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::DiscardConfig");
-  pending_images_in_config_.clear();
   const fidl::Result check_config_result = display_coordinator_->CheckConfig({{
       .discard = true,
   }});
@@ -830,21 +806,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
 
     // Reset the event data.
     auto& event_data = display_engine_data.frame_event_datas[curr_vmo];
-
-    // TODO(https://fxbug.dev/42173333): Remove this after the direct-to-display path is stable.
-    // We expect the retired event to already have been signaled. Verify this without waiting.
-    {
-      const zx_status_t status =
-          event_data.signal_event.wait_one(ZX_EVENT_SIGNALED, zx::time(), nullptr);
-      if (status != ZX_OK) {
-        FX_DCHECK(status == ZX_ERR_TIMED_OUT) << "unexpected status: " << status;
-        FX_LOGS(ERROR)
-            << "flatland::DisplayCompositor::PerformGpuComposition rendering into in-use backbuffer";
-      }
-    }
-
     event_data.wait_event.signal(ZX_EVENT_SIGNALED, 0);
-    event_data.signal_event.signal(ZX_EVENT_SIGNALED, 0);
 
     // Apply the debugging color to the images.
     auto images = render_data.images;
@@ -877,7 +839,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     const fuchsia_hardware_display::LayerId layer = display_engine_data.layers[0];
     SetDisplayLayers(render_data.display_id, {layer});
     ApplyLayerImage(layer, {glm::vec2(0), glm::vec2(render_target.width, render_target.height)},
-                    render_target, event_data.wait_id, event_data.signal_id);
+                    render_target, event_data.wait_id, /*signal_id*/ kInvalidEventId);
 
     // We are being opportunistic and skipping the costly CheckConfig() call at this stage, because
     // we know that gpu composited layers work and there is no fallback case beyond this. See
@@ -907,14 +869,14 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
 
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
-  // Note: SetRenderDatasOnDisplay() failing indicates hardware failure to do display composition.
-  const bool fallback_to_gpu_composition =
-      !enable_display_composition_ || test_args.force_gpu_composition ||
-      !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
+  // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
+  const bool fallback_to_gpu_composition = !enable_display_composition_ ||
+                                           test_args.force_gpu_composition ||
+                                           !TryDirectToDisplay(render_data_list) || !CheckConfig();
 
   if (fallback_to_gpu_composition) {
-    // Discard only if we have attempted to SetRenderDatasOnDisplay() and have an unapplied config.
-    // DiscardConfig call is costly and we should avoid calling when it isnt necessary.
+    // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
+    // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
     if (enable_display_composition_) {
       DiscardConfig();
     }
@@ -926,11 +888,6 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   } else {
     // CC was successfully applied to the config so we update the state machine.
     cc_state_machine_.SetApplyConfigSucceeded();
-
-    // Unsignal image events before applying config.
-    for (auto id : pending_images_in_config_) {
-      image_event_map_[id].signal_event.signal(ZX_EVENT_SIGNALED, 0);
-    }
 
     // See ReleaseFenceManager comments for details.
     release_fence_manager_.OnDirectScanoutFrame(frame_number, std::move(release_fences),
@@ -944,9 +901,13 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
                                      : RenderFrameResult::kDirectToDisplay;
 }
 
-bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& render_data_list) {
+bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render_data_list) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(enable_display_composition_);
+
+  // TODO(https://fxbug.dev/377979329): re-enable direct-to-display once we have relaxed the display
+  // coordinator's restrictions on image reuse.
+  return false;
 
   for (const auto& data : render_data_list) {
     if (!SetRenderDataOnDisplay(data)) {
@@ -1020,37 +981,8 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
     const auto status = zx::event::create(0, &result.wait_event);
     FX_DCHECK(status == ZX_OK);
   }
-  {  // The DC signals this once it has set the layer image.  We pre-signal this event so the first
-    // frame rendered with it behaves as though it was previously OKed for recycling.
-    const auto status = zx::event::create(0, &result.signal_event);
-    FX_DCHECK(status == ZX_OK);
-  }
-
   result.wait_id = scenic_impl::ImportEvent(display_coordinator_, result.wait_event);
   FX_DCHECK(result.wait_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
-  result.signal_event.signal(0, ZX_EVENT_SIGNALED);
-  result.signal_id = scenic_impl::ImportEvent(display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
-  return result;
-}
-
-DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
-  FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  ImageEventData result;
-  // The DC signals this once it has set the layer image.  We pre-signal this event so the first
-  // frame rendered with it behaves as though it was previously OKed for recycling.
-  {
-    const auto status = zx::event::create(0, &result.signal_event);
-    FX_DCHECK(status == ZX_OK);
-  }
-  {
-    const auto status = result.signal_event.signal(0, ZX_EVENT_SIGNALED);
-    FX_DCHECK(status == ZX_OK);
-  }
-
-  result.signal_id = scenic_impl::ImportEvent(display_coordinator_, result.signal_event);
-  FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
-
   return result;
 }
 
