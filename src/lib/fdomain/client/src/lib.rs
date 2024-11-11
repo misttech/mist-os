@@ -119,7 +119,7 @@ pub enum Error {
     Transport(Arc<std::io::Error>),
     ConnectionMismatch,
     NamespaceAlreadyTaken,
-    ConnectionLost,
+    ClientLost,
 }
 
 impl std::fmt::Display for Error {
@@ -162,7 +162,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Tried to use an FDomain handle from a different connection")
             }
             Self::NamespaceAlreadyTaken => write!(f, "Called `take_namespace` more than once"),
-            Self::ConnectionLost => write!(f, "Remote connection for handle was closed"),
+            Self::ClientLost => write!(f, "The client associated with this handle was destroyed"),
         }
     }
 }
@@ -181,7 +181,7 @@ impl std::fmt::Debug for Error {
             Self::ProtocolStreamEventIncompatible => write!(f, "ProtocolStreamEventIncompatible"),
             Self::ConnectionMismatch => write!(f, "ConnectionMismatch"),
             Self::NamespaceAlreadyTaken => write!(f, "NamespaceAlreadyTaken"),
-            Self::ConnectionLost => write!(f, "ConnectionLost"),
+            Self::ClientLost => write!(f, "ClientLost"),
         }
     }
 }

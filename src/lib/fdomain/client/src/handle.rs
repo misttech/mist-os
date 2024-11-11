@@ -21,7 +21,7 @@ pub struct Handle {
 impl Handle {
     /// Get the FDomain client this handle belongs to.
     pub(crate) fn client(&self) -> Result<Arc<Client>, Error> {
-        self.client.upgrade().ok_or(Error::ConnectionLost)
+        self.client.upgrade().ok_or(Error::ClientLost)
     }
 
     /// Get an invalid handle.
@@ -130,7 +130,7 @@ pub trait AsHandleRef {
 
     /// Get the client supporting this handle.
     fn client(&self) -> Result<Arc<Client>, Error> {
-        self.as_handle_ref().0.client.upgrade().ok_or(Error::ConnectionLost)
+        self.as_handle_ref().0.client.upgrade().ok_or(Error::ClientLost)
     }
 }
 

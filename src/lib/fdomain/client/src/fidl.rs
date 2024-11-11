@@ -64,7 +64,7 @@ impl FDomainProxyChannel {
         handles: &mut Vec<HandleInfo>,
     ) -> Poll<Result<(), Option<crate::Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
-            return Poll::Ready(Err(Some(Error::ConnectionLost)));
+            return Poll::Ready(Err(Some(Error::ClientLost)));
         };
 
         match got {
@@ -88,7 +88,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
         buf: &mut ChannelMessage,
     ) -> Poll<Result<(), Option<Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
-            return Poll::Ready(Err(Some(Error::ConnectionLost)));
+            return Poll::Ready(Err(Some(Error::ClientLost)));
         };
 
         match got {
