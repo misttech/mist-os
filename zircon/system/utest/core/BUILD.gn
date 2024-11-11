@@ -45,6 +45,7 @@ core_tests = [
   "pthread-tls",
   "socket",
   "stack",
+  "standalone-elf-load",
   "stream",
   "sync-completion",
   "sync-condition",

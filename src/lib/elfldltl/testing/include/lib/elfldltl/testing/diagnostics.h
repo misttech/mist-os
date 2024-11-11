@@ -16,7 +16,11 @@
 #include <type_traits>
 #include <utility>
 
+#ifdef USE_ZXTEST
+#include <zxtest/zxtest.h>
+#else
 #include <gtest/gtest.h>
+#endif
 
 namespace elfldltl::testing {
 
