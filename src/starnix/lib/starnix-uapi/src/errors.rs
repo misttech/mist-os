@@ -4,45 +4,28 @@
 
 #![allow(dead_code)]
 
-use crate::uapi;
-
 use std::fmt::{Debug, Display, Formatter};
 
+#[derive(Clone, Debug)]
 pub struct Errno {
     pub code: ErrnoCode,
-    anyhow: Option<anyhow::Error>,
+    location: &'static std::panic::Location<'static>,
+    context: Option<String>,
 }
 
 impl Errno {
     #[track_caller]
-    pub fn new(code: ErrnoCode, name: &'static str, context: Option<String>) -> Errno {
-        Errno {
-            code,
-            anyhow: Some(anyhow::format_err!(
-                "{} ({}), source: {}, context: {}",
-                name,
-                code,
-                std::panic::Location::caller(),
-                context.as_ref().unwrap_or(&"None".to_string())
-            )),
-        }
+    pub fn new(code: ErrnoCode) -> Self {
+        Errno { code, location: std::panic::Location::caller(), context: None }
     }
 
-    /// Returns a new `Result` that is an `Err` with an `Errno` with the given `code`. This error
-    /// has no context, and as such, is cheap to built.
-    pub fn fail<A>(code: ErrnoCode) -> Result<A, Errno> {
-        Err(Errno { code, anyhow: None })
+    #[track_caller]
+    pub fn with_context(code: ErrnoCode, context: impl ToString) -> Self {
+        Errno { code, location: std::panic::Location::caller(), context: Some(context.to_string()) }
     }
 
     pub fn return_value(&self) -> u64 {
         self.code.return_value()
-    }
-}
-
-impl Clone for Errno {
-    fn clone(&self) -> Self {
-        let anyhow = self.anyhow.as_ref().map(|e| anyhow::anyhow!(e.to_string()));
-        Errno { code: self.code, anyhow }
     }
 }
 
@@ -62,13 +45,10 @@ impl Eq for Errno {}
 
 impl Display for Errno {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.anyhow {
-            Some(details) => {
-                write!(f, "errno {}, details: {details}", self.code)
-            }
-            None => {
-                write!(f, "errno {} from unknown location", self.code)
-            }
+        if let Some(context) = &self.context {
+            write!(f, "errno {} from {}, context: {}", self.code, self.location, context)
+        } else {
+            write!(f, "errno {} from {}", self.code, self.location)
         }
     }
 }
@@ -78,42 +58,32 @@ impl std::error::Error for Errno {}
 impl From<Errno> for zx_status::Status {
     fn from(e: Errno) -> Self {
         match e.code.error_code() {
-            uapi::ENOENT => zx_status::Status::NOT_FOUND,
-            uapi::ENOMEM => zx_status::Status::NO_MEMORY,
-            uapi::EINVAL => zx_status::Status::INVALID_ARGS,
-            uapi::ETIMEDOUT => zx_status::Status::TIMED_OUT,
-            uapi::EBUSY => zx_status::Status::UNAVAILABLE,
-            uapi::EEXIST => zx_status::Status::ALREADY_EXISTS,
-            uapi::EPIPE => zx_status::Status::PEER_CLOSED,
-            uapi::ENAMETOOLONG => zx_status::Status::BAD_PATH,
-            uapi::EIO => zx_status::Status::IO,
-            uapi::EISDIR => zx_status::Status::NOT_FILE,
-            uapi::ENOTDIR => zx_status::Status::NOT_DIR,
-            uapi::EOPNOTSUPP => zx_status::Status::NOT_SUPPORTED,
-            uapi::EBADF => zx_status::Status::BAD_HANDLE,
-            uapi::EACCES => zx_status::Status::ACCESS_DENIED,
-            uapi::EAGAIN => zx_status::Status::SHOULD_WAIT,
-            uapi::EFBIG => zx_status::Status::FILE_BIG,
-            uapi::ENOSPC => zx_status::Status::NO_SPACE,
-            uapi::ENOTEMPTY => zx_status::Status::NOT_EMPTY,
-            uapi::EPROTONOSUPPORT => zx_status::Status::PROTOCOL_NOT_SUPPORTED,
-            uapi::ENETUNREACH => zx_status::Status::ADDRESS_UNREACHABLE,
-            uapi::EADDRINUSE => zx_status::Status::ADDRESS_IN_USE,
-            uapi::ENOTCONN => zx_status::Status::NOT_CONNECTED,
-            uapi::ECONNREFUSED => zx_status::Status::CONNECTION_REFUSED,
-            uapi::ECONNRESET => zx_status::Status::CONNECTION_RESET,
-            uapi::ECONNABORTED => zx_status::Status::CONNECTION_ABORTED,
+            crate::uapi::ENOENT => zx_status::Status::NOT_FOUND,
+            crate::uapi::ENOMEM => zx_status::Status::NO_MEMORY,
+            crate::uapi::EINVAL => zx_status::Status::INVALID_ARGS,
+            crate::uapi::ETIMEDOUT => zx_status::Status::TIMED_OUT,
+            crate::uapi::EBUSY => zx_status::Status::UNAVAILABLE,
+            crate::uapi::EEXIST => zx_status::Status::ALREADY_EXISTS,
+            crate::uapi::EPIPE => zx_status::Status::PEER_CLOSED,
+            crate::uapi::ENAMETOOLONG => zx_status::Status::BAD_PATH,
+            crate::uapi::EIO => zx_status::Status::IO,
+            crate::uapi::EISDIR => zx_status::Status::NOT_FILE,
+            crate::uapi::ENOTDIR => zx_status::Status::NOT_DIR,
+            crate::uapi::EOPNOTSUPP => zx_status::Status::NOT_SUPPORTED,
+            crate::uapi::EBADF => zx_status::Status::BAD_HANDLE,
+            crate::uapi::EACCES => zx_status::Status::ACCESS_DENIED,
+            crate::uapi::EAGAIN => zx_status::Status::SHOULD_WAIT,
+            crate::uapi::EFBIG => zx_status::Status::FILE_BIG,
+            crate::uapi::ENOSPC => zx_status::Status::NO_SPACE,
+            crate::uapi::ENOTEMPTY => zx_status::Status::NOT_EMPTY,
+            crate::uapi::EPROTONOSUPPORT => zx_status::Status::PROTOCOL_NOT_SUPPORTED,
+            crate::uapi::ENETUNREACH => zx_status::Status::ADDRESS_UNREACHABLE,
+            crate::uapi::EADDRINUSE => zx_status::Status::ADDRESS_IN_USE,
+            crate::uapi::ENOTCONN => zx_status::Status::NOT_CONNECTED,
+            crate::uapi::ECONNREFUSED => zx_status::Status::CONNECTION_REFUSED,
+            crate::uapi::ECONNRESET => zx_status::Status::CONNECTION_RESET,
+            crate::uapi::ECONNABORTED => zx_status::Status::CONNECTION_ABORTED,
             _ => zx_status::Status::NOT_SUPPORTED,
-        }
-    }
-}
-
-impl Debug for Errno {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(err) = self.anyhow.as_ref() {
-            Debug::fmt(&err, f)
-        } else {
-            write!(f, "error {} from unknown location", self.code)
         }
     }
 }
@@ -147,7 +117,7 @@ impl ErrnoCode {
 
 impl Display for ErrnoCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}({})", self.name(), self.0)
     }
 }
 
@@ -189,139 +159,167 @@ impl<T> ErrnoResultExt<T> for Result<T, Errno> {
     }
 }
 
-pub const EPERM: ErrnoCode = ErrnoCode(uapi::EPERM);
-pub const ENOENT: ErrnoCode = ErrnoCode(uapi::ENOENT);
-pub const ESRCH: ErrnoCode = ErrnoCode(uapi::ESRCH);
-pub const EINTR: ErrnoCode = ErrnoCode(uapi::EINTR);
-pub const EIO: ErrnoCode = ErrnoCode(uapi::EIO);
-pub const ENXIO: ErrnoCode = ErrnoCode(uapi::ENXIO);
-pub const E2BIG: ErrnoCode = ErrnoCode(uapi::E2BIG);
-pub const ENOEXEC: ErrnoCode = ErrnoCode(uapi::ENOEXEC);
-pub const EBADF: ErrnoCode = ErrnoCode(uapi::EBADF);
-pub const ECHILD: ErrnoCode = ErrnoCode(uapi::ECHILD);
-pub const EAGAIN: ErrnoCode = ErrnoCode(uapi::EAGAIN);
-pub const ENOMEM: ErrnoCode = ErrnoCode(uapi::ENOMEM);
-pub const EACCES: ErrnoCode = ErrnoCode(uapi::EACCES);
-pub const EFAULT: ErrnoCode = ErrnoCode(uapi::EFAULT);
-pub const ENOTBLK: ErrnoCode = ErrnoCode(uapi::ENOTBLK);
-pub const EBUSY: ErrnoCode = ErrnoCode(uapi::EBUSY);
-pub const EEXIST: ErrnoCode = ErrnoCode(uapi::EEXIST);
-pub const EXDEV: ErrnoCode = ErrnoCode(uapi::EXDEV);
-pub const ENODEV: ErrnoCode = ErrnoCode(uapi::ENODEV);
-pub const ENOTDIR: ErrnoCode = ErrnoCode(uapi::ENOTDIR);
-pub const EISDIR: ErrnoCode = ErrnoCode(uapi::EISDIR);
-pub const EINVAL: ErrnoCode = ErrnoCode(uapi::EINVAL);
-pub const ENFILE: ErrnoCode = ErrnoCode(uapi::ENFILE);
-pub const EMFILE: ErrnoCode = ErrnoCode(uapi::EMFILE);
-pub const ENOTTY: ErrnoCode = ErrnoCode(uapi::ENOTTY);
-pub const ETXTBSY: ErrnoCode = ErrnoCode(uapi::ETXTBSY);
-pub const EFBIG: ErrnoCode = ErrnoCode(uapi::EFBIG);
-pub const ENOSPC: ErrnoCode = ErrnoCode(uapi::ENOSPC);
-pub const ESPIPE: ErrnoCode = ErrnoCode(uapi::ESPIPE);
-pub const EROFS: ErrnoCode = ErrnoCode(uapi::EROFS);
-pub const EMLINK: ErrnoCode = ErrnoCode(uapi::EMLINK);
-pub const EPIPE: ErrnoCode = ErrnoCode(uapi::EPIPE);
-pub const EDOM: ErrnoCode = ErrnoCode(uapi::EDOM);
-pub const ERANGE: ErrnoCode = ErrnoCode(uapi::ERANGE);
-pub const EDEADLK: ErrnoCode = ErrnoCode(uapi::EDEADLK);
-pub const ENAMETOOLONG: ErrnoCode = ErrnoCode(uapi::ENAMETOOLONG);
-pub const ENOLCK: ErrnoCode = ErrnoCode(uapi::ENOLCK);
-pub const ENOSYS: ErrnoCode = ErrnoCode(uapi::ENOSYS);
-pub const ENOTEMPTY: ErrnoCode = ErrnoCode(uapi::ENOTEMPTY);
-pub const ELOOP: ErrnoCode = ErrnoCode(uapi::ELOOP);
-pub const EWOULDBLOCK: ErrnoCode = ErrnoCode(uapi::EWOULDBLOCK);
-pub const ENOMSG: ErrnoCode = ErrnoCode(uapi::ENOMSG);
-pub const EIDRM: ErrnoCode = ErrnoCode(uapi::EIDRM);
-pub const ECHRNG: ErrnoCode = ErrnoCode(uapi::ECHRNG);
-pub const EL2NSYNC: ErrnoCode = ErrnoCode(uapi::EL2NSYNC);
-pub const EL3HLT: ErrnoCode = ErrnoCode(uapi::EL3HLT);
-pub const EL3RST: ErrnoCode = ErrnoCode(uapi::EL3RST);
-pub const ELNRNG: ErrnoCode = ErrnoCode(uapi::ELNRNG);
-pub const EUNATCH: ErrnoCode = ErrnoCode(uapi::EUNATCH);
-pub const ENOCSI: ErrnoCode = ErrnoCode(uapi::ENOCSI);
-pub const EL2HLT: ErrnoCode = ErrnoCode(uapi::EL2HLT);
-pub const EBADE: ErrnoCode = ErrnoCode(uapi::EBADE);
-pub const EBADR: ErrnoCode = ErrnoCode(uapi::EBADR);
-pub const EXFULL: ErrnoCode = ErrnoCode(uapi::EXFULL);
-pub const ENOANO: ErrnoCode = ErrnoCode(uapi::ENOANO);
-pub const EBADRQC: ErrnoCode = ErrnoCode(uapi::EBADRQC);
-pub const EBADSLT: ErrnoCode = ErrnoCode(uapi::EBADSLT);
-pub const EDEADLOCK: ErrnoCode = ErrnoCode(uapi::EDEADLOCK);
-pub const EBFONT: ErrnoCode = ErrnoCode(uapi::EBFONT);
-pub const ENOSTR: ErrnoCode = ErrnoCode(uapi::ENOSTR);
-pub const ENODATA: ErrnoCode = ErrnoCode(uapi::ENODATA);
-pub const ETIME: ErrnoCode = ErrnoCode(uapi::ETIME);
-pub const ENOSR: ErrnoCode = ErrnoCode(uapi::ENOSR);
-pub const ENONET: ErrnoCode = ErrnoCode(uapi::ENONET);
-pub const ENOPKG: ErrnoCode = ErrnoCode(uapi::ENOPKG);
-pub const EREMOTE: ErrnoCode = ErrnoCode(uapi::EREMOTE);
-pub const ENOLINK: ErrnoCode = ErrnoCode(uapi::ENOLINK);
-pub const EADV: ErrnoCode = ErrnoCode(uapi::EADV);
-pub const ESRMNT: ErrnoCode = ErrnoCode(uapi::ESRMNT);
-pub const ECOMM: ErrnoCode = ErrnoCode(uapi::ECOMM);
-pub const EPROTO: ErrnoCode = ErrnoCode(uapi::EPROTO);
-pub const EMULTIHOP: ErrnoCode = ErrnoCode(uapi::EMULTIHOP);
-pub const EDOTDOT: ErrnoCode = ErrnoCode(uapi::EDOTDOT);
-pub const EBADMSG: ErrnoCode = ErrnoCode(uapi::EBADMSG);
-pub const EOVERFLOW: ErrnoCode = ErrnoCode(uapi::EOVERFLOW);
-pub const ENOTUNIQ: ErrnoCode = ErrnoCode(uapi::ENOTUNIQ);
-pub const EBADFD: ErrnoCode = ErrnoCode(uapi::EBADFD);
-pub const EREMCHG: ErrnoCode = ErrnoCode(uapi::EREMCHG);
-pub const ELIBACC: ErrnoCode = ErrnoCode(uapi::ELIBACC);
-pub const ELIBBAD: ErrnoCode = ErrnoCode(uapi::ELIBBAD);
-pub const ELIBSCN: ErrnoCode = ErrnoCode(uapi::ELIBSCN);
-pub const ELIBMAX: ErrnoCode = ErrnoCode(uapi::ELIBMAX);
-pub const ELIBEXEC: ErrnoCode = ErrnoCode(uapi::ELIBEXEC);
-pub const EILSEQ: ErrnoCode = ErrnoCode(uapi::EILSEQ);
-pub const ERESTART: ErrnoCode = ErrnoCode(uapi::ERESTART);
-pub const ESTRPIPE: ErrnoCode = ErrnoCode(uapi::ESTRPIPE);
-pub const EUSERS: ErrnoCode = ErrnoCode(uapi::EUSERS);
-pub const ENOTSOCK: ErrnoCode = ErrnoCode(uapi::ENOTSOCK);
-pub const EDESTADDRREQ: ErrnoCode = ErrnoCode(uapi::EDESTADDRREQ);
-pub const EMSGSIZE: ErrnoCode = ErrnoCode(uapi::EMSGSIZE);
-pub const EPROTOTYPE: ErrnoCode = ErrnoCode(uapi::EPROTOTYPE);
-pub const ENOPROTOOPT: ErrnoCode = ErrnoCode(uapi::ENOPROTOOPT);
-pub const EPROTONOSUPPORT: ErrnoCode = ErrnoCode(uapi::EPROTONOSUPPORT);
-pub const ESOCKTNOSUPPORT: ErrnoCode = ErrnoCode(uapi::ESOCKTNOSUPPORT);
-pub const EOPNOTSUPP: ErrnoCode = ErrnoCode(uapi::EOPNOTSUPP);
-pub const EPFNOSUPPORT: ErrnoCode = ErrnoCode(uapi::EPFNOSUPPORT);
-pub const EAFNOSUPPORT: ErrnoCode = ErrnoCode(uapi::EAFNOSUPPORT);
-pub const EADDRINUSE: ErrnoCode = ErrnoCode(uapi::EADDRINUSE);
-pub const EADDRNOTAVAIL: ErrnoCode = ErrnoCode(uapi::EADDRNOTAVAIL);
-pub const ENETDOWN: ErrnoCode = ErrnoCode(uapi::ENETDOWN);
-pub const ENETUNREACH: ErrnoCode = ErrnoCode(uapi::ENETUNREACH);
-pub const ENETRESET: ErrnoCode = ErrnoCode(uapi::ENETRESET);
-pub const ECONNABORTED: ErrnoCode = ErrnoCode(uapi::ECONNABORTED);
-pub const ECONNRESET: ErrnoCode = ErrnoCode(uapi::ECONNRESET);
-pub const ENOBUFS: ErrnoCode = ErrnoCode(uapi::ENOBUFS);
-pub const EISCONN: ErrnoCode = ErrnoCode(uapi::EISCONN);
-pub const ENOTCONN: ErrnoCode = ErrnoCode(uapi::ENOTCONN);
-pub const ESHUTDOWN: ErrnoCode = ErrnoCode(uapi::ESHUTDOWN);
-pub const ETOOMANYREFS: ErrnoCode = ErrnoCode(uapi::ETOOMANYREFS);
-pub const ETIMEDOUT: ErrnoCode = ErrnoCode(uapi::ETIMEDOUT);
-pub const ECONNREFUSED: ErrnoCode = ErrnoCode(uapi::ECONNREFUSED);
-pub const EHOSTDOWN: ErrnoCode = ErrnoCode(uapi::EHOSTDOWN);
-pub const EHOSTUNREACH: ErrnoCode = ErrnoCode(uapi::EHOSTUNREACH);
-pub const EALREADY: ErrnoCode = ErrnoCode(uapi::EALREADY);
-pub const EINPROGRESS: ErrnoCode = ErrnoCode(uapi::EINPROGRESS);
-pub const ESTALE: ErrnoCode = ErrnoCode(uapi::ESTALE);
-pub const EUCLEAN: ErrnoCode = ErrnoCode(uapi::EUCLEAN);
-pub const ENOTNAM: ErrnoCode = ErrnoCode(uapi::ENOTNAM);
-pub const ENAVAIL: ErrnoCode = ErrnoCode(uapi::ENAVAIL);
-pub const EISNAM: ErrnoCode = ErrnoCode(uapi::EISNAM);
-pub const EREMOTEIO: ErrnoCode = ErrnoCode(uapi::EREMOTEIO);
-pub const EDQUOT: ErrnoCode = ErrnoCode(uapi::EDQUOT);
-pub const ENOMEDIUM: ErrnoCode = ErrnoCode(uapi::ENOMEDIUM);
-pub const EMEDIUMTYPE: ErrnoCode = ErrnoCode(uapi::EMEDIUMTYPE);
-pub const ECANCELED: ErrnoCode = ErrnoCode(uapi::ECANCELED);
-pub const ENOKEY: ErrnoCode = ErrnoCode(uapi::ENOKEY);
-pub const EKEYEXPIRED: ErrnoCode = ErrnoCode(uapi::EKEYEXPIRED);
-pub const EKEYREVOKED: ErrnoCode = ErrnoCode(uapi::EKEYREVOKED);
-pub const EKEYREJECTED: ErrnoCode = ErrnoCode(uapi::EKEYREJECTED);
-pub const EOWNERDEAD: ErrnoCode = ErrnoCode(uapi::EOWNERDEAD);
-pub const ENOTRECOVERABLE: ErrnoCode = ErrnoCode(uapi::ENOTRECOVERABLE);
-pub const ERFKILL: ErrnoCode = ErrnoCode(uapi::ERFKILL);
-pub const EHWPOISON: ErrnoCode = ErrnoCode(uapi::EHWPOISON);
+macro_rules! errno_codes {
+    ($($name:ident),+) => {
+        $(pub const $name: ErrnoCode = ErrnoCode(crate::uapi::$name);)+
+
+        impl ErrnoCode {
+            fn name(&self) -> &'static str {
+                match self.0 {
+                    $(
+                        crate::uapi::$name => stringify!($name),
+                    )+
+                    _ => "unknown error code",
+                }
+            }
+        }
+
+        #[cfg(test)]
+        #[test]
+        fn expected_errno_code_strings() {
+            $(
+                assert_eq!(
+                    $name.to_string(),
+                    format!("{}({})", stringify!($name), crate::uapi::$name),
+                );
+            )+
+        }
+    };
+}
+
+errno_codes![
+    EPERM,
+    ENOENT,
+    ESRCH,
+    EINTR,
+    EIO,
+    ENXIO,
+    E2BIG,
+    ENOEXEC,
+    EBADF,
+    ECHILD,
+    EAGAIN,
+    ENOMEM,
+    EACCES,
+    EFAULT,
+    ENOTBLK,
+    EBUSY,
+    EEXIST,
+    EXDEV,
+    ENODEV,
+    ENOTDIR,
+    EISDIR,
+    EINVAL,
+    ENFILE,
+    EMFILE,
+    ENOTTY,
+    ETXTBSY,
+    EFBIG,
+    ENOSPC,
+    ESPIPE,
+    EROFS,
+    EMLINK,
+    EPIPE,
+    EDOM,
+    ERANGE,
+    ENAMETOOLONG,
+    ENOLCK,
+    ENOSYS,
+    ENOTEMPTY,
+    ELOOP,
+    ENOMSG,
+    EIDRM,
+    ECHRNG,
+    EL2NSYNC,
+    EL3HLT,
+    EL3RST,
+    ELNRNG,
+    EUNATCH,
+    ENOCSI,
+    EL2HLT,
+    EBADE,
+    EBADR,
+    EXFULL,
+    ENOANO,
+    EBADRQC,
+    EBADSLT,
+    EDEADLOCK,
+    EBFONT,
+    ENOSTR,
+    ENODATA,
+    ETIME,
+    ENOSR,
+    ENONET,
+    ENOPKG,
+    EREMOTE,
+    ENOLINK,
+    EADV,
+    ESRMNT,
+    ECOMM,
+    EPROTO,
+    EMULTIHOP,
+    EDOTDOT,
+    EBADMSG,
+    EOVERFLOW,
+    ENOTUNIQ,
+    EBADFD,
+    EREMCHG,
+    ELIBACC,
+    ELIBBAD,
+    ELIBSCN,
+    ELIBMAX,
+    ELIBEXEC,
+    EILSEQ,
+    ERESTART,
+    ESTRPIPE,
+    EUSERS,
+    ENOTSOCK,
+    EDESTADDRREQ,
+    EMSGSIZE,
+    EPROTOTYPE,
+    ENOPROTOOPT,
+    EPROTONOSUPPORT,
+    ESOCKTNOSUPPORT,
+    EOPNOTSUPP,
+    EPFNOSUPPORT,
+    EAFNOSUPPORT,
+    EADDRINUSE,
+    EADDRNOTAVAIL,
+    ENETDOWN,
+    ENETUNREACH,
+    ENETRESET,
+    ECONNABORTED,
+    ECONNRESET,
+    ENOBUFS,
+    EISCONN,
+    ENOTCONN,
+    ESHUTDOWN,
+    ETOOMANYREFS,
+    ETIMEDOUT,
+    ECONNREFUSED,
+    EHOSTDOWN,
+    EHOSTUNREACH,
+    EALREADY,
+    EINPROGRESS,
+    ESTALE,
+    EUCLEAN,
+    ENOTNAM,
+    ENAVAIL,
+    EISNAM,
+    EREMOTEIO,
+    EDQUOT,
+    ENOMEDIUM,
+    EMEDIUMTYPE,
+    ECANCELED,
+    ENOKEY,
+    EKEYEXPIRED,
+    EKEYREVOKED,
+    EKEYREJECTED,
+    EOWNERDEAD,
+    ENOTRECOVERABLE,
+    ERFKILL,
+    EHWPOISON
+];
 
 // ENOTSUP is a different error in posix, but has the same value as EOPNOTSUPP in linux.
 pub const ENOTSUP: ErrnoCode = EOPNOTSUPP;
@@ -332,14 +330,10 @@ pub const ENOTSUP: ErrnoCode = EOPNOTSUPP;
 #[macro_export]
 macro_rules! errno {
     ($err:ident) => {
-        $crate::errors::Errno::new($crate::errors::$err, stringify!($err), None)
+        $crate::errors::Errno::new($crate::errors::$err)
     };
     ($err:ident, $context:expr) => {
-        $crate::errors::Errno::new(
-            $crate::errors::$err,
-            stringify!($err),
-            Some($context.to_string()),
-        )
+        $crate::errors::Errno::with_context($crate::errors::$err, $context.to_string())
     };
 }
 
@@ -357,8 +351,7 @@ macro_rules! error {
 #[macro_export]
 macro_rules! errno_from_code {
     ($err:expr) => {{
-        let errno = $crate::errors::ErrnoCode::from_error_code($err);
-        $crate::errors::Errno::new(errno, stringify!($err), None)
+        $crate::errors::Errno::new($crate::errors::ErrnoCode::from_error_code($err))
     }};
 }
 
@@ -367,8 +360,7 @@ macro_rules! errno_from_code {
 #[macro_export]
 macro_rules! errno_from_zxio_code {
     ($err:expr) => {{
-        let code = $err.raw();
-        $crate::errno_from_code!(code)
+        $crate::errno_from_code!($err.raw())
     }};
 }
 
@@ -483,8 +475,25 @@ mod tests {
     use std::panic::Location;
 
     #[test]
+    fn basic_errno_formatting() {
+        let location = std::panic::Location::caller();
+        let errno = Errno { code: ENOENT, location, context: None };
+        assert_eq!(errno.to_string(), format!("errno ENOENT(2) from {}", location));
+    }
+
+    #[test]
+    fn context_errno_formatting() {
+        let location = std::panic::Location::caller();
+        let errno = Errno { code: ENOENT, location, context: Some("TEST CONTEXT".to_string()) };
+        assert_eq!(
+            errno.to_string(),
+            format!("errno ENOENT(2) from {}, context: TEST CONTEXT", location)
+        );
+    }
+
+    #[test]
     fn with_source_context() {
-        let errno = Errno { code: ENOENT, anyhow: None };
+        let errno = Errno { code: ENOENT, location: std::panic::Location::caller(), context: None };
         let result: Result<(), Errno> = Err(errno);
         let error = result.with_source_context(|| format!("42")).unwrap_err();
         let line_after_error = Location::caller();
@@ -492,7 +501,7 @@ mod tests {
             format!("42, {}:{}:", line_after_error.file(), line_after_error.line() - 1,);
         assert!(
             error.to_string().starts_with(&expected_prefix),
-            "{:?} must start with {:?}",
+            "{} must start with {}",
             error,
             expected_prefix
         );
@@ -500,7 +509,7 @@ mod tests {
 
     #[test]
     fn source_context() {
-        let errno = Errno { code: ENOENT, anyhow: None };
+        let errno = Errno { code: ENOENT, location: std::panic::Location::caller(), context: None };
         let result: Result<(), Errno> = Err(errno);
         let error = result.source_context("42").unwrap_err();
         let line_after_error = Location::caller();
@@ -508,7 +517,7 @@ mod tests {
             format!("42, {}:{}:", line_after_error.file(), line_after_error.line() - 1,);
         assert!(
             error.to_string().starts_with(&expected_prefix),
-            "{:?} must start with {:?}",
+            "{} must start with {}",
             error,
             expected_prefix
         );

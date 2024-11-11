@@ -173,7 +173,7 @@ impl<Key: FutexKey> FutexTable<Key> {
                     //          (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
                     //          FUTEX_CMP_REQUEUE_PI) The futex word at uaddr is already
                     //          locked by the caller.
-                    return error!(EDEADLK);
+                    return error!(EDEADLOCK);
                 }
 
                 if current_value == 0 {

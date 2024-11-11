@@ -422,7 +422,7 @@ impl FileObject {
 
             // 4. The operation cannot be done at this time.
             if !operation.is_blocking() {
-                return error!(EWOULDBLOCK);
+                return error!(EAGAIN);
             }
 
             // Register a waiter to be notified when the lock is released. Release the lock on

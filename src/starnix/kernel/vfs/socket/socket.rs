@@ -891,7 +891,7 @@ where
             // cast the value to an `i64` to check that it is a
             // valid (negative) errno value.
             let code = ErrnoCode::from_return_value(code.get() as u64);
-            return Err(Errno::new(code, "error code from RTM_GETLINK", None));
+            return Err(Errno::with_context(code, "error code from RTM_GETLINK"));
         }
         NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewLink(msg)) => msg,
         // netlink is only expected to return an error or
@@ -1024,7 +1024,7 @@ where
             // cast the value to an `i64` to check that it is a
             // valid (negative) errno value.
             let code = ErrnoCode::from_return_value(code.get() as u64);
-            Err(Errno::new(code, "error code from RTM_SETLINK", None))
+            Err(Errno::with_context(code, "error code from RTM_SETLINK"))
         }
         // `ErrorMessage` with no code represents an ACK.
         NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => Ok(()),
