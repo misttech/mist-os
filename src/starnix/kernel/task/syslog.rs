@@ -393,7 +393,7 @@ fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
         Severity::Error => 3,
         Severity::Fatal => 2,
     };
-    let time = zx::MonotonicDuration::from_nanos(data.metadata.timestamp.into_nanos());
+    let time = zx::BootDuration::from_nanos(data.metadata.timestamp.into_nanos());
     let component_name = data.component_name();
     let time_secs = time.into_seconds();
     let time_fract = time.into_micros() % 1_000_000;
