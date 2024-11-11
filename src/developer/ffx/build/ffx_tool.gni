@@ -5,6 +5,7 @@
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/sdk/sdk_atom.gni")
+import("//build/testing/host_test_data.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
@@ -87,22 +88,6 @@ template("ffx_tool") {
   output_unversioned = "${output_name}_unversioned"
   output_metadata = "${output_name}.json"
 
-  assert_no_deps = []
-  if (defined(invoker.assert_no_deps)) {
-    assert_no_deps += invoker.assert_no_deps
-  }
-
-  # TODO(b/314822328): improve this logic to cascade properly
-  if (defined(invoker.sdk_category) && invoker.sdk_category != "internal") {
-    assert_no_deps += [
-      "//sdk:marker-cts",
-      "//sdk:marker-excluded",
-      "//sdk:marker-experimental",
-      "//sdk:marker-internal",
-      "//sdk:marker-unknown",
-    ]
-  }
-
   # Make the rust binary
   rustc_binary(target_unversioned) {
     output_name = output_unversioned
@@ -114,7 +99,6 @@ template("ffx_tool") {
                              "sdk_category",
                              "sdk_area",
                              "sdk_deps",
-                             "assert_no_deps",
                            ])
   }
 
@@ -202,7 +186,12 @@ template("ffx_tool") {
 
   # Install host tool and metadata as test data
   host_test_data(target_test_data) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
 
     data_deps = [ ":$target_host_tool" ]
     sources = [
@@ -224,7 +213,11 @@ template("ffx_tool") {
     # for the moment this goes directly to sdk_atom because this is a 'weird'
     # host tool that includes a json metadata file.
     sdk_atom(invoker.sdk_target_name) {
-      forward_variables_from(invoker, [ "sdk_area" ])
+      forward_variables_from(invoker,
+                             [
+                               "assert_no_deps",
+                               "sdk_area",
+                             ])
 
       category = invoker.sdk_category
       id = "sdk://$file_base"
@@ -277,6 +270,20 @@ template("ffx_tool") {
         ":$target_metadata",
         ":$target_versioned",
       ]
+
+      # TODO(b/314822328): improve this logic to cascade properly
+      if (invoker.sdk_category != "internal") {
+        if (!defined(assert_no_deps)) {
+          assert_no_deps = []
+        }
+        assert_no_deps += [
+          "//sdk:marker-cts",
+          "//sdk:marker-excluded",
+          "//sdk:marker-experimental",
+          "//sdk:marker-internal",
+          "//sdk:marker-unknown",
+        ]
+      }
     }
   }
 }

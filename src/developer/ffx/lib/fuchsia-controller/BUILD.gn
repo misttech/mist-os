@@ -12,6 +12,8 @@ import("//tools/fidl/gidl/gidl.gni")
 
 assert(is_host)
 
+visibility = [ ":*" ]
+
 conformance_test_source = "$target_gen_dir/conformance_test.py"
 
 gidl("conformance_tests_py") {
@@ -20,7 +22,6 @@ gidl("conformance_tests_py") {
   inputs = conformance_suite_gidl_files
   fidl = conformance_suite_fidl_target
   output = conformance_test_source
-  visibility = [ ":*" ]
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
@@ -37,6 +38,7 @@ python_host_test("fuchsia_controller_conformance_tests") {
 }
 
 rustc_staticlib("lib") {
+  visibility += [ "tests:*" ]
   output_name = "fuchsia_controller"
   edition = "2021"
   with_unit_tests = true
@@ -75,6 +77,11 @@ rustc_staticlib("lib") {
 }
 
 python_c_extension("fidl_codec") {
+  visibility += [
+    "tests:*",
+    "//src/testing/end_to_end/*",
+    "//src/tests/end_to_end/*",
+  ]
   sources = [
     "cpp/abi/convert.h",
     "cpp/abi/macros.h",
@@ -103,6 +110,10 @@ python_c_extension("fidl_codec") {
 }
 
 python_c_extension("fuchsia_controller_internal") {
+  visibility += [
+    "//src/testing/end_to_end/*",
+    "//src/tests/end_to_end/*",
+  ]
   sources = [
     "cpp/abi/convert.h",
     "cpp/abi/error.cc",
@@ -124,17 +135,12 @@ python_c_extension("fuchsia_controller_internal") {
     "//zircon/system/public",
   ]
 
-  # make sure no fidl libraries not in the SDK are used.
-  assert_no_deps = [
-    "//sdk:marker-internal",
-    "//sdk:marker-unknown",
-  ]
-
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 python_library("fuchsia_controller_py") {
+  visibility += [ "tests:*" ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
@@ -145,11 +151,24 @@ python_library("fuchsia_controller_py") {
     "__init__.py",
     "wrappers.py",
   ]
+
+  # make sure no fidl libraries not in the SDK are used.
+  assert_no_deps = [
+    "//sdk:marker-internal",
+    "//sdk:marker-unknown",
+  ]
 }
 
 python_library("fidl_bindings") {
+  visibility += [
+    "./*",
+    "tests:*",
+    "//src/testing/end_to_end/honeydew:*",
+  ]
+
   # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
   enable_mypy = false
+
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
@@ -169,6 +188,7 @@ python_library("fidl_bindings") {
 }
 
 python_binary("example") {
+  testonly = true
   main_source = "python/example.py"
   deps = [
     ":fidl_bindings",
@@ -180,6 +200,7 @@ python_binary("example") {
 
 group("fuchsia-controller") {
   testonly = true
+  visibility += [ "//src/developer/ffx/lib" ]
   deps = [
     ":example",
     ":fidl_codec",
@@ -189,6 +210,7 @@ group("fuchsia-controller") {
 
 group("tests") {
   testonly = true
+  visibility += [ "*" ]
   deps = [
     ":lib_test",
     "tests:fuchsia_controller_encode_test",
@@ -214,6 +236,7 @@ group("tests") {
 
 group("host_tests") {
   testonly = true
+  visibility += [ "//src/developer/ffx/lib:host_tests" ]
   deps = []
 
   # TODO(https://fxbug.dev/42078138): These tests fail on mac builders. This is most likely

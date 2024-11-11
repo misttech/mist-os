@@ -163,18 +163,6 @@ template("ffx_plugin") {
                                  "with_unit_tests",
                                  "original_target_name",
                                ])
-
-        # make sure no fidl libraries not in the SDK are used if it's public
-        # TODO(b/314822328): improve this logic to cascade properly
-        if (sdk_category != "internal") {
-          assert_no_deps = [
-            "//sdk:marker-cts",
-            "//sdk:marker-excluded",
-            "//sdk:marker-experimental",
-            "//sdk:marker-internal",
-            "//sdk:marker-unknown",
-          ]
-        }
         deps += [ "//sdk:marker-$sdk_category" ]
       }
 
@@ -331,18 +319,6 @@ template("ffx_plugin") {
                                  "original_target_name",
                                ])
         original_target_name = _original_target_name
-
-        # make sure no fidl libraries not in the SDK are used if it's public
-        # TODO(b/314822328): improve this logic to cascade properly
-        if (sdk_category != "internal") {
-          assert_no_deps = [
-            "//sdk:marker-cts",
-            "//sdk:marker-excluded",
-            "//sdk:marker-experimental",
-            "//sdk:marker-internal",
-            "//sdk:marker-unknown",
-          ]
-        }
         deps += [ "//sdk:marker-$sdk_category" ]
       }
       suite_deps += [ ":" + crate_name ]
@@ -375,6 +351,23 @@ template("ffx_plugin") {
                                "with_unit_tests",
                                "original_target_name",
                              ])
+
+      # make sure no fidl libraries not in the SDK are used if it's public
+      # This target includes all other targets defined above, so this
+      # `assert_no_deps` covers all of them.
+      # TODO(b/314822328): improve this logic to cascade properly
+      if (sdk_category != "internal") {
+        if (!defined(assert_no_deps)) {
+          assert_no_deps = []
+        }
+        assert_no_deps += [
+          "//sdk:marker-cts",
+          "//sdk:marker-excluded",
+          "//sdk:marker-experimental",
+          "//sdk:marker-internal",
+          "//sdk:marker-unknown",
+        ]
+      }
     }
   } else {
     not_needed(invoker, "*")

@@ -83,6 +83,7 @@ template("host_test_data") {
       testonly = _testonly
       forward_variables_from(invoker,
                              [
+                               "assert_no_deps",
                                "deps",
                                "data_deps",
                                "public_deps",

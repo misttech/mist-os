@@ -40,8 +40,9 @@ import("//build/sdk/sdk_atom.gni")
 #   sdk_area (optional)
 #     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
-
 template("sdk_python_mobly_test") {
+  visibility = []
+
   assert(defined(invoker.category), "Must define an SDK category")
   assert(defined(invoker.sdk_name),
          "Must define a distribution name for this test.")
@@ -70,7 +71,7 @@ template("sdk_python_mobly_test") {
   _test_sources_target = "${target_name}_test_sources"
   _test_sources_file = "${target_gen_dir}/${target_name}_test_sources.json"
   generated_file(_test_sources_target) {
-    visibility = [ ":*" ]
+    visibility = [ ":${_labels.meta_json_and_file_list}" ]
 
     public_deps = [ _labels.full_test_bundle ]
 
@@ -80,6 +81,7 @@ template("sdk_python_mobly_test") {
   }
 
   python_action(_labels.meta_json_and_file_list) {
+    visibility = [ ":*" ]
     binary_label = "//build/python:gen_sdk_metadata_and_file_sources"
 
     inputs = [ _test_sources_file ]
@@ -106,20 +108,12 @@ template("sdk_python_mobly_test") {
       ":${_test_sources_target}",
       _labels.full_test_bundle,
     ]
-
-    # Ensure FIDL-IR dependencies used in the test are supported in SDK.
-    #
-    # TODO(b/330629017): Centralize this group in //sdk somewhere.
-    assert_no_deps = [
-      "//sdk:marker-cts",
-      "//sdk:marker-excluded",
-      "//sdk:marker-experimental",
-      "//sdk:marker-internal",
-      "//sdk:marker-unknown",
-    ]
   }
 
   sdk_atom(target_name) {
+    # TODO(https://fxbug.dev/347094435): Make `sdk_atom()` support `visibility` and uncomment.
+    # visibility = ["//sdk:*"]
+
     forward_variables_from(invoker,
                            [
                              "category",
@@ -137,5 +131,16 @@ template("sdk_python_mobly_test") {
     non_sdk_deps = [ ":${_labels.meta_json_and_file_list}" ]
 
     file_list = _files.file_list
+
+    # Ensure FIDL-IR dependencies used in the test are supported in SDK.
+    #
+    # TODO(b/330629017): Centralize this group in //sdk somewhere.
+    assert_no_deps = [
+      "//sdk:marker-cts",
+      "//sdk:marker-excluded",
+      "//sdk:marker-experimental",
+      "//sdk:marker-internal",
+      "//sdk:marker-unknown",
+    ]
   }
 }

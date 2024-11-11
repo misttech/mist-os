@@ -126,9 +126,9 @@ template("python_library") {
   group_with_inputs(_labels.input_group) {
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "testonly",
                              "visibility",
-                             "assert_no_deps",
                            ])
 
     # Seed with the library_deps, and then add any other deps as well
@@ -158,7 +158,11 @@ template("python_library") {
 
   # Generate library_info.json file with all the library dependencies info
   generated_file(_labels.library_infos) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                           ])
     visibility = [ ":*" ]
     public_deps = [ ":${_labels.input_group}" ]
     outputs = [ _files.library_infos ]
@@ -168,7 +172,12 @@ template("python_library") {
   }
 
   action(_labels.mypy_checker) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
     inputs = [
                "//pyproject.toml",
                "//build/python/package_python_binary.py",
@@ -202,7 +211,12 @@ template("python_library") {
   }
 
   group(target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
     deps = [ ":${_labels.input_group}" ]
     if (_enable_mypy) {
       # Run python type checks using Mypy if enable_mypy flag is set.

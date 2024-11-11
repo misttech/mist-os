@@ -46,17 +46,22 @@ import("//build/python/python_library.gni")
 template("python_c_extension") {
   assert(is_host, "python C extensions can only be built on the host")
 
+  visibility = [ ":*" ]
+
   main_target_name = target_name
   shlib_target_name = "lib${target_name}"
   python_c_extension_shared_lib(shlib_target_name) {
     forward_variables_from(invoker,
                            [
-                             "sources",
-                             "deps",
                              "assert_no_deps",
                              "configs",
+                             "deps",
+                             "sources",
                              "testonly",
                            ])
+    if (defined(invoker.visibility)) {
+      visibility += invoker.visibility
+    }
   }
 
   if (defined(invoker.stubs)) {
@@ -81,8 +86,8 @@ template("python_c_extension") {
   action("${main_target_name}_wrapper") {
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "testonly",
-                             "visibility",
                            ])
     deps = [ ":${shlib_target_name}" ]
 
@@ -102,9 +107,13 @@ template("python_c_extension") {
   python_library(target_name) {
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "testonly",
-                             "visibility",
                            ])
+    if (defined(invoker.visibility)) {
+      visibility += invoker.visibility
+    }
+
     deps = [ ":${main_target_name}_wrapper" ]
     source_root = "${target_gen_dir}/${main_target_name}"
     sources = [ "__init__.py" ]
