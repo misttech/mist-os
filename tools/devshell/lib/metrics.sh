@@ -763,7 +763,6 @@ function track-build-event {
   local switches="$5"
   local fuchsia_targets="$6"
   local build_dir="$7"
-  local target_count="$8"
 
   local args_gn=""
 
@@ -802,7 +801,6 @@ function track-build-event {
     --arg exit_status "${exit_status}" \
     --argjson start_time_micros "${start_time}" \
     --argjson end_time_micros "${end_time}" \
-    --argjson target_count "${target_count}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"
