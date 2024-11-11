@@ -54,7 +54,7 @@ impl DeviceOps for SocketTunnelDevice {
         device_proxy
             .register_socket(register_socket_params, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?
-            .map_err(|_| errno!(ENOENT))?;
+            .ok_or_else(|| errno!(ENOENT))?;
 
         // This will only be reached if the status was OK
         new_remote_file_ops(tx.into())

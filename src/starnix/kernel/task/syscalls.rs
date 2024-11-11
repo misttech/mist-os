@@ -24,7 +24,7 @@ use starnix_uapi::auth::{
     Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
     CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
 };
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{Errno, ENAMETOOLONG};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::kcmp::KcmpResource;
 use starnix_uapi::open_flags::OpenFlags;
@@ -144,7 +144,7 @@ fn read_c_string_vector(
             break;
         }
         let string = mm.read_c_string_to_vec(user_string, elem_limit).map_err(|e| {
-            if e == errno!(ENAMETOOLONG) {
+            if e.code == ENAMETOOLONG {
                 errno!(E2BIG)
             } else {
                 e
@@ -906,7 +906,7 @@ pub fn sys_prctl(
                 let name = UserCString::new(UserAddress::from(arg5));
                 let name = current_task.read_c_string_to_vec(name, 256).map_err(|e| {
                     // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
-                    if e == errno!(ENAMETOOLONG) {
+                    if e.code == ENAMETOOLONG {
                         errno!(EINVAL)
                     } else {
                         e

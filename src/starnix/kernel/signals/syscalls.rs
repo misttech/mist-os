@@ -586,7 +586,7 @@ fn signal_thread_groups<F>(
 where
     F: IntoIterator<Item: AsRef<ThreadGroup>>,
 {
-    let mut last_error = errno!(ESRCH);
+    let mut last_error = None;
     let mut sent_signal = false;
 
     // This loop keeps track of whether a signal was sent, so that "on
@@ -594,14 +594,14 @@ where
     for thread_group in thread_groups.into_iter() {
         match thread_group.as_ref().send_signal_unchecked(current_task, unchecked_signal) {
             Ok(_) => sent_signal = true,
-            Err(errno) => last_error = errno,
+            Err(errno) => last_error = Some(errno),
         }
     }
 
     if sent_signal {
         Ok(())
     } else {
-        Err(last_error)
+        Err(last_error.unwrap_or_else(|| errno!(ESRCH)))
     }
 }
 

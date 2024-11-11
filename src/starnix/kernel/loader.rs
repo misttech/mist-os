@@ -251,9 +251,12 @@ fn load_elf(
                 // Location of main position-independent executable is subject to ASLR
                 LoadElfUsage::MainElf => mm.get_random_base_for_executable(length)?.ptr(),
                 // Interpreter is mapped in the same range as regular `mmap` allocations.
-                LoadElfUsage::Interpreter => {
-                    mm.state.read().find_next_unused_range(length).ok_or(errno!(EINVAL))?.ptr()
-                }
+                LoadElfUsage::Interpreter => mm
+                    .state
+                    .read()
+                    .find_next_unused_range(length)
+                    .ok_or_else(|| errno!(EINVAL))?
+                    .ptr(),
             }
         }
         Ok(elf_parse::ElfType::Executable) => elf_info.low,

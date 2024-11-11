@@ -3516,7 +3516,7 @@ impl MemoryManager {
         state.mmap_top = state
             .stack_origin
             .checked_sub(generate_random_offset_for_aslr())
-            .ok_or(errno!(EINVAL))?;
+            .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
@@ -3532,8 +3532,9 @@ impl MemoryManager {
         self: &Arc<Self>,
         executable_end: UserAddress,
     ) -> Result<(), Errno> {
-        self.state.write().brk_origin =
-            executable_end.checked_add(generate_random_offset_for_aslr()).ok_or(errno!(EINVAL))?;
+        self.state.write().brk_origin = executable_end
+            .checked_add(generate_random_offset_for_aslr())
+            .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
@@ -3544,7 +3545,7 @@ impl MemoryManager {
         // Place it at approx. 2/3 of the available mmap space, subject to ASLR adjustment.
         let base = round_up_to_system_page_size(2 * state.mmap_top.ptr() / 3).unwrap()
             + generate_random_offset_for_aslr();
-        if base.checked_add(length).ok_or(errno!(EINVAL))? <= state.mmap_top.ptr() {
+        if base.checked_add(length).ok_or_else(|| errno!(EINVAL))? <= state.mmap_top.ptr() {
             Ok(UserAddress::from_ptr(base))
         } else {
             Err(errno!(EINVAL))
