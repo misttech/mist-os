@@ -70,7 +70,7 @@
 
 // This defines the table with pointers to all the macro-generated functions.
 // This does the same as .object, but .function can't be nested inside .object.
-.pushsection .rodata.isr_table, "a", %progbits
+.pushsection .data.rel.ro.isr_table, "aw", %progbits
 .balign 8
 .label _isr_table, global, object
   isr.current = 0
