@@ -11,6 +11,7 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
@@ -281,13 +282,35 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   {
-    zx::result result = pdev.GetDeviceInfo();
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get device info: %s", result.status_string());
-      return result.take_error();
+    std::string instance_identifier;
+    zx::result metadata = compat::GetMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
+        incoming(), DEVICE_METADATA_SDMMC);
+    if (metadata.is_error()) {
+      FDF_LOGL(WARNING, logger(), "Failed to get metadata: %s", metadata.status_string());
+    } else if (metadata->instance_identifier().has_value()) {
+      instance_identifier = "-" + metadata->instance_identifier().value();
     }
 
-    zx_status_t status = Init(result.value());
+    if (instance_identifier.empty()) {
+      zx::result device_info = pdev.GetDeviceInfo();
+      if (device_info.is_error()) {
+        FDF_LOGL(WARNING, logger(), "Failed to get device info: %s", device_info.status_string());
+      } else {
+        switch (device_info->did) {
+          case PDEV_DID_AMLOGIC_SDMMC_A:
+            instance_identifier = 'A';
+            break;
+          case PDEV_DID_AMLOGIC_SDMMC_B:
+            instance_identifier = 'B';
+            break;
+          case PDEV_DID_AMLOGIC_SDMMC_C:
+            instance_identifier = 'C';
+            break;
+        }
+      }
+    }
+
+    zx_status_t status = Init(instance_identifier.empty() ? "-unknown" : instance_identifier);
     if (status != ZX_OK) {
       return zx::error(status);
     }
@@ -561,25 +584,9 @@ void AmlSdmmc::ClearStatus() {
       .WriteTo(&*mmio_);
 }
 
-void AmlSdmmc::Inspect::Init(const fdf::PDev::DeviceInfo& device_info, inspect::Node& parent,
+void AmlSdmmc::Inspect::Init(const std::string& instance_identifier, inspect::Node& parent,
                              bool is_power_suspended) {
-  std::string root_name = "aml-sdmmc-port";
-  switch (device_info.did) {
-    case PDEV_DID_AMLOGIC_SDMMC_A:
-      root_name += 'A';
-      break;
-    case PDEV_DID_AMLOGIC_SDMMC_B:
-      root_name += 'B';
-      break;
-    case PDEV_DID_AMLOGIC_SDMMC_C:
-      root_name += 'C';
-      break;
-    default:
-      root_name += "-unknown";
-      break;
-  }
-
-  root = parent.CreateChild(root_name);
+  root = parent.CreateChild("aml-sdmmc-port" + instance_identifier);
 
   bus_clock_frequency = root.CreateUint(
       "bus_clock_frequency", AmlSdmmcClock::kCtsOscinClkFreq / AmlSdmmcClock::kDefaultClkDiv);
@@ -1770,7 +1777,7 @@ zx_status_t AmlSdmmc::RequestImpl(const fuchsia_hardware_sdmmc::wire::SdmmcReq& 
   return response.status_value();
 }
 
-zx_status_t AmlSdmmc::Init(const fdf::PDev::DeviceInfo& device_info) {
+zx_status_t AmlSdmmc::Init(const std::string& instance_identifier) {
   std::lock_guard<std::mutex> lock(lock_);
 
   // The core clock must be enabled before attempting to access the start register.
@@ -1793,7 +1800,7 @@ zx_status_t AmlSdmmc::Init(const fdf::PDev::DeviceInfo& device_info) {
 
   dev_info_.max_transfer_size = kMaxDmaDescriptors * zx_system_get_page_size();
 
-  inspect_.Init(device_info, inspector().root(), power_suspended_);
+  inspect_.Init(instance_identifier, inspector().root(), power_suspended_);
   inspect_.max_delay.Set(AmlSdmmcClock::kMaxDelay + 1);
 
   return ZX_OK;

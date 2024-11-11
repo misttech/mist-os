@@ -62,6 +62,7 @@ TEST(SdmmcVisitorTest, TestClocksProperty) {
       fit::result sdmmc_metadata =
           fidl::Unpersist<fuchsia_hardware_sdmmc::SdmmcMetadata>(metadata_blob);
       ASSERT_TRUE(sdmmc_metadata.is_ok());
+      EXPECT_EQ(sdmmc_metadata->instance_identifier(), "mmc@ff000000");
       EXPECT_EQ(sdmmc_metadata->max_frequency(), static_cast<uint32_t>(MAX_FREQUENCY));
       EXPECT_EQ(sdmmc_metadata->removable(), true);
       EXPECT_EQ(sdmmc_metadata->speed_capabilities(),
