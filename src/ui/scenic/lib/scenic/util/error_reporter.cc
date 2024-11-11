@@ -12,18 +12,18 @@ namespace {
 
 class DefaultErrorReporter : public ErrorReporter {
  public:
-  void ReportError(FuchsiaLogSeverity severity, std::string error_string) override {
+  void ReportError(fuchsia_logging::LogSeverity severity, std::string error_string) override {
     switch (severity) {
-      case FUCHSIA_LOG_INFO:
+      case fuchsia_logging::LogSeverity::Info:
         FX_LOGS(INFO) << error_string;
         break;
-      case FUCHSIA_LOG_WARNING:
+      case fuchsia_logging::LogSeverity::Warn:
         FX_LOGS(WARNING) << error_string;
         break;
-      case FUCHSIA_LOG_ERROR:
+      case fuchsia_logging::LogSeverity::Error:
         FX_LOGS(ERROR) << error_string;
         break;
-      case FUCHSIA_LOG_FATAL:
+      case fuchsia_logging::LogSeverity::Fatal:
         FX_LOGS(FATAL) << error_string;
         break;
       default:
@@ -35,7 +35,7 @@ class DefaultErrorReporter : public ErrorReporter {
 
 }  // anonymous namespace
 
-ErrorReporter::Report::Report(ErrorReporter* owner, FuchsiaLogSeverity severity,
+ErrorReporter::Report::Report(ErrorReporter* owner, fuchsia_logging::LogSeverity severity,
                               const std::string& prefix)
     : owner_(owner), severity_(severity) {
   stream_ << prefix;

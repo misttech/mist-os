@@ -12,15 +12,15 @@ namespace {
 ::fuchsia_logging::LogSeverity ToFuchsiaLevel(int pw_level) {
   switch (pw_level) {
     case PW_LOG_LEVEL_ERROR:
-      return FUCHSIA_LOG_ERROR;
+      return fuchsia_logging::LogSeverity::Error;
     case PW_LOG_LEVEL_WARN:
-      return FUCHSIA_LOG_WARNING;
+      return fuchsia_logging::LogSeverity::Warn;
     case PW_LOG_LEVEL_INFO:
-      return FUCHSIA_LOG_INFO;
+      return fuchsia_logging::LogSeverity::Info;
     case PW_LOG_LEVEL_DEBUG:
-      return FUCHSIA_LOG_DEBUG;
+      return fuchsia_logging::LogSeverity::Debug;
     default:
-      return FUCHSIA_LOG_ERROR;
+      return fuchsia_logging::LogSeverity::Error;
   }
 }
 

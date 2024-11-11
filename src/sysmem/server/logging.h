@@ -46,13 +46,15 @@ class LoggingMixin {
   void LogInfo(Location location, const char* format, ...) __PRINTFLIKE(3, 4) {
     va_list args;
     va_start(args, format);
-    vLog(FUCHSIA_LOG_INFO, location.file(), location.line(), logging_prefix_, format, args);
+    vLog(fuchsia_logging::LogSeverity::Info, location.file(), location.line(), logging_prefix_,
+         format, args);
     va_end(args);
   }
   void LogError(Location location, const char* format, ...) __PRINTFLIKE(3, 4) {
     va_list args;
     va_start(args, format);
-    vLog(FUCHSIA_LOG_INFO, location.file(), location.line(), logging_prefix_, format, args);
+    vLog(fuchsia_logging::LogSeverity::Info, location.file(), location.line(), logging_prefix_,
+         format, args);
     va_end(args);
   }
 

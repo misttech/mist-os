@@ -72,10 +72,10 @@ int Main(int argc, const char* argv[]) {
   fuchsia_logging::LogSettingsBuilder builder;
   builder.WithTags({"symbolizer"});
   if (options.verbose) {
-    builder.WithMinLogSeverity(FUCHSIA_LOG_DEBUG);
+    builder.WithMinLogSeverity(fuchsia_logging::LogSeverity::Debug);
     FX_LOGS(DEBUG) << "Verbose logging enabled.";
   } else {
-    builder.WithMinLogSeverity(FUCHSIA_LOG_FATAL);
+    builder.WithMinLogSeverity(fuchsia_logging::LogSeverity::Fatal);
   }
   builder.BuildAndInitialize();
 

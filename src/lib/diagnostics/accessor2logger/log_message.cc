@@ -291,17 +291,18 @@ ConvertFormattedContentToLogMessages(FormattedContent content) {
   return fpromise::ok(std::move(output));
 }
 
-FuchsiaLogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
+fuchsia_logging::RawLogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
   // Clamp verbosity scale to the interstitial space between INFO and DEBUG
-  uint8_t max_verbosity = (FUCHSIA_LOG_INFO - FUCHSIA_LOG_DEBUG);
+  uint8_t max_verbosity =
+      (fuchsia_logging::LogSeverity::Info - fuchsia_logging::LogSeverity::Debug);
   if (verbosity > max_verbosity) {
     verbosity = max_verbosity;
   }
-  int severity = FUCHSIA_LOG_INFO - verbosity;
-  if (severity < FUCHSIA_LOG_DEBUG + 1) {
-    return FUCHSIA_LOG_DEBUG + 1;
+  int severity = fuchsia_logging::LogSeverity::Info - verbosity;
+  if (severity < fuchsia_logging::LogSeverity::Debug + 1) {
+    return fuchsia_logging::LogSeverity::Debug + 1;
   }
-  return static_cast<FuchsiaLogSeverity>(severity);
+  return static_cast<fuchsia_logging::RawLogSeverity>(severity);
 }
 
 }  // namespace diagnostics::accessor2logger

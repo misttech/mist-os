@@ -25,7 +25,7 @@ class LogBuffer;
 /// Constructs a LogBuffer
 class LogBufferBuilder {
  public:
-  explicit LogBufferBuilder(fuchsia_logging::LogSeverity severity) : severity_(severity) {}
+  explicit LogBufferBuilder(fuchsia_logging::RawLogSeverity severity) : severity_(severity) {}
 
   /// Sets the file name and line number for the log message
   LogBufferBuilder& WithFile(cpp17::string_view file, unsigned int line) {
@@ -68,7 +68,7 @@ class LogBufferBuilder {
 #ifdef __Fuchsia__
   zx_handle_t socket_ = ZX_HANDLE_INVALID;
 #endif
-  fuchsia_logging::LogSeverity severity_;
+  fuchsia_logging::RawLogSeverity severity_;
 };
 
 template <typename Key, typename Value>
@@ -89,9 +89,10 @@ class KeyValue final {
 // touch these values.
 class LogBuffer final {
  public:
-  void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
-                   unsigned int line, cpp17::optional<cpp17::string_view> message,
-                   zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
+  void BeginRecord(fuchsia_logging::RawLogSeverity severity,
+                   cpp17::optional<cpp17::string_view> file_name, unsigned int line,
+                   cpp17::optional<cpp17::string_view> message, zx_handle_t socket,
+                   uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
   void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
 
@@ -182,7 +183,7 @@ class LogBuffer final {
 
 #ifdef __Fuchsia__
   /// Sets the raw severity
-  void SetRawSeverity(fuchsia_logging::LogSeverity severity) { raw_severity_ = severity; }
+  void SetRawSeverity(fuchsia_logging::RawLogSeverity severity) { raw_severity_ = severity; }
 
   /// Sets a fatal error string
   void SetFatalErrorString(cpp17::string_view fatal_error_string) {
@@ -209,7 +210,7 @@ class LogBuffer final {
   cpp17::optional<cpp17::string_view> maybe_fatal_string_;
 
   // Severity of the log message.
-  FuchsiaLogSeverity raw_severity_;
+  fuchsia_logging::RawLogSeverity raw_severity_;
   // Underlying log buffer.
   fuchsia_syslog::LogBuffer inner_;
 #else
@@ -301,7 +302,7 @@ class LogMessageVoidify final {
 
 class LogMessage final {
  public:
-  LogMessage(LogSeverity severity, const char* file, int line, const char* condition,
+  LogMessage(RawLogSeverity severity, const char* file, int line, const char* condition,
              const char* tag
 #if defined(__Fuchsia__)
              ,
@@ -314,7 +315,7 @@ class LogMessage final {
 
  private:
   std::ostringstream stream_;
-  const LogSeverity severity_;
+  const RawLogSeverity severity_;
   const char* file_;
   const int line_;
   const char* condition_;
@@ -335,7 +336,7 @@ class LogFirstNState final {
 
 /// Returns true if |severity| is at or above the current minimum log level.
 /// LOG_FATAL and above is always true.
-bool IsSeverityEnabled(LogSeverity severity);
+bool IsSeverityEnabled(RawLogSeverity severity);
 
 }  // namespace fuchsia_logging
 

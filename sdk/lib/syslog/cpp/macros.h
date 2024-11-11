@@ -7,12 +7,12 @@
 
 #include <lib/syslog/cpp/log_message_impl.h>
 
-#define __FX_LOG_SEVERITY_TRACE FUCHSIA_LOG_TRACE
-#define __FX_LOG_SEVERITY_DEBUG FUCHSIA_LOG_DEBUG
-#define __FX_LOG_SEVERITY_INFO FUCHSIA_LOG_INFO
-#define __FX_LOG_SEVERITY_WARNING FUCHSIA_LOG_WARNING
-#define __FX_LOG_SEVERITY_ERROR FUCHSIA_LOG_ERROR
-#define __FX_LOG_SEVERITY_FATAL FUCHSIA_LOG_FATAL
+#define __FX_LOG_SEVERITY_TRACE (fuchsia_logging::LogSeverity::Trace)
+#define __FX_LOG_SEVERITY_DEBUG (fuchsia_logging::LogSeverity::Debug)
+#define __FX_LOG_SEVERITY_INFO (fuchsia_logging::LogSeverity::Info)
+#define __FX_LOG_SEVERITY_WARNING (fuchsia_logging::LogSeverity::Warn)
+#define __FX_LOG_SEVERITY_ERROR (fuchsia_logging::LogSeverity::Error)
+#define __FX_LOG_SEVERITY_FATAL (fuchsia_logging::LogSeverity::Fatal)
 
 /// Used for stream-based logging with a custom tag.
 #define FX_LOG_STREAM(severity, tag)                                                            \

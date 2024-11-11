@@ -63,7 +63,7 @@ constexpr std::chrono::nanoseconds kDefaultSleepDuration =
 constexpr bool kDefaultEnableState = true;
 
 // Default severity level with which messages are logged.
-constexpr FuchsiaLogSeverity kDefaultLogSeverity = FUCHSIA_LOG_INFO;
+constexpr fuchsia_logging::LogSeverity kDefaultLogSeverity = fuchsia_logging::LogSeverity::Info;
 
 // Log messages are buffered before they are sent to logging subsystem.
 // This is default size of that buffer.
@@ -84,7 +84,7 @@ struct Options {
   // This is largely unused because syslog expects a macro and not variable
   // to specify logging level. Once that is changed, we need to use
   // severity_.
-  FuchsiaLogSeverity severity = kDefaultLogSeverity;
+  fuchsia_logging::LogSeverity severity = kDefaultLogSeverity;
 
   // Size of the log buffer.
   size_t log_buffer_size = kDefaultLogBufferSize;

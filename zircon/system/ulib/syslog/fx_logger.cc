@@ -167,7 +167,10 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
-    auto builder = syslog_runtime::LogBufferBuilder(severity);
+    if (severity < 0) {
+      severity = 0;
+    }
+    auto builder = syslog_runtime::LogBufferBuilder(static_cast<uint8_t>(severity));
     if (file) {
       builder.WithFile(file, line);
     }

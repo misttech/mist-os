@@ -27,7 +27,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
     fuchsia_logging::LogSettingsBuilder log_settings;
-    log_settings.WithMinLogSeverity(FUCHSIA_LOG_TRACE)
+    log_settings.WithMinLogSeverity(fuchsia_logging::LogSeverity::Trace)
         .DisableInterestListener()
         .BuildAndInitialize();
     callback();
@@ -80,7 +80,7 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::LogSettingsBuilder log_settings;
   log_settings.WithDispatcher(loop.dispatcher())
-      .WithSeverityChangedListener(+[](fuchsia_logging::LogSeverity severity) {
+      .WithSeverityChangedListener(+[](fuchsia_logging::RawLogSeverity severity) {
         if (is_init) {
           // Don't log if it's our first interest event.
           // If we try to log here, we deadlock (since this is the first event,

@@ -7,7 +7,8 @@
 
 #include "src/sysmem/server/logging.h"
 
-#define LOG(severity, fmt, ...) \
-  ::sysmem_service::Log(FUCHSIA_LOG_##severity, __FILE__, __LINE__, nullptr, fmt, ##__VA_ARGS__)
+#define LOG(severity, fmt, ...)                                                         \
+  ::sysmem_service::Log(__FX_LOG_SEVERITY_##severity, __FILE__, __LINE__, nullptr, fmt, \
+                        ##__VA_ARGS__)
 
 #endif  // SRC_SYSMEM_SERVER_MACROS_H_

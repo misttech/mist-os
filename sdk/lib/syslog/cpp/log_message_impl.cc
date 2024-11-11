@@ -33,7 +33,7 @@ const char* StripPath(const char* path) {
 
 }  // namespace
 
-LogMessage::LogMessage(LogSeverity severity, const char* file, int line, const char* condition,
+LogMessage::LogMessage(RawLogSeverity severity, const char* file, int line, const char* condition,
                        const char* tag
 #if defined(__Fuchsia__)
                        ,
@@ -41,7 +41,7 @@ LogMessage::LogMessage(LogSeverity severity, const char* file, int line, const c
 #endif
                        )
     : severity_(severity),
-      file_(severity_ > FUCHSIA_LOG_INFO ? StripDots(file) : StripPath(file)),
+      file_(severity_ > fuchsia_logging::LogSeverity::Info ? StripDots(file) : StripPath(file)),
       line_(line),
       condition_(condition),
       tag_(tag)
@@ -72,7 +72,7 @@ LogMessage::~LogMessage() {
     buffer.WriteKeyValue("tag", tag_);
   }
   buffer.Flush();
-  if (severity_ >= FUCHSIA_LOG_FATAL)
+  if (severity_ >= fuchsia_logging::LogSeverity::Fatal)
     __builtin_debugtrap();
 }
 
@@ -81,6 +81,6 @@ bool LogFirstNState::ShouldLog(uint32_t n) {
   return counter_value < n;
 }
 
-bool IsSeverityEnabled(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
+bool IsSeverityEnabled(RawLogSeverity severity) { return severity >= GetMinLogSeverity(); }
 
 }  // namespace fuchsia_logging

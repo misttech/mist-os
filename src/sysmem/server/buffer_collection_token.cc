@@ -513,7 +513,8 @@ void BufferCollectionToken::FailAsync(Location location, zx_status_t status, con
                                       ...) {
   va_list args;
   va_start(args, format);
-  vLog(FUCHSIA_LOG_WARNING, location.file(), location.line(), logging_prefix(), format, args);
+  vLog(fuchsia_logging::LogSeverity::Warn, location.file(), location.line(), logging_prefix(),
+       format, args);
   va_end(args);
 
   // Idempotent, so only close once.

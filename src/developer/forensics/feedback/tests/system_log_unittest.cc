@@ -38,8 +38,8 @@ namespace {
 using testing::IsEmpty;
 using testing::UnorderedElementsAreArray;
 
-constexpr fuchsia_logging::LogSeverity kLogInfo = FUCHSIA_LOG_INFO;
-constexpr fuchsia_logging::LogSeverity kLogWarning = FUCHSIA_LOG_WARNING;
+constexpr fuchsia_logging::LogSeverity kLogInfo = fuchsia_logging::LogSeverity::Info;
+constexpr fuchsia_logging::LogSeverity kLogWarning = fuchsia_logging::LogSeverity::Warn;
 
 std::string MessageJson(const int id) {
   return fxl::StringPrintf(

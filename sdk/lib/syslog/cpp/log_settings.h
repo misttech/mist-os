@@ -38,7 +38,7 @@ struct LogSettings {
   ///
   /// Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
   /// the range between INFO and DEBUG
-  FuchsiaLogSeverity min_log_level = fuchsia_logging::kDefaultLogLevel;
+  fuchsia_logging::RawLogSeverity min_log_level = fuchsia_logging::kDefaultLogLevel;
   std::vector<std::string> tags;
 #ifndef __Fuchsia__
   /// The name of a file to which the log should be written.
@@ -59,7 +59,7 @@ struct LogSettings {
   // in the pogram incoming namespace will be used.
   zx_handle_t log_sink = ZX_HANDLE_INVALID;
   /// Interest listener callback, or nullptr
-  void (*severity_change_callback)(FuchsiaLogSeverity severity) = nullptr;
+  void (*severity_change_callback)(fuchsia_logging::RawLogSeverity severity) = nullptr;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_ = fuchsia_logging::Enabled;
 #endif
 };
@@ -71,7 +71,7 @@ class LogSettingsBuilder {
  public:
   /// Sets the default log severity. If not explicitly set,
   /// this defaults to INFO, or to the value specified by Archivist.
-  LogSettingsBuilder& WithMinLogSeverity(FuchsiaLogSeverity min_log_level);
+  LogSettingsBuilder& WithMinLogSeverity(fuchsia_logging::RawLogSeverity min_log_level);
 
   /// Sets the tags that are implicitly logged with every message.
   LogSettingsBuilder& WithTags(const std::initializer_list<std::string>& tags);
@@ -98,7 +98,8 @@ class LogSettingsBuilder {
   LogSettingsBuilder& WithInterestListenerConfiguration(InterestListenerBehavior config);
 
   /// Sets a callback that is invoked when the severity changes.
-  LogSettingsBuilder& WithSeverityChangedListener(void (*callback)(FuchsiaLogSeverity severity));
+  LogSettingsBuilder& WithSeverityChangedListener(
+      void (*callback)(fuchsia_logging::RawLogSeverity severity));
 #endif
   /// Configures the log settings
   /// and initializes (or re-initializes) the LogSink connection.
@@ -110,7 +111,7 @@ class LogSettingsBuilder {
 
 /// Gets the minimum log severity for the current process. Never returns a value
 /// higher than LOG_FATAL.
-FuchsiaLogSeverity GetMinLogSeverity();
+fuchsia_logging::RawLogSeverity GetMinLogSeverity();
 
 }  // namespace fuchsia_logging
 
