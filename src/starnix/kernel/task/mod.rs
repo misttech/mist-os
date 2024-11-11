@@ -17,7 +17,7 @@ mod ptrace;
 mod scheduler;
 mod seccomp;
 mod session;
-mod syslog;
+pub(crate) mod syslog;
 #[allow(clippy::module_inception)]
 mod task;
 mod thread_group;

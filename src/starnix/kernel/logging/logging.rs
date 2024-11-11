@@ -12,6 +12,8 @@ use std::fmt;
 #[doc(hidden)]
 pub use tracing as __tracing;
 
+pub use tracing::Level;
+
 /// Used to track the current thread's logical context.
 /// The thread with this set is used to service syscalls for a specific user thread, and this
 /// describes the user thread's identity.
@@ -138,6 +140,24 @@ macro_rules! log_error {
     ($($arg:tt)*) => {
         if $crate::logs_enabled() {
             $crate::__tracing::error!($($arg)*);
+        }
+    };
+}
+
+// Note that we can't just call `event!` with a non-const level since
+// tracing requires the metadata fields to be static.
+// See: https://github.com/tokio-rs/tracing/issues/2730
+#[macro_export]
+macro_rules! log {
+    ($lvl:expr, $($arg:tt)*) => {
+        if $crate::logs_enabled() {
+            match $lvl {
+                $crate::Level::TRACE => $crate::__tracing::trace!($($arg)*),
+                $crate::Level::DEBUG => $crate::__tracing::debug!($($arg)*),
+                $crate::Level::INFO => $crate::__tracing::info!($($arg)*),
+                $crate::Level::WARN => $crate::__tracing::warn!($($arg)*),
+                $crate::Level::ERROR => $crate::__tracing::error!($($arg)*),
+            }
         }
     };
 }
