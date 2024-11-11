@@ -127,7 +127,7 @@ impl SocketWriter {
 pub struct SocketReadStream {
     socket: Arc<Socket>,
     buf: Vec<u8>,
-    channel: UnboundedReceiver<Result<Vec<u8>, proto::Error>>,
+    channel: UnboundedReceiver<Result<Vec<u8>, Error>>,
 }
 
 impl SocketReadStream {

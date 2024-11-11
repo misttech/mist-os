@@ -265,7 +265,7 @@ impl ChannelWriter {
 #[derive(Debug)]
 pub struct ChannelMessageStream {
     channel: Arc<Channel>,
-    messages: UnboundedReceiver<Result<proto::ChannelMessage, proto::Error>>,
+    messages: UnboundedReceiver<Result<proto::ChannelMessage, Error>>,
 }
 
 impl ChannelMessageStream {
@@ -278,7 +278,7 @@ impl ChannelMessageStream {
     pub fn rejoin(
         mut self,
         writer: ChannelWriter,
-    ) -> (Channel, UnboundedReceiver<Result<proto::ChannelMessage, proto::Error>>) {
+    ) -> (Channel, UnboundedReceiver<Result<proto::ChannelMessage, Error>>) {
         assert!(Arc::ptr_eq(&self.channel, &writer.0), "Tried to join stream with wrong writer!");
         if let Ok(client) = self.channel.0.client() {
             client.stop_channel_streaming(self.channel.0.proto())
@@ -302,7 +302,7 @@ impl ChannelMessageStream {
 }
 
 impl Stream for ChannelMessageStream {
-    type Item = Result<ChannelMessage, proto::Error>;
+    type Item = Result<ChannelMessage, Error>;
     fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match ready!(Pin::new(&mut self.messages).poll_next(ctx)) {
             Some(Ok(c)) => {

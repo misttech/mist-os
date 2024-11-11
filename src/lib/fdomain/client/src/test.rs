@@ -2,25 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyHandle, Client, FDomainTransport};
+use crate::{AnyHandle, Client, Error, FDomainTransport};
 use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
 use futures::stream::Stream;
+use futures::StreamExt;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
-struct LocalFDomain(FDomainCodec);
+#[derive(Clone, Debug)]
+struct TestError(String);
 
-impl LocalFDomain {
-    fn new_client() -> Arc<Client> {
-        let (client, fut) = Client::new(LocalFDomain(FDomainCodec::new(FDomain::new_empty())));
-        fuchsia_async::Task::spawn(fut).detach();
-        client
+impl std::error::Error for TestError {}
+
+impl std::fmt::Display for TestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
-impl FDomainTransport for LocalFDomain {
+struct TestFDomain(FDomainCodec, Arc<Mutex<Option<TestError>>>);
+
+impl TestFDomain {
+    fn new_client() -> (Arc<Client>, FaultInjector) {
+        let fault_injector = FaultInjector(Arc::new(Mutex::new(None)));
+        let (client, fut) = Client::new(TestFDomain(
+            FDomainCodec::new(FDomain::new_empty()),
+            Arc::clone(&fault_injector.0),
+        ));
+        fuchsia_async::Task::spawn(fut).detach();
+        (client, fault_injector)
+    }
+}
+
+impl FDomainTransport for TestFDomain {
     fn poll_send_message(
         mut self: Pin<&mut Self>,
         msg: &[u8],
@@ -30,17 +46,29 @@ impl FDomainTransport for LocalFDomain {
     }
 }
 
-impl Stream for LocalFDomain {
+impl Stream for TestFDomain {
     type Item = Result<Box<[u8]>, std::io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(e) = self.1.lock().unwrap().clone() {
+            return Poll::Ready(Some(Err(std::io::Error::other(e))));
+        }
+
         Pin::new(&mut self.0).poll_next(cx).map_err(std::io::Error::other)
+    }
+}
+
+struct FaultInjector(Arc<Mutex<Option<TestError>>>);
+
+impl FaultInjector {
+    fn inject(&self, e: TestError) {
+        *self.0.lock().unwrap() = Some(e)
     }
 }
 
 #[fuchsia::test]
 async fn socket() {
-    let client = LocalFDomain::new_client();
+    let (client, _) = TestFDomain::new_client();
 
     let (a, b) = client.create_stream_socket().await.unwrap();
     let test_str = b"Feral Cats Move In Mysterious Ways";
@@ -58,7 +86,7 @@ async fn socket() {
 
 #[fuchsia::test]
 async fn channel() {
-    let client = LocalFDomain::new_client();
+    let (client, _) = TestFDomain::new_client();
 
     let (a, b) = client.create_channel().await.unwrap();
     let (c, d) = client.create_stream_socket().await.unwrap();
@@ -101,7 +129,7 @@ async fn channel() {
 
 #[fuchsia::test]
 async fn socket_async() {
-    let client = LocalFDomain::new_client();
+    let (client, fault_injector) = TestFDomain::new_client();
 
     let (a, b) = client.create_stream_socket().await.unwrap();
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
@@ -125,6 +153,14 @@ async fn socket_async() {
             a.write_all(test_str_b).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
         }
+
+        fault_injector.inject(TestError("Connection failed".to_owned()));
+
+        let err = a.write_all(test_str_a).await.unwrap_err();
+        let Error::Transport(err) = err else { panic!("Wrong error type!") };
+
+        let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
+        assert_eq!("Connection failed", err);
     };
 
     let read_side = async move {
@@ -138,6 +174,12 @@ async fn socket_async() {
             }
         }
 
+        let err = b_reader.read(&mut [0]).await.unwrap_err();
+        let Error::Transport(err) = err else { panic!("Wrong error type!") };
+
+        let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
+        assert_eq!("Connection failed", err);
+
         let mut buf = buf.as_mut_slice();
 
         for _ in 0..5 {
@@ -148,6 +190,65 @@ async fn socket_async() {
         }
 
         assert!(buf.is_empty());
+    };
+
+    futures::future::join(read_side, write_side).await;
+}
+
+#[fuchsia::test]
+async fn channel_async() {
+    let (client, fault_injector) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel().await.unwrap();
+    let test_str_a = b"Feral Cats Move In Mysterious Ways";
+    let test_str_b = b"Almost all of our feelings were programmed in to us.";
+
+    let (mut b_reader, b_writer) = b.stream().unwrap();
+    b_writer.write(test_str_a, Vec::new()).await.unwrap();
+
+    let write_side = async move {
+        let msg = a.recv_msg().await.unwrap();
+
+        assert_eq!(test_str_a, msg.bytes.as_slice());
+        assert!(msg.handles.is_empty());
+
+        for _ in 0..5 {
+            a.write(test_str_a, Vec::new()).await.unwrap();
+            fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
+            a.write(test_str_b, Vec::new()).await.unwrap();
+            fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
+        }
+
+        fault_injector.inject(TestError("Connection failed".to_owned()));
+
+        let err = a.write(test_str_a, Vec::new()).await.unwrap_err();
+        let Error::Transport(err) = err else { panic!("Wrong error type!") };
+
+        let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
+        assert_eq!("Connection failed", err);
+    };
+
+    let read_side = async move {
+        let mut msgs = Vec::new();
+
+        for _ in 0..10 {
+            msgs.push(b_reader.next().await.unwrap().unwrap());
+        }
+
+        let err = b_reader.next().await.unwrap().unwrap_err();
+        let Error::Transport(err) = err else { panic!("Wrong error type!") };
+
+        let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
+        assert_eq!("Connection failed", err);
+
+        for pair in msgs.chunks(2) {
+            let a = &pair[0];
+            let b = &pair[1];
+            assert_eq!(test_str_a, a.bytes.as_slice());
+            assert_eq!(test_str_b, b.bytes.as_slice());
+            assert!(a.handles.is_empty());
+            assert!(b.handles.is_empty());
+        }
     };
 
     futures::future::join(read_side, write_side).await;

@@ -333,9 +333,9 @@ impl Transport {
 struct ClientInner {
     transport: Transport,
     transactions: HashMap<NonZeroU32, responder::Responder>,
-    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, proto::Error>>>,
+    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, Error>>>,
     channel_read_subscriptions:
-        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, proto::Error>>>,
+        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
     next_tx_id: u32,
     waiting_to_close: Vec<proto::Hid>,
 }
@@ -377,6 +377,14 @@ impl ClientInner {
 
         loop {
             if let Poll::Ready(e) = self.transport.poll_send_messages(ctx) {
+                for sender in self.socket_read_subscriptions.values_mut() {
+                    let _ = sender.unbounded_send(Err(e.clone().into()));
+                }
+                for sender in self.channel_read_subscriptions.values_mut() {
+                    let _ = sender.unbounded_send(Err(e.clone().into()));
+                }
+                self.socket_read_subscriptions.clear();
+                self.channel_read_subscriptions.clear();
                 return Err(e);
             }
             let Poll::Ready(Some(result)) = self.transport.poll_next(ctx) else { return Ok(()) };
@@ -423,7 +431,7 @@ impl ClientInner {
                         proto::SocketMessage::Stopped(proto::AioStopped { error }) => {
                             let o = o.remove();
                             if let Some(error) = error {
-                                let _ = o.unbounded_send(Err(*error));
+                                let _ = o.unbounded_send(Err(Error::FDomain(*error)));
                             }
                             Ok(())
                         }
@@ -455,7 +463,7 @@ impl ClientInner {
                         proto::ChannelSent::Stopped(proto::AioStopped { error }) => {
                             let o = o.remove();
                             if let Some(error) = error {
-                                let _ = o.unbounded_send(Err(*error));
+                                let _ = o.unbounded_send(Err(Error::FDomain(*error)));
                             }
                             Ok(())
                         }
@@ -676,7 +684,7 @@ impl Client {
     pub(crate) fn start_socket_streaming(
         &self,
         id: proto::Hid,
-        output: UnboundedSender<Result<Vec<u8>, proto::Error>>,
+        output: UnboundedSender<Result<Vec<u8>, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
         inner.socket_read_subscriptions.insert(id, output);
@@ -707,7 +715,7 @@ impl Client {
     pub(crate) fn start_channel_streaming(
         &self,
         id: proto::Hid,
-        output: UnboundedSender<Result<proto::ChannelMessage, proto::Error>>,
+        output: UnboundedSender<Result<proto::ChannelMessage, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
         inner.channel_read_subscriptions.insert(id, output);

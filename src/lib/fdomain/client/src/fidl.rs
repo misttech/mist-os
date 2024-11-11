@@ -73,10 +73,12 @@ impl FDomainProxyChannel {
                 *handles = got.handles;
                 Poll::Ready(Ok(()))
             }
-            Err(proto::Error::TargetError(i)) if i == fidl::Status::PEER_CLOSED.into_raw() => {
+            Err(Error::FDomain(proto::Error::TargetError(i)))
+                if i == fidl::Status::PEER_CLOSED.into_raw() =>
+            {
                 Poll::Ready(Err(None))
             }
-            Err(e) => Poll::Ready(Err(Some(Error::FDomain(e)))),
+            Err(e) => Poll::Ready(Err(Some(e))),
         }
     }
 }
@@ -96,10 +98,12 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
                 *buf = got;
                 Poll::Ready(Ok(()))
             }
-            Err(proto::Error::TargetError(i)) if i == fidl::Status::PEER_CLOSED.into_raw() => {
+            Err(Error::FDomain(proto::Error::TargetError(i)))
+                if i == fidl::Status::PEER_CLOSED.into_raw() =>
+            {
                 Poll::Ready(Err(None))
             }
-            Err(e) => Poll::Ready(Err(Some(Error::FDomain(e)))),
+            Err(e) => Poll::Ready(Err(Some(e))),
         }
     }
 
