@@ -12,13 +12,13 @@ use time_metrics_registry::HttpsdateBoundSizeMigratedMetricDimensionPhase as Cob
 #[derive(Clone, Debug, PartialEq)]
 pub struct HttpsSample {
     /// The utc time sample.
-    pub utc: zx::MonotonicInstant,
-    /// Monotonic time at which the `utc` sample was most valid.
-    pub monotonic: zx::MonotonicInstant,
+    pub utc: zx::BootInstant,
+    /// A reference time at which the `utc` sample was most valid.
+    pub reference: zx::BootInstant,
     /// Standard deviation of the error distribution of `utc`.
-    pub standard_deviation: zx::MonotonicDuration,
+    pub standard_deviation: zx::BootDuration,
     /// The size of the final bound on utc time for the sample.
-    pub final_bound_size: zx::MonotonicDuration,
+    pub final_bound_size: zx::BootDuration,
     /// Metrics for individual polls used to produce this sample.
     pub polls: Vec<Poll>,
 }
@@ -26,7 +26,7 @@ pub struct HttpsSample {
 impl Into<TimeSample> for HttpsSample {
     fn into(self) -> TimeSample {
         TimeSample {
-            monotonic: Some(self.monotonic.into_nanos()),
+            reference: Some(self.reference),
             utc: Some(self.utc.into_nanos()),
             standard_deviation: Some(self.standard_deviation.into_nanos()),
             ..Default::default()
@@ -44,13 +44,13 @@ impl Into<Update> for HttpsSample {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Poll {
     /// The round trip latency observed during this poll.
-    pub round_trip_time: zx::MonotonicDuration,
+    pub round_trip_time: zx::BootDuration,
 }
 
 #[cfg(test)]
 impl Poll {
     /// Construct a `Poll` with the given round trip time and no offset.
-    pub fn with_round_trip_time(round_trip_time: zx::MonotonicDuration) -> Self {
+    pub fn with_round_trip_time(round_trip_time: zx::BootDuration) -> Self {
         Self { round_trip_time }
     }
 }
@@ -85,22 +85,22 @@ mod test {
 
     #[fuchsia::test]
     fn test_https_sample_into_update() {
-        let utc_time = zx::MonotonicInstant::from_nanos(111_111_111_111);
-        let monotonic_time = zx::MonotonicInstant::from_nanos(222_222_222_222);
-        let standard_deviation = zx::MonotonicDuration::from_nanos(333_333);
+        let utc_time = zx::BootInstant::from_nanos(111_111_111_111);
+        let boot_time = zx::BootInstant::from_nanos(222_222_222_222);
+        let standard_deviation = zx::BootDuration::from_nanos(333_333);
 
         let sample = HttpsSample {
             utc: utc_time,
-            monotonic: monotonic_time,
+            reference: boot_time,
             standard_deviation,
-            final_bound_size: zx::MonotonicDuration::from_nanos(9001),
+            final_bound_size: zx::BootDuration::from_nanos(9001),
             polls: vec![],
         };
 
         assert_eq!(
             <HttpsSample as Into<Update>>::into(sample),
             Update::Sample(Arc::new(TimeSample {
-                monotonic: Some(monotonic_time.into_nanos()),
+                reference: Some(boot_time),
                 utc: Some(utc_time.into_nanos()),
                 standard_deviation: Some(standard_deviation.into_nanos()),
                 ..Default::default()

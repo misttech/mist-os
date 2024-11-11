@@ -26,21 +26,19 @@ use tracing::{debug, error, info};
 /// following successful poll attempts, and a capped exponential backoff following failed poll
 /// attempts.
 pub struct RetryStrategy {
-    pub min_between_failures: zx::MonotonicDuration,
+    pub min_between_failures: zx::BootDuration,
     pub max_exponent: u32,
     pub tries_per_exponent: u32,
-    pub converge_time_between_samples: zx::MonotonicDuration,
-    pub maintain_time_between_samples: zx::MonotonicDuration,
+    pub converge_time_between_samples: zx::BootDuration,
+    pub maintain_time_between_samples: zx::BootDuration,
 }
 
 impl RetryStrategy {
     /// Returns the duration to wait after a failed poll attempt. |attempt_index| is a zero-based
     /// index of the failed attempt, i.e. after the third failed attempt `attempt_index` = 2.
-    fn backoff_duration(&self, attempt_index: u32) -> zx::MonotonicDuration {
+    fn backoff_duration(&self, attempt_index: u32) -> zx::BootDuration {
         let exponent = std::cmp::min(attempt_index / self.tries_per_exponent, self.max_exponent);
-        zx::MonotonicDuration::from_nanos(
-            self.min_between_failures.into_nanos() * 2i64.pow(exponent),
-        )
+        zx::BootDuration::from_nanos(self.min_between_failures.into_nanos() * 2i64.pow(exponent))
     }
 }
 
@@ -163,15 +161,13 @@ where
 
         self.diagnostics.record(Event::Phase(Phase::Converge));
         for _ in 0..CONVERGE_SAMPLES {
-            fasync::Timer::new(fasync::MonotonicInstant::after(converge_time_between_samples))
-                .await;
+            fasync::Timer::new(fasync::BootInstant::after(converge_time_between_samples)).await;
             self.try_generate_sample_until_successful(SAMPLE_POLLS, &mut sink).await?;
         }
 
         self.diagnostics.record(Event::Phase(Phase::Maintain));
         loop {
-            fasync::Timer::new(fasync::MonotonicInstant::after(maintain_time_between_samples))
-                .await;
+            fasync::Timer::new(fasync::BootInstant::after(maintain_time_between_samples)).await;
             self.try_generate_sample_until_successful(SAMPLE_POLLS, &mut sink).await?;
         }
     }
@@ -230,16 +226,16 @@ where
                     let _ = self.handle_sample_error(http_error, &mut last_error_type);
                 }
             }
-            fasync::Timer::new(fasync::MonotonicInstant::after(
+            fasync::Timer::new(fasync::BootInstant::after(
                 self.retry_strategy.backoff_duration(attempt),
             ))
             .await;
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant {
+    async fn next_possible_sample_time(&self) -> zx::BootInstant {
         // TODO(https://fxbug.dev/42065019): Implement rate limiting if required.
-        zx::MonotonicInstant::get()
+        zx::BootInstant::get()
     }
 }
 
@@ -291,7 +287,7 @@ where
                     }
                 }
             }
-            fasync::Timer::new(fasync::MonotonicInstant::after(
+            fasync::Timer::new(fasync::BootInstant::after(
                 self.retry_strategy.backoff_duration(attempt),
             ))
             .await;
@@ -299,9 +295,9 @@ where
     }
 }
 
-fn mult_duration(duration: zx::MonotonicDuration, factor: f32) -> zx::MonotonicDuration {
+fn mult_duration(duration: zx::BootDuration, factor: f32) -> zx::BootDuration {
     let nanos_float = (duration.into_nanos() as f64) * factor as f64;
-    zx::MonotonicDuration::from_nanos(nanos_float as i64)
+    zx::BootDuration::from_nanos(nanos_float as i64)
 }
 
 #[cfg(test)]
@@ -324,34 +320,34 @@ mod test {
 
     /// Test retry strategy with minimal wait periods.
     const TEST_RETRY_STRATEGY: RetryStrategy = RetryStrategy {
-        min_between_failures: zx::MonotonicDuration::from_nanos(100),
+        min_between_failures: zx::BootDuration::from_nanos(100),
         max_exponent: 1,
         tries_per_exponent: 1,
-        converge_time_between_samples: zx::MonotonicDuration::from_nanos(100),
-        maintain_time_between_samples: zx::MonotonicDuration::from_nanos(100),
+        converge_time_between_samples: zx::BootDuration::from_nanos(100),
+        maintain_time_between_samples: zx::BootDuration::from_nanos(100),
     };
 
     lazy_static! {
         static ref TEST_SAMPLE_1: HttpsSample = HttpsSample {
-            utc: zx::MonotonicInstant::from_nanos(111_222_333_444_555),
-            monotonic: zx::MonotonicInstant::from_nanos(666_777_888_999_000),
-            standard_deviation: zx::MonotonicDuration::from_millis(101),
-            final_bound_size: zx::MonotonicDuration::from_millis(20),
+            utc: zx::BootInstant::from_nanos(111_222_333_444_555),
+            reference: zx::BootInstant::from_nanos(666_777_888_999_000),
+            standard_deviation: zx::BootDuration::from_millis(101),
+            final_bound_size: zx::BootDuration::from_millis(20),
             polls: vec![],
         };
         static ref TEST_SAMPLE_2: HttpsSample = HttpsSample {
-            utc: zx::MonotonicInstant::from_nanos(999_999_999_999_999),
-            monotonic: zx::MonotonicInstant::from_nanos(777_777_777_777_777),
-            standard_deviation: zx::MonotonicDuration::from_millis(102),
-            final_bound_size: zx::MonotonicDuration::from_millis(30),
-            polls: vec![Poll { round_trip_time: zx::MonotonicDuration::from_millis(23) }],
+            utc: zx::BootInstant::from_nanos(999_999_999_999_999),
+            reference: zx::BootInstant::from_nanos(777_777_777_777_777),
+            standard_deviation: zx::BootDuration::from_millis(102),
+            final_bound_size: zx::BootDuration::from_millis(30),
+            polls: vec![Poll { round_trip_time: zx::BootDuration::from_millis(23) }],
         };
     }
 
     fn to_fidl_time_sample(sample: &HttpsSample) -> TimeSample {
         TimeSample {
             utc: Some(sample.utc.into_nanos()),
-            monotonic: Some(sample.monotonic.into_nanos()),
+            reference: Some(sample.reference),
             standard_deviation: Some(sample.standard_deviation.into_nanos()),
             ..Default::default()
         }
@@ -370,7 +366,7 @@ mod test {
         .into_iter()
         .collect();
         Config {
-            https_timeout: zx::MonotonicDuration::from_seconds(10),
+            https_timeout: zx::BootDuration::from_seconds(10),
             standard_deviation_bound_percentage: 30,
             first_rtt_time_factor: 5,
             use_pull_api: false,
@@ -381,15 +377,15 @@ mod test {
     #[fuchsia::test]
     fn test_retry_strategy() {
         let strategy = RetryStrategy {
-            min_between_failures: zx::MonotonicDuration::from_seconds(1),
+            min_between_failures: zx::BootDuration::from_seconds(1),
             max_exponent: 3,
             tries_per_exponent: 3,
-            converge_time_between_samples: zx::MonotonicDuration::from_seconds(10),
-            maintain_time_between_samples: zx::MonotonicDuration::from_seconds(10),
+            converge_time_between_samples: zx::BootDuration::from_seconds(10),
+            maintain_time_between_samples: zx::BootDuration::from_seconds(10),
         };
         let expectation = vec![1, 1, 1, 2, 2, 2, 4, 4, 4, 8, 8, 8, 8, 8];
         for i in 0..expectation.len() {
-            let expected = zx::MonotonicDuration::from_seconds(expectation[i]);
+            let expected = zx::BootDuration::from_seconds(expectation[i]);
             let actual = strategy.backoff_duration(i as u32);
 
             assert_eq!(

@@ -27,20 +27,20 @@ struct vvar_data {
   // Implements a seqlock
   StdAtomicU64 seq_num;
 
-  // Linear transform which relates clock monotonic (zx_clock_get_monotonic) to utc time.
+  // Linear transform which relates boot clock (zx_clock_get_boot) to utc time.
   // Specifically...
   //
-  // utc(monotonic_time) =  (monotonic_time - mono_to_utc_reference_offset)
-  //                        * mono_to_utc_synthetic_ticks
-  //                        / mono_to_utc_reference_ticks
-  //                        + mono_to_utc_synthetic_offset;
+  // utc(boot_time) =  (boot_time - boot_to_utc_reference_offset)
+  //                        * boot_to_utc_synthetic_ticks
+  //                        / boot_to_utc_reference_ticks
+  //                        + boot_to_utc_synthetic_offset;
   //
   // This transform is protected by a seqlock, implemented using seq_num, to prevent
   // the vDSO reading the transform while it is being updated      .
-  StdAtomicI64 mono_to_utc_reference_offset;
-  StdAtomicI64 mono_to_utc_synthetic_offset;
-  StdAtomicU32 mono_to_utc_reference_ticks;
-  StdAtomicU32 mono_to_utc_synthetic_ticks;
+  StdAtomicI64 boot_to_utc_reference_offset;
+  StdAtomicI64 boot_to_utc_synthetic_offset;
+  StdAtomicU32 boot_to_utc_reference_ticks;
+  StdAtomicU32 boot_to_utc_synthetic_ticks;
 };
 
 #ifdef __cplusplus

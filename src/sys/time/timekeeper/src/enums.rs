@@ -196,8 +196,8 @@ impl Into<CobaltTrackEvent> for ClockUpdateReason {
 /// The reasons a received time sample may not be valid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SampleValidationError {
-    MonotonicInFuture,
-    MonotonicTooOld,
+    ReferenceInstantInFuture,
+    ReferenceInstantTooOld,
     BeforeBackstop,
     TooCloseToPrevious,
 }
@@ -205,8 +205,11 @@ pub enum SampleValidationError {
 impl Into<CobaltTimeSourceEvent> for SampleValidationError {
     fn into(self) -> CobaltTimeSourceEvent {
         match self {
-            Self::MonotonicInFuture => CobaltTimeSourceEvent::SampleRejectedMonotonicInFuture,
-            Self::MonotonicTooOld => CobaltTimeSourceEvent::SampleRejectedMonotonicTooOld,
+            // TODO: b/374817071 - Correct the Cobalt metric naming.
+            Self::ReferenceInstantInFuture => {
+                CobaltTimeSourceEvent::SampleRejectedMonotonicInFuture
+            }
+            Self::ReferenceInstantTooOld => CobaltTimeSourceEvent::SampleRejectedMonotonicTooOld,
             Self::BeforeBackstop => CobaltTimeSourceEvent::SampleRejectedBeforeBackstop,
             Self::TooCloseToPrevious => CobaltTimeSourceEvent::SampleRejectedTooCloseToPrevious,
         }

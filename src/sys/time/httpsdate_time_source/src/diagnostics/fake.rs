@@ -82,11 +82,11 @@ mod test {
 
     lazy_static! {
         static ref TEST_SAMPLE: HttpsSample = HttpsSample {
-            utc: zx::MonotonicInstant::from_nanos(111_111_111),
-            monotonic: zx::MonotonicInstant::from_nanos(222_222_222),
-            standard_deviation: zx::MonotonicDuration::from_millis(235),
-            final_bound_size: zx::MonotonicDuration::from_millis(100),
-            polls: vec![Poll { round_trip_time: zx::MonotonicDuration::from_nanos(23) }],
+            utc: zx::BootInstant::from_nanos(111_111_111),
+            reference: zx::BootInstant::from_nanos(222_222_222),
+            standard_deviation: zx::BootDuration::from_millis(235),
+            final_bound_size: zx::BootDuration::from_millis(100),
+            polls: vec![Poll { round_trip_time: zx::BootDuration::from_nanos(23) }],
         };
         static ref TEST_SUCCESS: Event<'static> = Event::Success(&*TEST_SAMPLE);
         static ref TEST_SAMPLE_2: HttpsSample = {

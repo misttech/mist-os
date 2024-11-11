@@ -30,16 +30,20 @@ use tracing::warn;
 
 /// Retry strategy used while polling for time.
 const RETRY_STRATEGY: RetryStrategy = RetryStrategy {
-    min_between_failures: zx::MonotonicDuration::from_seconds(1),
+    // This being on a boot timeline means suspension will cause timeouts.
+    min_between_failures: zx::BootDuration::from_seconds(1),
     max_exponent: 3,
     tries_per_exponent: 3,
-    converge_time_between_samples: zx::MonotonicDuration::from_minutes(2),
-    maintain_time_between_samples: zx::MonotonicDuration::from_minutes(20),
+    converge_time_between_samples: zx::BootDuration::from_minutes(2),
+    maintain_time_between_samples: zx::BootDuration::from_minutes(20),
 };
 
 /// HttpsDate config, populated from build-time generated structured config.
 pub struct Config {
-    https_timeout: zx::MonotonicDuration,
+    // The amount of time to wait for a HTTPs timeout for sampling.
+    // Looks like it could be boot duration, to ensure that requests fail fast
+    // when sampling is much delayed.
+    https_timeout: zx::BootDuration,
     standard_deviation_bound_percentage: u8,
     first_rtt_time_factor: u16,
     use_pull_api: bool,
@@ -79,7 +83,7 @@ impl From<httpsdate_config::Config> for Config {
         .into_iter()
         .collect();
         Config {
-            https_timeout: zx::MonotonicDuration::from_seconds(source.https_timeout_sec.into()),
+            https_timeout: zx::BootDuration::from_seconds(source.https_timeout_sec.into()),
             standard_deviation_bound_percentage: source.standard_deviation_bound_percentage,
             first_rtt_time_factor: source.first_rtt_time_factor,
             use_pull_api: source.use_pull_api,

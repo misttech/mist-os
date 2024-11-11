@@ -59,7 +59,7 @@ where
 /// on the test component retrieve the real time. When the test component needs to read fake
 /// time, it must do so using the `FakeClockController` handle. Basically, tests should access
 /// fake time through fake_clock_controller.get_monotonic() instead of the common methods such as
-/// zx::MonotonicInstant::get().
+/// zx::BootInstant::get().
 ///
 /// The provided `test_fn` is provided with handles to manipulate the time source, observe events
 /// passed to cobalt, and manipulate the fake time.
@@ -116,8 +116,8 @@ async fn freerun_time_fast(fake_clock: &FakeClockController) {
     fake_clock.pause().await.expect("Failed to pause time");
     fake_clock
         .resume_with_increments(
-            zx::MonotonicDuration::from_millis(1).into_nanos(),
-            &Increment::Determined(zx::MonotonicDuration::from_minutes(1).into_nanos()),
+            zx::BootDuration::from_millis(1).into_nanos(),
+            &Increment::Determined(zx::BootDuration::from_minutes(1).into_nanos()),
         )
         .await
         .expect("Failed to resume time")
@@ -125,8 +125,7 @@ async fn freerun_time_fast(fake_clock: &FakeClockController) {
 }
 
 /// The duration after which timekeeper restarts an inactive time source.
-const INACTIVE_SOURCE_RESTART_DURATION: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_hours(1);
+const INACTIVE_SOURCE_RESTART_DURATION: zx::BootDuration = zx::BootDuration::from_hours(1);
 
 #[fuchsia::test]
 async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
@@ -135,13 +134,16 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
 
-        let mono_before = zx::MonotonicInstant::from_nanos(
+        let mono_before = zx::BootInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
+        let reference_time = fake_time.get_reference().await.expect("Failed to get time");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
-                monotonic: Some(fake_time.get_monotonic().await.expect("Failed to get time")),
+                // Compatibility for CTF tests.
+                monotonic: Some(reference_time.into_nanos()),
+                reference: Some(reference_time),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -174,7 +176,7 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
         });
 
         // At least an hour should've passed.
-        let mono_after = zx::MonotonicInstant::from_nanos(
+        let mono_after = zx::BootInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
         assert_geq!(mono_after, mono_before + INACTIVE_SOURCE_RESTART_DURATION);
@@ -204,10 +206,13 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
 async fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() -> Result<()> {
     let clock = new_nonshareable_clock();
     faketime_test(clock, |clock, push_source_controller, _, fake_time| async move {
+        let reference_time = fake_time.get_reference().await.expect("Failed to get time");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
-                monotonic: Some(fake_time.get_monotonic().await.expect("Failed to get time")),
+                // Backwards compatibility for CTS tests.
+                monotonic: Some(reference_time.into_nanos()),
+                reference: Some(reference_time),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -229,11 +234,11 @@ async fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() -> R
         freerun_time_fast(&fake_time).await;
 
         // Wait longer than the usual restart duration.
-        let mono_before = zx::MonotonicInstant::from_nanos(
+        let mono_before = zx::BootInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
         poll_until_async!(|| async {
-            let mono_now = zx::MonotonicInstant::from_nanos(
+            let mono_now = zx::BootInstant::from_nanos(
                 fake_time.get_monotonic().await.expect("Failed to get time"),
             );
             mono_now - mono_before > INACTIVE_SOURCE_RESTART_DURATION * 4

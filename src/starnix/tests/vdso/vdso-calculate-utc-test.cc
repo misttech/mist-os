@@ -12,39 +12,45 @@
 vvar_data vvar;
 
 namespace {
-int64_t monotonic_value;
-const int64_t INITIAL_MONOTONIC_VALUE = 10'000;
-const int64_t MONOTONIC_INCREMENT_SIZE = 100;
+int64_t reference_value;
+const int64_t INITIAL_REFERENCE_TIME_VALUE = 10'000;
+const int64_t REFERENCE_INCREMENT_SIZE = 100;
 
 struct VvarTransform {
-  int64_t mono_to_utc_reference_offset;
-  int64_t mono_to_utc_synthetic_offset;
-  uint32_t mono_to_utc_reference_ticks;
-  uint32_t mono_to_utc_synthetic_ticks;
-  int64_t apply(int64_t monotonic_time_nsec) const {
-    return (monotonic_time_nsec - mono_to_utc_reference_offset) * mono_to_utc_synthetic_ticks /
-               mono_to_utc_reference_ticks +
-           mono_to_utc_synthetic_offset;
+  int64_t boot_to_utc_reference_offset;
+  int64_t boot_to_utc_synthetic_offset;
+  uint32_t boot_to_utc_reference_ticks;
+  uint32_t boot_to_utc_synthetic_ticks;
+  int64_t apply(int64_t reference_time_nsec) const {
+    return ((reference_time_nsec - boot_to_utc_reference_offset) * boot_to_utc_synthetic_ticks /
+            boot_to_utc_reference_ticks) +
+           boot_to_utc_synthetic_offset;
   }
 };
 
-VvarTransform transform1 = {1001, 2002, 3003, 4004};
+VvarTransform transform1 = {.boot_to_utc_reference_offset = 1001,
+                            .boot_to_utc_synthetic_offset = 2002,
+                            .boot_to_utc_reference_ticks = 3003,
+                            .boot_to_utc_synthetic_ticks = 4004};
 
-VvarTransform transform2 = {160, 230, 5, 20};
+VvarTransform transform2 = {.boot_to_utc_reference_offset = 160,
+                            .boot_to_utc_synthetic_offset = 230,
+                            .boot_to_utc_reference_ticks = 5,
+                            .boot_to_utc_synthetic_ticks = 20};
 
 class VdsoCalculateUtcTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    monotonic_value = INITIAL_MONOTONIC_VALUE;
+    reference_value = INITIAL_REFERENCE_TIME_VALUE;
     // Seq_num says that data can be read.
     vvar.seq_num.store(4, std::memory_order_release);
-    vvar.mono_to_utc_reference_offset.store(transform1.mono_to_utc_reference_offset,
+    vvar.boot_to_utc_reference_offset.store(transform1.boot_to_utc_reference_offset,
                                             std::memory_order_release);
-    vvar.mono_to_utc_synthetic_offset.store(transform1.mono_to_utc_synthetic_offset,
+    vvar.boot_to_utc_synthetic_offset.store(transform1.boot_to_utc_synthetic_offset,
                                             std::memory_order_release);
-    vvar.mono_to_utc_reference_ticks.store(transform1.mono_to_utc_reference_ticks,
+    vvar.boot_to_utc_reference_ticks.store(transform1.boot_to_utc_reference_ticks,
                                            std::memory_order_release);
-    vvar.mono_to_utc_synthetic_ticks.store(transform1.mono_to_utc_synthetic_ticks,
+    vvar.boot_to_utc_synthetic_ticks.store(transform1.boot_to_utc_synthetic_ticks,
                                            std::memory_order_release);
   }
 };
@@ -57,13 +63,13 @@ void writer_thread(std::atomic_bool *should_stop) {
     i++;
     const VvarTransform &current_transform = (i % 2) ? transform1 : transform2;
     std::atomic_fetch_add(&vvar.seq_num, 1);
-    vvar.mono_to_utc_reference_offset.store(current_transform.mono_to_utc_reference_offset,
+    vvar.boot_to_utc_reference_offset.store(current_transform.boot_to_utc_reference_offset,
                                             std::memory_order_release);
-    vvar.mono_to_utc_synthetic_offset.store(current_transform.mono_to_utc_synthetic_offset,
+    vvar.boot_to_utc_synthetic_offset.store(current_transform.boot_to_utc_synthetic_offset,
                                             std::memory_order_release);
-    vvar.mono_to_utc_reference_ticks.store(current_transform.mono_to_utc_reference_ticks,
+    vvar.boot_to_utc_reference_ticks.store(current_transform.boot_to_utc_reference_ticks,
                                            std::memory_order_release);
-    vvar.mono_to_utc_synthetic_ticks.store(current_transform.mono_to_utc_synthetic_ticks,
+    vvar.boot_to_utc_synthetic_ticks.store(current_transform.boot_to_utc_synthetic_ticks,
                                            std::memory_order_release);
     std::atomic_fetch_add(&vvar.seq_num, 1);
   }
@@ -72,13 +78,13 @@ void writer_thread(std::atomic_bool *should_stop) {
 
 // Custom function which replaces the normal calculate_monotonic_time_nsec.
 // By adjusting the value of monotonic_value, the monotonic time can be custom set.
-int64_t calculate_monotonic_time_nsec() { return monotonic_value; }
+int64_t calculate_monotonic_time_nsec() { return reference_value; }
 
 TEST_F(VdsoCalculateUtcTest, ValidVvarAccess) {
   int64_t expected_value =
-      (calculate_monotonic_time_nsec() - transform1.mono_to_utc_reference_offset) *
-          transform1.mono_to_utc_synthetic_ticks / transform1.mono_to_utc_reference_ticks +
-      transform1.mono_to_utc_synthetic_offset;
+      (calculate_monotonic_time_nsec() - transform1.boot_to_utc_reference_offset) *
+          transform1.boot_to_utc_synthetic_ticks / transform1.boot_to_utc_reference_ticks +
+      transform1.boot_to_utc_synthetic_offset;
   int64_t utc_result = calculate_utc_time_nsec();
   ASSERT_EQ(utc_result, expected_value);
 }
@@ -94,8 +100,8 @@ TEST_F(VdsoCalculateUtcTest, UtcCalculationIncreasesWithMono) {
   int64_t prev_utc_value = calculate_utc_time_nsec();
   ASSERT_NE(prev_utc_value, kUtcInvalid);
   for (int i = 0; i < 100; i++) {
-    // Monotonic time increases. Check that utc time also increases.
-    monotonic_value += MONOTONIC_INCREMENT_SIZE;
+    // Reference time increases. Check that utc time also increases.
+    reference_value += REFERENCE_INCREMENT_SIZE;
     int64_t current_utc_value = calculate_utc_time_nsec();
     ASSERT_NE(current_utc_value, kUtcInvalid);
     ASSERT_GT(current_utc_value, prev_utc_value);
@@ -109,8 +115,8 @@ TEST_F(VdsoCalculateUtcTest, SeqlockThreadSafe) {
   // either one of the outputs that one of the valid transforms would produce, or kUtcInvalid.
   std::atomic_bool should_stop = false;
   std::thread writer(writer_thread, &should_stop);
-  int64_t possible_utc_values[2] = {transform1.apply(INITIAL_MONOTONIC_VALUE),
-                                    transform2.apply(INITIAL_MONOTONIC_VALUE)};
+  int64_t possible_utc_values[2] = {transform1.apply(INITIAL_REFERENCE_TIME_VALUE),
+                                    transform2.apply(INITIAL_REFERENCE_TIME_VALUE)};
   int64_t valid_value_counter[2] = {0, 0};
   while (valid_value_counter[0] < 500 || valid_value_counter[1] < 500) {
     int64_t utc_result = calculate_utc_time_nsec();

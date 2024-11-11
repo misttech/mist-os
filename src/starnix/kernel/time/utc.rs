@@ -103,14 +103,14 @@ impl UtcClock {
     pub fn update_utc_clock(&mut self, dest: &MemoryMappedVvar) {
         self.poll_transform();
         // TODO(https://fxbug.dev/356911500): Remove the parsing
-        let mono_transform = zx::ClockTransformation {
-            reference_offset: zx::MonotonicInstant::from_nanos(
+        let reference_transform = zx::ClockTransformation {
+            reference_offset: zx::BootInstant::from_nanos(
                 self.current_transform.reference_offset.into_nanos(),
             ),
             synthetic_offset: self.current_transform.synthetic_offset,
             rate: self.current_transform.rate.clone(),
         };
-        dest.update_utc_data_transform(&mono_transform);
+        dest.update_utc_data_transform(&reference_transform);
     }
 }
 

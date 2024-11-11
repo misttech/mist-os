@@ -74,6 +74,12 @@ __EXPORT zx_time_t zx_clock_get_monotonic() {
   return result.value().time;
 }
 
+__EXPORT zx_time_t zx_clock_get_boot() {
+  // For now, treat the boot clock and the monotonic clock exactly the same when
+  // fake clock is used.
+  return zx_clock_get_monotonic();
+}
+
 __EXPORT zx_time_t zx_deadline_after(zx_duration_t duration) {
   return zx_time_add_duration(zx_clock_get_monotonic(), duration);
 }

@@ -50,18 +50,18 @@ struct EstimationWindow {
     /// The UTC time of the first sample in the window.
     initial_utc: UtcInstant,
     /// The monotonic time of the first sample in the window.
-    initial_monotonic: zx::MonotonicInstant,
+    initial_reference: zx::BootInstant,
     /// The number of samples accepted into this window.
     sample_count: u32,
     /// The sum of (UTC - initial UTC), in nanoseconds, over all samples.
     sum_utc: f64,
     /// The sum of (monotonic - initial monotonic), in nanoseconds, over all samples.
-    sum_monotonic: f64,
+    sum_reference: f64,
     /// The sum of (monotonic - initial monotonic)^2, in nanoseconds squared, over all samples.
-    sum_monotonic_squared: f64,
+    sum_reference_squared: f64,
     /// The sum of (UTC - initial UTC)*(monotonic - initial monotonic), in nanoseconds squared,
     /// over all samples.
-    sum_utc_monotonic: f64,
+    sum_utc_reference: f64,
 }
 
 impl EstimationWindow {
@@ -69,12 +69,12 @@ impl EstimationWindow {
     fn new(sample: &Sample) -> Self {
         EstimationWindow {
             initial_utc: sample.utc,
-            initial_monotonic: sample.monotonic,
+            initial_reference: sample.reference,
             sample_count: 1,
             sum_utc: 0.0,
-            sum_monotonic: 0.0,
-            sum_monotonic_squared: 0.0,
-            sum_utc_monotonic: 0.0,
+            sum_reference: 0.0,
+            sum_reference_squared: 0.0,
+            sum_utc_reference: 0.0,
         }
     }
 
@@ -88,12 +88,12 @@ impl EstimationWindow {
         }
 
         let utc = (sample.utc - self.initial_utc).into_nanos() as f64;
-        let monotonic = (sample.monotonic - self.initial_monotonic).into_nanos() as f64;
+        let monotonic = (sample.reference - self.initial_reference).into_nanos() as f64;
         self.sample_count += 1;
         self.sum_utc += utc;
-        self.sum_monotonic += monotonic;
-        self.sum_monotonic_squared += monotonic * monotonic;
-        self.sum_utc_monotonic += utc * monotonic;
+        self.sum_reference += monotonic;
+        self.sum_reference_squared += monotonic * monotonic;
+        self.sum_utc_reference += utc * monotonic;
         Ok(())
     }
 
@@ -108,8 +108,8 @@ impl EstimationWindow {
 
         let sample_count = self.sample_count as f64;
         let denominator =
-            self.sum_monotonic_squared - self.sum_monotonic * self.sum_monotonic / sample_count;
-        let numerator = self.sum_utc_monotonic - self.sum_utc * self.sum_monotonic / sample_count;
+            self.sum_reference_squared - self.sum_reference * self.sum_reference / sample_count;
+        let numerator = self.sum_utc_reference - self.sum_utc * self.sum_reference / sample_count;
         Ok(numerator / denominator)
     }
 
@@ -235,8 +235,8 @@ mod test {
     use chrono::DateTime;
     use test_util::assert_near;
 
-    const INITIAL_MONO: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(7_000_000_000);
-    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(88);
+    const INITIAL_MONO: zx::BootInstant = zx::BootInstant::from_nanos(7_000_000_000);
+    const STD_DEV: zx::BootDuration = zx::BootDuration::from_millis(88);
 
     // This time is nowhere near a leap second.
     const TEST_UTC_STR: &str = "2021-03-25T13:22:52-08:00";
@@ -245,7 +245,7 @@ mod test {
 
     /// Creates a single sample with the supplied times and the standard standard deviation
     /// Initial UTC is specified as an RFC3339 string.
-    fn create_sample(utc_string: &str, monotonic: zx::MonotonicInstant) -> Sample {
+    fn create_sample(utc_string: &str, monotonic: zx::BootInstant) -> Sample {
         let chrono_utc = DateTime::parse_from_rfc3339(utc_string).expect("Invalid UTC string");
         Sample::new(
             UtcInstant::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
@@ -263,11 +263,11 @@ mod test {
         frequency: f64,
     ) -> Vec<Sample> {
         let monotonic_spacing =
-            zx::MonotonicDuration::from_nanos((utc_spacing.into_nanos() as f64 / frequency) as i64);
+            zx::BootDuration::from_nanos((utc_spacing.into_nanos() as f64 / frequency) as i64);
 
         let mut vec = Vec::<Sample>::new();
         let mut utc = reference_sample.utc;
-        let mut monotonic = reference_sample.monotonic;
+        let mut monotonic = reference_sample.reference;
 
         for _ in 0..quantity {
             utc += utc_spacing;
@@ -322,12 +322,12 @@ mod test {
         let initial = create_sample(TEST_UTC_STR, INITIAL_MONO);
         let earlier = Sample::new(
             initial.utc - UtcDuration::from_hours(1),
-            initial.monotonic - zx::MonotonicDuration::from_hours(1),
+            initial.reference - zx::BootDuration::from_hours(1),
             STD_DEV,
         );
         let later = Sample::new(
             initial.utc + UtcDuration::from_hours(36),
-            initial.monotonic + zx::MonotonicDuration::from_hours(36),
+            initial.reference + zx::BootDuration::from_hours(36),
             STD_DEV,
         );
 

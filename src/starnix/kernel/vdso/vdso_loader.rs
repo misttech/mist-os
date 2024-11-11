@@ -60,15 +60,15 @@ impl MemoryMappedVvar {
     pub fn update_utc_data_transform(&self, new_transform: &UtcClockTransform) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = UtcClockTransform {
-            reference_offset: zx::MonotonicInstant::from_nanos(
-                vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
+            reference_offset: zx::BootInstant::from_nanos(
+                vvar_data.boot_to_utc_reference_offset.load(Ordering::Acquire),
             ),
             synthetic_offset: UtcInstant::from_nanos(
-                vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
+                vvar_data.boot_to_utc_synthetic_offset.load(Ordering::Acquire),
             ),
             rate: zx::sys::zx_clock_rate_t {
-                synthetic_ticks: vvar_data.mono_to_utc_synthetic_ticks.load(Ordering::Acquire),
-                reference_ticks: vvar_data.mono_to_utc_reference_ticks.load(Ordering::Acquire),
+                synthetic_ticks: vvar_data.boot_to_utc_synthetic_ticks.load(Ordering::Acquire),
+                reference_ticks: vvar_data.boot_to_utc_reference_ticks.load(Ordering::Acquire),
             },
         };
         if old_transform != *new_transform {
@@ -76,16 +76,16 @@ impl MemoryMappedVvar {
             // Verify that no other thread is currently trying to update vvar_data
             debug_assert!(seq_num & 1 == 0);
             vvar_data
-                .mono_to_utc_reference_offset
+                .boot_to_utc_reference_offset
                 .store(new_transform.reference_offset.into_nanos(), Ordering::Release);
             vvar_data
-                .mono_to_utc_synthetic_offset
+                .boot_to_utc_synthetic_offset
                 .store(new_transform.synthetic_offset.into_nanos(), Ordering::Release);
             vvar_data
-                .mono_to_utc_reference_ticks
+                .boot_to_utc_reference_ticks
                 .store(new_transform.rate.reference_ticks, Ordering::Release);
             vvar_data
-                .mono_to_utc_synthetic_ticks
+                .boot_to_utc_synthetic_ticks
                 .store(new_transform.rate.synthetic_ticks, Ordering::Release);
             let seq_num_after = vvar_data.seq_num.swap(seq_num + 2, Ordering::Release);
             // Verify that no other thread also tried to update vvar_data during this update
@@ -134,7 +134,7 @@ fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<MemoryObject>) {
     // Map the writeable vvar_memory to a region of Starnix kernel VMAR and write initial vvar_data
     let vvar_memory_mapped =
         Arc::new(MemoryMappedVvar::new(&vvar_memory_writeable).expect("couldn't map vvar memory"));
-    // Write initial mono to utc transform to the vvar.
+    // Write initial boot time to utc transform to the vvar.
     update_utc_clock(&vvar_memory_mapped);
     let vvar_writeable_rights = vvar_memory_writeable.basic_info().rights;
     // Create a duplicate handle to this vvar memory which doesn't have write permission

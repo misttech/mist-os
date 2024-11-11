@@ -443,6 +443,11 @@ impl FakeClockController {
     pub async fn get_monotonic(&self) -> Result<i64, fidl::Error> {
         self.clock_proxy.get().await
     }
+
+    /// Returns the current fake instant on the reference timeline.
+    pub async fn get_reference(&self) -> Result<zx::BootInstant, fidl::Error> {
+        self.get_monotonic().await.map(|v| zx::BootInstant::from_nanos(v))
+    }
 }
 
 /// The RTC configuration options.
@@ -700,10 +705,10 @@ lazy_static! {
 }
 
 /// Time between each reported sample.
-pub const BETWEEN_SAMPLES: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
+pub const BETWEEN_SAMPLES: zx::BootDuration = zx::BootDuration::from_seconds(5);
 
 /// The standard deviation to report on valid time samples.
-pub const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(50);
+pub const STD_DEV: zx::BootDuration = zx::BootDuration::from_millis(50);
 
 /// Create a new clock with backstop time set to `BACKSTOP_TIME`.
 // TODO: b/306024715 - To be removed once all tests are migrated to TTRF.

@@ -214,7 +214,7 @@ impl WatchSender<Arc<TimeSample>> for WatchSampleResponder {
     fn send_response(self, data: Arc<TimeSample>) {
         let time_sample = TimeSample {
             utc: data.utc.clone(),
-            monotonic: data.monotonic.clone(),
+            reference: data.reference.clone(),
             standard_deviation: data.standard_deviation.clone(),
             ..Default::default()
         };
@@ -375,7 +375,7 @@ mod test {
         let sample_fut = proxy.watch_sample();
         harness
             .push_update(Update::Sample(Arc::new(TimeSample {
-                monotonic: Some(23),
+                reference: Some(zx::BootInstant::from_nanos(23)),
                 utc: Some(24),
                 standard_deviation: None,
                 ..Default::default()
@@ -384,7 +384,7 @@ mod test {
         assert_eq!(
             sample_fut.await.unwrap(),
             TimeSample {
-                monotonic: Some(23),
+                reference: Some(zx::BootInstant::from_nanos(23)),
                 utc: Some(24),
                 standard_deviation: None,
                 ..Default::default()
@@ -395,7 +395,7 @@ mod test {
         let sample_fut = proxy.watch_sample();
         harness
             .push_update(Update::Sample(Arc::new(TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()
@@ -404,7 +404,7 @@ mod test {
         assert_eq!(
             sample_fut.await.unwrap(),
             TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()
@@ -426,7 +426,7 @@ mod test {
         let sample_fut_2 = proxy_2.watch_sample();
         harness
             .push_update(Update::Sample(Arc::new(TimeSample {
-                monotonic: Some(23),
+                reference: Some(zx::BootInstant::from_nanos(23)),
                 utc: Some(24),
                 standard_deviation: None,
                 ..Default::default()
@@ -435,7 +435,7 @@ mod test {
         assert_eq!(
             sample_fut.await.unwrap(),
             TimeSample {
-                monotonic: Some(23),
+                reference: Some(zx::BootInstant::from_nanos(23)),
                 utc: Some(24),
                 standard_deviation: None,
                 ..Default::default()
@@ -444,7 +444,7 @@ mod test {
         assert_eq!(
             sample_fut_2.await.unwrap(),
             TimeSample {
-                monotonic: Some(23),
+                reference: Some(zx::BootInstant::from_nanos(23)),
                 utc: Some(24),
                 standard_deviation: None,
                 ..Default::default()
@@ -456,7 +456,7 @@ mod test {
         let sample_fut_2 = proxy_2.watch_sample();
         harness
             .push_update(Update::Sample(Arc::new(TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()
@@ -465,7 +465,7 @@ mod test {
         assert_eq!(
             sample_fut.await.unwrap(),
             TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()
@@ -474,7 +474,7 @@ mod test {
         assert_eq!(
             sample_fut_2.await.unwrap(),
             TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()
@@ -486,7 +486,7 @@ mod test {
         assert_eq!(
             proxy_3.watch_sample().await.unwrap(),
             TimeSample {
-                monotonic: Some(25),
+                reference: Some(zx::BootInstant::from_nanos(25)),
                 utc: Some(26),
                 standard_deviation: None,
                 ..Default::default()

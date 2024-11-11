@@ -19,17 +19,17 @@ const MIN_COVARIANCE: f64 = 1e12;
 /// two sigma approximately corresponds to a 95% confidence interval.
 const ERROR_BOUND_FACTOR: u32 = 2;
 
-/// Converts a zx::MonotonicDuration to a floating point number of nanoseconds.
+/// Converts a zx::BootDuration to a floating point number of nanoseconds.
 fn duration_to_f64<T: zx::Timeline>(duration: zx::Duration<T>) -> f64 {
     duration.into_nanos() as f64
 }
 
-/// Converts a floating point number of nanoseconds to a zx::MonotonicDuration.
+/// Converts a floating point number of nanoseconds to a zx::BootDuration.
 fn f64_to_duration<T: zx::Timeline>(float: f64) -> zx::Duration<T> {
     zx::Duration::from_nanos(float as i64)
 }
 
-/// Maintains an estimate of the offset between true UTC time and monotonic time on this
+/// Maintains an estimate of the offset between true UTC time and reference time on this
 /// device, based on time samples received from one or more time sources.
 ///
 /// The UTC estimate is implemented as a two dimensional Kalman filter where
@@ -47,11 +47,11 @@ fn f64_to_duration<T: zx::Timeline>(float: f64) -> zx::Duration<T> {
 pub struct KalmanFilter {
     /// A reference utc from which the estimate is maintained.
     reference_utc: UtcInstant,
-    /// The monotonic time at which the estimate applies.
-    monotonic: zx::MonotonicInstant,
+    /// The reference time at which the estimate applies.
+    reference: zx::BootInstant,
     /// Element 0 of the state vector, i.e. estimated utc after reference_utc, in nanoseconds.
     estimate_0: f64,
-    /// Element 1 of the state vector, i.e. utc nanoseconds per monotonic nanosecond.
+    /// Element 1 of the state vector, i.e. utc nanoseconds per reference nanosecond.
     estimate_1: f64,
     /// Element 0,0 of the covariance matrix, i.e. utc estimate covariance in nanoseconds squared.
     /// Note 0,0 is the only non-zero element in the matrix.
@@ -62,11 +62,11 @@ pub struct KalmanFilter {
 
 impl KalmanFilter {
     /// Construct a new KalmanFilter initialized to the supplied sample.
-    pub fn new(Sample { utc, monotonic, std_dev }: &Sample, config: Arc<Config>) -> Self {
+    pub fn new(Sample { utc, reference, std_dev }: &Sample, config: Arc<Config>) -> Self {
         let covariance_00 = duration_to_f64(*std_dev).powf(2.0).max(MIN_COVARIANCE);
         KalmanFilter {
             reference_utc: utc.clone(),
-            monotonic: monotonic.clone(),
+            reference: reference.clone(),
             estimate_0: 0f64,
             estimate_1: 1f64,
             covariance_00,
@@ -74,19 +74,19 @@ impl KalmanFilter {
         }
     }
 
-    /// Propagate the estimate forward to the requested monotonic time.
-    fn predict(&mut self, monotonic: &zx::MonotonicInstant) {
-        let monotonic_step = duration_to_f64(*monotonic - self.monotonic);
-        self.monotonic = monotonic.clone();
-        // Estimated UTC increases by (change in monotonic time) * frequency.
-        self.estimate_0 += self.estimate_1 * monotonic_step;
+    /// Propagate the estimate forward to the requested reference time.
+    fn predict(&mut self, reference: &zx::BootInstant) {
+        let reference_step = duration_to_f64(*reference - self.reference);
+        self.reference = reference.clone();
+        // Estimated UTC increases by (change in reference time) * frequency.
+        self.estimate_0 += self.estimate_1 * reference_step;
         // Estimated covariance increases as a function of the time step and oscillator error.
         self.covariance_00 +=
-            monotonic_step.powf(2.0) * self.config.get_oscillator_error_variance();
+            reference_step.powf(2.0) * self.config.get_oscillator_error_variance();
     }
 
     /// Correct the estimate by incorporating measurement data.
-    fn correct(&mut self, utc: &UtcInstant, std_dev: &zx::MonotonicDuration) {
+    fn correct(&mut self, utc: &UtcInstant, std_dev: &zx::BootDuration) {
         let measurement_variance = duration_to_f64(*std_dev).powf(2.0);
         let measurement_utc_offset = duration_to_f64(*utc - self.reference_utc);
         // Gain is based on the relative variance of the apriori estimate and the new measurement...
@@ -101,21 +101,21 @@ impl KalmanFilter {
     /// that this caused.
     pub fn update(
         &mut self,
-        Sample { utc, monotonic, std_dev }: &Sample,
+        Sample { utc, reference, std_dev }: &Sample,
     ) -> Result<UtcDuration, Error> {
         // Ignore any updates that are earlier than the current filter state. Samples from a single
         // time source should arrive in order due to the validation in time_source_manager, but its
         // not impossible that a backwards step occurs during a time source switch.
-        if *monotonic < self.monotonic {
+        if *reference < self.reference {
             return Err(anyhow!(
-                "sample monotonic={} prior to previous monotonic={}",
-                monotonic.into_nanos(),
-                self.monotonic.into_nanos()
+                "sample reference={} prior to previous reference={}",
+                reference.into_nanos(),
+                self.reference.into_nanos()
             ));
         }
 
-        // Calculate apriori by moving the estimate forward to the measurement's monotonic time.
-        self.predict(monotonic);
+        // Calculate apriori by moving the estimate forward to the measurement's reference time.
+        self.predict(reference);
         let apriori_utc = self.utc();
         // Then correct to aposteriori by merging in the measurement.
         self.correct(utc, std_dev);
@@ -134,10 +134,10 @@ impl KalmanFilter {
     }
 
     /// Returns a `UtcTransform` describing the estimated synthetic time and error as a function
-    /// of the monotonic time.
+    /// of the reference time.
     pub fn transform(&self) -> UtcTransform {
         UtcTransform {
-            reference_offset: self.monotonic,
+            reference_offset: self.reference,
             synthetic_offset: self.utc(),
             rate_adjust_ppm: frequency_to_adjust_ppm(self.estimate_1),
             error_bound_at_offset: ERROR_BOUND_FACTOR as u64 * self.covariance_00.sqrt() as u64,
@@ -146,9 +146,9 @@ impl KalmanFilter {
         }
     }
 
-    /// Returns the monotonic time of the last state update.
-    pub fn monotonic(&self) -> zx::MonotonicInstant {
-        self.monotonic
+    /// Returns the reference time of the last state update.
+    pub fn reference(&self) -> zx::BootInstant {
+        self.reference
     }
 
     /// Returns the estimated utc at the last state update.
@@ -157,7 +157,7 @@ impl KalmanFilter {
     }
 
     /// Returns the square root of the last updated filter covariance.
-    pub fn sqrt_covariance(&self) -> zx::MonotonicDuration {
+    pub fn sqrt_covariance(&self) -> zx::BootDuration {
         f64_to_duration(self.covariance_00.sqrt())
     }
 }
@@ -168,12 +168,12 @@ mod test {
     use crate::make_test_config;
     use test_util::assert_near;
 
-    const TIME_1: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(10_000_000_000);
-    const TIME_2: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(20_000_000_000);
-    const OFFSET_1: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(777);
-    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(999);
-    const STD_DEV_1: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(22);
-    const ZERO_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(0);
+    const TIME_1: zx::BootInstant = zx::BootInstant::from_nanos(10_000_000_000);
+    const TIME_2: zx::BootInstant = zx::BootInstant::from_nanos(20_000_000_000);
+    const OFFSET_1: zx::BootDuration = zx::BootDuration::from_seconds(777);
+    const OFFSET_2: zx::BootDuration = zx::BootDuration::from_seconds(999);
+    const STD_DEV_1: zx::BootDuration = zx::BootDuration::from_millis(22);
+    const ZERO_DURATION: zx::BootDuration = zx::BootDuration::from_nanos(0);
     const SQRT_COV_1: u64 = STD_DEV_1.into_nanos() as u64;
 
     #[fuchsia::test]
@@ -203,15 +203,15 @@ mod test {
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
         assert_eq!(
-            transform.error_bound(TIME_1 - zx::MonotonicDuration::from_seconds(1)),
+            transform.error_bound(TIME_1 - zx::BootDuration::from_seconds(1)),
             2 * SQRT_COV_1
         );
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + zx::MonotonicDuration::from_seconds(1)),
+            transform.error_bound(TIME_1 + zx::BootDuration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
-        assert_eq!(filter.monotonic(), TIME_1);
+        assert_eq!(filter.reference(), TIME_1);
         assert_eq!(filter.utc().into_nanos(), (TIME_1 + OFFSET_1).into_nanos());
         assert_eq!(filter.sqrt_covariance(), STD_DEV_1);
     }
@@ -224,8 +224,8 @@ mod test {
         let mut filter = KalmanFilter::new(
             &Sample::new(
                 UtcInstant::from_nanos(10001_000000000),
-                zx::MonotonicInstant::from_nanos(1_000000000),
-                zx::MonotonicDuration::from_millis(50),
+                zx::BootInstant::from_nanos(1_000000000),
+                zx::BootDuration::from_millis(50),
             ),
             config,
         );
@@ -238,8 +238,8 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10101_100000000),
-                    zx::MonotonicInstant::from_nanos(101_000000000),
-                    zx::MonotonicDuration::from_millis(200),
+                    zx::BootInstant::from_nanos(101_000000000),
+                    zx::BootDuration::from_millis(200),
                 ))
                 .unwrap(),
             UtcDuration::from_nanos(100_005887335 - 0 - 100_000000000)
@@ -252,8 +252,8 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10300_900000000),
-                    zx::MonotonicInstant::from_nanos(301_000000000),
-                    zx::MonotonicDuration::from_millis(100),
+                    zx::BootInstant::from_nanos(301_000000000),
+                    zx::BootDuration::from_millis(100),
                 ))
                 .unwrap(),
             UtcDuration::from_nanos(299_985642105 - 100_005887335 - 200_000000000)
@@ -269,8 +269,8 @@ mod test {
         let mut filter = KalmanFilter::new(
             &Sample::new(
                 UtcInstant::from_nanos(10001_000000000),
-                zx::MonotonicInstant::from_nanos(1_000000000),
-                zx::MonotonicDuration::from_millis(50),
+                zx::BootInstant::from_nanos(1_000000000),
+                zx::BootDuration::from_millis(50),
             ),
             Arc::clone(&config),
         );
@@ -278,8 +278,8 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10201_000000000),
-                    zx::MonotonicInstant::from_nanos(201_000000000),
-                    zx::MonotonicDuration::from_millis(50),
+                    zx::BootInstant::from_nanos(201_000000000),
+                    zx::BootDuration::from_millis(50),
                 ))
                 .unwrap(),
             UtcDuration::from_nanos(0)
@@ -291,7 +291,7 @@ mod test {
         assert_eq!(
             filter.transform(),
             UtcTransform {
-                reference_offset: zx::MonotonicInstant::from_nanos(201_000000000),
+                reference_offset: zx::BootInstant::from_nanos(201_000000000),
                 synthetic_offset: UtcInstant::from_nanos(10201_000000000),
                 rate_adjust_ppm: 0,
                 error_bound_at_offset: 70774174,
@@ -309,7 +309,7 @@ mod test {
         assert_eq!(
             filter.transform(),
             UtcTransform {
-                reference_offset: zx::MonotonicInstant::from_nanos(201_000000000),
+                reference_offset: zx::BootInstant::from_nanos(201_000000000),
                 synthetic_offset: UtcInstant::from_nanos(10201_000000000),
                 rate_adjust_ppm: -100,
                 error_bound_at_offset: 70774174,
@@ -317,15 +317,15 @@ mod test {
             }
         );
 
-        // Even though this new sample has the same monotonic to UTC offset as before, based on the
+        // Even though this new sample has the same reference to UTC offset as before, based on the
         // updated frequency the new UTC is higher than the filter was expecting. It causes an
         // increase relative to the apriori estimate.
         assert_eq!(
             filter
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10301_000000000),
-                    zx::MonotonicInstant::from_nanos(301_000000000),
-                    zx::MonotonicDuration::from_millis(50),
+                    zx::BootInstant::from_nanos(301_000000000),
+                    zx::BootDuration::from_millis(50),
                 ))
                 .unwrap(),
             UtcDuration::from_nanos(3341316)
@@ -358,7 +358,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn earlier_monotonic_ignored() {
+    fn earlier_reference_ignored() {
         let config = make_test_config();
         let mut filter = KalmanFilter::new(
             &Sample::new(

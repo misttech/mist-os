@@ -33,7 +33,7 @@ pub async fn create_realm(
         NestedTimekeeper::new(
             Arc::new(fake_utc_clock),
             options.rtc.map(|r| r.into()).unwrap_or(RtcOptions::None),
-            !options.use_real_monotonic_clock.unwrap_or(false),
+            !options.use_real_reference_clock.unwrap_or(false),
         )
         .await;
     Ok((

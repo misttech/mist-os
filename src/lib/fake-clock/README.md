@@ -1,7 +1,10 @@
 # Fake-clock
 
-A system enabling a test component to manipulate monotonic time for components
-under test.
+> At the moment, the fake-clock library returns identical results from monotonic
+> and boot clocks.
+
+A system enabling a test component to manipulate monotonic and boot time for
+components under test.
 
 Fake-clock consists of a library and service component.
 
@@ -10,8 +13,8 @@ through the [`fuchsia.testing.FakeClock`][fidl] protocol and may be controlled
 through the [`fuchsia.testing.FakeClockControl`][fidl] protocol.
 
 The library overrides syscalls defined in the
-[vDSO][vdso] that interact with monotonic time or
-have a built in deadline. The overrides route time-based waits and signals to
+[vDSO][vdso] that interact with time or have a built in deadline.
+The overrides route time-based waits and signals to
 the service component via the [`fuchsia.testing.FakeClock`][fidl] protocol.
 
 In addition, the named-timer crate allows an author to annotate critical
@@ -88,7 +91,7 @@ component's manifest.
 ```
 
 The test may then connect to
-[`fuchsia.testing.FakeClockControl`][fidl] to control monotonic time.
+[`fuchsia.testing.FakeClockControl`][fidl] to control monotonic or boot time.
 
 See the [examples][examples] directory for example setups.
 

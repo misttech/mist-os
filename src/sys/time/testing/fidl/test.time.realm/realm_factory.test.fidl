@@ -26,10 +26,10 @@ open protocol RealmFactory {
     flexible CreateRealm(resource struct {
         /// The options for creating the Timekeeper realm factory.
         options @generated_name("RealmOptions") resource table {
-            /// If set, the test realm will us a real monotonic clock handle (in
+            /// If set, the test realm will us a real reference clock handle (in
             /// contrast to a fake handle which can be manipulated from the test
             /// fixture).
-            1: use_real_monotonic_clock bool;
+            1: use_real_reference_clock bool;
 
             /// Sets up the RTC clock.
             ///

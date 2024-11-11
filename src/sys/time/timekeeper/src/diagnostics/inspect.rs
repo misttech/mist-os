@@ -36,8 +36,8 @@ lazy_static! {
     pub static ref INSPECTOR: Inspector = Inspector::default();
 }
 
-fn monotonic_time() -> i64 {
-    zx::MonotonicInstant::get().into_nanos()
+fn reference_time() -> i64 {
+    zx::BootInstant::get().into_nanos()
 }
 
 /// A vector of inspect nodes used to store some struct implementing `InspectWritable`, where the
@@ -81,8 +81,8 @@ impl<T: InspectWritable + Default> CircularBuffer<T> {
 /// A representation of a point in time as measured by all pertinent clocks.
 #[derive(InspectWritable)]
 pub struct TimeSet {
-    /// The ZX_CLOCK_MONOTONIC time, in ns.
-    monotonic: i64,
+    /// The reference time, in ns.
+    reference: i64,
     /// The UTC UtcClock time, in ns.
     clock_utc: i64,
 }
@@ -91,7 +91,7 @@ impl TimeSet {
     /// Creates a new `TimeSet` set to current time.
     pub fn now(clock: &UtcClock) -> Self {
         TimeSet {
-            monotonic: monotonic_time(),
+            reference: reference_time(),
             clock_utc: clock.read().map(UtcInstant::into_nanos).unwrap_or(FAILED_TIME),
         }
     }
@@ -100,18 +100,18 @@ impl TimeSet {
 /// A representation of a single update to a UTC UtcClock.
 #[derive(InspectWritable)]
 pub struct ClockDetails {
-    /// The monotonic time at which the details were retrieved. Note this is the time the Rust
+    /// The reference time at which the details were retrieved. Note this is the time the Rust
     /// object was created, which may not exactly match the time its contents were supplied by
     /// the kernel.
-    retrieval_monotonic: i64,
+    retrieval_reference: i64,
     /// The generation counter as documented in the UtcClock.
     generation_counter: u32,
-    /// The monotonic time from the monotonic-UTC correspondence pair, in ns.
+    /// The reference time from the monotonic-UTC correspondence pair, in ns.
     reference_offset: i64,
-    /// The UTC time from the monotonic-UTC correspondence pair, in ns.
+    /// The UTC time from the reference-UTC correspondence pair, in ns.
     utc_offset: i64,
-    /// The ratio between UTC tick rate and monotonic tick rate in parts per million, expressed as
-    /// a PPM deviation from nominal. A positive number means UTC is running faster than monotonic.
+    /// The ratio between UTC tick rate and reference tick rate in parts per million, expressed as
+    /// a PPM deviation from nominal. A positive number means UTC is running faster than reference.
     rate_ppm: i32,
     /// The error bounds as documented in the UtcClock.
     error_bounds: u64,
@@ -139,7 +139,7 @@ impl From<UtcClockDetails> for ClockDetails {
             (syn, refr) => ((syn as i64 * ONE_MILLION as i64) / refr as i64) as i32 - ONE_MILLION,
         };
         ClockDetails {
-            retrieval_monotonic: monotonic_time(),
+            retrieval_reference: reference_time(),
             generation_counter: details.generation_counter,
             reference_offset: details.reference_to_synthetic.reference_offset.into_nanos(),
             utc_offset: details.reference_to_synthetic.synthetic_offset.into_nanos(),
@@ -191,7 +191,7 @@ impl RealTimeClockNode {
 struct TimeSourceNode {
     /// The most recent status of the time source.
     status: StringProperty,
-    /// The monotonic time at which the time source last changed.
+    /// The reference time at which the time source last changed.
     status_change: IntProperty,
     /// The number of time source failures for each failure mode.
     failure_counters: HashMap<TimeSourceError, UintProperty>,
@@ -207,7 +207,7 @@ impl TimeSourceNode {
         node.record_string("component", format!("{:?}", time_source));
         TimeSourceNode {
             status: node.create_string("status", "Launched"),
-            status_change: node.create_int("status_change_monotonic", monotonic_time()),
+            status_change: node.create_int("status_change_reference", reference_time()),
             failure_counters: HashMap::new(),
             rejection_counters: HashMap::new(),
             node: node,
@@ -217,13 +217,13 @@ impl TimeSourceNode {
     /// Records a change in status of the time source.
     pub fn status(&mut self, status: Status) {
         self.status.set(&format!("{:?}", &status));
-        self.status_change.set(monotonic_time());
+        self.status_change.set(reference_time());
     }
 
     /// Records a failure of the time source.
     pub fn failure(&mut self, error: TimeSourceError) {
         self.status.set(&format!("Failed({:?})", error));
-        self.status_change.set(monotonic_time());
+        self.status_change.set(reference_time());
         match self.failure_counters.get_mut(&error) {
             Some(field) => {
                 let _ = field.add(1);
@@ -252,9 +252,9 @@ impl TimeSourceNode {
 /// A representation of the state of a Kalman filter at a point in time.
 #[derive(InspectWritable, Default)]
 pub struct KalmanFilterState {
-    /// The monotonic time at which the state applies, in nanoseconds.
-    monotonic: i64,
-    /// The estimated UTC corresponding to monotonic, in nanoseconds.
+    /// The reference time at which the state applies, in nanoseconds.
+    reference: i64,
+    /// The estimated UTC corresponding to reference, in nanoseconds.
     utc: i64,
     /// The square root of element [0,0] of the covariance matrix, in nanoseconds.
     sqrt_covariance: u64,
@@ -263,10 +263,10 @@ pub struct KalmanFilterState {
 /// A representation of a frequency estimate at a point in time.
 #[derive(InspectWritable, Default)]
 pub struct FrequencyState {
-    /// The monotonic time at which the state applies, in nanoseconds.
-    monotonic: i64,
+    /// The reference time at which the state applies, in nanoseconds.
+    reference: i64,
     /// The estimated frequency as a PPM deviation from nominal. A positive number means UTC is
-    /// running faster than monotonic, i.e. the oscillator is slow.
+    /// running faster than reference, i.e. the oscillator is slow.
     rate_adjust_ppm: i32,
     /// The number of frequency windows that contributed to this estimate.
     window_count: u32,
@@ -275,8 +275,8 @@ pub struct FrequencyState {
 /// A representation of a single planned clock correction.
 #[derive(InspectWritable, Default)]
 pub struct ClockCorrection {
-    /// The monotonic time at which the clock correction was received.
-    monotonic: i64,
+    /// The reference time at which the clock correction was received.
+    reference: i64,
     /// The change to be applied to the current clock value, in nanoseconds.
     correction: i64,
     /// The strategy that will be used to apply this correction.
@@ -331,12 +331,12 @@ impl TrackNode {
     /// Records a new Kalman filter update for the track.
     pub fn update_filter_state(
         &mut self,
-        monotonic: zx::MonotonicInstant,
+        reference: zx::BootInstant,
         utc: UtcInstant,
-        sqrt_covariance: zx::MonotonicDuration,
+        sqrt_covariance: zx::BootDuration,
     ) {
         let filter_state = KalmanFilterState {
-            monotonic: monotonic.into_nanos(),
+            reference: reference.into_nanos(),
             utc: utc.into_nanos(),
             sqrt_covariance: sqrt_covariance.into_nanos() as u64,
         };
@@ -346,19 +346,19 @@ impl TrackNode {
     /// Records a new frequency update for the track.
     pub fn update_frequency(
         &mut self,
-        monotonic: zx::MonotonicInstant,
+        reference: zx::BootInstant,
         rate_adjust_ppm: i32,
         window_count: u32,
     ) {
         let frequency_state =
-            FrequencyState { monotonic: monotonic.into_nanos(), rate_adjust_ppm, window_count };
+            FrequencyState { reference: reference.into_nanos(), rate_adjust_ppm, window_count };
         self.frequencies.update(&frequency_state);
     }
 
     /// Records a new planned correction for the clock.
     pub fn clock_correction(&mut self, correction: UtcDuration, strategy: ClockCorrectionStrategy) {
         let clock_correction = ClockCorrection {
-            monotonic: monotonic_time(),
+            reference: reference_time(),
             correction: correction.into_nanos(),
             strategy,
         };
@@ -489,14 +489,14 @@ impl Diagnostics for InspectDiagnostics {
             Event::FrequencyWindowDiscarded { track, reason } => {
                 self.update_track(track, |tn| tn.discard_frequency(reason));
             }
-            Event::KalmanFilterUpdated { track, monotonic, utc, sqrt_covariance } => {
+            Event::KalmanFilterUpdated { track, reference, utc, sqrt_covariance } => {
                 self.update_track(track, |tn| {
-                    tn.update_filter_state(monotonic, utc, sqrt_covariance)
+                    tn.update_filter_state(reference, utc, sqrt_covariance)
                 });
             }
-            Event::FrequencyUpdated { track, monotonic, rate_adjust_ppm, window_count } => {
+            Event::FrequencyUpdated { track, reference, rate_adjust_ppm, window_count } => {
                 self.update_track(track, |tn| {
-                    tn.update_frequency(monotonic, rate_adjust_ppm, window_count)
+                    tn.update_frequency(reference, rate_adjust_ppm, window_count)
                 });
             }
             Event::ClockCorrection { track, correction, strategy } => {
@@ -534,7 +534,7 @@ mod tests {
     const RATE_ADJUST: i32 = 222;
     const ERROR_BOUNDS: u64 = 4444444444;
     const GENERATION_COUNTER: u32 = 7777;
-    const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(311);
+    const OFFSET: zx::BootDuration = zx::BootDuration::from_seconds(311);
     const CORRECTION: UtcDuration = UtcDuration::from_millis(88);
     const SQRT_COVARIANCE: i64 = 5454545454;
 
@@ -625,23 +625,23 @@ mod tests {
             inspector,
             root: contains {
                 initialization: contains {
-                    monotonic: AnyProperty,
+                    reference: AnyProperty,
                     clock_utc: AnyProperty,
                 },
                 backstop: BACKSTOP_TIME,
                 current: contains {
-                    monotonic: AnyProperty,
+                    reference: AnyProperty,
                     clock_utc: AnyProperty,
                 },
                 primary_time_source: contains {
                     component: "Push(FakePushTimeSource)",
                     status: "Launched",
-                    status_change_monotonic: AnyProperty,
+                    status_change_reference: AnyProperty,
                 },
                 primary_track: contains {
                     filter_state_0: contains {
                         counter: 0u64,
-                        monotonic: 0i64,
+                        reference: 0i64,
                         utc: 0i64,
                         sqrt_covariance: 0u64,
                     }
@@ -658,11 +658,11 @@ mod tests {
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
-        let monotonic_time = zx::MonotonicInstant::get();
+        let reference_time = zx::BootInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .absolute_value(monotonic_time, UtcInstant::from_nanos(BACKSTOP_TIME + 1234))
+                    .absolute_value(reference_time, UtcInstant::from_nanos(BACKSTOP_TIME + 1234))
                     .rate_adjust(0)
                     .error_bounds(0),
             )
@@ -670,11 +670,11 @@ mod tests {
         inspect_diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
 
-        let monotonic_time = zx::MonotonicInstant::get();
+        let reference_time = zx::BootInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .absolute_value(monotonic_time, UtcInstant::from_nanos(BACKSTOP_TIME + 2345))
+                    .absolute_value(reference_time, UtcInstant::from_nanos(BACKSTOP_TIME + 2345))
                     .rate_adjust(RATE_ADJUST)
                     .error_bounds(ERROR_BOUNDS),
             )
@@ -687,19 +687,19 @@ mod tests {
             inspector,
             root: contains {
                 initialization: contains {
-                    monotonic: AnyProperty,
+                    reference: AnyProperty,
                     clock_utc: AnyProperty,
                 },
                 backstop: BACKSTOP_TIME,
                 current: contains {
-                    monotonic: AnyProperty,
+                    reference: AnyProperty,
                     clock_utc: AnyProperty,
                 },
                 primary_track: contains {
                     last_update: contains {
-                        retrieval_monotonic: AnyProperty,
+                        retrieval_reference: AnyProperty,
                         generation_counter: 2u64,
-                        reference_offset: monotonic_time.into_nanos() as i64,
+                        reference_offset: reference_time.into_nanos() as i64,
                         utc_offset: (BACKSTOP_TIME + 2345) as i64,
                         rate_ppm: RATE_ADJUST as i64,
                         error_bounds: ERROR_BOUNDS,
@@ -756,12 +756,12 @@ mod tests {
                 primary_time_source: contains {
                     component: "Push(FakePushTimeSource)",
                     status: "Launched",
-                    status_change_monotonic: AnyProperty,
+                    status_change_reference: AnyProperty,
                 },
                 monitor_time_source: contains {
                     component: "Push(FakePushTimeSource)",
                     status: "Launched",
-                    status_change_monotonic: AnyProperty,
+                    status_change_reference: AnyProperty,
                 }
             }
         );
@@ -779,7 +779,7 @@ mod tests {
                 primary_time_source: contains {
                     component: "Push(FakePushTimeSource)",
                     status: "Failed(CallFailed)",
-                    status_change_monotonic: AnyProperty,
+                    status_change_reference: AnyProperty,
                     failure_count_LaunchFailed: 1u64,
                     failure_count_CallFailed: 2u64,
                     rejection_count_BeforeBackstop: 1u64,
@@ -787,7 +787,7 @@ mod tests {
                 monitor_time_source: contains {
                     component: "Push(FakePushTimeSource)",
                     status: "Network",
-                    status_change_monotonic: AnyProperty,
+                    status_change_reference: AnyProperty,
                 }
             }
         );
@@ -804,7 +804,7 @@ mod tests {
                 primary_track: contains {
                     filter_state_0: contains {
                         counter: 0u64,
-                        monotonic: 0i64,
+                        reference: 0i64,
                         utc: 0i64,
                         sqrt_covariance: 0u64,
                     },
@@ -814,7 +814,7 @@ mod tests {
                     filter_state_4: contains {},
                     frequency_0: contains {
                         counter: 0u64,
-                        monotonic: 0i64,
+                        reference: 0i64,
                         rate_adjust_ppm: 0i64,
                         window_count: 0u64,
                     },
@@ -822,7 +822,7 @@ mod tests {
                     frequency_2: contains {},
                     clock_correction_0: contains {
                         counter: 0u64,
-                        monotonic: 0i64,
+                        reference: 0i64,
                         correction: 0i64,
                         strategy: "Step",
                     },
@@ -849,13 +849,13 @@ mod tests {
         for i in 1..8 {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
+                reference: zx::BootInstant::ZERO + OFFSET * i,
                 utc: UtcInstant::from_nanos(BACKSTOP_TIME + OFFSET.into_nanos() * i),
-                sqrt_covariance: zx::MonotonicDuration::from_nanos(SQRT_COVARIANCE) * i,
+                sqrt_covariance: zx::BootDuration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
+                reference: zx::BootInstant::ZERO + OFFSET * i,
                 rate_adjust_ppm: -i as i32,
                 window_count: i as u32,
             });
@@ -882,72 +882,72 @@ mod tests {
                 primary_track: contains {
                     filter_state_0: contains {
                         counter: 6u64,
-                        monotonic: 6 * OFFSET.into_nanos(),
+                        reference: 6 * OFFSET.into_nanos(),
                         utc: BACKSTOP_TIME + 6 * OFFSET.into_nanos(),
                         sqrt_covariance: 6 * SQRT_COVARIANCE as u64,
                     },
                     filter_state_1: contains {
                         counter: 7u64,
-                        monotonic: 7 * OFFSET.into_nanos(),
+                        reference: 7 * OFFSET.into_nanos(),
                         utc: BACKSTOP_TIME + 7 * OFFSET.into_nanos(),
                         sqrt_covariance: 7 * SQRT_COVARIANCE as u64,
                     },
                     filter_state_2: contains {
                         counter: 3u64,
-                        monotonic: 3 * OFFSET.into_nanos(),
+                        reference: 3 * OFFSET.into_nanos(),
                         utc: BACKSTOP_TIME + 3 * OFFSET.into_nanos(),
                         sqrt_covariance: 3 * SQRT_COVARIANCE as u64,
                     },
                     filter_state_3: contains {
                         counter: 4u64,
-                        monotonic: 4 * OFFSET.into_nanos(),
+                        reference: 4 * OFFSET.into_nanos(),
                         utc: BACKSTOP_TIME + 4 * OFFSET.into_nanos(),
                         sqrt_covariance: 4 * SQRT_COVARIANCE as u64,
                     },
                     filter_state_4: contains {
                         counter: 5u64,
-                        monotonic: 5 * OFFSET.into_nanos(),
+                        reference: 5 * OFFSET.into_nanos(),
                         utc: BACKSTOP_TIME + 5 * OFFSET.into_nanos(),
                         sqrt_covariance: 5 * SQRT_COVARIANCE as u64,
                     },
                     frequency_0: contains {
                         counter: 7u64,
-                        monotonic: 7 * OFFSET.into_nanos(),
+                        reference: 7 * OFFSET.into_nanos(),
                         rate_adjust_ppm: -7i64,
                         window_count: 7u64,
                     },
                     frequency_1: contains {
                         counter: 5u64,
-                        monotonic: 5 * OFFSET.into_nanos(),
+                        reference: 5 * OFFSET.into_nanos(),
                         rate_adjust_ppm: -5i64,
                         window_count: 5u64,
                     },
                     frequency_2: contains {
                         counter: 6u64,
-                        monotonic: 6 * OFFSET.into_nanos(),
+                        reference: 6 * OFFSET.into_nanos(),
                         rate_adjust_ppm: -6i64,
                         window_count: 6u64,
                     },
                     clock_correction_0: contains {
                         counter: 7u64,
-                        monotonic: AnyProperty,
+                        reference: AnyProperty,
                         correction: 7 * CORRECTION.into_nanos(),
                         strategy: "MaxDurationSlew",
                     },
                     clock_correction_1: contains {
                         counter: 5u64,
-                        monotonic: AnyProperty,
+                        reference: AnyProperty,
                         correction: 5 * CORRECTION.into_nanos(),
                         strategy: "MaxDurationSlew",
                     },
                     clock_correction_2: contains {
                         counter: 6u64,
-                        monotonic: AnyProperty,
+                        reference: AnyProperty,
                         correction: 6 * CORRECTION.into_nanos(),
                         strategy: "MaxDurationSlew",
                     },
                     last_update: contains {
-                        retrieval_monotonic: AnyProperty,
+                        retrieval_reference: AnyProperty,
                         generation_counter: 0u64,
                         reference_offset: AnyProperty,
                         utc_offset: AnyProperty,

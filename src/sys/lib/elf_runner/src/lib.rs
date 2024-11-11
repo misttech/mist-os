@@ -466,7 +466,10 @@ impl ElfRunner {
             .flatten();
         if let Some(clock_transformation) = clock_transformation {
             let utc_timestamp = clock_transformation
-                .apply(zx::MonotonicInstant::from_nanos(process_start_time))
+                // TODO: b/377525445 - This will give wrong values once we introduce
+                // stoppable monotonic clock. We allow it temporarily since it
+                // will work until that happens.
+                .apply(zx::BootInstant::from_nanos(process_start_time))
                 .into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;

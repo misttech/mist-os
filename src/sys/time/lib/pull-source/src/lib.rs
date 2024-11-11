@@ -24,8 +24,13 @@ pub trait UpdateAlgorithm {
     /// Produce a new time sample, taking into account `Urgency`.
     async fn sample(&self, urgency: Urgency) -> Result<TimeSample, SampleError>;
 
-    /// Returns the monotonic time at which the next sample may be produced.
-    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant;
+    /// Returns the reference time at which the next sample may be produced.
+    ///
+    /// A reference timeline is always given on the boot timeline, which means
+    /// it could fall in a time when the device was suspended.  We may want
+    /// to wake the device to sample time, but also may decide not to, depending
+    /// on power policy.
+    async fn next_possible_sample_time(&self) -> zx::BootInstant;
 }
 
 /// Reasons `sample()` may fail.
@@ -152,9 +157,8 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant {
-        // TODO(https://fxbug.dev/42065019): Implement rate limiting.
-        zx::MonotonicInstant::get()
+    async fn next_possible_sample_time(&self) -> zx::BootInstant {
+        zx::BootInstant::get()
     }
 }
 
@@ -212,7 +216,7 @@ mod test {
             .add_sample(
                 Urgency::Low,
                 Ok(TimeSample {
-                    monotonic: Some(12),
+                    reference: Some(zx::BootInstant::from_nanos(12)),
                     utc: Some(34),
                     standard_deviation: None,
                     ..Default::default()
@@ -233,7 +237,7 @@ mod test {
             .add_sample(
                 Urgency::Low,
                 Ok(TimeSample {
-                    monotonic: Some(12),
+                    reference: Some(zx::BootInstant::from_nanos(12)),
                     utc: Some(34),
                     standard_deviation: None,
                     ..Default::default()
@@ -244,7 +248,7 @@ mod test {
             .add_sample(
                 Urgency::High,
                 Ok(TimeSample {
-                    monotonic: Some(56),
+                    reference: Some(zx::BootInstant::from_nanos(56)),
                     utc: Some(78),
                     standard_deviation: None,
                     ..Default::default()
@@ -255,7 +259,7 @@ mod test {
         assert_eq!(
             client.sample(Urgency::Low).await.unwrap().unwrap(),
             TimeSample {
-                monotonic: Some(12),
+                reference: Some(zx::BootInstant::from_nanos(12)),
                 utc: Some(34),
                 standard_deviation: None,
                 ..Default::default()
@@ -264,7 +268,7 @@ mod test {
         assert_eq!(
             client.sample(Urgency::High).await.unwrap().unwrap(),
             TimeSample {
-                monotonic: Some(56),
+                reference: Some(zx::BootInstant::from_nanos(56)),
                 utc: Some(78),
                 standard_deviation: None,
                 ..Default::default()

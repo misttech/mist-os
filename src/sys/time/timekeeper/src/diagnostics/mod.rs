@@ -24,7 +24,7 @@ use fuchsia_runtime::{UtcDuration, UtcInstant};
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
-pub const ANY_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(i64::MIN);
+pub const ANY_DURATION: zx::BootDuration = zx::BootDuration::from_nanos(i64::MIN);
 
 /// A special instant that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
@@ -49,12 +49,12 @@ pub enum Event {
     KalmanFilterUpdated {
         /// The `Track` of the estimate.
         track: Track,
-        /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicInstant,
-        /// The estimated UTC corresponding to monotonic.
+        /// The reference time at which the state applies.
+        reference: zx::BootInstant,
+        /// The estimated UTC corresponding to reference.
         utc: UtcInstant,
         /// Square root of element [0,0] of the covariance matrix.
-        sqrt_covariance: zx::MonotonicDuration,
+        sqrt_covariance: zx::BootDuration,
     },
     /// A partially completed frequency window was discarded without being used.
     FrequencyWindowDiscarded { track: Track, reason: FrequencyDiscardReason },
@@ -62,10 +62,10 @@ pub enum Event {
     FrequencyUpdated {
         /// The `Track` of the estimate.
         track: Track,
-        /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicInstant,
+        /// The reference time at which the state applies.
+        reference: zx::BootInstant,
         /// The estimated frequency as a PPM deviation from nominal. A positive number means UTC is
-        /// running faster than monotonic, i.e. the oscillator is slow.
+        /// running faster than reference, i.e. the oscillator is slow.
         rate_adjust_ppm: i32,
         /// The number of frequency windows that contributed to this estimate.
         window_count: u32,

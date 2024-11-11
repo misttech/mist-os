@@ -37,11 +37,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
-use zx::MonotonicTimeline;
+use zx::BootTimeline;
 use {fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync};
 
-// TODO(https://fxbug.dev/356911500) switch to boot timeline
-type UtcTransform = time_util::Transform<MonotonicTimeline, UtcTimeline>;
+type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
 
 /// A command sent from various FIDL clients.
 #[derive(Debug)]
@@ -349,7 +348,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     force_start: bool,
 ) {
     info!("reading initial RTC time.");
-    let mono_before = zx::MonotonicInstant::get();
+    let mono_before = zx::BootInstant::get();
     let mut rtc_time = match rtc.get().await {
         Err(err) => {
             error!("failed to read RTC time: {}", err);
@@ -361,7 +360,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         }
         Ok(time) => time,
     };
-    let mono_after = zx::MonotonicInstant::get();
+    let mono_after = zx::BootInstant::get();
     let mono_time = mono_before + (mono_after - mono_before) / 2;
 
     let mut rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
@@ -464,7 +463,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
         let b1 = *backstop + UtcDuration::from_nanos(1);
-        let mono = zx::MonotonicInstant::get();
+        let mono = zx::BootInstant::get();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
         if let Err(status) =
@@ -563,9 +562,9 @@ mod tests {
     use test_case::test_case;
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
-    const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_000);
-    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_333);
-    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(44);
+    const OFFSET: zx::BootDuration = zx::BootDuration::from_seconds(1111_000);
+    const OFFSET_2: zx::BootDuration = zx::BootDuration::from_seconds(1111_333);
+    const STD_DEV: zx::BootDuration = zx::BootDuration::from_millis(44);
     const INVALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(111111 * NANOS_PER_SECOND);
     const BACKSTOP_TIME: UtcInstant = UtcInstant::from_nanos(222222 * NANOS_PER_SECOND);
     const VALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(333333 * NANOS_PER_SECOND);
@@ -639,7 +638,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config();
 
-        let monotonic_ref = zx::MonotonicInstant::get();
+        let boot_ref = zx::BootInstant::get();
 
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
@@ -651,8 +650,8 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
-                        monotonic_ref,
+                        UtcInstant::from_nanos((boot_ref + OFFSET).into_nanos()),
+                        boot_ref,
                         STD_DEV,
                     )),
                 ])
@@ -664,8 +663,8 @@ mod tests {
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Network },
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcInstant::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
-                        monotonic_ref,
+                        UtcInstant::from_nanos((boot_ref + OFFSET_2).into_nanos()),
+                        boot_ref,
                         STD_DEV,
                     )),
                 ])
@@ -695,8 +694,8 @@ mod tests {
             Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Ok },
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: monotonic_ref,
-                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                reference: boot_ref,
+                utc: UtcInstant::from_nanos((boot_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -708,8 +707,8 @@ mod tests {
             Event::TimeSourceStatus { role: Role::Monitor, status: ftexternal::Status::Ok },
             Event::KalmanFilterUpdated {
                 track: Track::Monitor,
-                monotonic: monotonic_ref,
-                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                reference: boot_ref,
+                utc: UtcInstant::from_nanos((boot_ref + OFFSET_2).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -729,7 +728,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(delay);
 
-        let monotonic_ref = zx::MonotonicInstant::get();
+        let boot_ref = zx::BootInstant::get();
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
 
@@ -740,8 +739,8 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
-                        monotonic_ref,
+                        UtcInstant::from_nanos((boot_ref + OFFSET).into_nanos()),
+                        boot_ref,
                         STD_DEV,
                     )),
                 ])
@@ -773,7 +772,13 @@ mod tests {
         let _ = executor.run_until_stalled(&mut fut); // Finish clock update work.
 
         // Check that the clocks are set.
-        assert!(primary_clock.get_details().unwrap().last_value_update_ticks > primary_ticks);
+        let last_value = primary_clock.get_details().unwrap().last_value_update_ticks;
+        assert!(
+            last_value > primary_ticks,
+            "wanted: last_value: {} > primary_ticks: {}",
+            last_value,
+            primary_ticks
+        );
         assert!(rtc.last_set().is_some());
 
         // Check that the correct diagnostic events were logged.
@@ -786,8 +791,8 @@ mod tests {
             Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Ok },
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: monotonic_ref,
-                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                reference: boot_ref,
+                utc: UtcInstant::from_nanos((boot_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -800,13 +805,19 @@ mod tests {
 
     #[fuchsia::test]
     fn fail_when_no_delays() {
+        let actual_now = zx::MonotonicInstant::get();
+
         let mut executor = fasync::TestExecutor::new_with_fake_time();
+        // Ensure that we don't hit hard limitations such as backstop but that
+        // we still run in fake time.
+        executor.set_fake_time(actual_now.into());
+
         let (primary_clock, primary_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(1);
 
-        let monotonic_ref = zx::MonotonicInstant::get();
+        let boot_ref = executor.boot_now();
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
 
@@ -817,8 +828,8 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
-                        monotonic_ref,
+                        UtcInstant::from_nanos((boot_ref + OFFSET).into_nanos()),
+                        boot_ref.into(),
                         STD_DEV,
                     )),
                 ])
