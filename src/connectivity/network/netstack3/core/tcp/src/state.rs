@@ -624,9 +624,9 @@ impl FinQueued {
 #[derive(Derivative)]
 #[derivative(Debug)]
 #[cfg_attr(test, derivative(PartialEq, Eq))]
-struct Send<I, S, const FIN_QUEUED: bool> {
+pub(crate) struct Send<I, S, const FIN_QUEUED: bool> {
     nxt: SeqNum,
-    max: SeqNum,
+    pub(crate) max: SeqNum,
     una: SeqNum,
     wnd: WindowSize,
     wnd_scale: WindowScale,
@@ -830,7 +830,7 @@ impl<R: ReceiveBuffer> RecvBufferState<R> {
 /// TCP control block variables that are responsible for receiving.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-struct Recv<I, R> {
+pub(crate) struct Recv<I, R> {
     timer: Option<ReceiveTimer<I>>,
     mss: Mss,
     wnd_scale: WindowScale,
@@ -858,7 +858,23 @@ impl<I> Recv<I, ()> {
 }
 
 impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
+    /// Returns the next window size and updates [`Recv::last_window_update`].
+    ///
+    /// NOTE: Since it updates [`Recv::last_window_update`], this method should
+    /// only be called when a segment is definitely going to be sent. If not,
+    /// prefer to call [`Recv::calculate_window_size`] instead.
     fn select_window(&mut self) -> WindowSize {
+        let (rcv_nxt, last_wnd) = self.calculate_window_size();
+        self.last_window_update = (rcv_nxt, last_wnd);
+
+        last_wnd
+    }
+
+    /// Calculates the next window size to advertise to the peer.
+    ///
+    /// Returns the next window size and the sequence number of the next octet
+    /// that we expect to receive from the peer.
+    fn calculate_window_size(&self) -> (SeqNum, WindowSize) {
         let rcv_nxt = self.nxt();
         let Self { buffer, timer: _, mss, wnd_scale: _, last_window_update: (rcv_wup, last_wnd) } =
             self;
@@ -893,8 +909,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         // have reduced our receive buffer's capacity, so we need to use
         // saturating arithmetic below.
         let reduction = capacity.saturating_sub(len.saturating_add(usize::from(unused_window)));
-        *rcv_wup = rcv_nxt;
-        *last_wnd = if reduction >= usize::min(capacity / 2, usize::from(mss.get().get())) {
+        let last_wnd = if reduction >= usize::min(capacity / 2, usize::from(mss.get().get())) {
             // We have enough reduction in the buffer space, advertise more.
             WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
         } else {
@@ -902,10 +917,45 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             // the last advertisement.
             unused_window
         };
-        *last_wnd
+
+        (rcv_nxt, last_wnd)
     }
 
-    fn nxt(&self) -> SeqNum {
+    /// Processes data being removed from the receive buffer. Returns a window
+    /// update segment to be sent immediately if necessary.
+    fn poll_receive_data_dequeued(&mut self, snd_max: SeqNum) -> Option<Segment<()>> {
+        let (rcv_nxt, next_window_size): (_, WindowSize) = self.calculate_window_size();
+        let (_, last_window_size): (_, WindowSize) = self.last_window_update;
+
+        // Make sure next_window_size is a multiple of wnd_scale, since that's what the peer will
+        // receive. Otherwise, our later MSS comparison might pass, but we'll advertise a window
+        // that's less than MSS, which we don't want.
+        let next_window_size = (next_window_size >> self.wnd_scale) << self.wnd_scale;
+
+        // NOTE: We lose type information here, but we already know these are
+        // both WindowSize from the type annotations above.
+        let next_window_size_u32: u32 = next_window_size.into();
+        let last_window_size_u32: u32 = last_window_size.into();
+
+        // NOTE: The MSS always is a number of octets, which is the same for
+        // WindowSize (though not UnscaledWindowSize), so any comparisons are
+        // safe.
+        let mss: u32 = self.mss.into();
+
+        // If the previously-advertised window was less than advertised MSS, we
+        // assume the sender is in SWS avoidance.  If we now have enough space
+        // to accept at least one MSS worth of data, tell the caller to
+        // immediately send a window update to get the sender back into normal
+        // operation.
+        if last_window_size_u32 < mss && next_window_size_u32 >= mss {
+            self.last_window_update = (rcv_nxt, next_window_size);
+            Some(Segment::ack(snd_max, self.nxt(), next_window_size >> self.wnd_scale))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn nxt(&self) -> SeqNum {
         match &self.buffer {
             RecvBufferState::Open { assembler, .. } => assembler.nxt(),
             RecvBufferState::Closed { nxt, .. } => *nxt,
@@ -940,8 +990,8 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Established<I, R, S> {
-    snd: Takeable<Send<I, S, { FinQueued::NO }>>,
-    rcv: Takeable<Recv<I, R>>,
+    pub(crate) snd: Takeable<Send<I, S, { FinQueued::NO }>>,
+    pub(crate) rcv: Takeable<Recv<I, R>>,
 }
 
 /// Indicates whether at least one byte of data was acknowledged by the remote
@@ -2441,6 +2491,27 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             (ack_to_fin.or(ack_to_text), NewlyClosed::No)
         })();
         (seg, passive_open, data_acked, newly_closed)
+    }
+
+    /// To be called when bytes have been dequeued from the receive buffer.
+    ///
+    /// Returns a segment to send.
+    pub(crate) fn poll_receive_data_dequeued(&mut self) -> Option<Segment<()>> {
+        let (rcv, snd_max) = match self {
+            State::Closed(_)
+            | State::Listen(_)
+            | State::SynRcvd(_)
+            | State::SynSent(_)
+            | State::CloseWait(_)
+            | State::LastAck(_)
+            | State::Closing(_)
+            | State::TimeWait(_) => return None,
+            State::Established(Established { snd, rcv }) => (rcv.get_mut(), snd.max),
+            State::FinWait1(FinWait1 { snd, rcv }) => (rcv.get_mut(), snd.max),
+            State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => (rcv, *last_seq),
+        };
+
+        rcv.poll_receive_data_dequeued(snd_max)
     }
 
     /// Polls if there are any bytes available to send in the buffer.
@@ -7140,5 +7211,136 @@ mod test {
         new_state: State<FakeInstant, RingBuffer, RingBuffer, ()>,
     ) -> NewlyClosed {
         old_state.transition_to_state(&Default::default(), new_state)
+    }
+
+    #[test_case(true; "more than mss dequeued")]
+    #[test_case(false; "less than mss dequeued")]
+    fn poll_receive_data_dequeued_state(dequeue_more_than_mss: bool) {
+        // NOTE: Just enough room to hold TEST_BYTES, but will end up below the MSS when full.
+        const BUFFER_SIZE: usize = 5;
+        const MSS: Mss = Mss(const_unwrap_option(NonZeroU16::new(5)));
+        const TEST_BYTES: &[u8] = "Hello".as_bytes();
+
+        let new_snd = || Send {
+            nxt: ISS_1 + 1,
+            max: ISS_1 + 1,
+            una: ISS_1 + 1,
+            wnd: WindowSize::ZERO,
+            wnd_max: WindowSize::ZERO,
+            buffer: NullBuffer,
+            wl1: ISS_2 + 1,
+            wl2: ISS_1 + 1,
+            rtt_estimator: Estimator::default(),
+            last_seq_ts: None,
+            timer: None,
+            congestion_control: CongestionControl::cubic_with_mss(MSS),
+            wnd_scale: WindowScale::default(),
+        };
+        let new_rcv = || Recv {
+            buffer: RecvBufferState::Open {
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                assembler: Assembler::new(ISS_2 + 1),
+            },
+            timer: None,
+            mss: MSS,
+            wnd_scale: WindowScale::default(),
+            last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+        };
+
+        let last_window_update = |state: &State<_, _, _, _>| match state {
+            State::Closed(_)
+            | State::Listen(_)
+            | State::SynRcvd(_)
+            | State::SynSent(_)
+            | State::CloseWait(_)
+            | State::LastAck(_)
+            | State::Closing(_)
+            | State::TimeWait(_) => unreachable!(),
+
+            State::Established(Established { rcv, .. }) => rcv.last_window_update.clone(),
+            State::FinWait1(FinWait1 { rcv, .. }) => rcv.last_window_update.clone(),
+            State::FinWait2(FinWait2 { rcv, .. }) => rcv.last_window_update.clone(),
+        };
+
+        let clock = FakeInstantCtx::default();
+        let counters = TcpCountersInner::default();
+        for mut state in [
+            State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
+            State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
+            State::FinWait2(FinWait2 { last_seq: ISS_1 + 1, rcv: new_rcv(), timeout_at: None }),
+        ] {
+            // At the beginning, our last window update was greater than MSS, so there's no
+            // need to send an update.
+            assert_matches!(state.poll_receive_data_dequeued(), None);
+            assert_eq!(
+                last_window_update(&state),
+                (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap())
+            );
+
+            // Receive a segment that almost entirely fills the buffer.  We now have less
+            // than MSS of available window, which means we won't send an update.
+            assert_eq!(
+                state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                    Segment::data(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0), TEST_BYTES,),
+                    clock.now(),
+                    &counters,
+                ),
+                (
+                    Some(Segment::ack(
+                        ISS_1 + 1,
+                        ISS_2 + 1 + TEST_BYTES.len(),
+                        UnscaledWindowSize::from((BUFFER_SIZE - TEST_BYTES.len()) as u16),
+                    )),
+                    None
+                ),
+            );
+            assert_matches!(state.poll_receive_data_dequeued(), None);
+            assert_eq!(
+                last_window_update(&state),
+                (ISS_2 + 1 + TEST_BYTES.len(), WindowSize::new(0).unwrap())
+            );
+
+            if dequeue_more_than_mss {
+                // Dequeue the data we just received, which frees up enough space in the buffer
+                // to receive another MSS worth of data. Since we went from under to over MSS,
+                // we expect to immediately send a window update.
+                assert_eq!(
+                    state.read_with(|available| {
+                        assert_eq!(available, &[TEST_BYTES]);
+                        available[0].len()
+                    }),
+                    TEST_BYTES.len()
+                );
+                assert_eq!(
+                    state.poll_receive_data_dequeued(),
+                    Some(Segment::ack(
+                        ISS_1 + 1,
+                        ISS_2 + 1 + TEST_BYTES.len(),
+                        UnscaledWindowSize::from(BUFFER_SIZE as u16)
+                    ))
+                );
+                assert_eq!(
+                    last_window_update(&state),
+                    (ISS_2 + 1 + TEST_BYTES.len(), WindowSize::new(BUFFER_SIZE).unwrap())
+                );
+            } else {
+                // Dequeue data we just received, but just under one MSS worth.
+                // We shouldn't expect there to be any window update sent in
+                // that case.
+                let mss: usize = MSS.get().get().into();
+                assert_eq!(
+                    state.read_with(|available| {
+                        assert_eq!(available, &[TEST_BYTES]);
+                        mss - 1
+                    }),
+                    mss - 1
+                );
+                assert_eq!(state.poll_receive_data_dequeued(), None,);
+                assert_eq!(
+                    last_window_update(&state),
+                    (ISS_2 + 1 + TEST_BYTES.len(), WindowSize::new(0).unwrap())
+                );
+            }
+        }
     }
 }

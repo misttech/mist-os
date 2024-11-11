@@ -3260,6 +3260,75 @@ where
         Ok(result)
     }
 
+    /// Polls the state machine after data is dequeued from the receive buffer.
+    ///
+    /// Possibly sends a window update to the peer if enough data has been read
+    /// from the buffer and we suspect that the peer is in SWS avoidance.
+    ///
+    /// This does nothing for a disconnected socket.
+    pub fn on_receive_buffer_read(&mut self, id: &TcpApiSocketId<I, C>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_socket_mut_transport_demux(
+            id,
+            |core_ctx, TcpSocketState { socket_state, ip_options: _ }| {
+                let conn = match socket_state {
+                    TcpSocketStateInner::Unbound(_) => return,
+                    TcpSocketStateInner::Bound(bound) => match bound {
+                        BoundSocketState::Listener(_) => return,
+                        BoundSocketState::Connected { conn, sharing: _, timer: _ } => conn,
+                    },
+                };
+
+                match core_ctx {
+                    MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                        let (conn, addr) = converter.convert(conn);
+                        if let Some(ack) = conn.state.poll_receive_data_dequeued() {
+                            send_tcp_segment(
+                                core_ctx,
+                                bindings_ctx,
+                                Some(id),
+                                Some(&conn.ip_sock),
+                                addr.ip,
+                                ack.into_empty(),
+                                &conn.socket_options.ip_options,
+                            )
+                        }
+                    }
+                    MaybeDualStack::DualStack((core_ctx, converter)) => {
+                        match converter.convert(conn) {
+                            EitherStack::ThisStack((conn, addr)) => {
+                                if let Some(ack) = conn.state.poll_receive_data_dequeued() {
+                                    send_tcp_segment(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        Some(id),
+                                        Some(&conn.ip_sock),
+                                        addr.ip,
+                                        ack.into_empty(),
+                                        &conn.socket_options.ip_options,
+                                    )
+                                }
+                            }
+                            EitherStack::OtherStack((conn, addr)) => {
+                                if let Some(ack) = conn.state.poll_receive_data_dequeued() {
+                                    send_tcp_segment(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        Some(id),
+                                        Some(&conn.ip_sock),
+                                        addr.ip,
+                                        ack.into_empty(),
+                                        &conn.socket_options.ip_options,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        )
+    }
+
     fn set_device_conn<SockI, WireI, CC>(
         core_ctx: &mut CC,
         bindings_ctx: &mut C::BindingsContext,
@@ -5390,7 +5459,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu};
-    use net_types::LinkLocalAddr;
+    use net_types::{LinkLocalAddr, Witness};
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
         new_rng, run_with_many_seeds, set_logger_for_test, FakeAtomicInstant, FakeCoreCtx,
@@ -5424,6 +5493,7 @@ mod tests {
     use crate::internal::buffer::testutil::{
         ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
     };
+    use crate::internal::buffer::BufferLimits;
     use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
@@ -8883,5 +8953,304 @@ mod tests {
                 assert_eq!(socketmap.len(), 0);
             })
         });
+    }
+
+    #[ip_test(I)]
+    #[test_case(true; "server read over mss")]
+    #[test_case(false; "server read under mss")]
+    fn tcp_data_dequeue_sends_window_update<I: TcpTestIpExt>(server_read_over_mss: bool)
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
+            I,
+            TcpBindingsCtx<FakeDeviceId>,
+            SingleStackConverter = I::SingleStackConverter,
+            DualStackConverter = I::DualStackConverter,
+        >,
+    {
+        const EXTRA_DATA_AMOUNT: usize = 128;
+        set_logger_for_test();
+
+        let (mut net, client, client_snd_end, accepted) = bind_listen_connect_accept_inner(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
+            0,
+            0.0,
+        );
+
+        let accepted_rcv_bufsize = net
+            .with_context(REMOTE, |ctx| ctx.tcp_api::<I>().receive_buffer_size(&accepted).unwrap());
+
+        // Send enough data to the server to fill up its receive buffer.
+        client_snd_end.lock().extend(core::iter::repeat(0xAB).take(accepted_rcv_bufsize));
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().do_send(&client);
+        });
+        net.run_until_idle();
+
+        // From now on, we don't want to trigger timers
+        // because that would result in either:
+        // 1. The client to time out, since the server isn't going to read any
+        //    data from its buffer.
+        // 2. ZWP from the client, which would make this test pointless.
+
+        // Push extra data into the send buffer that won't be sent because the
+        // receive window is zero.
+        client_snd_end.lock().extend(core::iter::repeat(0xAB).take(EXTRA_DATA_AMOUNT));
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().do_send(&client);
+        });
+        let _ = net.step_deliver_frames();
+
+        let send_buf_len = net
+            .with_context(LOCAL, |ctx| {
+                ctx.tcp_api::<I>().with_send_buffer(&client, |buf| {
+                    let BufferLimits { len, capacity: _ } = buf.limits();
+                    len
+                })
+            })
+            .unwrap();
+        assert_eq!(send_buf_len, EXTRA_DATA_AMOUNT);
+
+        if server_read_over_mss {
+            // Clear out the receive buffer
+            let nread = net
+                .with_context(REMOTE, |ctx| {
+                    ctx.tcp_api::<I>().with_receive_buffer(&accepted, |buf| {
+                        buf.lock()
+                            .read_with(|readable| readable.into_iter().map(|buf| buf.len()).sum())
+                    })
+                })
+                .unwrap();
+            assert_eq!(nread, accepted_rcv_bufsize);
+
+            // The server sends a window update because the window went from 0 to
+            // larger than MSS.
+            net.with_context(REMOTE, |ctx| ctx.tcp_api::<I>().on_receive_buffer_read(&accepted));
+
+            let (server_snd_max, server_acknum) = {
+                let socket = accepted.get();
+                let state = assert_matches!(
+                    &socket.deref().socket_state,
+                    TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
+                        assert_matches!(I::get_state(conn), State::Established(e) => e)
+                    }
+                );
+
+                (state.snd.max, state.rcv.nxt())
+            };
+
+            // Deliver the window update to the client.
+            assert_eq!(
+                net.step_deliver_frames_with(|_, meta, frame| {
+                    let mut buffer = Buf::new(frame.clone(), ..);
+
+                    let (packet_seq, packet_ack, window_size, body_len) = match I::VERSION {
+                        IpVersion::V4 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V4(v4) => v4);
+
+                            // Server -> Client.
+                            assert_eq!(*meta.src_ip, Ipv4::TEST_ADDRS.remote_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv4::TEST_ADDRS.local_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            (
+                                parsed.seq_num(),
+                                parsed.ack_num().unwrap(),
+                                parsed.window_size(),
+                                parsed.body().len(),
+                            )
+                        }
+                        IpVersion::V6 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V6(v6) => v6);
+
+                            // Server -> Client.
+                            assert_eq!(*meta.src_ip, Ipv6::TEST_ADDRS.remote_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv6::TEST_ADDRS.local_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            (
+                                parsed.seq_num(),
+                                parsed.ack_num().unwrap(),
+                                parsed.window_size(),
+                                parsed.body().len(),
+                            )
+                        }
+                    };
+
+                    // Ensure that this is actually a window update, and no data
+                    // is being sent or ACKed.
+                    assert_eq!(packet_seq, u32::from(server_snd_max));
+                    assert_eq!(packet_ack, u32::from(server_acknum));
+                    assert_eq!(window_size, 65535);
+                    assert_eq!(body_len, 0);
+
+                    Some((meta, frame))
+                })
+                .frames_sent,
+                1
+            );
+
+            // Deliver the data send to the server.
+            assert_eq!(
+                net.step_deliver_frames_with(|_, meta, frame| {
+                    let mut buffer = Buf::new(frame.clone(), ..);
+
+                    let body_len = match I::VERSION {
+                        IpVersion::V4 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V4(v4) => v4);
+
+                            // Client -> Server.
+                            assert_eq!(*meta.src_ip, Ipv4::TEST_ADDRS.local_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv4::TEST_ADDRS.remote_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            parsed.body().len()
+                        }
+                        IpVersion::V6 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V6(v6) => v6);
+
+                            // Client -> Server.
+                            assert_eq!(*meta.src_ip, Ipv6::TEST_ADDRS.local_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv6::TEST_ADDRS.remote_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            parsed.body().len()
+                        }
+                    };
+
+                    assert_eq!(body_len, EXTRA_DATA_AMOUNT);
+
+                    Some((meta, frame))
+                })
+                .frames_sent,
+                1
+            );
+
+            // Deliver the ACK of the data send to the client so it will flush the
+            // data from its buffers.
+            assert_eq!(
+                net.step_deliver_frames_with(|_, meta, frame| {
+                    let mut buffer = Buf::new(frame.clone(), ..);
+
+                    let (packet_seq, packet_ack, body_len) = match I::VERSION {
+                        IpVersion::V4 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V4(v4) => v4);
+
+                            // Server -> Client.
+                            assert_eq!(*meta.src_ip, Ipv4::TEST_ADDRS.remote_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv4::TEST_ADDRS.local_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            (parsed.seq_num(), parsed.ack_num().unwrap(), parsed.body().len())
+                        }
+                        IpVersion::V6 => {
+                            let meta =
+                                assert_matches!(&meta, DualStackSendIpPacketMeta::V6(v6) => v6);
+
+                            // Server -> Client.
+                            assert_eq!(*meta.src_ip, Ipv6::TEST_ADDRS.remote_ip.into_addr());
+                            assert_eq!(*meta.dst_ip, Ipv6::TEST_ADDRS.local_ip.into_addr());
+
+                            let parsed = buffer
+                                .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                                    *meta.src_ip,
+                                    *meta.dst_ip,
+                                ))
+                                .expect("failed to parse");
+
+                            (parsed.seq_num(), parsed.ack_num().unwrap(), parsed.body().len())
+                        }
+                    };
+
+                    assert_eq!(packet_seq, u32::from(server_snd_max));
+                    assert_eq!(
+                        packet_ack,
+                        u32::from(server_acknum) + u32::try_from(EXTRA_DATA_AMOUNT).unwrap()
+                    );
+                    assert_eq!(body_len, 0);
+
+                    Some((meta, frame))
+                })
+                .frames_sent,
+                1
+            );
+
+            let send_buf_len = net
+                .with_context(LOCAL, |ctx| {
+                    ctx.tcp_api::<I>().with_send_buffer(&client, |buf| {
+                        let BufferLimits { len, capacity: _ } = buf.limits();
+                        len
+                    })
+                })
+                .unwrap();
+            assert_eq!(send_buf_len, 0);
+        } else {
+            // Read a single byte out of the receive buffer, which is guaranteed
+            // to be less than MSS.
+            let nread = net
+                .with_context(REMOTE, |ctx| {
+                    ctx.tcp_api::<I>()
+                        .with_receive_buffer(&accepted, |buf| buf.lock().read_with(|_readable| 1))
+                })
+                .unwrap();
+            assert_eq!(nread, 1);
+
+            // The server won't send a window update because it wouldn't be
+            // advertising a window that's larger than the MSS.
+            net.with_context(REMOTE, |ctx| ctx.tcp_api::<I>().on_receive_buffer_read(&accepted));
+            assert_eq!(net.step_deliver_frames().frames_sent, 0);
+
+            let send_buf_len = net
+                .with_context(LOCAL, |ctx| {
+                    ctx.tcp_api::<I>().with_send_buffer(&client, |buf| {
+                        let BufferLimits { len, capacity: _ } = buf.limits();
+                        len
+                    })
+                })
+                .unwrap();
+            // The client didn't hear about the data being read, since no window
+            // update was sent.
+            assert_eq!(send_buf_len, EXTRA_DATA_AMOUNT);
+        }
     }
 }

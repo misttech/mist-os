@@ -215,6 +215,7 @@ impl ReceiveBuffer for CoreReceiveBuffer {
 /// [`ReceiveTaskArgs`] is the proper production impl.
 pub(super) trait ReceiveTaskOps {
     fn shutdown_recv(&mut self) -> Result<bool, NoConnection>;
+    fn on_receive_buffer_read(&mut self);
 }
 
 pub(super) struct ReceiveTaskArgs<I: IpExt> {
@@ -227,6 +228,11 @@ impl<I: IpExt> ReceiveTaskOps for ReceiveTaskArgs<I> {
     fn shutdown_recv(&mut self) -> Result<bool, NoConnection> {
         let Self { ctx, id } = self;
         ctx.api().tcp().shutdown(id, ShutdownType::Receive)
+    }
+
+    fn on_receive_buffer_read(&mut self) {
+        let Self { ctx, id } = self;
+        ctx.api().tcp().on_receive_buffer_read(id)
     }
 }
 
@@ -298,16 +304,18 @@ pub(super) async fn receive_task<O: ReceiveTaskOps>(
                 }
             };
 
-            // NB: `skip` is a weird name for this method, it calls drop for all
-            // the consumed bytes and then advances the read index.
-            assert_eq!(
-                async_ringbuf::traits::Consumer::skip(&mut buffer, total_written),
-                total_written
-            );
+            // Notify core that we've dequeued some bytes in case it wants to send an
+            // updated window.
+            if total_written > 0 {
+                // NB: `skip` is a weird name for this method, it calls drop for all
+                // the consumed bytes and then advances the read index.
+                assert_eq!(
+                    async_ringbuf::traits::Consumer::skip(&mut buffer, total_written),
+                    total_written
+                );
 
-            // TODO(https://fxbug.dev/360392280): Notify core that the
-            // application has read data so we can send window updates if
-            // needed.
+                ops.on_receive_buffer_read();
+            }
         }
     }
     // If core has dropped its sender it means we're not receiving data anymore.
@@ -1374,6 +1382,8 @@ mod test {
         fn shutdown_recv(&mut self) -> Result<bool, NoConnection> {
             Ok(true)
         }
+
+        fn on_receive_buffer_read(&mut self) {}
     }
 
     impl SendTaskOps for Rc<RefCell<CoreSendBuffer>> {

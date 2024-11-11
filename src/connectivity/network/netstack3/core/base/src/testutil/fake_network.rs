@@ -281,7 +281,7 @@ where
         ) -> Option<(Spec::RecvMeta, Buf<Vec<u8>>)>,
     >(
         &mut self,
-        mut filter_map_frame: F,
+        filter_map_frame: F,
     ) -> StepResult
     where
         Spec::TimerId: Debug,
@@ -313,22 +313,7 @@ where
             ctx.with_fake_timer_ctx_mut(|ctx| ctx.instant.time = next_step);
         }
 
-        // Dispatch all pending frames:
-        while let Some(InstantAndData(t, _)) = self.pending_frames.peek() {
-            // TODO(https://github.com/rust-lang/rust/issues/53667): Remove
-            // this break once let_chains is stable.
-            if *t > self.current_time {
-                break;
-            }
-            // We can unwrap because we just peeked.
-            let PendingFrameData { dst_context, meta, frame } =
-                self.pending_frames.pop().unwrap().1;
-            let dst_context = self.context(dst_context);
-            if let Some((meta, frame)) = filter_map_frame(dst_context, meta, Buf::new(frame, ..)) {
-                Spec::handle_frame(dst_context, meta, frame)
-            }
-            ret.frames_sent += 1;
-        }
+        ret.frames_sent = self.dispatch_pending_frames(filter_map_frame);
 
         // Dispatch all pending timers.
         for (_, ctx) in self.contexts.iter_mut() {
@@ -353,6 +338,49 @@ where
                 ret.timers_fired += 1;
             }
         }
+        ret
+    }
+
+    /// Collects and dispatches all pending frames without advancing time or
+    /// triggering any timers.
+    ///
+    /// # Panics
+    ///
+    /// Panics under the same conditions as [`dispatch_pending_frames`].
+    pub fn step_deliver_frames(&mut self) -> StepResult
+    where
+        Spec::TimerId: Debug,
+    {
+        self.step_deliver_frames_with(|_, meta, frame| Some((meta, frame)))
+    }
+
+    /// Like [`FakeNetwork::step_deliver_frames`], but receives a function
+    /// `filter_map_frame` that can modify frames, or drop them if it returns
+    /// `None`.
+    pub fn step_deliver_frames_with<
+        F: FnMut(
+            &mut Spec::Context,
+            Spec::RecvMeta,
+            Buf<Vec<u8>>,
+        ) -> Option<(Spec::RecvMeta, Buf<Vec<u8>>)>,
+    >(
+        &mut self,
+        filter_map_frame: F,
+    ) -> StepResult
+    where
+        Spec::TimerId: Debug,
+    {
+        let mut ret = StepResult::new_idle();
+        // Drive all queues before checking for the network simulation.
+        for (_, ctx) in self.contexts.iter_mut() {
+            if Spec::process_queues(ctx) {
+                ret.contexts_with_queued_frames += 1;
+            }
+        }
+
+        self.collect_frames();
+        ret.frames_sent = self.dispatch_pending_frames(filter_map_frame);
+
         ret
     }
 
@@ -426,6 +454,46 @@ where
                 }
             }
         }
+    }
+
+    /// Dispatches scheduled frames that were previously collected with
+    /// [`collect_frames`].
+    ///
+    /// Only frames for which the current deadline is less than or equal to the
+    /// current simulation time are delivered.
+    ///
+    /// # Panics
+    ///
+    /// If `FakeNetwork` was set up with a bad `links`, calls may panic when
+    /// trying to route frames to their context/device destinations.
+    pub fn dispatch_pending_frames<
+        F: FnMut(
+            &mut Spec::Context,
+            Spec::RecvMeta,
+            Buf<Vec<u8>>,
+        ) -> Option<(Spec::RecvMeta, Buf<Vec<u8>>)>,
+    >(
+        &mut self,
+        mut filter_map_frame: F,
+    ) -> usize {
+        let mut frames_sent = 0;
+        while let Some(InstantAndData(t, _)) = self.pending_frames.peek() {
+            // TODO(https://github.com/rust-lang/rust/issues/53667): Remove
+            // this break once let_chains is stable.
+            if *t > self.current_time {
+                break;
+            }
+            // We can unwrap because we just peeked.
+            let PendingFrameData { dst_context, meta, frame } =
+                self.pending_frames.pop().unwrap().1;
+            let dst_context = self.context(dst_context);
+            if let Some((meta, frame)) = filter_map_frame(dst_context, meta, Buf::new(frame, ..)) {
+                Spec::handle_frame(dst_context, meta, frame)
+            }
+            frames_sent += 1;
+        }
+
+        frames_sent
     }
 
     /// Calculates the next `FakeInstant` when events are available.
