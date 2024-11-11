@@ -185,6 +185,7 @@
           "third_party/golibs/vendor": true,
           "third_party/tink/cc/third_party": true,
           "third_party/tink/cc/integration/awskms/third_party": true,
+          "third_party/tink/testing/java_src/third_party": true,
           "third_party/syzkaller": true,
           "third_party/pylibs": true,
           "build/secondary/vendor/google/build": true
