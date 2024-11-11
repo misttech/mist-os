@@ -25,7 +25,7 @@ from core_testing import base_test
 from core_testing.handlers import ConnectTransactionEventHandler
 from core_testing.ies import Ie, read_ssid
 from fuchsia_controller_py.wrappers import asyncmethod
-from mobly import base_test, test_runner
+from mobly import test_runner
 from mobly.asserts import assert_equal, assert_true, fail
 
 
@@ -46,7 +46,7 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
         )
 
     def name_func(self, security: Security) -> str:
-        return f"test_successfully_scan_for_ap_{security.security_mode}"
+        return f"test_successfully_connect_to_ap_{security.security_mode}"
 
     @asyncmethod
     async def _test_logic(self, security: Security) -> None:

@@ -111,7 +111,7 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
 
     def teardown_test(self) -> None:
         # Maintain the invariant that every test starts with no access points.
-        self.access_point().download_ap_logs(logging.log_path)
+        self.access_point().download_ap_logs(self.log_path)
         self.access_point().stop_all_aps()
         super().teardown_test()
 
