@@ -118,7 +118,6 @@ pub enum Error {
     ProtocolStreamEventIncompatible,
     Transport(Arc<std::io::Error>),
     ConnectionMismatch,
-    NamespaceAlreadyTaken,
     ClientLost,
 }
 
@@ -161,7 +160,6 @@ impl std::fmt::Display for Error {
             Self::ConnectionMismatch => {
                 write!(f, "Tried to use an FDomain handle from a different connection")
             }
-            Self::NamespaceAlreadyTaken => write!(f, "Called `take_namespace` more than once"),
             Self::ClientLost => write!(f, "The client associated with this handle was destroyed"),
         }
     }
@@ -180,7 +178,6 @@ impl std::fmt::Debug for Error {
             Self::ProtocolSignalsIncompatible => write!(f, "ProtocolSignalsIncompatible "),
             Self::ProtocolStreamEventIncompatible => write!(f, "ProtocolStreamEventIncompatible"),
             Self::ConnectionMismatch => write!(f, "ConnectionMismatch"),
-            Self::NamespaceAlreadyTaken => write!(f, "NamespaceAlreadyTaken"),
             Self::ClientLost => write!(f, "ClientLost"),
         }
     }
@@ -340,7 +337,6 @@ struct ClientInner {
     channel_read_subscriptions:
         HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, proto::Error>>>,
     next_tx_id: u32,
-    namespace_taken: bool,
     waiting_to_close: Vec<proto::Hid>,
 }
 
@@ -522,7 +518,6 @@ impl Client {
             socket_read_subscriptions: HashMap::new(),
             channel_read_subscriptions: HashMap::new(),
             next_tx_id: 1,
-            namespace_taken: false,
             waiting_to_close: Vec::new(),
         })));
 
@@ -541,18 +536,14 @@ impl Client {
 
     /// Get the namespace for the connected FDomain. Calling this more than once is an error.
     pub async fn namespace(self: &Arc<Self>) -> Result<Channel, Error> {
-        if std::mem::replace(&mut self.0.lock().unwrap().namespace_taken, true) {
-            Err(Error::NamespaceAlreadyTaken)
-        } else {
-            let new_handle = self.new_hid();
-            self.transaction(
-                ordinals::NAMESPACE,
-                proto::FDomainNamespaceRequest { new_handle },
-                Responder::Namespace,
-            )
-            .await?;
-            Ok(Channel(Handle { id: new_handle.id, client: Arc::downgrade(self) }))
-        }
+        let new_handle = self.new_hid();
+        self.transaction(
+            ordinals::NAMESPACE,
+            proto::FDomainNamespaceRequest { new_handle },
+            Responder::Namespace,
+        )
+        .await?;
+        Ok(Channel(Handle { id: new_handle.id, client: Arc::downgrade(self) }))
     }
 
     /// Create a new channel in the connected FDomain.
