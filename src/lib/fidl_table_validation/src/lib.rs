@@ -30,8 +30,8 @@
 //! }
 //! ```
 //!
-//! This code generates a [TryFrom][std::convert::TryFrom]<FidlTable> implementation for
-//! `ValidatedFidlTable`:
+//! This code generates a [TryFrom][std::convert::TryFrom]<FidlTable>
+//! implementation for `ValidatedFidlTable`:
 //!
 //! ```
 //! pub enum FidlTableValidationError {
@@ -43,13 +43,13 @@
 //!     fn try_from(src: FidlTable) -> Result<ValidatedFidlTable, Self::Error> { .. }
 //! }
 //! ```
-//! and also a [From][std::convert::From]<ValidatedFidlTable> implementation for `FidlTable`,
-//! so you can get a `FidlTable` using `validated.into()`.
+//! and also a [From][std::convert::From]<ValidatedFidlTable> implementation for
+//! `FidlTable`, so you can get a `FidlTable` using `validated.into()`.
 //!
 //! ## Custom Validations
 //!
-//! When tables have logical relationships between fields that must be
-//! checked, you can use a custom validator:
+//! When tables have logical relationships between fields that must be checked,
+//! you can use a custom validator:
 //!
 //! ```
 //! struct FidlTableValidator;
@@ -74,9 +74,9 @@
 //!
 //! ## Non-literal defaults
 //!
-//! Attribute syntax for `name = value` only supports literals. Another attribute for
-//! expressing defaults is used for consts. Or any type that has a `Default` impl can simply omit
-//! the literal.
+//! Attribute syntax for `name = value` only supports literals. Another
+//! attribute for expressing defaults is used for consts. Or any type that has a
+//! `Default` impl can simply omit the literal.
 //!
 //! ```
 //! const MY_DEFAULT: MyEnum = MyEnum::MyVariant;
@@ -91,12 +91,72 @@
 //! }
 //! ```
 //!
+//! ## Custom converters
+//!
+//! Custom converters (implementing [`Converter`]) can be used to validate the
+//! fields. A `converter` field type acts like `required` (i.e. the derive
+//! handles the optionality) and passes the unwrapped option to the given
+//! converter. An `optional_converter` field type acts like `optional` and the
+//! converter is given (and expects to generate back) `Option` wrapped values.
+//!
+//! Example:
+//!
+//! ```
+//! struct RequiredConverter;
+//!
+//! impl Converter for RequiredConverter {
+//!     type Fidl = u32;
+//!     type Validated = NonZeroU32;
+//!     type Error = anyhow::Error;
+//!     fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error> {
+//!        NonZeroU32::new(value).ok_or_else(|| anyhow::anyhow!("bad zero value"))
+//!     }
+//!     fn from_validated(validated: Self::Validated) -> Self::Fidl {
+//!        validated.get()
+//!     }
+//! }
+//!
+//! struct OptionalConverter;
+//!
+//! enum MaybeMissing { Present(u32), Missing }
+//!
+//! impl Converter for OptionalConverter {
+//!    type Fidl = Option<u32>;
+//!    type Validated = MaybeMissing;
+//!    type Error = std::convert::Infallible;
+//!     fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error> {
+//!        Ok(match value {
+//!           Some(v) => MaybeMissing::Present(v),
+//!           None => MaybeMissing::Missing,
+//!        })
+//!     }
+//!     fn from_validated(validated: Self::Validated) -> Self::Fidl {
+//!        match validated {
+//!          MaybeMissing::Present(v) => Some(v),
+//!          MaybeMissing::Missing => None,
+//!        }
+//!     }
+//! }
+//!
+//! #[derive(ValidFidlTable)]
+//! #[fidl_table_src(FidlHello)]
+//! #[fidl_table_strict]
+//! struct ValidatedFidlTable {
+//!     #[fidl_field_type(converter = RequiredConverter)]
+//!     foo: NonZeroU32,
+//!     #[fidl_field_type(optional_converter = OptionalConverter)]
+//!     bar: MaybeMissing,
+//! }
+//!
+//! ```
+//!
 //! ## Strict conversion
 //!
-//! By default, this derive does _not_ cause compilation errors if the source FIDL table has more
-//! fields than the validated struct. This behavior can be changed with the `fidl_table_strict`
-//! attribute. For example, the snippet below fails to compile if `FidlHello` has more fields than
-//! the ones in `ValidatedFidlTable`.
+//! By default, this derive does _not_ cause compilation errors if the source
+//! FIDL table has more fields than the validated struct. This behavior can be
+//! changed with the `fidl_table_strict` attribute. For example, the snippet
+//! below fails to compile if `FidlHello` has more fields than the ones in
+//! `ValidatedFidlTable`.
 //!
 //! ```
 //! #[derive(ValidFidlTable)]
@@ -107,7 +167,8 @@
 //! }
 //! ```
 //!
-//! Fields from the FIDL table can be explicitly ignored by giving `fidl_table_strict` arguments:
+//! Fields from the FIDL table can be explicitly ignored by giving
+//! `fidl_table_strict` arguments:
 //!
 //! ```
 //! #[derive(ValidFidlTable)]
@@ -131,4 +192,16 @@ pub use anyhow;
 pub trait Validate<T> {
     type Error;
     fn validate(candidate: &T) -> std::result::Result<(), Self::Error>;
+}
+
+/// A converter trait that can convert from FIDL types `T` into a validated type
+/// `Validated`.
+///
+/// Used in conjunction with `fidl_field_type` with custom converters.
+pub trait Converter {
+    type Fidl;
+    type Validated;
+    type Error;
+    fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error>;
+    fn from_validated(validated: Self::Validated) -> Self::Fidl;
 }

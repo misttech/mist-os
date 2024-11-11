@@ -4,6 +4,9 @@
 
 #![cfg(test)]
 
+use std::marker::PhantomData;
+use std::num::NonZeroU32;
+
 use assert_matches::assert_matches;
 use fidl_table_validation::*;
 use fidl_test_tablevalidation::{Example, VecOfExample, WrapExample};
@@ -369,5 +372,122 @@ fn strict_validation_ignore() {
             ..Default::default()
         }),
         Ok(Valid { num: 10 })
+    );
+}
+
+#[test]
+fn required_converter() {
+    struct CustomConverter;
+
+    impl Converter for CustomConverter {
+        type Fidl = u32;
+        type Validated = NonZeroU32;
+
+        type Error = anyhow::Error;
+
+        fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error> {
+            NonZeroU32::new(value).ok_or_else(|| anyhow::anyhow!("invalid zero"))
+        }
+
+        fn from_validated(validated: Self::Validated) -> Self::Fidl {
+            validated.get()
+        }
+    }
+
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    struct Valid {
+        #[fidl_field_type(converter = CustomConverter)]
+        num: NonZeroU32,
+    }
+
+    assert_matches!(
+        Valid::try_from(Example { num: Some(0), ..Default::default() }),
+        Err(ExampleValidationError::InvalidField(_))
+    );
+
+    assert_matches!(
+        Valid::try_from(Example { num: None, ..Default::default() }),
+        Err(ExampleValidationError::MissingField(ExampleMissingFieldError::Num))
+    );
+
+    let v = NonZeroU32::new(10).unwrap();
+
+    assert_eq!(
+        Valid::try_from(Example { num: Some(v.get()), ..Default::default() }).unwrap(),
+        Valid { num: v }
+    );
+
+    assert_eq!(
+        Example::from(Valid { num: v }),
+        Example { num: Some(v.get()), ..Default::default() }
+    );
+}
+
+#[test]
+fn optional_converter() {
+    // NB: Adding a type parameter to custom converter to prove the macro can
+    // take full paths and not only identifiers.
+    struct CustomConverter<T>(PhantomData<T>);
+
+    #[derive(Debug, Eq, PartialEq)]
+    enum MaybeMissing {
+        Present(NonZeroU32),
+        Missing,
+    }
+
+    impl Converter for CustomConverter<()> {
+        type Fidl = Option<u32>;
+        type Validated = MaybeMissing;
+
+        type Error = anyhow::Error;
+
+        fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error> {
+            Ok(match value {
+                Some(v) => MaybeMissing::Present(
+                    NonZeroU32::new(v).ok_or_else(|| anyhow::anyhow!("invalid zero"))?,
+                ),
+                None => MaybeMissing::Missing,
+            })
+        }
+
+        fn from_validated(validated: Self::Validated) -> Self::Fidl {
+            match validated {
+                MaybeMissing::Present(v) => Some(v.get()),
+                MaybeMissing::Missing => None,
+            }
+        }
+    }
+
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    struct Valid {
+        #[fidl_field_type(optional_converter = CustomConverter::<()>)]
+        num: MaybeMissing,
+    }
+
+    assert_matches!(
+        Valid::try_from(Example { num: Some(0), ..Default::default() }),
+        Err(ExampleValidationError::InvalidField(_))
+    );
+
+    assert_eq!(
+        Valid::try_from(Example { num: None, ..Default::default() }).unwrap(),
+        Valid { num: MaybeMissing::Missing }
+    );
+
+    let v = NonZeroU32::new(10).unwrap();
+    assert_eq!(
+        Valid::try_from(Example { num: Some(v.get()), ..Default::default() }).unwrap(),
+        Valid { num: MaybeMissing::Present(v) }
+    );
+
+    assert_eq!(
+        Example::from(Valid { num: MaybeMissing::Present(v) }),
+        Example { num: Some(v.get()), ..Default::default() }
+    );
+    assert_eq!(
+        Example::from(Valid { num: MaybeMissing::Missing }),
+        Example { num: None, ..Default::default() }
     );
 }

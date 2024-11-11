@@ -287,6 +287,21 @@ impl FidlField {
                     .map_err(anyhow::Error::from)?
                     .unwrap_or(#value),
             ),
+            FidlFieldKind::Converter(path) => {
+                let camel_case = self.camel_case();
+                quote!(
+                    #ident: <#path as ::fidl_table_validation::Converter>::try_from_fidl(
+                        #src_ident.ok_or(#missing_field_error_type::#camel_case)?
+                    )?,
+                )
+            }
+            FidlFieldKind::OptionalConverter(path) => {
+                quote!(
+                    #ident: <#path as ::fidl_table_validation::Converter>::try_from_fidl(
+                        #src_ident
+                    )?,
+                )
+            }
         }
     }
 }
@@ -298,6 +313,8 @@ enum FidlFieldKind {
     Default,
     ExprDefault(Ident),
     HasDefault(Lit),
+    Converter(Path),
+    OptionalConverter(Path),
 }
 
 impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
@@ -317,6 +334,22 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
                     Some(FidlFieldKind::HasDefault(lit.clone()))
                 } else {
                     return Err(Error::new(default_value.span(), "expected literal value"));
+                }
+            }
+            Some(Meta::NameValue(ref converter)) if converter.path.is_ident("converter") => {
+                if let Expr::Path(ExprPath { ref path, .. }) = converter.value {
+                    Some(FidlFieldKind::Converter(path.clone()))
+                } else {
+                    return Err(Error::new(converter.span(), "expected path"));
+                }
+            }
+            Some(Meta::NameValue(ref converter))
+                if converter.path.is_ident("optional_converter") =>
+            {
+                if let Expr::Path(ExprPath { ref path, .. }) = converter.value {
+                    Some(FidlFieldKind::OptionalConverter(path.clone()))
+                } else {
+                    return Err(Error::new(converter.span(), "expected path"));
                 }
             }
             _ => None,
@@ -447,6 +480,16 @@ fn impl_valid_fidl_table(
                     },
                 ),
             },
+            FidlFieldKind::Converter(path) => {
+                quote!(#ident: Some(
+                    <#path as ::fidl_table_validation::Converter>::from_validated(src.#ident)
+                ),)
+            }
+            FidlFieldKind::OptionalConverter(path) => {
+                quote!(#ident:
+                    <#path as ::fidl_table_validation::Converter>::from_validated(src.#ident),
+                )
+            }
             _ => match field.in_vec {
                 true => quote!(
                     #ident: Some(
@@ -467,7 +510,7 @@ fn impl_valid_fidl_table(
         fields
             .iter()
             .filter(|field| match field.kind {
-                FidlFieldKind::Required => true,
+                FidlFieldKind::Required | FidlFieldKind::Converter(_) => true,
                 _ => false,
             })
             .map(|field| {
