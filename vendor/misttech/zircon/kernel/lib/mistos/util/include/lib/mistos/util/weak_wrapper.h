@@ -14,6 +14,8 @@ namespace util {
 template <typename T>
 class WeakPtr final {
  public:
+  using element_type = T;
+
   // Constructors
   constexpr WeakPtr() : ptr_(nullptr) {}
   constexpr WeakPtr(decltype(nullptr)) : WeakPtr() {}
@@ -44,13 +46,15 @@ class WeakPtr final {
 
   fbl::RefPtr<T> Lock() const {
     fbl::AutoLock lock(&lock_);
-    // DEBUG_ASSERT_MSG(ptr_, "WeakPtr::lock() on nullptr\n");
     if (ptr_)
       return fbl::MakeRefPtrUpgradeFromRaw(ptr_, lock_);
     return fbl::RefPtr<T>();
   }
 
-  ~WeakPtr() { ptr_ = nullptr; }
+  ~WeakPtr() {
+    fbl::AutoLock lock(&lock_);
+    ptr_ = nullptr;
+  }
 
   void reset(T* ptr = nullptr) { WeakPtr(ptr).swap(*this); }
 
