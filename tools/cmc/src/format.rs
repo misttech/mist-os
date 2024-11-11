@@ -6,9 +6,14 @@ use crate::error::Error;
 use crate::util;
 use cml::format_cml;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::str::from_utf8;
+
+pub(crate) enum Input<'a, R: BufRead> {
+    File(&'a PathBuf),
+    Stdin(R),
+}
 
 /// Formats a CML file.
 ///
@@ -17,11 +22,28 @@ use std::str::from_utf8;
 /// If `output` is not given, prints the result to stdout.
 ///
 /// See [format_cml] for current style conventions.
-pub(crate) fn format(file: &PathBuf, output: Option<PathBuf>) -> Result<(), Error> {
+pub(crate) fn format<R: BufRead>(
+    input: Input<'_, R>,
+    output: Option<PathBuf>,
+) -> Result<(), Error> {
     let mut buffer = String::new();
-    fs::File::open(&file)?.read_to_string(&mut buffer)?;
+    let file = match input {
+        Input::File(p) => {
+            fs::File::open(&p)?.read_to_string(&mut buffer)?;
+            Some(p.as_path())
+        }
+        Input::Stdin(mut handle) => {
+            loop {
+                let n = handle.read_line(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+            }
+            None
+        }
+    };
 
-    let res = format_cml(&buffer, &file)?;
+    let res = format_cml(&buffer, file)?;
 
     if let Some(output_path) = output {
         util::ensure_directory_exists(&output_path)?;
@@ -43,10 +65,15 @@ pub(crate) fn format(file: &PathBuf, output: Option<PathBuf>) -> Result<(), Erro
 mod tests {
     use super::*;
     use std::fs::File;
+    use std::io::BufReader;
     use tempfile::TempDir;
+    use test_case::test_case;
 
-    #[test]
-    fn test_format_cml() {
+    type Phantom = std::io::StdinLock<'static>;
+
+    #[test_case(true; "stdin")]
+    #[test_case(false; "file")]
+    fn test_format_cml(stdin: bool) {
         let example_cml = r##"{
     offer: [
         {
@@ -151,7 +178,13 @@ mod tests {
 
         let output_file_path = tmp_dir.path().join("output.cml");
 
-        let result = format(&tmp_file_path, Some(output_file_path.clone()));
+        let input = if stdin {
+            let f = File::open(&tmp_file_path).unwrap();
+            Input::Stdin(BufReader::new(f))
+        } else {
+            Input::File(&tmp_file_path)
+        };
+        let result = format(input, Some(output_file_path.clone()));
         assert!(result.is_ok());
 
         let mut buffer = String::new();
@@ -246,7 +279,7 @@ mod tests {
 
         let output_file_path = tmp_dir.path().join("output.cml");
 
-        let result = format(&tmp_file_path, Some(output_file_path.clone()));
+        let result = format(Input::<Phantom>::File(&tmp_file_path), Some(output_file_path.clone()));
         assert!(result.is_ok());
 
         let mut buffer = String::new();
@@ -262,7 +295,7 @@ mod tests {
         let tmp_file_path = tmp_dir.path().join("input.json");
         File::create(&tmp_file_path).unwrap().write_all(example_json5.as_bytes()).unwrap();
 
-        let result = format(&tmp_file_path, None);
+        let result = format(Input::<Phantom>::File(&tmp_file_path), None);
         assert!(result.is_ok());
     }
 
@@ -274,7 +307,7 @@ mod tests {
         let tmp_file_path = tmp_dir.path().join("input.json");
         File::create(&tmp_file_path).unwrap().write_all(invalid_json5.as_bytes()).unwrap();
 
-        let result = format(&tmp_file_path, None);
+        let result = format(Input::<Phantom>::File(&tmp_file_path), None);
         assert!(result.is_err());
     }
 }

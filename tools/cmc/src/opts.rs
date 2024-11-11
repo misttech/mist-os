@@ -172,8 +172,8 @@ pub enum Commands {
     /// format a json file
     Format {
         #[structopt(name = "FILE", parse(from_os_str))]
-        /// file to format
-        file: PathBuf,
+        /// file to format. If missing, use stdin
+        file: Option<PathBuf>,
 
         #[structopt(short = "p", long = "pretty")]
         /// deprecated and ignored. Please do not use (https://fxbug.dev/42060365).

@@ -51,6 +51,7 @@ rustc_library("cmc_lib") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
   ]
 }
 
