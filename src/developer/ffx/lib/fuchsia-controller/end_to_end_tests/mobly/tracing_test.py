@@ -80,20 +80,16 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         )
         controller = tracing_controller.Session.Client(client_end)
 
-        await controller.start_tracing(
-            options=tracing_controller.StartOptions()
-        )
+        await controller.start_tracing()
         socket_task = asyncio.get_running_loop().create_task(client.read_all())
         await asyncio.sleep(10)
-        stop_res = await controller.stop_tracing(
-            options=tracing_controller.StopOptions(write_results=True)
-        )
+        stop_res = await controller.stop_tracing(write_results=True)
         asserts.assert_true(
             stop_res.response,
             msg="Error stopping tracing",
         )
 
-        stop_result = stop_res.response.result
+        stop_result = stop_res.response
         asserts.assert_true(
             len(stop_result.provider_stats) > 0,
             msg="Stop result provider stats should not be empty.",

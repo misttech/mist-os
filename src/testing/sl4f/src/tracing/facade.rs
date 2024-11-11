@@ -9,7 +9,7 @@ use anyhow::Error;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_tracing_controller::{
-    ProvisionerMarker, SessionMarker, SessionProxy, StartErrorCode, StartOptions, StopOptions,
+    ProvisionerMarker, SessionMarker, SessionProxy, StartError, StartOptions, StopOptions,
     TraceConfig,
 };
 use fuchsia_component::{self as app};
@@ -131,12 +131,12 @@ impl TracingFacade {
         match response {
             Ok(_) => Ok(to_value(())?),
             Err(e) => match e {
-                StartErrorCode::NotInitialized => {
+                StartError::NotInitialized => {
                     Err(format_err!("trace_manager reports trace not initialized"))
                 }
-                StartErrorCode::AlreadyStarted => Err(format_err!("Trace already started")),
-                StartErrorCode::Stopping => Err(format_err!("Trace is stopping")),
-                StartErrorCode::Terminating => Err(format_err!("Trace is terminating")),
+                StartError::AlreadyStarted => Err(format_err!("Trace already started")),
+                StartError::Stopping => Err(format_err!("Trace is stopping")),
+                StartError::Terminating => Err(format_err!("Trace is terminating")),
                 _ => Err(format_err!("Unhandled error code during trace start")),
             },
         }

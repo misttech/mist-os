@@ -181,7 +181,7 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   // This value is only valid between those calls.
   struct StopState {
     bool stop_completed = false;
-    controller::TerminateResult stop_result;
+    controller::StopResult stop_result;
   };
 
   void SetUp() override;

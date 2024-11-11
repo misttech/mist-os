@@ -368,20 +368,18 @@ class TracingFCTests(unittest.TestCase):
         # Perform setup based on parameters.
         records_dropped = parameterized_dict.get("dropped")
         mock_tracingcontroller_stop.return_value = mock.Mock(
-            response=f_tracingcontroller.SessionStopTracingResponse(
-                result=f_tracingcontroller.TerminateResult(
-                    provider_stats=[
-                        f_tracingcontroller.ProviderStats(
-                            name="virtual-console.cm",
-                            pid=4566,
-                            buffering_mode=1,
-                            buffer_wrapped_count=0,
-                            records_dropped=records_dropped,
-                            percentage_durable_buffer_used=0.0,
-                            non_durable_bytes_written=16,
-                        )
-                    ]
-                )
+            response=f_tracingcontroller.StopResult(
+                provider_stats=[
+                    f_tracingcontroller.ProviderStats(
+                        name="virtual-console.cm",
+                        pid=4566,
+                        buffering_mode=1,
+                        buffer_wrapped_count=0,
+                        records_dropped=records_dropped,
+                        percentage_durable_buffer_used=0.0,
+                        non_durable_bytes_written=16,
+                    )
+                ]
             )
         )
 

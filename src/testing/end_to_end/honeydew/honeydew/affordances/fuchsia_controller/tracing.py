@@ -161,9 +161,7 @@ class Tracing(tracing.Tracing):
             assert self._trace_controller_proxy is not None
             asyncio.run(
                 self._trace_controller_proxy.start_tracing(
-                    options=f_tracingcontroller.StartOptions(
-                        buffer_disposition=f_tracing.BufferDisposition.CLEAR_ENTIRE
-                    )
+                    buffer_disposition=f_tracing.BufferDisposition.CLEAR_ENTIRE
                 )
             )
         except fc.ZxStatus as status:
@@ -194,13 +192,11 @@ class Tracing(tracing.Tracing):
         try:
             assert self._trace_controller_proxy is not None
             stop_tracing_result = asyncio.run(
-                self._trace_controller_proxy.stop_tracing(
-                    options=f_tracingcontroller.StopOptions(write_results=True)
-                )
+                self._trace_controller_proxy.stop_tracing(write_results=True)
             )
             if stop_tracing_result.response is not None:
                 stop_tracing_response = stop_tracing_result.response
-                provider_stats = stop_tracing_response.result.provider_stats
+                provider_stats = stop_tracing_response.provider_stats
                 for p in provider_stats:
                     if p.records_dropped and p.records_dropped > 0:
                         _LOGGER.warning(

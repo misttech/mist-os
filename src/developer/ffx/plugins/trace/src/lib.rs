@@ -867,7 +867,7 @@ mod tests {
         assert_eq!(want, output);
     }
 
-    fn generate_terminate_result() -> tracing_controller::TerminateResult {
+    fn generate_stop_result() -> tracing_controller::StopResult {
         let mut stats = tracing_controller::ProviderStats::default();
         stats.name = Some("provider_bar".to_string());
         stats.pid = Some(1234);
@@ -876,7 +876,7 @@ mod tests {
         stats.records_dropped = Some(0);
         stats.percentage_durable_buffer_used = Some(30.0);
         stats.non_durable_bytes_written = Some(40);
-        let mut result = tracing_controller::TerminateResult::default();
+        let mut result = tracing_controller::StopResult::default();
         result.provider_stats = Some(vec![stats]);
         return result;
     }
@@ -893,7 +893,7 @@ mod tests {
                 .send(Ok((
                     &ffx::TargetInfo { nodename: Some("foo".to_owned()), ..Default::default() },
                     &if name.is_empty() { "foo".to_owned() } else { name },
-                    &generate_terminate_result(),
+                    &generate_stop_result(),
                 )))
                 .expect("responder err"),
             ffx::TracingRequest::Status { responder, iterator } => {

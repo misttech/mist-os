@@ -33,6 +33,9 @@ constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
 
 constexpr size_t kMaxAlertQueueDepth = 16;
 
+constexpr uint32_t kDefaultMajorVersion = 0;
+constexpr uint32_t kDefaultMinorVersion = 1;
+
 uint32_t ConstrainBufferSize(uint32_t buffer_size_megabytes) {
   return std::max(buffer_size_megabytes, kMinBufferSizeMegabytes);
 }
@@ -77,7 +80,7 @@ void TraceController::StartTracing(controller::StartOptions options,
 
   if (!session_) {
     FX_LOGS(ERROR) << "Ignoring start request, trace must be initialized first";
-    result.set_err(controller::StartErrorCode::NOT_INITIALIZED);
+    result.set_err(controller::StartError::NOT_INITIALIZED);
     start_callback(std::move(result));
     return;
   }
@@ -86,17 +89,17 @@ void TraceController::StartTracing(controller::StartOptions options,
     case TraceSession::State::kStarting:
     case TraceSession::State::kStarted:
       FX_LOGS(ERROR) << "Ignoring start request, trace already started";
-      result.set_err(controller::StartErrorCode::ALREADY_STARTED);
+      result.set_err(controller::StartError::ALREADY_STARTED);
       start_callback(std::move(result));
       return;
     case TraceSession::State::kStopping:
       FX_LOGS(ERROR) << "Ignoring start request, trace stopping";
-      result.set_err(controller::StartErrorCode::STOPPING);
+      result.set_err(controller::StartError::STOPPING);
       start_callback(std::move(result));
       return;
     case TraceSession::State::kTerminating:
       FX_LOGS(ERROR) << "Ignoring start request, trace terminating";
-      result.set_err(controller::StartErrorCode::TERMINATING);
+      result.set_err(controller::StartError::TERMINATING);
       start_callback(std::move(result));
       return;
     case TraceSession::State::kInitialized:
@@ -126,7 +129,7 @@ void TraceController::StartTracing(controller::StartOptions options,
         FX_LOGS(ERROR) << "Bad value for buffer disposition: " << buffer_disposition
                        << ", dropping connection";
         // TODO(dje): IWBN to drop the connection. How?
-        result.set_err(controller::StartErrorCode::TERMINATING);
+        result.set_err(controller::StartError::TERMINATING);
         start_callback(std::move(result));
         return;
     }
@@ -146,7 +149,7 @@ void TraceController::StopTracing(controller::StopOptions options,
       session_->state() != TraceSession::State::kStarting &&
       session_->state() != TraceSession::State::kStarted) {
     FX_LOGS(INFO) << "Ignoring stop request, state != Initialized,Starting,Started";
-    stop_result.set_err(controller::StopErrorCode::NOT_STARTED);
+    stop_result.set_err(controller::StopError::NOT_STARTED);
     stop_callback(std::move(stop_result));
     return;
   }
@@ -275,6 +278,15 @@ void TraceManager::InitializeTracing(fidl::InterfaceRequest<controller::Session>
       return;
   }
 
+  controller::FxtVersion fxt_version;
+  if (config.has_version()) {
+    fxt_version.set_major(config.version().major());
+    fxt_version.set_minor(config.version().minor());
+  } else {
+    fxt_version.set_major(kDefaultMajorVersion);
+    fxt_version.set_minor(kDefaultMinorVersion);
+  }
+
   FX_LOGS(INFO) << "Initializing trace with " << default_buffer_size_megabytes
                 << " MB buffers, buffering mode=" << mode_name;
   if (provider_specs.size() > 0) {
@@ -299,6 +311,7 @@ void TraceManager::InitializeTracing(fidl::InterfaceRequest<controller::Session>
   auto session = std::make_unique<TraceSession>(
       executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
       tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
+      std::move(fxt_version),
       [this]() {
         if (trace_controller_) {
           // We only abort when the write to socket fails. We do not want to attempt

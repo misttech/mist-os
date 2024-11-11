@@ -230,7 +230,7 @@ void TraceManagerTest::BeginStopSession(controller::StopOptions options) {
   auto callback = [this](controller::Session_StopTracing_Result result) {
     ASSERT_TRUE(result.is_response());
     stop_state_.stop_completed = true;
-    stop_state_.stop_result = std::move(result.response().result);
+    stop_state_.stop_result = std::move(result.response());
     // We need to run the loop one last time to pick up the result.
     // Be sure to exit it now that we have the result.
     QuitLoop();

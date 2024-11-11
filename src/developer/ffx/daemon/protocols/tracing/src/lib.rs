@@ -26,7 +26,7 @@ struct TraceTask {
     config: trace::TraceConfig,
     proxy: Option<trace::SessionProxy>,
     options: ffx::TraceOptions,
-    terminate_result: Rc<Mutex<trace::TerminateResult>>,
+    terminate_result: Rc<Mutex<trace::StopResult>>,
     start_time: Instant,
     shutdown_sender: async_channel::Sender<()>,
     task: Task<()>,
@@ -128,14 +128,14 @@ enum TraceTaskStartError {
     #[error("fidl error: {0:?}")]
     FidlError(#[from] fidl::Error),
     #[error("tracing start error: {0:?}")]
-    TracingStartError(trace::StartErrorCode),
+    TracingStartError(trace::StartError),
     #[error("general start error: {0:?}")]
     GeneralError(#[from] anyhow::Error),
 }
 
 async fn trace_shutdown(
     proxy: &trace::SessionProxy,
-) -> Result<trace::TerminateResult, ffx::RecordingError> {
+) -> Result<trace::StopResult, ffx::RecordingError> {
     proxy
         .stop_tracing(&trace::StopOptions { write_results: Some(true), ..Default::default() })
         .await
@@ -192,7 +192,7 @@ impl TraceTask {
         let controller = client_end.clone();
         let triggers = options.triggers.clone();
         let trace_shutdown_complete = Rc::new(Mutex::new(false));
-        let terminate_result = Rc::new(Mutex::new(trace::TerminateResult::default()));
+        let terminate_result = Rc::new(Mutex::new(trace::StopResult::default()));
         let (shutdown_sender, shutdown_receiver) = async_channel::bounded::<()>(1);
         Ok(Self {
             target_info: target_info.clone(),
@@ -286,7 +286,7 @@ impl TraceTask {
         })
     }
 
-    async fn shutdown(mut self) -> Result<trace::TerminateResult, ffx::RecordingError> {
+    async fn shutdown(mut self) -> Result<trace::StopResult, ffx::RecordingError> {
         {
             let proxy = self.proxy.take().expect("missing trace session proxy");
             let mut trace_shutdown_done = self.trace_shutdown_complete.lock().await;
@@ -305,7 +305,7 @@ impl TraceTask {
         }
         let target_info_clone = self.target_info.clone();
         let output_file = self.output_file.clone();
-        let terminate_result: Rc<Mutex<trace::TerminateResult>> = self.terminate_result.clone();
+        let terminate_result: Rc<Mutex<trace::StopResult>> = self.terminate_result.clone();
         let _ = self.shutdown_sender.send(()).await;
         self.await;
         tracing::trace!("trace task {:?} -> {} shutdown completed", target_info_clone, output_file);
@@ -442,7 +442,7 @@ impl FidlProtocol for TracingProtocol {
                                 tracing::warn!("unable to start trace: {:?}", e);
                                 let res = match e {
                                     TraceTaskStartError::TracingStartError(t) => match t {
-                                        trace::StartErrorCode::AlreadyStarted => {
+                                        trace::StartError::AlreadyStarted => {
                                             Err(ffx::RecordingError::RecordingAlreadyStarted)
                                         }
                                         e => {
@@ -557,7 +557,7 @@ mod tests {
 
     #[derive(Default)]
     struct FakeProvisioner {
-        start_error: Option<trace::StartErrorCode>,
+        start_error: Option<trace::StartError>,
     }
 
     #[async_trait(?Send)]
@@ -579,13 +579,13 @@ mod tests {
                                 };
                                 responder.send(response).expect("Failed to start")
                             }
-                            trace::SessionRequest::StopTracing { responder, options } => {
+                            trace::SessionRequest::StopTracing { responder, payload } => {
                                 if start_error.is_some() {
                                     responder
-                                        .send(Err(trace::StopErrorCode::NotStarted))
+                                        .send(Err(trace::StopError::NotStarted))
                                         .expect("Failed to stop")
                                 } else {
-                                    assert_eq!(options.write_results.unwrap(), true);
+                                    assert_eq!(payload.write_results.unwrap(), true);
                                     assert_eq!(
                                         FAKE_CONTROLLER_TRACE_OUTPUT.len(),
                                         output
@@ -593,7 +593,7 @@ mod tests {
                                             .unwrap()
                                     );
                                     responder
-                                        .send(Ok(&trace::TerminateResult::default()))
+                                        .send(Ok(&trace::StopResult::default()))
                                         .expect("Failed to stop")
                                 }
                                 break;
@@ -684,7 +684,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_trace_error_handling_already_started() {
         let fake_provisioner = Rc::new(RefCell::new(FakeProvisioner::default()));
-        fake_provisioner.borrow_mut().start_error.replace(trace::StartErrorCode::AlreadyStarted);
+        fake_provisioner.borrow_mut().start_error.replace(trace::StartError::AlreadyStarted);
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<TracingProtocol>()
             .inject_fidl_protocol(fake_provisioner)
@@ -713,7 +713,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_trace_error_handling_generic_start_error() {
         let fake_provisioner = Rc::new(RefCell::new(FakeProvisioner::default()));
-        fake_provisioner.borrow_mut().start_error.replace(trace::StartErrorCode::NotInitialized);
+        fake_provisioner.borrow_mut().start_error.replace(trace::StartError::NotInitialized);
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<TracingProtocol>()
             .inject_fidl_protocol(fake_provisioner)

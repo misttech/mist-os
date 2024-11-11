@@ -38,7 +38,7 @@ void TryExtraStart(TraceManagerTest* fixture, const T& interface_ptr) {
   controller::Session_StartTracing_Result start_result{TryStart(fixture, interface_ptr)};
   EXPECT_EQ(fixture->GetSessionState(), SessionState::kStarted);
   EXPECT_TRUE(start_result.is_err());
-  EXPECT_EQ(start_result.err(), controller::StartErrorCode::ALREADY_STARTED);
+  EXPECT_EQ(start_result.err(), controller::StartError::ALREADY_STARTED);
 }
 
 TEST_F(TraceManagerTest, ExtraStart) {
@@ -90,7 +90,7 @@ TEST_F(TraceManagerTest, StartWhileStopping) {
   EXPECT_TRUE(GetSessionState() == SessionState::kStopping);
   ASSERT_TRUE(start_completed);
   ASSERT_TRUE(result.is_err());
-  EXPECT_EQ(result.err(), controller::StartErrorCode::STOPPING);
+  EXPECT_EQ(result.err(), controller::StartError::STOPPING);
 }
 
 }  // namespace test

@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_tracing_controller::{
-    ProvisionerMarker, ProvisionerProxy, SessionMarker, SessionProxy, StartErrorCode, StartOptions,
+    ProvisionerMarker, ProvisionerProxy, SessionMarker, SessionProxy, StartError, StartOptions,
     StopOptions, TerminateOptions, TraceConfig,
 };
 use fuchsia_async;
@@ -88,12 +88,12 @@ impl SingleSessionTrace {
         match trace_controller.start_tracing(StartOptions::default()).await? {
             Ok(_) => Ok(()),
             Err(e) => match e {
-                StartErrorCode::NotInitialized => {
+                StartError::NotInitialized => {
                     Err(format_err!("trace_manager reports trace not initialized"))
                 }
-                StartErrorCode::AlreadyStarted => Err(format_err!("Trace already started")),
-                StartErrorCode::Stopping => Err(format_err!("Trace is stopping")),
-                StartErrorCode::Terminating => Err(format_err!("Trace is terminating")),
+                StartError::AlreadyStarted => Err(format_err!("Trace already started")),
+                StartError::Stopping => Err(format_err!("Trace is stopping")),
+                StartError::Terminating => Err(format_err!("Trace is terminating")),
             },
         }
     }
