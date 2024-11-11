@@ -13,6 +13,7 @@ zx_library("util") {
     "trim.cc",
     "try_from.cc",
     "utf_codecs.cc",
+    "weak_ptr_internal.cc",
     "zx_cprng_draw.cc",
     "zx_status_get_string.cc",
   ]

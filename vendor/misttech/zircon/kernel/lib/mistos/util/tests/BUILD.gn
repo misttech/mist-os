@@ -13,7 +13,8 @@ source_set("tests") {
     "split_string_unittest.cc",
 
     #"trim_unittest.cc",
-    "weak_wrapper-test.cc",
+    "weak_ptr_thread_unittest.cc",
+    "weak_ptr_unittest.cc",
   ]
   deps = [
     "//vendor/misttech/zircon/kernel/lib/mistos/util",
