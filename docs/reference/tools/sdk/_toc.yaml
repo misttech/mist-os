@@ -44,5 +44,3 @@ toc:
   section:
   - title: "blobfs-compression"
     path: /reference/tools/sdk/blobfs-compression.md
-  - title: "pm"
-    path: /reference/tools/sdk/pm.md
