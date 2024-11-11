@@ -127,6 +127,11 @@ pub trait AsHandleRef {
     ) -> impl Future<Output = Result<(), Error>> {
         self.as_handle_ref().signal(set, clear)
     }
+
+    /// Get the client supporting this handle.
+    fn client(&self) -> Result<Arc<Client>, Error> {
+        self.as_handle_ref().0.client.upgrade().ok_or(Error::ConnectionLost)
+    }
 }
 
 impl AsHandleRef for Handle {

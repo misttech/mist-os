@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    AnyHandle, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, Error, Handle,
-    HandleInfo,
+    AnyHandle, AsHandleRef, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, Error,
+    Handle, HandleInfo,
 };
 use fidl_fuchsia_fdomain as proto;
 use futures::{Stream, StreamExt, TryStream};
 use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
 pub trait FDomainFlexibleIntoResult<T> {
@@ -373,6 +373,11 @@ pub trait Proxy: Sized + Send + Sync {
     /// writing to the channel is unsafe because the proxy assumes it has
     /// exclusive control over these operations.
     fn as_channel(&self) -> &Channel;
+
+    /// Get the client supporting this proxy.
+    fn client(&self) -> Result<Arc<crate::Client>, Error> {
+        self.as_channel().client()
+    }
 }
 
 /// A stream of requests coming into a FIDL server over a channel.
