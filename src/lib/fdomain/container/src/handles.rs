@@ -9,62 +9,22 @@ use zx::{AsHandleRef, HandleBased, Peered};
 /// serve read requests.
 const READ_BUFFER_SIZE: usize = 4096;
 
-fn convert_object_type(ty: zx::ObjectType) -> proto::ObjType {
-    match ty {
-        zx::ObjectType::NONE => proto::ObjType::None,
-        zx::ObjectType::PROCESS => proto::ObjType::Process,
-        zx::ObjectType::THREAD => proto::ObjType::Thread,
-        zx::ObjectType::VMO => proto::ObjType::Vmo,
-        zx::ObjectType::CHANNEL => proto::ObjType::Channel,
-        zx::ObjectType::EVENT => proto::ObjType::Event,
-        zx::ObjectType::PORT => proto::ObjType::Port,
-        zx::ObjectType::INTERRUPT => proto::ObjType::Interrupt,
-        zx::ObjectType::PCI_DEVICE => proto::ObjType::PciDevice,
-        zx::ObjectType::DEBUGLOG => proto::ObjType::Debuglog,
-        zx::ObjectType::SOCKET => proto::ObjType::Socket,
-        zx::ObjectType::RESOURCE => proto::ObjType::Resource,
-        zx::ObjectType::EVENTPAIR => proto::ObjType::Eventpair,
-        zx::ObjectType::JOB => proto::ObjType::Job,
-        zx::ObjectType::VMAR => proto::ObjType::Vmar,
-        zx::ObjectType::FIFO => proto::ObjType::Fifo,
-        zx::ObjectType::GUEST => proto::ObjType::Guest,
-        zx::ObjectType::VCPU => proto::ObjType::Vcpu,
-        zx::ObjectType::TIMER => proto::ObjType::Timer,
-        zx::ObjectType::IOMMU => proto::ObjType::Iommu,
-        zx::ObjectType::BTI => proto::ObjType::Bti,
-        zx::ObjectType::PROFILE => proto::ObjType::Profile,
-        zx::ObjectType::PMT => proto::ObjType::Pmt,
-        zx::ObjectType::SUSPEND_TOKEN => proto::ObjType::SuspendToken,
-        zx::ObjectType::PAGER => proto::ObjType::Pager,
-        zx::ObjectType::EXCEPTION => proto::ObjType::Exception,
-        zx::ObjectType::CLOCK => proto::ObjType::Clock,
-        zx::ObjectType::STREAM => proto::ObjType::Stream,
-        zx::ObjectType::MSI => proto::ObjType::Msi,
-        zx::ObjectType::IOB => proto::ObjType::Iob,
-        _ => unreachable!("Unknown object type!"),
-    }
-}
-
 /// This is implemented on the `zx::*` objects for every type of handle FDomain
 /// supports. It essentially makes the handle object a responder to a stream of
 /// [`HandleOperation`]s.
 pub trait HandleType: Sync + Sized + Into<zx::Handle> + zx::AsHandleRef + 'static {
     /// This should be the handle type corresponding to the implementing handle.
     /// We use this to generalize some of the error reporting in this trait.
-    fn zx_type(&self) -> zx::ObjectType;
-
-    fn proto_type(&self) -> proto::ObjType {
-        convert_object_type(self.zx_type())
-    }
+    fn object_type(&self) -> zx::ObjectType;
 
     /// Returns `Ok` if this handle is the given type, `Err` otherwise.
     fn expected_type(&self, expected_type: zx::ObjectType) -> Result<(), proto::Error> {
-        if expected_type == self.zx_type() {
+        if expected_type == self.object_type() {
             Ok(())
         } else {
             Err(proto::Error::WrongHandleType(proto::WrongHandleType {
-                expected: convert_object_type(expected_type),
-                got: self.proto_type(),
+                expected: expected_type,
+                got: self.object_type(),
             }))
         }
     }
@@ -106,7 +66,7 @@ pub trait HandleType: Sync + Sized + Into<zx::Handle> + zx::AsHandleRef + 'stati
 }
 
 impl HandleType for zx::Socket {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> zx::ObjectType {
         zx::ObjectType::SOCKET
     }
 
@@ -172,7 +132,7 @@ impl HandleType for zx::Socket {
 }
 
 impl HandleType for zx::Channel {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> zx::ObjectType {
         zx::ObjectType::CHANNEL
     }
 
@@ -215,13 +175,13 @@ impl HandleType for zx::Channel {
 }
 
 impl HandleType for zx::EventPair {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> zx::ObjectType {
         zx::ObjectType::EVENTPAIR
     }
 }
 
 impl HandleType for zx::Event {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> zx::ObjectType {
         zx::ObjectType::EVENT
     }
 }
@@ -241,7 +201,7 @@ impl zx::AsHandleRef for Unknown {
 }
 
 impl HandleType for Unknown {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> zx::ObjectType {
         self.1
     }
 }
@@ -369,8 +329,8 @@ macro_rules! impl_method {
 }
 
 impl HandleType for AnyHandle {
-    fn zx_type(&self) -> zx::ObjectType {
-        impl_method!(self => h.zx_type())
+    fn object_type(&self) -> zx::ObjectType {
+        impl_method!(self => h.object_type())
     }
 
     fn socket_disposition(

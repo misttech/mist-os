@@ -7,7 +7,6 @@ use crate::{
     HandleInfo,
 };
 use fidl_fuchsia_fdomain as proto;
-use fidl_fuchsia_fdomain_ext::AsFDomainRights;
 use futures::{Stream, StreamExt, TryStream};
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -109,7 +108,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
         for handle in handles {
             handle_ops.push(crate::channel::HandleOp::Move(
                 std::mem::replace(&mut handle.handle, AnyHandle::invalid()).into(),
-                convert_rights(handle.rights).map_err(Some)?,
+                handle.rights,
             ));
         }
         let _ = self.1.write_etc(bytes, handle_ops);
@@ -138,54 +137,13 @@ pub struct FDomainResourceDialect;
 impl ::fidl::encoding::ResourceDialect for FDomainResourceDialect {
     type Handle = Handle;
     type MessageBufEtc = ChannelMessage;
-    type ObjectType = proto::ObjType;
     type ProxyChannel = Channel;
-    type Rights = proto::Rights;
 
     #[inline]
     fn with_tls_buf<R>(f: impl FnOnce(&mut ::fidl::encoding::TlsBuf<Self>) -> R) -> R {
         thread_local!(static TLS_BUF: RefCell<::fidl::encoding::TlsBuf<FDomainResourceDialect>> =
             RefCell::new(::fidl::encoding::TlsBuf::default()));
         TLS_BUF.with(|buf| f(&mut buf.borrow_mut()))
-    }
-
-    fn obj_type_from_local(ty: fidl::ObjectType) -> Self::ObjectType {
-        match ty {
-            fidl::ObjectType::PROCESS => proto::ObjType::Process,
-            fidl::ObjectType::THREAD => proto::ObjType::Thread,
-            fidl::ObjectType::VMO => proto::ObjType::Vmo,
-            fidl::ObjectType::CHANNEL => proto::ObjType::Channel,
-            fidl::ObjectType::EVENT => proto::ObjType::Event,
-            fidl::ObjectType::PORT => proto::ObjType::Port,
-            fidl::ObjectType::INTERRUPT => proto::ObjType::Interrupt,
-            fidl::ObjectType::PCI_DEVICE => proto::ObjType::PciDevice,
-            fidl::ObjectType::DEBUGLOG => proto::ObjType::Debuglog,
-            fidl::ObjectType::SOCKET => proto::ObjType::Socket,
-            fidl::ObjectType::RESOURCE => proto::ObjType::Resource,
-            fidl::ObjectType::EVENTPAIR => proto::ObjType::Eventpair,
-            fidl::ObjectType::JOB => proto::ObjType::Job,
-            fidl::ObjectType::VMAR => proto::ObjType::Vmar,
-            fidl::ObjectType::FIFO => proto::ObjType::Fifo,
-            fidl::ObjectType::GUEST => proto::ObjType::Guest,
-            fidl::ObjectType::VCPU => proto::ObjType::Vcpu,
-            fidl::ObjectType::TIMER => proto::ObjType::Timer,
-            fidl::ObjectType::IOMMU => proto::ObjType::Iommu,
-            fidl::ObjectType::BTI => proto::ObjType::Bti,
-            fidl::ObjectType::PROFILE => proto::ObjType::Profile,
-            fidl::ObjectType::PMT => proto::ObjType::Pmt,
-            fidl::ObjectType::SUSPEND_TOKEN => proto::ObjType::SuspendToken,
-            fidl::ObjectType::PAGER => proto::ObjType::Pager,
-            fidl::ObjectType::EXCEPTION => proto::ObjType::Exception,
-            fidl::ObjectType::CLOCK => proto::ObjType::Clock,
-            fidl::ObjectType::STREAM => proto::ObjType::Stream,
-            fidl::ObjectType::MSI => proto::ObjType::Msi,
-            fidl::ObjectType::IOB => proto::ObjType::Iob,
-            _ => proto::ObjType::None,
-        }
-    }
-
-    fn rights_from_local(rights: fidl::Rights) -> Self::Rights {
-        rights.as_fdomain_rights_truncate()
     }
 }
 
@@ -243,7 +201,7 @@ impl ::fidl::encoding::ProxyChannelFor<FDomainResourceDialect> for Channel {
         for handle in handles {
             handle_ops.push(crate::channel::HandleOp::Move(
                 std::mem::replace(&mut handle.handle, AnyHandle::invalid()).into(),
-                convert_rights(handle.rights).map_err(Some)?,
+                handle.rights,
             ));
         }
         let _ = self.write_etc(bytes, handle_ops);
@@ -273,7 +231,7 @@ impl ::fidl::encoding::HandleFor<FDomainResourceDialect> for Handle {
 }
 
 impl ::fidl::encoding::HandleDispositionFor<FDomainResourceDialect> for HandleInfo {
-    fn from_handle(handle: Handle, object_type: proto::ObjType, rights: proto::Rights) -> Self {
+    fn from_handle(handle: Handle, object_type: fidl::ObjectType, rights: fidl::Rights) -> Self {
         HandleInfo { handle: AnyHandle::from_handle(handle, object_type), rights }
     }
 }
@@ -281,19 +239,19 @@ impl ::fidl::encoding::HandleDispositionFor<FDomainResourceDialect> for HandleIn
 impl ::fidl::encoding::HandleInfoFor<FDomainResourceDialect> for HandleInfo {
     fn consume(
         &mut self,
-        expected_object_type: proto::ObjType,
-        expected_rights: proto::Rights,
+        expected_object_type: fidl::ObjectType,
+        expected_rights: fidl::Rights,
     ) -> Result<Handle, ::fidl::Error> {
         let handle_info = std::mem::replace(
             self,
             HandleInfo {
                 handle: crate::AnyHandle::Unknown(Handle::invalid(), fidl::ObjectType::NONE),
-                rights: proto::Rights::empty(),
+                rights: fidl::Rights::empty(),
             },
         );
         let received_object_type = handle_info.handle.object_type();
-        if expected_object_type != proto::ObjType::None
-            && received_object_type != proto::ObjType::None
+        if expected_object_type != fidl::ObjectType::NONE
+            && received_object_type != fidl::ObjectType::NONE
             && expected_object_type != received_object_type
         {
             return Err(fidl::Error::IncorrectHandleSubtype {
@@ -306,8 +264,8 @@ impl ::fidl::encoding::HandleInfoFor<FDomainResourceDialect> for HandleInfo {
         }
 
         let received_rights = handle_info.rights;
-        if expected_rights != proto::Rights::SAME_RIGHTS
-            && received_rights != proto::Rights::SAME_RIGHTS
+        if expected_rights != fidl::Rights::SAME_RIGHTS
+            && received_rights != fidl::Rights::SAME_RIGHTS
             && expected_rights != received_rights
         {
             if !received_rights.contains(expected_rights) {
@@ -327,7 +285,7 @@ impl ::fidl::encoding::HandleInfoFor<FDomainResourceDialect> for HandleInfo {
     fn drop_in_place(&mut self) {
         *self = HandleInfo {
             handle: crate::AnyHandle::Unknown(Handle::invalid(), fidl::ObjectType::NONE),
-            rights: proto::Rights::empty(),
+            rights: fidl::Rights::empty(),
         };
     }
 }
@@ -586,48 +544,4 @@ impl<T: ProtocolMarker> From<Channel> for ServerEnd<T> {
     fn from(chan: Channel) -> Self {
         ServerEnd { inner: chan, phantom: PhantomData }
     }
-}
-
-fn convert_rights(mut rights: proto::Rights) -> Result<fidl::Rights, Error> {
-    let mut ret = fidl::Rights::empty();
-
-    for (proto, local) in [
-        (proto::Rights::DUPLICATE, fidl::Rights::DUPLICATE),
-        (proto::Rights::TRANSFER, fidl::Rights::TRANSFER),
-        (proto::Rights::READ, fidl::Rights::READ),
-        (proto::Rights::WRITE, fidl::Rights::WRITE),
-        (proto::Rights::EXECUTE, fidl::Rights::EXECUTE),
-        (proto::Rights::MAP, fidl::Rights::MAP),
-        (proto::Rights::GET_PROPERTY, fidl::Rights::GET_PROPERTY),
-        (proto::Rights::SET_PROPERTY, fidl::Rights::SET_PROPERTY),
-        (proto::Rights::ENUMERATE, fidl::Rights::ENUMERATE),
-        (proto::Rights::DESTROY, fidl::Rights::DESTROY),
-        (proto::Rights::SET_POLICY, fidl::Rights::SET_POLICY),
-        (proto::Rights::GET_POLICY, fidl::Rights::GET_POLICY),
-        (proto::Rights::SIGNAL, fidl::Rights::SIGNAL),
-        (proto::Rights::SIGNAL_PEER, fidl::Rights::SIGNAL_PEER),
-        (proto::Rights::WAIT, fidl::Rights::WAIT),
-        (proto::Rights::INSPECT, fidl::Rights::INSPECT),
-        (proto::Rights::MANAGE_JOB, fidl::Rights::MANAGE_JOB),
-        (proto::Rights::MANAGE_PROCESS, fidl::Rights::MANAGE_PROCESS),
-        (proto::Rights::MANAGE_THREAD, fidl::Rights::MANAGE_THREAD),
-        (proto::Rights::APPLY_PROFILE, fidl::Rights::APPLY_PROFILE),
-        (proto::Rights::MANAGE_SOCKET, fidl::Rights::MANAGE_SOCKET),
-        (proto::Rights::OP_CHILDREN, fidl::Rights::OP_CHILDREN),
-        (proto::Rights::RESIZE, fidl::Rights::RESIZE),
-        (proto::Rights::ATTACH_VMO, fidl::Rights::ATTACH_VMO),
-        (proto::Rights::MANAGE_VMO, fidl::Rights::MANAGE_VMO),
-        (proto::Rights::SAME_RIGHTS, fidl::Rights::SAME_RIGHTS),
-    ] {
-        if rights.contains(proto) {
-            rights.remove(proto);
-            ret |= local;
-        }
-    }
-
-    if !rights.is_empty() {
-        return Err(Error::ProtocolRightsIncompatible);
-    }
-
-    Ok(ret)
 }

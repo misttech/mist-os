@@ -6,7 +6,6 @@ use crate::handle::handle_type;
 use crate::responder::Responder;
 use crate::{ordinals, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
 use fidl_fuchsia_fdomain as proto;
-use fidl_fuchsia_fdomain_ext::{AsFDomainObjectType, AsFDomainRights};
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::Either;
 use futures::stream::{FusedStream, Stream};
@@ -20,7 +19,7 @@ use std::task::{ready, Context, Poll};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Channel(pub(crate) Handle);
 
-handle_type!(Channel peered);
+handle_type!(Channel CHANNEL peered);
 
 /// A message which has been read from a channel.
 #[derive(Debug)]
@@ -53,7 +52,7 @@ impl ChannelMessage {
 #[derive(Debug)]
 pub struct HandleInfo {
     pub handle: AnyHandle,
-    pub rights: proto::Rights,
+    pub rights: fidl::Rights,
 }
 
 /// Sum type of all the handle types which can be read from a channel. Allows
@@ -69,13 +68,13 @@ pub enum AnyHandle {
 
 impl AnyHandle {
     /// Construct an `AnyHandle` from a `Handle` and an object type.
-    pub fn from_handle(handle: Handle, ty: proto::ObjType) -> AnyHandle {
+    pub fn from_handle(handle: Handle, ty: fidl::ObjectType) -> AnyHandle {
         match ty {
-            proto::ObjType::Channel => AnyHandle::Channel(Channel(handle)),
-            proto::ObjType::Socket => AnyHandle::Socket(Socket(handle)),
-            proto::ObjType::Event => AnyHandle::Event(Event(handle)),
-            proto::ObjType::Eventpair => AnyHandle::EventPair(EventPair(handle)),
-            _ => AnyHandle::Unknown(handle, convert_object_type(ty)),
+            fidl::ObjectType::CHANNEL => AnyHandle::Channel(Channel(handle)),
+            fidl::ObjectType::SOCKET => AnyHandle::Socket(Socket(handle)),
+            fidl::ObjectType::EVENT => AnyHandle::Event(Event(handle)),
+            fidl::ObjectType::EVENTPAIR => AnyHandle::EventPair(EventPair(handle)),
+            _ => AnyHandle::Unknown(handle, ty),
         }
     }
 
@@ -85,13 +84,13 @@ impl AnyHandle {
     }
 
     /// Get the object type for a handle.
-    pub fn object_type(&self) -> proto::ObjType {
+    pub fn object_type(&self) -> fidl::ObjectType {
         match self {
-            AnyHandle::Channel(_) => proto::ObjType::Channel,
-            AnyHandle::Socket(_) => proto::ObjType::Socket,
-            AnyHandle::Event(_) => proto::ObjType::Event,
-            AnyHandle::EventPair(_) => proto::ObjType::Eventpair,
-            AnyHandle::Unknown(_, t) => t.as_fdomain_object_type().unwrap_or(proto::ObjType::None),
+            AnyHandle::Channel(_) => fidl::ObjectType::CHANNEL,
+            AnyHandle::Socket(_) => fidl::ObjectType::SOCKET,
+            AnyHandle::Event(_) => fidl::ObjectType::EVENT,
+            AnyHandle::EventPair(_) => fidl::ObjectType::EVENTPAIR,
+            AnyHandle::Unknown(_, t) => *t,
         }
     }
 }
@@ -147,13 +146,7 @@ impl Channel {
 
     /// A future that returns when the channel is closed.
     pub fn on_closed(&self) -> OnFDomainSignals {
-        OnFDomainSignals::new(
-            &self.0,
-            proto::Signals {
-                typed: Some(Box::new(proto::Typed::Channel(proto::ChannelSignals::PEER_CLOSED))),
-                general: proto::General::empty(),
-            },
-        )
+        OnFDomainSignals::new(&self.0, fidl::Signals::OBJECT_PEER_CLOSED)
     }
 
     /// Whether this handle is closed.
@@ -174,9 +167,7 @@ impl Channel {
                     if Weak::ptr_eq(&x.client, &self.0.client) {
                         Ok(proto::HandleDisposition {
                             handle: proto::HandleOp::Move_(x.take_proto()),
-                            rights: rights
-                                .as_fdomain_rights()
-                                .ok_or(Error::ProtocolRightsIncompatible)?,
+                            rights,
                         })
                     } else {
                         Err(Error::ConnectionMismatch)
@@ -186,9 +177,7 @@ impl Channel {
                     if Weak::ptr_eq(&x.client, &self.0.client) {
                         Ok(proto::HandleDisposition {
                             handle: proto::HandleOp::Duplicate(x.proto()),
-                            rights: rights
-                                .as_fdomain_rights()
-                                .ok_or(Error::ProtocolRightsIncompatible)?,
+                            rights,
                         })
                     } else {
                         Err(Error::ConnectionMismatch)
@@ -334,42 +323,5 @@ impl Drop for ChannelMessageStream {
         if let Ok(client) = self.channel.0.client() {
             client.stop_channel_streaming(self.channel.0.proto());
         }
-    }
-}
-
-/// Convert a `proto::ObjType` to a `fidl::ObjectType`
-fn convert_object_type(ty: proto::ObjType) -> fidl::ObjectType {
-    match ty {
-        proto::ObjType::None => fidl::ObjectType::NONE,
-        proto::ObjType::Process => fidl::ObjectType::PROCESS,
-        proto::ObjType::Thread => fidl::ObjectType::THREAD,
-        proto::ObjType::Vmo => fidl::ObjectType::VMO,
-        proto::ObjType::Channel => fidl::ObjectType::CHANNEL,
-        proto::ObjType::Event => fidl::ObjectType::EVENT,
-        proto::ObjType::Port => fidl::ObjectType::PORT,
-        proto::ObjType::Interrupt => fidl::ObjectType::INTERRUPT,
-        proto::ObjType::PciDevice => fidl::ObjectType::PCI_DEVICE,
-        proto::ObjType::Debuglog => fidl::ObjectType::DEBUGLOG,
-        proto::ObjType::Socket => fidl::ObjectType::SOCKET,
-        proto::ObjType::Resource => fidl::ObjectType::RESOURCE,
-        proto::ObjType::Eventpair => fidl::ObjectType::EVENTPAIR,
-        proto::ObjType::Job => fidl::ObjectType::JOB,
-        proto::ObjType::Vmar => fidl::ObjectType::VMAR,
-        proto::ObjType::Fifo => fidl::ObjectType::FIFO,
-        proto::ObjType::Guest => fidl::ObjectType::GUEST,
-        proto::ObjType::Vcpu => fidl::ObjectType::VCPU,
-        proto::ObjType::Timer => fidl::ObjectType::TIMER,
-        proto::ObjType::Iommu => fidl::ObjectType::IOMMU,
-        proto::ObjType::Bti => fidl::ObjectType::BTI,
-        proto::ObjType::Profile => fidl::ObjectType::PROFILE,
-        proto::ObjType::Pmt => fidl::ObjectType::PMT,
-        proto::ObjType::SuspendToken => fidl::ObjectType::SUSPEND_TOKEN,
-        proto::ObjType::Pager => fidl::ObjectType::PAGER,
-        proto::ObjType::Exception => fidl::ObjectType::EXCEPTION,
-        proto::ObjType::Clock => fidl::ObjectType::CLOCK,
-        proto::ObjType::Stream => fidl::ObjectType::STREAM,
-        proto::ObjType::Msi => fidl::ObjectType::MSI,
-        proto::ObjType::Iob => fidl::ObjectType::IOB,
-        proto::ObjType::__SourceBreaking { .. } => fidl::ObjectType::NONE,
     }
 }

@@ -3,14 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.fdomain;
 
-// Signals which are valid for channels.
-// See `Signals` in zx.fidl
-type ChannelSignals = flexible bits {
-    READABLE = 1; // 1 << 0
-    WRITABLE = 2; // 1 << 1
-    PEER_CLOSED = 4; // 1 << 2
-};
-
 // Result from a channel write operation.
 type WriteChannelError = strict union {
     1: error Error;

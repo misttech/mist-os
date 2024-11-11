@@ -3,13 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.fdomain;
 
-// Signals which are valid for EventPairs.
-// See `Signals` in zx.fidl
-type EventPairSignals = flexible bits {
-    PEER_CLOSED = 1; // 1 << 0
-    SIGNALED = 2; // 1 << 1
-};
-
 // FDomain operations on EventPairs.
 open protocol EventPair {
     // Create a new event pair in this FDomain and return both its ends.

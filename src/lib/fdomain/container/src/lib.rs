@@ -3,9 +3,6 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_fdomain_ext::{
-    proto_signals_to_fidl_take, AsFDomainObjectType, AsFDomainRights, AsFDomainSignals,
-};
 use futures::prelude::*;
 use replace_with::replace_with;
 use std::collections::hash_map::Entry;
@@ -386,17 +383,12 @@ impl HandleState {
             let Poll::Ready(result) = x.waiter.poll_unpin(ctx) else {
                 return true;
             };
-            let ty = x.waiter.as_ref().0.proto_type();
 
             event_queue.push_back(
                 FDomainEvent::WaitForSignals(
                     x.tid,
                     result
-                        .map(|x| proto::FDomainWaitForSignalsResponse {
-                            signals: x
-                                .as_fdomain_signals(ty)
-                                .expect("Waited for signals we didn't know how to encode!"),
-                        })
+                        .map(|x| proto::FDomainWaitForSignalsResponse { signals: x.bits() })
                         .map_err(|e| proto::Error::TargetError(e.into_raw())),
                 )
                 .into(),
@@ -863,8 +855,7 @@ impl FDomain {
         let handles = handles
             .into_iter()
             .map(|info| {
-                let type_ =
-                    info.object_type.as_fdomain_object_type().unwrap_or(proto::ObjType::None);
+                let type_ = info.object_type;
 
                 let handle = match info.object_type {
                     fidl::ObjectType::CHANNEL => {
@@ -883,7 +874,7 @@ impl FDomain {
                 };
 
                 proto::HandleInfo {
-                    rights: info.rights.as_fdomain_rights_truncate(),
+                    rights: info.rights,
                     handle: self.alloc_fdomain_handle(handle),
                     type_,
                 }
@@ -1105,7 +1096,7 @@ impl FDomain {
                         }
                     };
 
-                    res.and_then(|x| Ok((x, convert_rights(d.rights)?)))
+                    res.and_then(|x| Ok((x, d.rights)))
                 })
                 .collect(),
         };
@@ -1161,7 +1152,7 @@ impl FDomain {
         request: proto::FDomainWaitForSignalsRequest,
     ) {
         let result = self.using_handle(request.handle, |h| {
-            let signals = convert_signals(request.signals)?;
+            let signals = fidl::Signals::from_bits_retain(request.signals);
             h.signal_waiters.push(SignalWaiter {
                 tid,
                 waiter: fasync::OnSignals::new(AnyHandleRef(Arc::clone(&h.handle)), signals),
@@ -1204,7 +1195,7 @@ impl FDomain {
     }
 
     pub fn duplicate(&mut self, request: proto::FDomainDuplicateRequest) -> Result<()> {
-        let rights = convert_rights(request.rights)?;
+        let rights = request.rights;
         let handle = self.using_handle(request.handle, |h| h.handle.duplicate(rights));
         handle.and_then(|h| self.alloc_client_handles([request.new_handle], [h]))
     }
@@ -1214,7 +1205,7 @@ impl FDomain {
         tid: NonZeroU32,
         request: proto::FDomainReplaceRequest,
     ) -> Result<()> {
-        let rights = convert_rights(request.rights)?;
+        let rights = request.rights;
         let new_hid = request.new_handle;
         match self.take_handle(request.handle) {
             Ok(state) => self.closing_handles.push(ClosingHandle {
@@ -1230,8 +1221,8 @@ impl FDomain {
     }
 
     pub fn signal(&mut self, request: proto::FDomainSignalRequest) -> Result<()> {
-        let set = convert_signals(request.set)?;
-        let clear = convert_signals(request.clear)?;
+        let set = fidl::Signals::from_bits_retain(request.set);
+        let clear = fidl::Signals::from_bits_retain(request.clear);
 
         self.using_handle(request.handle, |h| {
             h.handle.signal_handle(clear, set).map_err(|e| proto::Error::TargetError(e.into_raw()))
@@ -1239,8 +1230,8 @@ impl FDomain {
     }
 
     pub fn signal_peer(&mut self, request: proto::FDomainSignalPeerRequest) -> Result<()> {
-        let set = convert_signals(request.set)?;
-        let clear = convert_signals(request.clear)?;
+        let set = fidl::Signals::from_bits_retain(request.set);
+        let clear = fidl::Signals::from_bits_retain(request.clear);
 
         self.using_handle(request.handle, |h| h.handle.signal_peer(clear, set))
     }
@@ -1346,58 +1337,4 @@ impl futures::Stream for FDomain {
             Poll::Pending
         }
     }
-}
-
-fn convert_signals(mut sigs: proto::Signals) -> Result<fidl::Signals> {
-    let ret = proto_signals_to_fidl_take(&mut sigs);
-
-    if sigs.general.is_empty() && sigs.typed.is_none() {
-        Ok(ret)
-    } else {
-        Err(proto::Error::SignalsUnknown(proto::SignalsUnknown { signals: sigs }))
-    }
-}
-
-fn convert_rights(mut rights: proto::Rights) -> Result<fidl::Rights> {
-    let mut ret = fidl::Rights::empty();
-
-    for (proto, local) in [
-        (proto::Rights::DUPLICATE, fidl::Rights::DUPLICATE),
-        (proto::Rights::TRANSFER, fidl::Rights::TRANSFER),
-        (proto::Rights::READ, fidl::Rights::READ),
-        (proto::Rights::WRITE, fidl::Rights::WRITE),
-        (proto::Rights::EXECUTE, fidl::Rights::EXECUTE),
-        (proto::Rights::MAP, fidl::Rights::MAP),
-        (proto::Rights::GET_PROPERTY, fidl::Rights::GET_PROPERTY),
-        (proto::Rights::SET_PROPERTY, fidl::Rights::SET_PROPERTY),
-        (proto::Rights::ENUMERATE, fidl::Rights::ENUMERATE),
-        (proto::Rights::DESTROY, fidl::Rights::DESTROY),
-        (proto::Rights::SET_POLICY, fidl::Rights::SET_POLICY),
-        (proto::Rights::GET_POLICY, fidl::Rights::GET_POLICY),
-        (proto::Rights::SIGNAL, fidl::Rights::SIGNAL),
-        (proto::Rights::SIGNAL_PEER, fidl::Rights::SIGNAL_PEER),
-        (proto::Rights::WAIT, fidl::Rights::WAIT),
-        (proto::Rights::INSPECT, fidl::Rights::INSPECT),
-        (proto::Rights::MANAGE_JOB, fidl::Rights::MANAGE_JOB),
-        (proto::Rights::MANAGE_PROCESS, fidl::Rights::MANAGE_PROCESS),
-        (proto::Rights::MANAGE_THREAD, fidl::Rights::MANAGE_THREAD),
-        (proto::Rights::APPLY_PROFILE, fidl::Rights::APPLY_PROFILE),
-        (proto::Rights::MANAGE_SOCKET, fidl::Rights::MANAGE_SOCKET),
-        (proto::Rights::OP_CHILDREN, fidl::Rights::OP_CHILDREN),
-        (proto::Rights::RESIZE, fidl::Rights::RESIZE),
-        (proto::Rights::ATTACH_VMO, fidl::Rights::ATTACH_VMO),
-        (proto::Rights::MANAGE_VMO, fidl::Rights::MANAGE_VMO),
-        (proto::Rights::SAME_RIGHTS, fidl::Rights::SAME_RIGHTS),
-    ] {
-        if rights.contains(proto) {
-            rights.remove(proto);
-            ret |= local;
-        }
-    }
-
-    if !rights.is_empty() {
-        return Err(proto::Error::RightsUnknown(proto::RightsUnknown { rights }));
-    }
-
-    Ok(ret)
 }

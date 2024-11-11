@@ -15,7 +15,7 @@ use std::sync::Arc;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Socket(pub(crate) Handle);
 
-handle_type!(Socket peered);
+handle_type!(Socket SOCKET peered);
 
 /// Disposition of a socket.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

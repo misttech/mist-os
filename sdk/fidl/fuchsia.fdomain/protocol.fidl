@@ -4,6 +4,8 @@
 @available(added=HEAD)
 library fuchsia.fdomain;
 
+using zx;
+
 // A handle ID. This is the same size as an actual Zircon handle, and refers to
 // one conceptually, but internally it is not actually a Zircon handle number.
 type Hid = struct {
@@ -20,8 +22,8 @@ type NewHid = struct {
 // A handle, and the rights that handle is known to possess.
 type HandleInfo = struct {
     handle Hid;
-    type ObjType;
-    rights Rights;
+    type zx.ObjType;
+    rights zx.Rights;
 };
 
 // A return value indicating asynchronous IO has stopped, optionally with an error.
@@ -56,8 +58,8 @@ type Error = flexible union {
 
     // The handle used is not of the right type for the operation requested.
     5: wrong_handle_type struct {
-        expected ObjType;
-        got ObjType;
+        expected zx.ObjType;
+        got zx.ObjType;
     };
 
     // Occurs when we try to start streaming reading twice on the same handle,
@@ -88,7 +90,7 @@ type Error = flexible union {
     // safely without knowing what they were. The signals field should contain
     // only the signals that weren't understood.
     12: signals_unknown struct {
-        signals Signals;
+        signals uint32;
     };
 
     // The flexible features of this protocol allowed the client to send us
@@ -96,7 +98,7 @@ type Error = flexible union {
     // without knowing what they were. The rights field should contain only the
     // rights that weren't understood.
     13: rights_unknown struct {
-        rights Rights;
+        rights zx.Rights;
     };
 
     // The client used a socket disposition that the FDomain did not recognize.
@@ -121,7 +123,7 @@ type HandleOp = strict union {
 // as an operation to perform before writing.
 type HandleDisposition = struct {
     handle HandleOp;
-    rights Rights;
+    rights zx.Rights;
 };
 
 // The FDomain control protocol.
@@ -152,7 +154,7 @@ open protocol FDomain {
     flexible Duplicate(struct {
         handle Hid;
         new_handle NewHid;
-        rights Rights;
+        rights zx.Rights;
     }) -> () error Error;
 
     // Close a handle and replace it with a new one with possibly different
@@ -160,30 +162,30 @@ open protocol FDomain {
     flexible Replace(struct {
         handle Hid;
         new_handle NewHid;
-        rights Rights;
+        rights zx.Rights;
     }) -> () error Error;
 
     // Set or clear signals on a handle.
     flexible Signal(struct {
         handle Hid;
-        set Signals;
-        clear Signals;
+        set uint32;
+        clear uint32;
     }) -> () error Error;
 
     // Set or clear signals on a handle's peer.
     flexible SignalPeer(struct {
         handle Hid;
-        set Signals;
-        clear Signals;
+        set uint32;
+        clear uint32;
     }) -> () error Error;
 
     // Wait for signals from the given handle. Reply will be returned when one
     // of the given signals is asserted.
     flexible WaitForSignals(struct {
         handle Hid;
-        signals Signals;
+        signals uint32;
     }) -> (struct {
-        signals Signals;
+        signals uint32;
     }) error Error;
 
     // When a write error occurs, further write operations to that handle will

@@ -11,8 +11,8 @@ fidl("fuchsia.fdomain") {
     "event_pair.fidl",
     "protocol.fidl",
     "socket.fidl",
-    "zx.fidl",
   ]
+  public_deps = [ "//zircon/vdso/zx" ]
   excluded_checks = [ "vector-bounds-not-specified" ]
   experimental_flags = [ "allow_arbitrary_error_types" ]
 }

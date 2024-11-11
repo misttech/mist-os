@@ -3,18 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.fdomain;
 
-// Signals which are valid for sockets.
-// See `Signals` in zx.fidl
-type SocketSignals = flexible bits {
-    READABLE = 1; // 1 << 0
-    WRITABLE = 2; // 1 << 1
-    PEER_CLOSED = 4; // 1 << 2
-    PEER_WRITE_DISABLED = 8; // 1 << 3
-    WRITE_DISABLED = 16; // 1 << 4
-    READ_THRESHOLD = 32; // 1 << 5
-    WRITE_THRESHOLD = 64; // 1 << 6
-};
-
 // Result from a socket write operation.
 type WriteSocketError = struct {
     error Error;
