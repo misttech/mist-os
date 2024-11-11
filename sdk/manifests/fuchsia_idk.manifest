@@ -349,6 +349,7 @@ fidl_library://fidl/fuchsia.settings.policy
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
 fidl_library://fidl/fuchsia.sysmem2
+fidl_library://fidl/fuchsia.system.state (unstable)
 fidl_library://fidl/fuchsia.test
 fidl_library://fidl/fuchsia.thermal
 fidl_library://fidl/fuchsia.tracing

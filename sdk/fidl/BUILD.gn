@@ -167,6 +167,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo",
   "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem",
   "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2",
+  "//sdk/fidl/fuchsia.system.state:fuchsia.system.state",
   "//sdk/fidl/fuchsia.test:fuchsia.test",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal",
   "//sdk/fidl/fuchsia.tracing:fuchsia.tracing",

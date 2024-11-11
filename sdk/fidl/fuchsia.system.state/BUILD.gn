@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.system.state") {
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Drivers"
   sources = [ "system-state-transition.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
