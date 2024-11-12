@@ -352,10 +352,10 @@ impl ElfRunner {
             };
             let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
             start_info.outgoing_dir = Some(outgoing_dir_server);
-            fdio::open_at_deprecated(
+            fdio::open_at(
                 outgoing_dir_client.channel(),
                 ".",
-                fio::OpenFlags::DIRECTORY,
+                fio::Flags::PROTOCOL_DIRECTORY,
                 outgoing_dir.into_channel(),
             )
             .unwrap();
