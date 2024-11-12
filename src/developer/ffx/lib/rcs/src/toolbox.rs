@@ -3,10 +3,21 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_sys2::OpenDirType;
 use std::time::{Duration, Instant};
+
+#[cfg(feature = "fdomain")]
+use {
+    fdomain_client::fidl::{DiscoverableProtocolMarker, Proxy},
+    fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fdomain_fuchsia_sys2::OpenDirType,
+};
+
+#[cfg(not(feature = "fdomain"))]
+use {
+    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasClient},
+    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fidl_fuchsia_sys2::OpenDirType,
+};
 
 pub const LEGACY_MONIKER: &str = "core/toolbox";
 pub const MONIKER: &str = "toolbox";
@@ -24,7 +35,7 @@ where
     P: DiscoverableProtocolMarker,
 {
     let protocol_name = P::PROTOCOL_NAME;
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
     // time this so that we can use an appropriately shorter timeout for the attempt
     // to connect by the backup (if there is one)
     let start_time = Instant::now();
@@ -42,7 +53,7 @@ where
     let (toolbox_res, proxy) = if toolbox_res.is_ok() {
         (toolbox_res, proxy)
     } else {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+        let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
         let toolbox_took = Instant::now() - start_time;
         let timeout = dur.saturating_sub(toolbox_took);
         (
@@ -76,7 +87,7 @@ where
     // try to connect to the moniker given instead, but don't double
     // up the timeout.
     let timeout = dur.saturating_sub(toolbox_took);
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>().unwrap();
+    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
     let moniker_res = crate::open_with_timeout::<P>(
         timeout,
         &backup,

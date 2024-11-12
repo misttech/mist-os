@@ -4,36 +4,57 @@
 
 import("//build/rust/rustc_library.gni")
 
+rcs_deps = [
+  "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+  "//src/developer/ffx/lib/errors:lib",
+  "//src/developer/ffx/lib/timeout:lib",
+  "//src/lib/fidl/rust/fidl",
+  "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:thiserror",
+  "//third_party/rust_crates:tracing",
+]
+
+rcs_sources = [
+  "src/lib.rs",
+  "src/toolbox.rs",
+]
+
 rustc_library("lib") {
   name = "rcs"
   edition = "2021"
   with_unit_tests = true
 
-  deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
-    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/connectivity/overnet/lib/core",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/timeout:lib",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/network/fidl_fuchsia_net_ext",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
-  ]
+  deps = rcs_deps + [
+           "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+           "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+           "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+           "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
+           "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+           "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+           "//src/connectivity/overnet/lib/core",
+           "//src/lib/fuchsia-async",
+           "//src/lib/network/fidl_fuchsia_net_ext",
+         ]
 
-  sources = [
-    "src/lib.rs",
-    "src/port_forward.rs",
-    "src/toolbox.rs",
-  ]
+  sources = rcs_sources + [ "src/port_forward.rs" ]
+}
+
+rustc_library("lib_fdomain") {
+  name = "rcs_fdomain"
+  edition = "2021"
+  with_unit_tests = true
+
+  deps = rcs_deps + [
+           "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
+           "//sdk/fidl/fuchsia.io:fuchsia.io_fdomain",
+           "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_fdomain",
+           "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_fdomain",
+           "//src/lib/fdomain/client",
+         ]
+
+  features = [ "fdomain" ]
+  sources = rcs_sources
 }
 
 group("rcs") {
@@ -43,5 +64,8 @@ group("rcs") {
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_test($host_toolchain)" ]
+  deps = [
+    ":lib_fdomain_test($host_toolchain)",
+    ":lib_test($host_toolchain)",
+  ]
 }
