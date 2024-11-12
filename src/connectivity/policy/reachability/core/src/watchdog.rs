@@ -834,7 +834,7 @@ mod tests {
     const SUBNET_V6: fnet::Subnet = fidl_subnet!("::0/0");
 
     struct MockInterfaceView {
-        properties: fnet_interfaces_ext::Properties,
+        properties: fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         routes: RouteTable,
         neighbors: crate::InterfaceNeighborCache,
     }

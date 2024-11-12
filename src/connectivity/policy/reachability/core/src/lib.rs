@@ -487,7 +487,7 @@ impl StateInfo {
 /// Provides a view into state for a specific system interface.
 #[derive(Copy, Clone, Debug)]
 pub struct InterfaceView<'a> {
-    pub properties: &'a fnet_interfaces_ext::Properties,
+    pub properties: &'a fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
     pub routes: &'a RouteTable,
     pub neighbors: Option<&'a InterfaceNeighborCache>,
 }
@@ -946,7 +946,9 @@ impl<Time: TimeProvider> Monitor<Time> {
     /// Handle an interface removed event.
     pub fn handle_interface_removed(
         &mut self,
-        fnet_interfaces_ext::Properties { id, name, .. }: fnet_interfaces_ext::Properties,
+        fnet_interfaces_ext::Properties { id, name, .. }: fnet_interfaces_ext::Properties<
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) {
         let time = fasync::MonotonicInstant::now();
         if let Some(mut reachability) = self.state.get(id.into()).cloned() {
@@ -1750,7 +1752,7 @@ mod tests {
 
     fn run_network_check_repeated<P: Ping, D: Dig, F: Fetch>(
         exec: &mut fasync::TestExecutor,
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         routes: &RouteTable,
         neighbors: Option<&InterfaceNeighborCache>,
         mocks: Vec<(P, D, F)>,
@@ -1796,7 +1798,7 @@ mod tests {
 
     fn run_network_check<P: Ping, D: Dig, F: Fetch>(
         exec: &mut fasync::TestExecutor,
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         routes: &RouteTable,
         neighbors: Option<&InterfaceNeighborCache>,
         pinger: P,
@@ -2577,16 +2579,14 @@ mod tests {
             addresses: vec![
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("1.2.3.0/24"),
-                    valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
-                    preferred_lifetime_info:
-                        fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
+                    valid_until: fnet_interfaces_ext::NoInterest,
+                    preferred_lifetime_info: fnet_interfaces_ext::NoInterest,
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("123::4/64"),
-                    valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
-                    preferred_lifetime_info:
-                        fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
+                    valid_until: fnet_interfaces_ext::NoInterest,
+                    preferred_lifetime_info: fnet_interfaces_ext::NoInterest,
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
             ],

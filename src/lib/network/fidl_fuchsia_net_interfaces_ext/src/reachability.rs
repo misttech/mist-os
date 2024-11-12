@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    Address, PortClass, Properties, PropertiesAndState, Update, UpdateResult, WatcherOperationError,
+    Address, EventWithInterest, FieldInterests, PortClass, Properties, PropertiesAndState, Update,
+    UpdateResult, WatcherOperationError,
 };
 
 use futures::{Stream, TryStreamExt};
@@ -17,7 +18,7 @@ use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 /// route and a globally routable address for either IPv4 or IPv6. An IPv4 address is assumed to be
 /// globally routable if it's not link-local. An IPv6 address is assumed to be globally routable if
 /// it has global scope.
-pub fn is_globally_routable(
+pub fn is_globally_routable<I: FieldInterests>(
     &Properties {
         ref port_class,
         online,
@@ -25,7 +26,7 @@ pub fn is_globally_routable(
         has_default_ipv4_route,
         has_default_ipv6_route,
         ..
-    }: &Properties,
+    }: &Properties<I>,
 ) -> bool {
     match port_class {
         PortClass::Loopback => return false,
@@ -71,23 +72,25 @@ pub fn is_globally_routable(
     )
 }
 
-/// Wraps `event_stream` and returns a stream which yields the reachability status as a bool (true
-/// iff there exists an interface with properties that satisfy [`is_globally_routable`]) whenever
-/// it changes. The first item the returned stream yields is the reachability status of the first
-/// interface discovered through an `Added` or `Existing` event on `event_stream`.
+/// Wraps `event_stream` and returns a stream which yields the reachability
+/// status as a bool (true iff there exists an interface with properties that
+/// satisfy [`is_globally_routable`]) whenever it changes. The first item the
+/// returned stream yields is the reachability status of the first interface
+/// discovered through an `Added` or `Existing` event on `event_stream`.
 ///
-/// Note that `event_stream` must be created from a watcher with interest in all
-/// fields, such as one created from [`crate::event_stream_from_state`].
-pub fn to_reachability_stream(
-    event_stream: impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-) -> impl Stream<Item = Result<bool, WatcherOperationError<(), HashMap<u64, PropertiesAndState<()>>>>>
+/// Note that `event_stream` must be created from a watcher with interest in the
+/// appropriate fields, such as one created from
+/// [`crate::event_stream_from_state`].
+pub fn to_reachability_stream<I: FieldInterests>(
+    event_stream: impl Stream<Item = Result<EventWithInterest<I>, fidl::Error>>,
+) -> impl Stream<Item = Result<bool, WatcherOperationError<(), HashMap<u64, PropertiesAndState<(), I>>>>>
 {
     let mut if_map = HashMap::<u64, _>::new();
     let mut reachable = None;
     let mut reachable_ids = HashSet::new();
     event_stream.map_err(WatcherOperationError::EventStream).try_filter_map(move |event| {
         futures::future::ready(if_map.update(event).map_err(WatcherOperationError::Update).map(
-            |changed: UpdateResult<'_, ()>| {
+            |changed: UpdateResult<'_, (), _>| {
                 let reachable_ids_changed = match changed {
                     UpdateResult::Existing { properties, state: _ }
                     | UpdateResult::Added { properties, state: _ }
@@ -134,9 +137,9 @@ pub enum OperationError<S: std::fmt::Debug, B: Update<S> + std::fmt::Debug> {
 
 /// Returns a future which resolves when any network interface observed through `event_stream`
 /// has properties which satisfy [`is_globally_routable`].
-pub async fn wait_for_reachability(
-    event_stream: impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-) -> Result<(), OperationError<(), HashMap<u64, PropertiesAndState<()>>>> {
+pub async fn wait_for_reachability<I: FieldInterests>(
+    event_stream: impl Stream<Item = Result<EventWithInterest<I>, fidl::Error>>,
+) -> Result<(), OperationError<(), HashMap<u64, PropertiesAndState<(), I>>>> {
     futures::pin_mut!(event_stream);
     let rtn = to_reachability_stream(event_stream)
         .map_err(OperationError::Watcher)
@@ -151,7 +154,7 @@ pub async fn wait_for_reachability(
 mod tests {
     use super::*;
 
-    use crate::{PositiveMonotonicInstant, PreferredLifetimeInfo};
+    use crate::{AllInterest, PositiveMonotonicInstant, PreferredLifetimeInfo};
 
     use anyhow::Context as _;
     use futures::FutureExt as _;
@@ -217,60 +220,60 @@ mod tests {
     #[test]
     fn test_is_globally_routable() -> Result<(), anyhow::Error> {
         const ID: u64 = 1;
-        const ASSIGNED_ADDR: Address = Address {
+        const ASSIGNED_ADDR: Address<AllInterest> = Address {
             addr: IPV4_GLOBAL,
             valid_until: PositiveMonotonicInstant::INFINITE_FUTURE,
             preferred_lifetime_info: PreferredLifetimeInfo::preferred_forever(),
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         };
         // These combinations are not globally routable.
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             port_class: PortClass::Loopback,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             online: false,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             addresses: vec![],
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             has_default_ipv4_route: false,
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             addresses: vec![Address { addr: IPV4_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: false,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             addresses: vec![Address { addr: IPV6_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             addresses: vec![Address { addr: IPV6_LINK_LOCAL, ..ASSIGNED_ADDR }],
             has_default_ipv6_route: true,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(!is_globally_routable(&Properties {
+        assert!(!is_globally_routable(&Properties::<AllInterest> {
             addresses: vec![Address { addr: IPV4_LINK_LOCAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: true,
             ..valid_interface(ID).try_into()?
         }));
 
         // These combinations are globally routable.
-        assert!(is_globally_routable(&valid_interface(ID).try_into()?));
-        assert!(is_globally_routable(&Properties {
+        assert!(is_globally_routable::<AllInterest>(&valid_interface(ID).try_into()?));
+        assert!(is_globally_routable::<AllInterest>(&Properties {
             addresses: vec![Address { addr: IPV4_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: true,
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
-        assert!(is_globally_routable(&Properties {
+        assert!(is_globally_routable::<AllInterest>(&Properties {
             addresses: vec![Address { addr: IPV6_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: false,
             has_default_ipv6_route: true,
@@ -282,7 +285,7 @@ mod tests {
     #[test]
     fn test_to_reachability_stream() -> Result<(), anyhow::Error> {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
-        let mut reachability_stream = to_reachability_stream(receiver);
+        let mut reachability_stream = to_reachability_stream::<AllInterest>(receiver);
         for (event, want) in vec![
             (fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}), None),
             // Added events
@@ -331,7 +334,8 @@ mod tests {
             (fnet_interfaces::Event::Removed(3), Some(false)),
             (fnet_interfaces::Event::Removed(2), None),
         ] {
-            let () = sender.unbounded_send(Ok(event.clone())).context("failed to send event")?;
+            let () =
+                sender.unbounded_send(Ok(event.clone().into())).context("failed to send event")?;
             let got = reachability_stream.try_next().now_or_never();
             if let Some(want_reachable) = want {
                 let r = got.ok_or_else(|| {

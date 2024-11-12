@@ -436,10 +436,12 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 if step.may_reconstruct_bridge() {
                     let mut interfaces_map = HashMap::<
                         u64,
-                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>,
+                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>,
                     >::new();
                     let bridge_id = fnet_interfaces_ext::wait_interface(
-                        fnet_interfaces_ext::event_stream_from_state(
+                        fnet_interfaces_ext::event_stream_from_state::<
+                            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+                        >(
                             &host_interfaces_state,
                             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
                         )

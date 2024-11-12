@@ -168,7 +168,10 @@ pub struct EventLoop {
     monitor: Monitor,
     handler: ReachabilityHandler,
     watchdog: Watchdog,
-    interface_properties: HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
+    interface_properties: HashMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<(), fnet_interfaces_ext::DefaultInterest>,
+    >,
     neighbor_cache: NeighborCache,
     routes: RouteTable,
     telemetry_sender: Option<TelemetrySender>,
@@ -235,9 +238,6 @@ impl EventLoop {
             let interface_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
                 .context("network_manager failed to connect to interface state")
                 .unwrap_or_else(|err| exit_with_anyhow_error(err));
-            // TODO(https://fxbug.dev/42061810): Don't register interest in
-            // valid-until. Note that the event stream returned by the extension
-            // crate is created from a watcher with interest in all fields.
             fnet_interfaces_ext::event_stream_from_state(
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
@@ -402,7 +402,10 @@ impl EventLoop {
 
     async fn handle_interface_watcher_result(
         &mut self,
-        if_watcher_res: Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>,
+        if_watcher_res: Result<
+            Option<fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>>,
+            fidl::Error,
+        >,
     ) -> Option<u64> {
         let event = if_watcher_res
             .unwrap_or_else(|err| {
@@ -433,7 +436,7 @@ impl EventLoop {
 
     async fn handle_interface_watcher_event(
         &mut self,
-        event: fnet_interfaces::Event,
+        event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>,
     ) -> Result<Option<u64>, anyhow::Error> {
         match self
             .interface_properties
@@ -482,9 +485,10 @@ impl EventLoop {
                     },
                 state: _,
             } => {
-                // TODO(https://fxbug.dev/42061810): Don't register interest in
-                // valid-until instead of filtering out address property
-                // changes manually here.
+                // NOTE: Filter changed events to only changes that might affect
+                // reachability. This acts as a guard against too many
+                // reachability checks in case of fuchsia.net.interfaces adding
+                // more fields.
                 if online.is_some()
                     || has_default_ipv4_route.is_some()
                     || has_default_ipv6_route.is_some()
@@ -533,7 +537,9 @@ impl EventLoop {
 
     /// Determine whether an interface should be monitored or not.
     fn should_monitor_interface(
-        &fnet_interfaces_ext::Properties { port_class, .. }: &fnet_interfaces_ext::Properties,
+        &fnet_interfaces_ext::Properties { port_class, .. }: &fnet_interfaces_ext::Properties<
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> bool {
         return match port_class {
             fnet_interfaces_ext::PortClass::Loopback | fnet_interfaces_ext::PortClass::Lowpan => {
@@ -584,7 +590,7 @@ impl EventLoop {
         monitor: &mut Monitor,
         watchdog: &mut Watchdog,
         handler: &mut ReachabilityHandler,
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         routes: &RouteTable,
         neighbor_cache: &NeighborCache,
     ) {
@@ -666,7 +672,7 @@ impl EventLoop {
 //
 // TODO(https://fxbug.dev/42070352): add a test that works as intended.
 fn exit_with_anyhow_error(cause: anyhow::Error) -> ! {
-    error!(%cause, "exiting due to error");
+    error!(?cause, "exiting due to error");
     std::process::exit(1);
 }
 
@@ -676,9 +682,7 @@ mod tests {
     #[allow(unused)]
     use assert_matches::assert_matches as _;
     use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet};
-    use fidl_fuchsia_net_interfaces::{
-        Address, AddressAssignmentState, Event, PreferredLifetimeInfo, Properties,
-    };
+    use fidl_fuchsia_net_interfaces::{Address, AddressAssignmentState, Event, Properties};
     use net_declare::{std_ip_v4, std_ip_v6};
 
     fn create_eventloop() -> EventLoop {
@@ -703,8 +707,6 @@ mod tests {
 
         let addr = Address {
             addr: Some(v4_subnet),
-            valid_until: Some(123_000_000_000),
-            preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
             assignment_state: Some(AddressAssignmentState::Assigned),
             ..Default::default()
         };
@@ -722,11 +724,11 @@ mod tests {
             ..Default::default()
         };
 
-        let event_res = Ok(Some(Event::Existing(props.clone())));
+        let event_res = Ok(Some(Event::Existing(props.clone()).into()));
         assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(12345));
 
         props.id = Some(54321);
-        let event_res = Ok(Some(Event::Added(props.clone())));
+        let event_res = Ok(Some(Event::Added(props.clone()).into()));
         assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(54321));
     }
 
@@ -741,8 +743,6 @@ mod tests {
 
         let addr = Address {
             addr: Some(v6_subnet),
-            valid_until: Some(123_000_000_000),
-            preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
             assignment_state: Some(AddressAssignmentState::Assigned),
             ..Default::default()
         };
@@ -760,11 +760,11 @@ mod tests {
             ..Default::default()
         };
 
-        let event_res = Ok(Some(Event::Existing(props.clone())));
+        let event_res = Ok(Some(Event::Existing(props.clone()).into()));
         assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(12345));
 
         props.id = Some(54321);
-        let event_res = Ok(Some(Event::Added(props.clone())));
+        let event_res = Ok(Some(Event::Added(props.clone()).into()));
         assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(54321));
     }
 }

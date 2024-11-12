@@ -482,7 +482,7 @@ impl InterfaceState {
     /// Handles the interface being discovered.
     async fn on_discovery(
         &mut self,
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         dhcpv6_client_provider: Option<&fnet_dhcpv6::ClientProviderProxy>,
         dhcpv4_server: Option<&fnet_dhcp::Server_Proxy>,
@@ -563,7 +563,10 @@ pub struct NetCfg<'a> {
     // TODO(https://fxbug.dev/42146318): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
     interface_states: HashMap<InterfaceId, InterfaceState>,
-    interface_properties: HashMap<InterfaceId, fnet_interfaces_ext::PropertiesAndState<()>>,
+    interface_properties: HashMap<
+        InterfaceId,
+        fnet_interfaces_ext::PropertiesAndState<(), fnet_interfaces_ext::DefaultInterest>,
+    >,
     interface_metrics: InterfaceMetrics,
 
     dns_servers: DnsServers,
@@ -639,7 +642,7 @@ fn start_dhcpv6_client(
         port_class: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
-    }: &fnet_interfaces_ext::Properties,
+    }: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::DefaultInterest>,
     duid: fnet_dhcpv6::Duid,
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
     pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -765,7 +768,12 @@ enum Dhcpv4ConfigurationHandlerResult {
 // Events associated with provisioning a device.
 #[derive(Debug)]
 enum ProvisioningEvent {
-    InterfaceWatcherResult(Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>),
+    InterfaceWatcherResult(
+        Result<
+            Option<fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>>,
+            fidl::Error,
+        >,
+    ),
     DnsWatcherResult(
         Option<(
             dns_server_watcher::DnsServersUpdateSource,
@@ -1615,7 +1623,7 @@ impl<'a> NetCfg<'a> {
     /// Handles an interface watcher event (existing, added, changed, or removed).
     async fn handle_interface_watcher_event(
         &mut self,
-        event: fnet_interfaces::Event,
+        event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::DefaultInterest>,
         watchers: &mut DnsServerWatchers<'_>,
         virtualization_handler: &mut impl virtualization::Handler,
     ) -> Result<(), anyhow::Error> {
@@ -1709,7 +1717,11 @@ impl<'a> NetCfg<'a> {
     // rather than `&mut self` directly, because `update_result` already holds a reference into
     // `self.interface_properties`.
     async fn handle_interface_update_result(
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
@@ -3481,11 +3493,10 @@ mod tests {
     });
 
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
-        fnet_interfaces_ext::Address {
+        fnet_interfaces_ext::Address::<fnet_interfaces_ext::DefaultInterest> {
             addr,
-            valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
-            preferred_lifetime_info: fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(
-            ),
+            valid_until: fnet_interfaces_ext::NoInterest,
+            preferred_lifetime_info: fnet_interfaces_ext::NoInterest,
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }
         .into()
@@ -3514,7 +3525,9 @@ mod tests {
             addresses,
             ..Default::default()
         });
-        netcfg.handle_interface_watcher_event(event, dns_watchers, &mut virtualization::Stub).await
+        netcfg
+            .handle_interface_watcher_event(event.into(), dns_watchers, &mut virtualization::Stub)
+            .await
     }
 
     /// Make sure that a new DHCPv6 client was requested, and verify its parameters.
@@ -3657,7 +3670,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -3740,7 +3754,8 @@ mod tests {
                     online,
                     addresses,
                     ..Default::default()
-                }),
+                })
+                .into(),
                 dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -3816,7 +3831,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virt_stub,
                 )
@@ -3925,7 +3941,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4109,7 +4126,7 @@ mod tests {
                 if remove_interface {
                     netcfg
                         .handle_interface_watcher_event(
-                            fnet_interfaces::Event::Removed(INTERFACE_ID.get()),
+                            fnet_interfaces::Event::Removed(INTERFACE_ID.get()).into(),
                             &mut dns_watchers,
                             &mut virtualization::Stub,
                         )
@@ -4216,7 +4233,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -4365,7 +4383,8 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    })
+                    .into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4506,7 +4525,8 @@ mod tests {
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
-                }),
+                })
+                .into(),
                 &mut dns_watchers,
                 &mut virtualization::Stub,
             )
@@ -4654,7 +4674,7 @@ mod tests {
         let ((), ()) = future::join(
             netcfg
                 .handle_interface_watcher_event(
-                    fnet_interfaces::Event::Removed(INTERFACE_ID.get()),
+                    fnet_interfaces::Event::Removed(INTERFACE_ID.get()).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -4845,7 +4865,7 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    }).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
@@ -5250,7 +5270,7 @@ mod tests {
                         has_default_ipv4_route: Some(false),
                         has_default_ipv6_route: Some(false),
                         ..Default::default()
-                    }),
+                    }).into(),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )

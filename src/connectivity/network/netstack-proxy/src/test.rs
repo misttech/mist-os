@@ -119,7 +119,9 @@ async fn connects_to_stack(netstack_version: fnet_migration::NetstackVersion) {
             let state = realm
                 .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
                 .expect("connect to protocol");
-            let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+                fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+            >(
                 &state,
                 fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )

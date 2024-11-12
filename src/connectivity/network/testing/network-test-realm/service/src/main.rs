@@ -232,17 +232,18 @@ async fn wait_for_any_ip_address(
     connector: &HermeticNetworkConnector,
 ) -> Result<(), fntr::Error> {
     let state_proxy = connector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &state_proxy,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .map_err(|e| {
-        error!("failed to read interface stream: {:?}", e);
-        fntr::Error::Internal
-    })?;
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &state_proxy,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .map_err(|e| {
+            error!("failed to read interface stream: {:?}", e);
+            fntr::Error::Internal
+        })?;
     let addr = fnet_interfaces_ext::wait_interface_with_id(
         stream,
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(id),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(id),
         |properties_and_state| properties_and_state.properties.addresses.iter().next().cloned(),
     )
     .await
@@ -264,18 +265,19 @@ async fn find_interface_id_and_status(
     connector: &impl Connector,
 ) -> Result<(u64, bool), fntr::Error> {
     let state_proxy = connector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &state_proxy,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .map_err(|e| {
-        error!("failed to read interface stream: {:?}", e);
-        fntr::Error::Internal
-    })?;
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &state_proxy,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .map_err(|e| {
+            error!("failed to read interface stream: {:?}", e);
+            fntr::Error::Internal
+        })?;
 
     let interfaces = fnet_interfaces_ext::existing(
         stream,
-        HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+        HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new(),
     )
     .await
     .map_err(|e| {

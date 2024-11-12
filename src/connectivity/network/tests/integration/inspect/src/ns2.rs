@@ -50,7 +50,11 @@ struct AddressMatcher {
 
 impl AddressMatcher {
     /// Creates an `AddressMatcher` from interface properties.
-    fn new(props: &fidl_fuchsia_net_interfaces_ext::Properties) -> Self {
+    fn new(
+        props: &fidl_fuchsia_net_interfaces_ext::Properties<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >,
+    ) -> Self {
         let set = props
             .addresses
             .iter()
@@ -154,7 +158,7 @@ async fn inspect_nic(name: &str) {
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("failed to create event stream"),
-        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
         |if_map| {
             let loopback = if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: _ }| {

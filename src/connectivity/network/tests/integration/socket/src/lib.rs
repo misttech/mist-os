@@ -862,9 +862,9 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
 
             // Wait until a default IPv6 route is added in response to the RA.
             let mut interface_state =
-                fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id());
+                fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
             fnet_interfaces_ext::wait_interface_with_id(
-                iface.get_interface_event_stream().expect("get interface event stream"),
+                realm.get_interface_event_stream().expect("get interface event stream"),
                 &mut interface_state,
                 |iface| iface.properties.has_default_ipv6_route.then_some(()),
             )
@@ -921,9 +921,9 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
 
             // Wait until the default IPv6 route is removed.
             let mut interface_state =
-                fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id());
+                fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
             fnet_interfaces_ext::wait_interface_with_id(
-                iface.get_interface_event_stream().expect("get interface event stream"),
+                realm.get_interface_event_stream().expect("get interface event stream"),
                 &mut interface_state,
                 |iface| (!iface.properties.has_default_ipv6_route).then_some(()),
             )
@@ -1061,12 +1061,12 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
 
     // Wait for an address to be auto generated.
     let autogen_address = fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
             &interfaces_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             iface.properties.addresses.iter().find_map(
                 |fnet_interfaces_ext::Address {
@@ -1105,12 +1105,12 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
 
     // Wait for the address to be invalidated and removed.
     fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
             &interfaces_state,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (!iface.properties.addresses.iter().any(
                 |fnet_interfaces_ext::Address {
@@ -3067,11 +3067,11 @@ async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
     server_ep.apply_nud_flake_workaround().await.expect("apply NUD flake workaround");
 
     // Get the link local address for the client.
-    let link_local_addr = std::pin::pin!(client_ep
+    let link_local_addr = std::pin::pin!(client
         .get_interface_event_stream()
         .expect("get_interface_event_stream failed")
         .filter_map(|event| async {
-            match event.expect("event error") {
+            match event.expect("event error").into_inner() {
                 fnet_interfaces::Event::Existing(properties)
                 | fnet_interfaces::Event::Added(properties) => {
                     if let Some(addresses) = properties.addresses {
@@ -3240,14 +3240,15 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let interface_state =
         host.connect_to_protocol::<fnet_interfaces::StateMarker>().expect("connect to protocol");
 
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &interface_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .expect("error getting interface state event stream");
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("error getting interface state event stream");
     let mut stream = pin!(stream);
     let mut state =
-        std::collections::HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new();
+        std::collections::HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new();
 
     // Wait for the interface to be present.
     fnet_interfaces_ext::wait_interface(stream.by_ref(), &mut state, |interfaces| {

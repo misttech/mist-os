@@ -492,12 +492,13 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
         .expect("failed to connect to fuchsia.net.interfaces/State");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("failed to create event stream"),
-        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<(), _>>::new(),
         |if_map| {
             if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {

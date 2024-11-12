@@ -872,12 +872,12 @@ impl Worker {
 /// This trait enables the implementation of [`Worker::collect_addresses`] to be
 /// agnostic to extension and pure FIDL types, it is not meant to be used in
 /// other contexts.
-trait SortableInterfaceAddress: From<finterfaces_ext::Address> {
+trait SortableInterfaceAddress: From<finterfaces_ext::Address<finterfaces_ext::AllInterest>> {
     type Key: Ord;
     fn get_sort_key(&self) -> Self::Key;
 }
 
-impl SortableInterfaceAddress for finterfaces_ext::Address {
+impl SortableInterfaceAddress for finterfaces_ext::Address<finterfaces_ext::AllInterest> {
     type Key = fnet::Subnet;
     fn get_sort_key(&self) -> fnet::Subnet {
         self.addr.clone()
@@ -958,7 +958,9 @@ trait IntoFidlBackwardsCompatible<F> {
 }
 
 // TODO(https://fxbug.dev/42157740): Remove this implementation.
-impl IntoFidlBackwardsCompatible<finterfaces::Properties> for finterfaces_ext::Properties {
+impl IntoFidlBackwardsCompatible<finterfaces::Properties>
+    for finterfaces_ext::Properties<finterfaces_ext::AllInterest>
+{
     fn into_fidl_backwards_compatible(self) -> finterfaces::Properties {
         // `device_class` has been replaced by `port_class`.
         let device_class = match &self.port_class {
@@ -1113,14 +1115,16 @@ mod tests {
                     valid_until: ADDR_VALID_UNTIL,
                 },
                 finterfaces::Event::Changed(finterfaces::Properties {
-                    addresses: Some(vec![finterfaces_ext::Address {
-                        addr: addr1.clone().into_fidl(),
-                        valid_until: ADDR_VALID_UNTIL.try_into().unwrap(),
-                        preferred_lifetime_info:
-                            finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
-                        assignment_state: finterfaces::AddressAssignmentState::Assigned,
-                    }
-                    .into()]),
+                    addresses: Some(vec![
+                        finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
+                            addr: addr1.clone().into_fidl(),
+                            valid_until: ADDR_VALID_UNTIL.try_into().unwrap(),
+                            preferred_lifetime_info:
+                                finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
+                            assignment_state: finterfaces::AddressAssignmentState::Assigned,
+                        }
+                        .into(),
+                    ]),
                     ..base_properties.clone()
                 }),
             ),
@@ -1367,7 +1371,9 @@ mod tests {
                 Ok(Some((
                     finterfaces::Event::Changed(finterfaces::Properties {
                         id: Some(id.get()),
-                        addresses: Some(vec![finterfaces_ext::Address {
+                        addresses: Some(vec![finterfaces_ext::Address::<
+                            finterfaces_ext::AllInterest,
+                        > {
                             addr: addr.clone().into_fidl(),
                             valid_until,
                             assignment_state: assignment_state.into_fidl(),
@@ -1450,14 +1456,16 @@ mod tests {
             Ok(Some((
                 finterfaces::Event::Changed(finterfaces::Properties {
                     id: Some(id.get()),
-                    addresses: Some(vec![finterfaces_ext::Address {
-                        addr: addr.into_fidl(),
-                        valid_until: valid_until.try_into().unwrap(),
-                        assignment_state: finterfaces::AddressAssignmentState::Tentative,
-                        preferred_lifetime_info:
-                            finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
-                    }
-                    .into()]),
+                    addresses: Some(vec![
+                        finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
+                            addr: addr.into_fidl(),
+                            valid_until: valid_until.try_into().unwrap(),
+                            assignment_state: finterfaces::AddressAssignmentState::Tentative,
+                            preferred_lifetime_info:
+                                finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
+                        }
+                        .into()
+                    ]),
                     ..Default::default()
                 }),
                 ChangedAddressProperties::AssignmentStateChanged { involves_assigned: false },
@@ -1533,7 +1541,9 @@ mod tests {
                     Ok(Some((
                         finterfaces::Event::Changed(finterfaces::Properties {
                             id: Some(id.get()),
-                            addresses: Some(vec![finterfaces_ext::Address {
+                            addresses: Some(vec![finterfaces_ext::Address::<
+                                finterfaces_ext::AllInterest,
+                            > {
                                 addr: subnet.into_fidl(),
                                 valid_until: valid_until.try_into().unwrap(),
                                 assignment_state: finterfaces::AddressAssignmentState::Unavailable,
@@ -1561,7 +1571,7 @@ mod tests {
 
         assert_eq!(
             Worker::collect_addresses::<finterfaces::Address>(&initial_state.addresses),
-            [finterfaces_ext::Address {
+            [finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
                 addr: subnet.into_fidl(),
                 valid_until: valid_until.try_into().unwrap(),
                 assignment_state: finterfaces::AddressAssignmentState::Tentative,
@@ -1587,7 +1597,7 @@ mod tests {
         let expected_event = (
             finterfaces::Event::Changed(finterfaces::Properties {
                 id: Some(id.get()),
-                addresses: Some(vec![finterfaces_ext::Address {
+                addresses: Some(vec![finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
                     addr: subnet.into_fidl(),
                     valid_until: valid_until.try_into().unwrap(),
                     assignment_state: finterfaces::AddressAssignmentState::Assigned,
@@ -1632,7 +1642,7 @@ mod tests {
         let expected_event = (
             finterfaces::Event::Changed(finterfaces::Properties {
                 id: Some(id.get()),
-                addresses: Some(vec![finterfaces_ext::Address {
+                addresses: Some(vec![finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
                     addr: subnet.into_fidl(),
                     valid_until: valid_until.try_into().unwrap(),
                     assignment_state: finterfaces::AddressAssignmentState::Tentative,
@@ -1708,14 +1718,16 @@ mod tests {
             new_state @ (IpAddressState::Assigned | IpAddressState::Tentative) => Some((
                 finterfaces::Event::Changed(finterfaces::Properties {
                     id: Some(id.get()),
-                    addresses: Some(vec![finterfaces_ext::Address {
-                        addr: addr.into_fidl(),
-                        valid_until: valid_until.try_into().unwrap(),
-                        assignment_state: new_state.into_fidl(),
-                        preferred_lifetime_info:
-                            finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
-                    }
-                    .into()]),
+                    addresses: Some(vec![
+                        finterfaces_ext::Address::<finterfaces_ext::AllInterest> {
+                            addr: addr.into_fidl(),
+                            valid_until: valid_until.try_into().unwrap(),
+                            assignment_state: new_state.into_fidl(),
+                            preferred_lifetime_info:
+                                finterfaces_ext::PreferredLifetimeInfo::preferred_forever(),
+                        }
+                        .into(),
+                    ]),
                     ..Default::default()
                 }),
                 ChangedAddressProperties::AssignmentStateChanged {

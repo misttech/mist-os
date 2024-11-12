@@ -82,7 +82,14 @@ impl Addresses {
     }
 }
 
-impl<I: Iterator<Item = fidl_fuchsia_net_interfaces_ext::Address>> From<I> for Addresses {
+impl<
+        I: Iterator<
+            Item = fidl_fuchsia_net_interfaces_ext::Address<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+        >,
+    > From<I> for Addresses
+{
     fn from(addresses: I) -> Addresses {
         use itertools::Itertools as _;
 
@@ -172,11 +179,19 @@ pub(crate) struct InterfaceView {
     pub(crate) mac: Option<fidl_fuchsia_net_ext::MacAddress>,
 }
 
-impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>)>
-    for InterfaceView
+impl
+    From<(
+        fidl_fuchsia_net_interfaces_ext::Properties<fidl_fuchsia_net_interfaces_ext::AllInterest>,
+        Option<fidl_fuchsia_net::MacAddress>,
+    )> for InterfaceView
 {
     fn from(
-        t: (fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>),
+        t: (
+            fidl_fuchsia_net_interfaces_ext::Properties<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+            Option<fidl_fuchsia_net::MacAddress>,
+        ),
     ) -> InterfaceView {
         let (
             fidl_fuchsia_net_interfaces_ext::Properties {

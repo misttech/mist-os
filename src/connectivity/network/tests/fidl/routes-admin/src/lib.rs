@@ -955,7 +955,7 @@ async fn removing_one_default_route_does_not_flip_presence<
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let TestSetup {
-        realm: _realm,
+        realm,
         network: _network,
         interface,
         route_table,
@@ -984,7 +984,7 @@ async fn removing_one_default_route_does_not_flip_presence<
     let route_set_1 = authenticate(route_set_1).await;
     let route_set_2 = authenticate(route_set_2).await;
 
-    let events = interface.get_interface_event_stream().expect("get interface event stream").fuse();
+    let events = realm.get_interface_event_stream().expect("get interface event stream").fuse();
     let mut events = pin!(events);
 
     let default_route = |metric| {

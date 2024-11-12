@@ -96,7 +96,11 @@ pub(super) trait Handler {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error>;
 }
 
@@ -669,7 +673,11 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error> {
         let Self { bridge, installer: _, _allowed_upstream_device_classes } = self;
         match update_result {
@@ -748,7 +756,11 @@ impl Handler for Stub {
 
     async fn handle_interface_update_result(
         &mut self,
-        _update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
+        _update_result: &fnet_interfaces_ext::UpdateResult<
+            '_,
+            (),
+            fnet_interfaces_ext::DefaultInterest,
+        >,
     ) -> Result<(), errors::Error> {
         Ok(())
     }

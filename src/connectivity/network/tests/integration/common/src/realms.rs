@@ -867,7 +867,9 @@ impl TestSandboxExt for netemul::TestSandbox {
 pub trait TestRealmExt {
     /// Returns the properties of the loopback interface, or `None` if there is no
     /// loopback interface.
-    async fn loopback_properties(&self) -> Result<Option<fnet_interfaces_ext::Properties>>;
+    async fn loopback_properties(
+        &self,
+    ) -> Result<Option<fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>>>;
 
     /// Get a `fuchsia.net.interfaces.admin/Control` client proxy for the
     /// interface identified by [`id`] via `fuchsia.net.root`.
@@ -880,7 +882,9 @@ pub trait TestRealmExt {
 
 #[async_trait]
 impl TestRealmExt for netemul::TestRealm<'_> {
-    async fn loopback_properties(&self) -> Result<Option<fnet_interfaces_ext::Properties>> {
+    async fn loopback_properties(
+        &self,
+    ) -> Result<Option<fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>>> {
         let interface_state = self
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .context("failed to connect to fuchsia.net.interfaces/State")?;
@@ -891,7 +895,7 @@ impl TestRealmExt for netemul::TestRealm<'_> {
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("create watcher event stream"),
-            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new(),
         )
         .await
         .context("failed to get existing interface properties from watcher")?

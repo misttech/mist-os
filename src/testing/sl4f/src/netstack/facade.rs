@@ -59,11 +59,19 @@ pub struct Properties {
     mac: Option<fidl_fuchsia_net_ext::MacAddress>,
 }
 
-impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>)>
-    for Properties
+impl
+    From<(
+        fidl_fuchsia_net_interfaces_ext::Properties<fidl_fuchsia_net_interfaces_ext::AllInterest>,
+        Option<fidl_fuchsia_net::MacAddress>,
+    )> for Properties
 {
     fn from(
-        t: (fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net::MacAddress>),
+        t: (
+            fidl_fuchsia_net_interfaces_ext::Properties<
+                fidl_fuchsia_net_interfaces_ext::AllInterest,
+            >,
+            Option<fidl_fuchsia_net::MacAddress>,
+        ),
     ) -> Self {
         use itertools::Itertools as _;
 

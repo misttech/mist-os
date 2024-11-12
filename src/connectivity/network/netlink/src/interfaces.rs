@@ -267,7 +267,10 @@ pub(crate) struct InterfacesWorkerState<
     route_clients: ClientTable<NetlinkRoute, S>,
     /// The table of interfaces and associated state discovered through the
     /// interfaces watcher.
-    interface_properties: BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>,
+    interface_properties: BTreeMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<InterfaceState, fnet_interfaces_ext::AllInterest>,
+    >,
 }
 
 /// FIDL errors from the interfaces worker.
@@ -397,7 +400,15 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         interfaces_proxy: fnet_root::InterfacesProxy,
         interfaces_state_proxy: fnet_interfaces::StateProxy,
     ) -> Result<
-        (Self, impl futures::Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>),
+        (
+            Self,
+            impl futures::Stream<
+                Item = Result<
+                    fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
+                    fidl::Error,
+                >,
+            >,
+        ),
         WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>,
     > {
         let mut if_event_stream = Box::pin(
@@ -413,7 +424,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         let mut interface_properties = {
             match fnet_interfaces_ext::existing(
                 if_event_stream.by_ref(),
-                BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new(),
+                BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState, _>>::new(),
             )
             .await
             {
@@ -475,7 +486,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     /// `UpdateError` when updates are not consistent with the current state.
     pub(crate) async fn handle_interface_watcher_event(
         &mut self,
-        event: fnet_interfaces::Event,
+        event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
     ) -> Result<(), InterfaceEventHandlerError> {
         let update = match self.interface_properties.update(event) {
             Ok(update) => update,
@@ -712,7 +723,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     fn get_link(
         &self,
         specifier: LinkSpecifier,
-    ) -> Option<&fnet_interfaces_ext::PropertiesAndState<InterfaceState>> {
+    ) -> Option<
+        &fnet_interfaces_ext::PropertiesAndState<InterfaceState, fnet_interfaces_ext::AllInterest>,
+    > {
         match specifier {
             LinkSpecifier::Index(id) => self.interface_properties.get(&id.get().into()),
             LinkSpecifier::Name(name) => self.interface_properties.values().find(
@@ -1046,7 +1059,7 @@ pub(crate) enum InterfaceEventHandlerError {
     #[error("interface event handler updated the map with an event, but received an unexpected response: {0:?}")]
     Update(fnet_interfaces_ext::UpdateError),
     #[error("interface event handler attempted to process an event for an interface that already existed: {0:?}")]
-    ExistingEventReceived(fnet_interfaces_ext::Properties),
+    ExistingEventReceived(fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>),
 }
 
 fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
@@ -1112,7 +1125,7 @@ pub(crate) struct NetlinkLinkMessage(LinkMessage);
 
 impl NetlinkLinkMessage {
     fn optionally_from(
-        properties: &fnet_interfaces_ext::Properties,
+        properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
         link_address: &Option<Vec<u8>>,
     ) -> Option<Self> {
         match interface_properties_to_link_message(properties, link_address) {
@@ -1215,7 +1228,7 @@ fn interface_properties_to_link_message(
         addresses: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
-    }: &fnet_interfaces_ext::Properties,
+    }: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
     link_address: &Option<Vec<u8>>,
 ) -> Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> {
     let online = *online;
@@ -1327,7 +1340,7 @@ enum NetlinkAddressMessageConversionError {
 }
 
 fn addresses_optionally_from_interface_properties(
-    properties: &fnet_interfaces_ext::Properties,
+    properties: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
 ) -> Option<BTreeMap<fnet::IpAddress, NetlinkAddressMessage>> {
     match interface_properties_to_address_messages(properties) {
         Ok(o) => Some(o),
@@ -1349,7 +1362,7 @@ fn interface_properties_to_address_messages(
         online: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
-    }: &fnet_interfaces_ext::Properties,
+    }: &fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
 ) -> Result<BTreeMap<fnet::IpAddress, NetlinkAddressMessage>, NetlinkAddressMessageConversionError>
 {
     // We expect interface ids to safely fit in the range of the u32 values.
@@ -1723,7 +1736,7 @@ pub(crate) mod testutil {
         addr: fnet::Subnet,
         assignment_state: fnet_interfaces::AddressAssignmentState,
     ) -> fnet_interfaces::Address {
-        fnet_interfaces_ext::Address {
+        fnet_interfaces_ext::Address::<fnet_interfaces_ext::AllInterest> {
             addr,
             valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
             preferred_lifetime_info: fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(
@@ -1767,8 +1780,8 @@ mod tests {
         name: String,
         port_class: fnet_interfaces_ext::PortClass,
         online: bool,
-        addresses: Vec<fnet_interfaces_ext::Address>,
-    ) -> fnet_interfaces_ext::Properties {
+        addresses: Vec<fnet_interfaces_ext::Address<fnet_interfaces_ext::AllInterest>>,
+    ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
         fnet_interfaces_ext::Properties {
             id: NonZeroU64::new(id).unwrap(),
             name,
@@ -1785,7 +1798,7 @@ mod tests {
         name: String,
         port_class: fnet_interfaces_ext::PortClass,
         online: bool,
-    ) -> fnet_interfaces_ext::Properties {
+    ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
         let addresses = vec![
             fnet_interfaces_ext::Address {
                 addr: TEST_V4_ADDR,
@@ -1827,7 +1840,7 @@ mod tests {
         id: u64,
         name: &'static str,
         port_class: fnet_interfaces_ext::PortClass,
-    ) -> fnet_interfaces_ext::Properties {
+    ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
         fnet_interfaces_ext::Properties {
             id: id.try_into().unwrap(),
             name: name.to_string(),
@@ -1843,9 +1856,11 @@ mod tests {
         S: Stream<Item = fnet_interfaces::WatcherRequest>,
     >(
         stream: S,
-        existing_interfaces: impl IntoIterator<Item = fnet_interfaces_ext::Properties>,
+        existing_interfaces: impl IntoIterator<
+            Item = fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>,
+        >,
         new_interfaces: Option<(
-            impl IntoIterator<Item = fnet_interfaces_ext::Properties>,
+            impl IntoIterator<Item = fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest>>,
             fn(fnet_interfaces::Properties) -> fnet_interfaces::Event,
         )>,
     ) {

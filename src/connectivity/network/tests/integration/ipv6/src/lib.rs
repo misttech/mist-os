@@ -97,11 +97,12 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State service");
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id.into());
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(id.into());
     let ipv6_addresses = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("creating interface event stream"),
         &mut state,
@@ -341,7 +342,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, _realm, iface, fake_ep) =
+    let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
@@ -372,8 +373,8 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     // netstack should generate both a stable and temporary SLAAC address.
     let expected_addrs = 2;
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        iface.get_interface_event_stream().expect("error getting interface state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        realm.get_interface_event_stream().expect("error getting interface state event stream"),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             (iface
                 .properties
@@ -983,12 +984,13 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interface_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("error getting interfaces state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             // We have to make sure 2 things:
             // 1. We have `expected_addrs` addrs which have the advertised prefix for the
@@ -1332,12 +1334,13 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     send_ra(&fake_router, ra, &options, src_ip).await.expect("RA sent");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+            fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("creating interface event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
         |iface| {
             iface.properties.addresses.iter().find_map(
                 |fidl_fuchsia_net_interfaces_ext::Address {

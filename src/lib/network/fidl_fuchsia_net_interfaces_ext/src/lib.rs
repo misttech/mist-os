@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42062192): Provide facilities that work with a watcher
-// disinterested in all address properties.
 //! Extensions for the fuchsia.net.interfaces FIDL library.
 
 #![deny(missing_docs)]
@@ -13,11 +11,15 @@ mod reachability;
 
 pub use reachability::{is_globally_routable, to_reachability_stream, wait_for_reachability};
 
+use anyhow::Context as _;
+use derivative::Derivative;
 use fidl_table_validation::*;
 use futures::{Stream, TryStreamExt as _};
 use std::collections::btree_map::{self, BTreeMap};
 use std::collections::hash_map::{self, HashMap};
 use std::convert::TryFrom as _;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use thiserror::Error;
 use {
@@ -146,10 +148,11 @@ impl TryFrom<fhardware_network::PortClass> for PortClass {
 }
 
 /// Properties of a network interface.
-#[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
+#[derive(Derivative, ValidFidlTable)]
+#[derivative(Clone(bound = ""), Debug(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
 #[fidl_table_src(fnet_interfaces::Properties)]
 #[fidl_table_strict(device_class)]
-pub struct Properties {
+pub struct Properties<I: FieldInterests> {
     /// An opaque identifier for the interface. Its value will not be reused
     /// even if the device is removed and subsequently re-added. Immutable.
     pub id: NonZeroU64,
@@ -158,7 +161,7 @@ pub struct Properties {
     /// The device is enabled and its physical state is online.
     pub online: bool,
     /// The addresses currently assigned to the interface.
-    pub addresses: Vec<Address>,
+    pub addresses: Vec<Address<I>>,
     /// Whether there is a default IPv4 route through this interface.
     pub has_default_ipv4_route: bool,
     /// Whether there is a default IPv6 route through this interface.
@@ -168,19 +171,28 @@ pub struct Properties {
 }
 
 /// An address and its properties.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, ValidFidlTable)]
+#[derive(Derivative, ValidFidlTable)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = ""),
+    PartialEq(bound = ""),
+    Hash(bound = "")
+)]
 #[fidl_table_src(fnet_interfaces::Address)]
 #[fidl_table_strict]
-pub struct Address {
+pub struct Address<I: FieldInterests> {
     /// The address and prefix length.
     pub addr: fidl_fuchsia_net::Subnet,
     /// The time after which the address will no longer be valid.
     ///
     /// Its value must be greater than 0. A value of zx.time.INFINITE indicates
     /// that the address will always be valid.
-    pub valid_until: PositiveMonotonicInstant,
+    #[fidl_field_type(optional_converter = InterestConverter::<I, ValidUntilInterest>)]
+    pub valid_until: FromInterest<I, ValidUntilInterest>,
     /// Preferred lifetime information.
-    pub preferred_lifetime_info: PreferredLifetimeInfo,
+    #[fidl_field_type(optional_converter = InterestConverter::<I, PreferredLifetimeInfoInterest>)]
+    pub preferred_lifetime_info: FromInterest<I, PreferredLifetimeInfoInterest>,
     /// The address's assignment state.
     pub assignment_state: fnet_interfaces::AddressAssignmentState,
 }
@@ -333,21 +345,22 @@ pub enum UpdateError {
 }
 
 /// The result of updating network interface state with an event.
-#[derive(Debug, PartialEq)]
-pub enum UpdateResult<'a, S> {
+#[derive(Derivative)]
+#[derivative(Debug(bound = "S: Debug"), PartialEq(bound = "S: PartialEq"))]
+pub enum UpdateResult<'a, S, I: FieldInterests> {
     /// The update did not change the local state.
     NoChange,
     /// The update inserted an existing interface into the local state.
     Existing {
         /// The properties,
-        properties: &'a Properties,
+        properties: &'a Properties<I>,
         /// The state.
         state: &'a mut S,
     },
     /// The update inserted an added interface into the local state.
     Added {
         /// The properties,
-        properties: &'a Properties,
+        properties: &'a Properties<I>,
         /// The state.
         state: &'a mut S,
     },
@@ -360,45 +373,57 @@ pub enum UpdateResult<'a, S> {
         /// iff it has changed as a result of the update.
         previous: fnet_interfaces::Properties,
         /// The properties of the interface post-update.
-        current: &'a Properties,
+        current: &'a Properties<I>,
         /// The state of the interface.
         state: &'a mut S,
     },
     /// The update removed an interface from the local state.
-    Removed(PropertiesAndState<S>),
+    Removed(PropertiesAndState<S, I>),
 }
 
 /// The properties and state for an interface.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PropertiesAndState<S> {
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "S: Clone"),
+    Debug(bound = "S: Debug"),
+    Eq(bound = "S: Eq"),
+    PartialEq(bound = "S: PartialEq")
+)]
+pub struct PropertiesAndState<S, I: FieldInterests> {
     /// Properties.
-    pub properties: Properties,
+    pub properties: Properties<I>,
     /// State.
     pub state: S,
 }
 
 /// A trait for types holding interface state that can be updated by change events.
 pub trait Update<S> {
-    /// Update state with the interface change event.
-    fn update(&mut self, event: fnet_interfaces::Event)
-        -> Result<UpdateResult<'_, S>, UpdateError>;
-}
+    /// The expected watcher interest type for this update target.
+    type Interest: FieldInterests;
 
-impl<S> Update<S> for PropertiesAndState<S> {
+    /// Update state with the interface change event.
     fn update(
         &mut self,
-        event: fnet_interfaces::Event,
-    ) -> Result<UpdateResult<'_, S>, UpdateError> {
+        event: EventWithInterest<Self::Interest>,
+    ) -> Result<UpdateResult<'_, S, Self::Interest>, UpdateError>;
+}
+
+impl<S, I: FieldInterests> Update<S> for PropertiesAndState<S, I> {
+    type Interest = I;
+    fn update(
+        &mut self,
+        event: EventWithInterest<I>,
+    ) -> Result<UpdateResult<'_, S, I>, UpdateError> {
         let Self { properties, state } = self;
-        match event {
+        match event.into_inner() {
             fnet_interfaces::Event::Existing(existing) => {
-                let existing = Properties::try_from(existing)?;
+                let existing = Properties::<I>::try_from(existing)?;
                 if existing.id == properties.id {
                     return Err(UpdateError::DuplicateExisting(existing.into()));
                 }
             }
             fnet_interfaces::Event::Added(added) => {
-                let added = Properties::try_from(added)?;
+                let added = Properties::<I>::try_from(added)?;
                 if added.id == properties.id {
                     return Err(UpdateError::DuplicateAdded(added.into()));
                 }
@@ -489,12 +514,15 @@ impl<S> Update<S> for PropertiesAndState<S> {
     }
 }
 
-impl<S: Default> Update<S> for InterfaceState<S> {
+impl<S: Default, I: FieldInterests> Update<S> for InterfaceState<S, I> {
+    type Interest = I;
     fn update(
         &mut self,
-        event: fnet_interfaces::Event,
-    ) -> Result<UpdateResult<'_, S>, UpdateError> {
-        fn get_properties<S>(state: &mut InterfaceState<S>) -> &mut PropertiesAndState<S> {
+        event: EventWithInterest<I>,
+    ) -> Result<UpdateResult<'_, S, I>, UpdateError> {
+        fn get_properties<S, I: FieldInterests>(
+            state: &mut InterfaceState<S, I>,
+        ) -> &mut PropertiesAndState<S, I> {
             match state {
                 InterfaceState::Known(properties) => properties,
                 InterfaceState::Unknown(id) => unreachable!(
@@ -504,7 +532,7 @@ impl<S: Default> Update<S> for InterfaceState<S> {
             }
         }
         match self {
-            InterfaceState::Unknown(id) => match event {
+            InterfaceState::Unknown(id) => match event.into_inner() {
                 fnet_interfaces::Event::Existing(existing) => {
                     let properties = Properties::try_from(existing)?;
                     if properties.id.get() == *id {
@@ -572,16 +600,19 @@ impl TryFromMaybeNonZero for NonZeroU64 {
 
 macro_rules! impl_map {
     ($map_type:ident, $map_mod:tt) => {
-        impl<K, S> Update<S> for $map_type<K, PropertiesAndState<S>>
+        impl<K, S, I> Update<S> for $map_type<K, PropertiesAndState<S, I>>
         where
             K: TryFromMaybeNonZero + Copy + From<NonZeroU64> + Eq + Ord + std::hash::Hash,
             S: Default,
+            I: FieldInterests,
         {
+            type Interest = I;
+
             fn update(
                 &mut self,
-                event: fnet_interfaces::Event,
-            ) -> Result<UpdateResult<'_, S>, UpdateError> {
-                match event {
+                event: EventWithInterest<I>,
+            ) -> Result<UpdateResult<'_, S, I>, UpdateError> {
+                match event.into_inner() {
                     fnet_interfaces::Event::Existing(existing) => {
                         let existing = Properties::try_from(existing)?;
                         match self.entry(existing.id.into()) {
@@ -624,7 +655,9 @@ macro_rules! impl_map {
                             &K::try_from(id)
                                 .map_err(|ZeroError {}| UpdateError::ZeroInterfaceId)?,
                         ) {
-                            properties.update(fnet_interfaces::Event::Changed(change))
+                            properties.update(EventWithInterest::new(
+                                fnet_interfaces::Event::Changed(change),
+                            ))
                         } else {
                             Err(UpdateError::UnknownChanged(change))
                         }
@@ -653,7 +686,7 @@ impl_map!(HashMap, hash_map);
 
 /// Interface watcher operational errors.
 #[derive(Error, Debug)]
-pub enum WatcherOperationError<S: std::fmt::Debug, B: Update<S> + std::fmt::Debug> {
+pub enum WatcherOperationError<S: Debug, B: Update<S> + Debug> {
     /// Watcher event stream yielded an error.
     #[error("event stream error: {0}")]
     EventStream(fidl::Error),
@@ -686,9 +719,6 @@ pub enum WatcherCreationError {
 
 /// Wait for a condition on interface state to be satisfied.
 ///
-/// Note that `stream` must be created from a watcher with interest in all
-/// fields, such as one created from [`event_stream_from_state`].
-///
 /// With the initial state in `init`, take events from `stream` and update the state, calling
 /// `predicate` whenever the state changes. When `predicate` returns `Some(T)`, yield `Ok(T)`.
 ///
@@ -701,9 +731,9 @@ pub async fn wait_interface<S, B, St, F, T>(
     mut predicate: F,
 ) -> Result<T, WatcherOperationError<S, B>>
 where
-    S: std::fmt::Debug + Default,
-    B: Update<S> + Clone + std::fmt::Debug,
-    St: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
+    S: Debug + Default,
+    B: Update<S> + Clone + Debug,
+    St: Stream<Item = Result<EventWithInterest<B::Interest>, fidl::Error>>,
     F: FnMut(&B) -> Option<T>,
 {
     async_utils::fold::try_fold_while(
@@ -737,12 +767,17 @@ where
 }
 
 /// The local state of an interface's properties.
-#[derive(Clone, Debug, PartialEq)]
-pub enum InterfaceState<S> {
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "S: Clone"),
+    Debug(bound = "S: Debug"),
+    PartialEq(bound = "S: PartialEq")
+)]
+pub enum InterfaceState<S, I: FieldInterests> {
     /// Not yet known.
     Unknown(u64),
     /// Locally known.
-    Known(PropertiesAndState<S>),
+    Known(PropertiesAndState<S, I>),
 }
 
 /// Wait for a condition on a specific interface to be satisfied.
@@ -756,15 +791,16 @@ pub enum InterfaceState<S> {
 /// Since the state passed via `init` is mutably updated for every event, when this function
 /// returns successfully, the state can be used as the initial state in a subsequent call with a
 /// stream of events from the same watcher.
-pub async fn wait_interface_with_id<S, St, F, T>(
+pub async fn wait_interface_with_id<S, St, F, T, I>(
     stream: St,
-    init: &mut InterfaceState<S>,
+    init: &mut InterfaceState<S, I>,
     mut predicate: F,
-) -> Result<T, WatcherOperationError<S, InterfaceState<S>>>
+) -> Result<T, WatcherOperationError<S, InterfaceState<S, I>>>
 where
-    S: Default + Clone + std::fmt::Debug,
-    St: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-    F: FnMut(&PropertiesAndState<S>) -> Option<T>,
+    S: Default + Clone + Debug,
+    St: Stream<Item = Result<EventWithInterest<I>, fidl::Error>>,
+    F: FnMut(&PropertiesAndState<S, I>) -> Option<T>,
+    I: FieldInterests,
 {
     wait_interface(stream, init, |state| {
         match state {
@@ -777,24 +813,24 @@ where
     .await
 }
 
-/// Read Existing interface events from `stream`, updating `init` until the Idle event is detected,
-/// returning the resulting state.
+/// Read Existing interface events from `stream`, updating `init` until the Idle
+/// event is detected, returning the resulting state.
 ///
-/// Note that `stream` must be created from a watcher with interest in all
-/// fields, such as one created from [`event_stream_from_state`].
+/// Note that `stream` must be created from a watcher with interest in the
+/// correct fields, such as one created from [`event_stream_from_state`].
 pub async fn existing<S, St, B>(stream: St, init: B) -> Result<B, WatcherOperationError<S, B>>
 where
-    S: std::fmt::Debug,
-    St: futures::Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-    B: Update<S> + std::fmt::Debug,
+    S: Debug,
+    St: futures::Stream<Item = Result<EventWithInterest<B::Interest>, fidl::Error>>,
+    B: Update<S> + Debug,
 {
     async_utils::fold::try_fold_while(
         stream.map_err(WatcherOperationError::EventStream),
         init,
         |mut acc, event| {
-            futures::future::ready(match event {
+            futures::future::ready(match event.inner() {
                 fnet_interfaces::Event::Existing(_) => match acc.update(event) {
-                    Ok::<UpdateResult<'_, _>, _>(_) => {
+                    Ok::<UpdateResult<'_, _, _>, _>(_) => {
                         Ok(async_utils::fold::FoldWhile::Continue(acc))
                     }
                     Err(e) => Err(WatcherOperationError::Update(e)),
@@ -805,7 +841,7 @@ where
                 fnet_interfaces::Event::Added(_)
                 | fnet_interfaces::Event::Removed(_)
                 | fnet_interfaces::Event::Changed(_) => {
-                    Err(WatcherOperationError::UnexpectedEvent(event))
+                    Err(WatcherOperationError::UnexpectedEvent(event.into_inner()))
                 }
             })
         },
@@ -829,24 +865,18 @@ pub enum IncludedAddresses {
 /// Initialize a watcher with interest in all fields and return its events as a
 /// stream.
 ///
-/// If `include_non_assigned_addresses` is true, then all addresses will be
-/// returned, not just assigned addresses.
-pub fn event_stream_from_state(
+/// If `included_addresses` is `All`, then all addresses will be returned, not
+/// just assigned addresses.
+pub fn event_stream_from_state<I: FieldInterests>(
     interface_state: &fnet_interfaces::StateProxy,
     included_addresses: IncludedAddresses,
-) -> Result<impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>, WatcherCreationError> {
+) -> Result<impl Stream<Item = Result<EventWithInterest<I>, fidl::Error>>, WatcherCreationError> {
     let (watcher, server) = ::fidl::endpoints::create_proxy::<fnet_interfaces::WatcherMarker>()
         .map_err(WatcherCreationError::CreateProxy)?;
     let () = interface_state
         .get_watcher(
-            // Register interest in all fields so that the strong validation
-            // witness type can be used and the stream returned is compatible
-            // with other methods in this crate.
             &fnet_interfaces::WatcherOptions {
-                address_properties_interest: Some(
-                    fnet_interfaces::AddressPropertiesInterest::VALID_UNTIL
-                        | fnet_interfaces::AddressPropertiesInterest::PREFERRED_LIFETIME_INFO,
-                ),
+                address_properties_interest: Some(interest_from_params::<I>()),
                 include_non_assigned_addresses: Some(match included_addresses {
                     IncludedAddresses::All => true,
                     IncludedAddresses::OnlyAssigned => false,
@@ -857,8 +887,239 @@ pub fn event_stream_from_state(
         )
         .map_err(WatcherCreationError::GetWatcher)?;
     Ok(futures::stream::try_unfold(watcher, |watcher| async {
-        Ok(Some((watcher.watch().await?, watcher)))
+        Ok(Some((EventWithInterest::new(watcher.watch().await?), watcher)))
     }))
+}
+
+fn interest_from_params<I: FieldInterests>() -> fnet_interfaces::AddressPropertiesInterest {
+    let mut interest = fnet_interfaces::AddressPropertiesInterest::empty();
+    if <I::ValidUntil as MaybeInterest<_>>::ENABLED {
+        interest |= fnet_interfaces::AddressPropertiesInterest::VALID_UNTIL;
+    }
+    if <I::PreferredLifetimeInfo as MaybeInterest<_>>::ENABLED {
+        interest |= fnet_interfaces::AddressPropertiesInterest::PREFERRED_LIFETIME_INFO;
+    }
+    interest
+}
+
+/// A marker for a field that didn't register interest with the watcher.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Default)]
+pub struct NoInterest;
+
+mod interest {
+    use super::*;
+
+    use std::hash::Hash;
+    use Debug;
+
+    /// A trait that parameterizes interest in fields from interfaces watcher.
+    ///
+    /// Use [`EnableInterest`] or [`DisableInterest`] in each type to
+    /// enable/disable interest in receiving those fields from the server,
+    /// respectively.
+    pub trait FieldInterests {
+        /// Interest in the `preferred_lifetime_info` field.
+        type PreferredLifetimeInfo: MaybeInterest<PreferredLifetimeInfo>;
+        /// Interest in the `valid_until` field.
+        type ValidUntil: MaybeInterest<PositiveMonotonicInstant>;
+    }
+
+    /// Helper trait to implement conversion with optional field interest.
+    pub trait MaybeInterest<T> {
+        /// Whether this is an enabled interest.
+        const ENABLED: bool;
+
+        /// The actual type carried by the validated struct.
+        type Ty: Clone + Debug + Eq + Hash + PartialEq + 'static;
+
+        /// Converts from an optional FIDL input to the target type `Self::Ty`.
+        fn try_from_fidl<F: TryInto<T, Error: Into<anyhow::Error>>>(
+            fidl: Option<F>,
+        ) -> Result<Self::Ty, anyhow::Error>;
+
+        /// Converts from the target type `Self::Ty` into an optional FIDL
+        /// value.
+        fn into_fidl<F: From<T>>(value: Self::Ty) -> Option<F>;
+    }
+
+    /// Enabled interest in a FIDL field.
+    ///
+    /// Use as a type parameter in [`FieldInterests`].
+    pub struct EnableInterest;
+
+    impl<T: Clone + Debug + Eq + Hash + PartialEq + 'static> MaybeInterest<T> for EnableInterest {
+        const ENABLED: bool = true;
+        type Ty = T;
+
+        fn try_from_fidl<F: TryInto<T, Error: Into<anyhow::Error>>>(
+            fidl: Option<F>,
+        ) -> Result<Self::Ty, anyhow::Error> {
+            fidl.map(|f| f.try_into().map_err(Into::into))
+                .unwrap_or_else(|| Err(anyhow::anyhow!("missing field with registered interest")))
+        }
+
+        fn into_fidl<F: From<T>>(value: Self::Ty) -> Option<F> {
+            Some(value.into())
+        }
+    }
+
+    /// Disabled interest in a FIDL field.
+    ///
+    /// Use as a type parameter in [`FieldInterests`].
+    pub struct DisableInterest;
+    impl<T> MaybeInterest<T> for DisableInterest {
+        const ENABLED: bool = false;
+
+        type Ty = NoInterest;
+
+        fn try_from_fidl<F: TryInto<T, Error: Into<anyhow::Error>>>(
+            fidl: Option<F>,
+        ) -> Result<Self::Ty, anyhow::Error> {
+            match fidl {
+                Some(_) => {
+                    // TODO(https://fxbug.dev/42061967): Make this stricter when
+                    // Netstack3 observes interest, we should return an error
+                    // here.
+                    Ok(NoInterest)
+                }
+                None => Ok(NoInterest),
+            }
+        }
+
+        fn into_fidl<F: From<T>>(_value: Self::Ty) -> Option<F> {
+            None
+        }
+    }
+
+    /// A handy alias to shorten the signature of a type derived from
+    /// [`MaybeInterest`] based on [`FieldSpec`].
+    pub(super) type FromInterest<I, T> =
+        <<T as FieldSpec>::Interest<I> as MaybeInterest<<T as FieldSpec>::Present>>::Ty;
+
+    /// Parameterizes interest fields.
+    ///
+    /// This trait allows a common converter implementation for the FIDL table
+    /// validation structure and unifies the schema of how interest fields
+    /// behave.
+    pub trait FieldSpec {
+        /// Extracts the interest type from [`FieldInterests`].
+        type Interest<I: FieldInterests>: MaybeInterest<Self::Present>;
+
+        /// The FIDL representation of the field.
+        type Fidl: From<Self::Present>;
+
+        /// The validated representation of the field when interest is
+        /// expressed.
+        type Present: TryFrom<Self::Fidl, Error: Into<anyhow::Error>>;
+
+        /// The field name in the originating struct. This helps generate better
+        /// error messages.
+        const FIELD_NAME: &'static str;
+    }
+
+    pub struct InterestConverter<I, P>(PhantomData<(I, P)>);
+
+    impl<I, P> fidl_table_validation::Converter for InterestConverter<I, P>
+    where
+        I: FieldInterests,
+        P: FieldSpec,
+    {
+        type Fidl = Option<P::Fidl>;
+        type Validated = <P::Interest<I> as MaybeInterest<P::Present>>::Ty;
+        type Error = anyhow::Error;
+
+        fn try_from_fidl(value: Self::Fidl) -> std::result::Result<Self::Validated, Self::Error> {
+            <P::Interest<I> as MaybeInterest<_>>::try_from_fidl(value).context(P::FIELD_NAME)
+        }
+
+        fn from_validated(validated: Self::Validated) -> Self::Fidl {
+            <P::Interest<I> as MaybeInterest<_>>::into_fidl(validated)
+        }
+    }
+
+    pub struct ValidUntilInterest;
+
+    impl FieldSpec for ValidUntilInterest {
+        type Interest<I: FieldInterests> = I::ValidUntil;
+        type Fidl = zx_types::zx_time_t;
+        type Present = PositiveMonotonicInstant;
+        const FIELD_NAME: &'static str = "valid_until";
+    }
+
+    pub struct PreferredLifetimeInfoInterest;
+
+    impl FieldSpec for PreferredLifetimeInfoInterest {
+        type Interest<I: FieldInterests> = I::PreferredLifetimeInfo;
+        type Fidl = fnet_interfaces::PreferredLifetimeInfo;
+        type Present = PreferredLifetimeInfo;
+        const FIELD_NAME: &'static str = "preferred_lifetime_info";
+    }
+}
+pub use interest::{DisableInterest, EnableInterest, FieldInterests};
+use interest::{
+    FromInterest, InterestConverter, MaybeInterest, PreferredLifetimeInfoInterest,
+    ValidUntilInterest,
+};
+
+/// A marker for interest in all optional fields.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AllInterest;
+impl FieldInterests for AllInterest {
+    type PreferredLifetimeInfo = EnableInterest;
+    type ValidUntil = EnableInterest;
+}
+
+/// A marker for the default interest options as defined by the interfaces
+/// watcher API.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct DefaultInterest;
+impl FieldInterests for DefaultInterest {
+    type PreferredLifetimeInfo = DisableInterest;
+    type ValidUntil = DisableInterest;
+}
+
+/// An [`fnet_interfaces::Event`] tagged with the interest parameters that
+/// created it.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Debug(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+pub struct EventWithInterest<I: FieldInterests> {
+    event: fnet_interfaces::Event,
+    #[derivative(Debug = "ignore")]
+    _marker: PhantomData<I>,
+}
+
+impl<I: FieldInterests> EventWithInterest<I> {
+    /// Creates a new `EventWithInterest` with the provided event.
+    ///
+    /// Note that this type exists to steer proper usage of this crate. Creating
+    /// `EventWithInterest` with arbitrary interests is potentially dangerous if
+    /// the combination of field expectations don't match what was used to
+    /// create the watcher.
+    pub fn new(event: fnet_interfaces::Event) -> Self {
+        Self { event, _marker: PhantomData }
+    }
+
+    /// Retrieves the internal event.
+    pub fn into_inner(self) -> fnet_interfaces::Event {
+        self.event
+    }
+
+    /// Borrows the internal event.
+    pub fn inner(&self) -> &fnet_interfaces::Event {
+        &self.event
+    }
+}
+
+impl<I: FieldInterests> From<fnet_interfaces::Event> for EventWithInterest<I> {
+    fn from(value: fnet_interfaces::Event) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<I: FieldInterests> From<EventWithInterest<I>> for fnet_interfaces::Event {
+    fn from(value: EventWithInterest<I>) -> Self {
+        value.into_inner()
+    }
 }
 
 #[cfg(test)]
@@ -888,7 +1149,7 @@ mod tests {
         }
     }
 
-    fn validated_properties(id: u64) -> PropertiesAndState<()> {
+    fn validated_properties(id: u64) -> PropertiesAndState<(), AllInterest> {
         PropertiesAndState {
             properties: fidl_properties(id).try_into().expect("failed to validate FIDL Properties"),
             state: (),
@@ -921,7 +1182,7 @@ mod tests {
         }
     }
 
-    fn validated_properties_after_change(id: u64) -> PropertiesAndState<()> {
+    fn validated_properties_after_change(id: u64) -> PropertiesAndState<(), AllInterest> {
         PropertiesAndState {
             properties: fidl_properties_after_change(id)
                 .try_into()
@@ -954,28 +1215,28 @@ mod tests {
     )]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_duplicate_error(state: &mut impl Update<()>) {
+    fn test_duplicate_error(state: &mut impl Update<(), Interest = AllInterest>) {
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Added(fidl_properties(ID))),
+            state.update(fnet_interfaces::Event::Added(fidl_properties(ID)).into()),
             Err(UpdateError::DuplicateAdded(added)) if added == fidl_properties(ID)
         );
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Existing(fidl_properties(ID))),
+            state.update(fnet_interfaces::Event::Existing(fidl_properties(ID)).into()),
             Err(UpdateError::DuplicateExisting(existing)) if existing == fidl_properties(ID)
         );
     }
 
     #[test_case(&mut HashMap::<u64, _>::new(); "hashmap")]
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
-    fn test_unknown_error(state: &mut impl Update<()>) {
+    fn test_unknown_error(state: &mut impl Update<(), Interest = AllInterest>) {
         let unknown =
             fnet_interfaces::Properties { id: Some(ID), online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Changed(unknown.clone())),
+            state.update(fnet_interfaces::Event::Changed(unknown.clone()).into()),
             Err(UpdateError::UnknownChanged(changed)) if changed == unknown
         );
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Removed(ID)),
+            state.update(fnet_interfaces::Event::Removed(ID).into()),
             Err(UpdateError::UnknownRemoved(id)) if id == ID
         );
     }
@@ -984,7 +1245,7 @@ mod tests {
     #[test_case(&mut validated_properties(ID); "properties")]
     fn test_removed_error(state: &mut impl Update<()>) {
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Removed(ID)),
+            state.update(fnet_interfaces::Event::Removed(ID).into()),
             Err(UpdateError::Removed)
         );
     }
@@ -993,10 +1254,10 @@ mod tests {
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_missing_id_error(state: &mut impl Update<()>) {
+    fn test_missing_id_error(state: &mut impl Update<(), Interest = AllInterest>) {
         let missing_id = fnet_interfaces::Properties { online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Changed(missing_id.clone())),
+            state.update(fnet_interfaces::Event::Changed(missing_id.clone()).into()),
             Err(UpdateError::MissingId(properties)) if properties == missing_id
         );
     }
@@ -1012,11 +1273,11 @@ mod tests {
         let net_zero_change =
             fnet_interfaces::Properties { name: None, port_class: None, ..fidl_properties(ID) };
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Changed(empty_change.clone())),
+            state.update(fnet_interfaces::Event::Changed(empty_change.clone()).into()),
             Err(UpdateError::EmptyChange(properties)) if properties == empty_change
         );
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Changed(net_zero_change.clone())),
+            state.update(fnet_interfaces::Event::Changed(net_zero_change.clone()).into()),
             Err(UpdateError::EmptyChange(properties)) if properties == net_zero_change
         );
     }
@@ -1027,7 +1288,7 @@ mod tests {
     )]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_update_changed_result(state: &mut impl Update<()>) {
+    fn test_update_changed_result(state: &mut impl Update<(), Interest = AllInterest>) {
         let want_previous = fnet_interfaces::Properties {
             online: Some(false),
             has_default_ipv4_route: Some(false),
@@ -1036,7 +1297,7 @@ mod tests {
             ..Default::default()
         };
         assert_matches::assert_matches!(
-            state.update(fnet_interfaces::Event::Changed(properties_delta(ID).clone())),
+            state.update(fnet_interfaces::Event::Changed(properties_delta(ID).clone()).into()),
             Ok(UpdateResult::Changed { previous, current, state: _ }) => {
                 assert_eq!(previous, want_previous);
                 let PropertiesAndState { properties, state: () } =
@@ -1046,40 +1307,44 @@ mod tests {
         );
     }
 
-    #[derive(Clone)]
-    struct EventStream(Rc<RefCell<Vec<fnet_interfaces::Event>>>);
+    #[derive(Derivative)]
+    #[derivative(Clone(bound = ""))]
+    struct EventStream<I: FieldInterests>(Rc<RefCell<Vec<fnet_interfaces::Event>>>, PhantomData<I>);
 
-    impl Stream for EventStream {
-        type Item = Result<fnet_interfaces::Event, fidl::Error>;
+    impl<I: FieldInterests> Stream for EventStream<I> {
+        type Item = Result<EventWithInterest<I>, fidl::Error>;
 
         fn poll_next(
             self: Pin<&mut Self>,
             _cx: &mut futures::task::Context<'_>,
         ) -> Poll<Option<Self::Item>> {
-            let EventStream(events_vec) = &*self;
+            let EventStream(events_vec, _marker) = &*self;
             if events_vec.borrow().is_empty() {
                 Poll::Ready(None)
             } else {
-                Poll::Ready(Some(Ok(events_vec.borrow_mut().remove(0))))
+                Poll::Ready(Some(Ok(EventWithInterest::new(events_vec.borrow_mut().remove(0)))))
             }
         }
     }
 
-    fn test_event_stream() -> EventStream {
-        EventStream(Rc::new(RefCell::new(vec![
-            fnet_interfaces::Event::Existing(fidl_properties(ID)),
-            fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}),
-            fnet_interfaces::Event::Added(fidl_properties(ID2)),
-            fnet_interfaces::Event::Changed(properties_delta(ID)),
-            fnet_interfaces::Event::Changed(properties_delta(ID2)),
-            fnet_interfaces::Event::Removed(ID),
-            fnet_interfaces::Event::Removed(ID2),
-        ])))
+    fn test_event_stream<I: FieldInterests>() -> EventStream<I> {
+        EventStream(
+            Rc::new(RefCell::new(vec![
+                fnet_interfaces::Event::Existing(fidl_properties(ID)),
+                fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}),
+                fnet_interfaces::Event::Added(fidl_properties(ID2)),
+                fnet_interfaces::Event::Changed(properties_delta(ID)),
+                fnet_interfaces::Event::Changed(properties_delta(ID2)),
+                fnet_interfaces::Event::Removed(ID),
+                fnet_interfaces::Event::Removed(ID2),
+            ])),
+            PhantomData,
+        )
     }
 
     #[test]
     fn test_wait_one_interface() {
-        let event_stream = test_event_stream();
+        let event_stream = test_event_stream::<AllInterest>();
         let mut state = InterfaceState::Unknown(ID);
         for want in &[validated_properties(ID), validated_properties_after_change(ID)] {
             let () = wait_interface_with_id(event_stream.clone(), &mut state, |got| {
@@ -1095,9 +1360,9 @@ mod tests {
 
     fn test_wait_interface<'a, B>(state: &mut B, want_states: impl IntoIterator<Item = &'a B>)
     where
-        B: 'a + Update<()> + Clone + std::fmt::Debug + std::cmp::PartialEq,
+        B: 'a + Update<()> + Clone + Debug + std::cmp::PartialEq,
     {
-        let event_stream = test_event_stream();
+        let event_stream = test_event_stream::<B::Interest>();
         for want in want_states.into_iter() {
             let () = wait_interface(event_stream.clone(), state, |got| {
                 assert_eq!(got, want);
@@ -1169,14 +1434,15 @@ mod tests {
     )]
     fn test_existing<B>(state: B, want: B)
     where
-        B: Update<()> + std::fmt::Debug + std::cmp::PartialEq,
+        B: Update<(), Interest = AllInterest> + Debug + std::cmp::PartialEq,
     {
         let events = [
             fnet_interfaces::Event::Existing(fidl_properties(ID)),
             fnet_interfaces::Event::Existing(fidl_properties(ID2)),
             fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}),
         ];
-        let event_stream = futures::stream::iter(events.iter().cloned().map(Ok));
+        let event_stream =
+            futures::stream::iter(events.iter().cloned().map(|e| Ok(EventWithInterest::new(e))));
         assert_eq!(
             existing(event_stream, state)
                 .now_or_never()

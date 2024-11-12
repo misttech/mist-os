@@ -13,7 +13,8 @@ use futures::stream::BoxStream;
 use futures::{FutureExt as _, StreamExt as _};
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use {
-    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
@@ -60,7 +61,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> UnifiedRequest<S
 pub(crate) enum UnifiedEvent {
     RoutesV4Event(fnet_routes_ext::Event<Ipv4>),
     RoutesV6Event(fnet_routes_ext::Event<Ipv6>),
-    InterfacesEvent(fnet_interfaces::Event),
+    InterfacesEvent(fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>),
 }
 
 #[derive(Derivative)]

@@ -35,7 +35,10 @@ const ENTRY_METRICS: u32 = 256;
 
 fn get_interface_id(
     want_name: &str,
-    intf: &HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
+    intf: &HashMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<(), fnet_interfaces_ext::DefaultInterest>,
+    >,
 ) -> Result<u64, Error> {
     intf.values()
         .find_map(

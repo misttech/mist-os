@@ -37,15 +37,16 @@ impl crate::Workload for Interfaces {
 
         // Install several interfaces backed by network-tun.
         let interfaces = {
-            let stream = fnet_interfaces_ext::event_stream_from_state(
-                &interfaces_state,
-                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            let stream = fnet_interfaces_ext::event_stream_from_state::<
+                fnet_interfaces_ext::DefaultInterest,
+            >(
+                &interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned
             )
             .expect("get interface event stream");
             let mut stream = pin!(stream);
             let mut if_state = fnet_interfaces_ext::existing(
                 stream.by_ref(),
-                HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+                HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new(),
             )
             .await
             .expect("collect existing interfaces");
@@ -80,15 +81,16 @@ impl crate::Workload for Interfaces {
             .await;
 
         // Wait for the interfaces we installed to be removed.
-        let stream = fnet_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        let stream = fnet_interfaces_ext::event_stream_from_state::<
+            fnet_interfaces_ext::DefaultInterest,
+        >(
+            &interfaces_state, fnet_interfaces_ext::IncludedAddresses::OnlyAssigned
         )
         .expect("get interface event stream");
         let mut stream = pin!(stream);
         let mut interfaces = fnet_interfaces_ext::existing(
             stream.by_ref(),
-            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new(),
         )
         .await
         .expect("collect existing interfaces");
@@ -159,13 +161,14 @@ async fn stress_interface(
     perftest_mode: bool,
 ) {
     let Interface { id, addr, control, tun_device, .. } = interface;
-    let stream = fnet_interfaces_ext::event_stream_from_state(
-        &interfaces_state,
-        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-    )
-    .expect("get interface event stream");
+    let stream =
+        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream");
     let mut stream = pin!(stream);
-    let mut state = fnet_interfaces_ext::InterfaceState::<()>::Unknown(id);
+    let mut state = fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(id);
 
     // Repeatedly toggle interface up/down and send traffic through it
     // simulating incoming neighbor solicitations.

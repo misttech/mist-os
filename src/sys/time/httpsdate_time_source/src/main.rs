@@ -267,7 +267,9 @@ async fn main() -> Result<(), Error> {
 
     let interface_state_service = fuchsia_component::client::connect_to_protocol::<StateMarker>()
         .context("failed to connect to fuchsia.net.interfaces/State")?;
-    let internet_reachable = fidl_fuchsia_net_interfaces_ext::wait_for_reachability(
+    let internet_reachable = fidl_fuchsia_net_interfaces_ext::wait_for_reachability::<
+        fidl_fuchsia_net_interfaces_ext::DefaultInterest,
+    >(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interface_state_service,
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,

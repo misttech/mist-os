@@ -152,7 +152,10 @@ pub async fn do_root<C: NetCliDepsConnector>(
 
 fn shortlist_interfaces(
     name_pattern: &str,
-    interfaces: &mut HashMap<u64, finterfaces_ext::PropertiesAndState<()>>,
+    interfaces: &mut HashMap<
+        u64,
+        finterfaces_ext::PropertiesAndState<(), finterfaces_ext::AllInterest>,
+    >,
 ) {
     interfaces.retain(|_: &u64, properties_and_state| {
         properties_and_state.properties.name.contains(name_pattern)
@@ -369,13 +372,13 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(
+            let stream = finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
             let mut response = finterfaces_ext::existing(
                 stream,
-                HashMap::<u64, finterfaces_ext::PropertiesAndState<()>>::new(),
+                HashMap::<u64, finterfaces_ext::PropertiesAndState<(), _>>::new(),
             )
             .await?;
             if let Some(name_pattern) = name_pattern {
@@ -415,13 +418,13 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(
+            let stream = finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
             let response = finterfaces_ext::existing(
                 stream,
-                finterfaces_ext::InterfaceState::<()>::Unknown(id),
+                finterfaces_ext::InterfaceState::<(), _>::Unknown(id),
             )
             .await?;
             match response {
@@ -720,10 +723,10 @@ async fn do_if<C: NetCliDepsConnector>(
                 let id = interface.find_nicid(connector).await?;
                 let interfaces_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-                let mut state = finterfaces_ext::InterfaceState::<()>::Unknown(id);
+                let mut state = finterfaces_ext::InterfaceState::<(), _>::Unknown(id);
 
                 let assigned_addr = finterfaces_ext::wait_interface_with_id(
-                    finterfaces_ext::event_stream_from_state(
+                    finterfaces_ext::event_stream_from_state::<finterfaces_ext::AllInterest>(
                         &interfaces_state,
                         finterfaces_ext::IncludedAddresses::OnlyAssigned,
                     )?,
@@ -768,9 +771,10 @@ async fn do_if<C: NetCliDepsConnector>(
             let build_name_to_id_map = || async {
                 let interface_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-                let stream = finterfaces_ext::event_stream_from_state(
-                    &interface_state,
-                    finterfaces_ext::IncludedAddresses::OnlyAssigned,
+                let stream = finterfaces_ext::event_stream_from_state::<
+                    finterfaces_ext::AllInterest,
+                >(
+                    &interface_state, finterfaces_ext::IncludedAddresses::OnlyAssigned
                 )?;
                 let response = finterfaces_ext::existing(stream, HashMap::new()).await?;
                 Ok::<HashMap<String, u64>, Error>(
@@ -2002,7 +2006,7 @@ mod tests {
         name: &'static str,
         port_class: finterfaces_ext::PortClass,
         octets: Option<[u8; 6]>,
-    ) -> (finterfaces_ext::Properties, Option<fnet::MacAddress>) {
+    ) -> (finterfaces_ext::Properties<finterfaces_ext::AllInterest>, Option<fnet::MacAddress>) {
         (
             finterfaces_ext::Properties {
                 id: id.try_into().unwrap(),
@@ -2655,7 +2659,9 @@ mod tests {
             online: true,
             addresses: addrs
                 .into_iter()
-                .map(|(addr, assignment_state)| finterfaces_ext::Address {
+                .map(|(addr, assignment_state)| finterfaces_ext::Address::<
+                    finterfaces_ext::AllInterest,
+                > {
                     addr,
                     assignment_state,
                     valid_until: finterfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,

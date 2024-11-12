@@ -25,7 +25,9 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect fuchsia.net.interfaces/State");
-    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state::<
+        fidl_fuchsia_net_interfaces_ext::AllInterest,
+    >(
         &interfaces_state,
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
