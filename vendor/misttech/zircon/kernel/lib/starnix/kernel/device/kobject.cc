@@ -21,7 +21,7 @@ ktl::optional<KObjectHandle> KObject::parent() const {
 }
 
 ktl::unique_ptr<FsNodeOps> KObject::ops() {
-  return create_fs_node_ops_(util::WeakPtr<KObject>(this));
+  return create_fs_node_ops_(weak_factory_.GetWeakPtr());
 }
 
 FsString KObject::path() {

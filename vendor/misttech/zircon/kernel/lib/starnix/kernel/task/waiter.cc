@@ -4,10 +4,10 @@
 
 #include "lib/mistos/starnix/kernel/task/waiter.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 
 #include <utility>
@@ -98,17 +98,17 @@ bool WaitEvents::intercept(const WaitEvents& other) const {
 
 void WaiterRef::interrupt() const {
   LTRACE_ENTRY_OBJ;
-  ktl::visit(WaiterKind::overloaded{[](const util::WeakPtr<PortWaiter>& waiter) {
+  ktl::visit(WaiterKind::overloaded{[](const mtl::WeakPtr<PortWaiter>& waiter) {
                                       if (auto strong = waiter.Lock()) {
                                         strong->interrupt();
                                       }
                                     },
-                                    [](const util::WeakPtr<InterruptibleEvent>& event) {
+                                    [](const mtl::WeakPtr<InterruptibleEvent>& event) {
                                       if (auto strong = event.Lock()) {
                                         // strong->Interrupt();
                                       }
                                     },
-                                    [](const util::WeakPtr<AbortHandle>& handle) {
+                                    [](const mtl::WeakPtr<AbortHandle>& handle) {
                                       if (auto strong = handle.Lock()) {
                                         // strong->Abort();
                                       }
@@ -122,21 +122,21 @@ void WaiterRef::will_remove_from_wait_queue(WaitKey key) { LTRACE; }
 bool WaiterRef::notify(WaitKey key, WaitEvents events) {
   LTRACE;
   return ktl::visit(
-      WaiterKind::overloaded{[&](const util::WeakPtr<PortWaiter>& waiter) -> bool {
+      WaiterKind::overloaded{[&](const mtl::WeakPtr<PortWaiter>& waiter) -> bool {
                                if (auto strong = waiter.Lock()) {
                                  strong->queue_events(key, events);
                                  return true;
                                }
                                return false;
                              },
-                             [&](const util::WeakPtr<InterruptibleEvent>& event) -> bool {
+                             [&](const mtl::WeakPtr<InterruptibleEvent>& event) -> bool {
                                if (auto strong = event.Lock()) {
                                  // strong->Notify();
                                  return true;
                                }
                                return false;
                              },
-                             [&](const util::WeakPtr<AbortHandle>& handle) -> bool {
+                             [&](const mtl::WeakPtr<AbortHandle>& handle) -> bool {
                                if (auto strong = handle.Lock()) {
                                  // strong->Abort();
                                  return true;
@@ -170,7 +170,7 @@ WaitCanceler WaitQueue::wait_async_entry(const Waiter& waiter, WaitEntry entry) 
   // profile_duration!("WaitAsyncEntry");
   auto wait_key = entry.key;
   auto waiter_id = this->add_waiter(entry);
-  auto wait_queue = util::WeakPtr(this->inner_.get());
+  auto wait_queue = inner_->weak_factory_.GetWeakPtr();
   auto [_, inserted] = waiter.inner_->wait_queues_.Lock()->emplace(wait_key, wait_queue);
   ZX_ASSERT_MSG(inserted, "wait key collision");
   return WaitCanceler::new_inner(
@@ -386,7 +386,8 @@ void PortWaiter::queue_events(const WaitKey& key, WaitEvents events) const {
 PortWaiter::PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals)
     : port_(ktl::move(port)),
       next_key_(AtomicCounter<uint64_t>::New(1)),
-      ignore_signals_(ignore_signals) {
+      ignore_signals_(ignore_signals),
+      weak_factory_(this) {
   LTRACE_ENTRY_OBJ;
 }
 

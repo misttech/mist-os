@@ -4,11 +4,11 @@
 
 #include "lib/mistos/starnix/kernel/task/process_group.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -47,7 +47,7 @@ bool ProcessGroupMutableState::remove(fbl::RefPtr<ThreadGroup> thread_group) {
 }
 
 ProcessGroup::ProcessGroup(fbl::RefPtr<Session> session, pid_t leader)
-    : session_(ktl::move(session)), leader_(leader) {}
+    : session_(ktl::move(session)), leader_(leader), weak_factory_(this) {}
 
 fbl::RefPtr<ProcessGroup> ProcessGroup::New(pid_t leader,
                                             ktl::optional<fbl::RefPtr<Session>> session) {

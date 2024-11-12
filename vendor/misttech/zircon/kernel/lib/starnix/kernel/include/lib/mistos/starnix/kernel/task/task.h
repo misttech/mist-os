@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
@@ -15,11 +16,9 @@
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/bitflags.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
@@ -513,7 +512,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
   /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
-  static fit::result<Errno, fbl::RefPtr<Task>> from_weak(const util::WeakPtr<Task>& weak) {
+  static fit::result<Errno, fbl::RefPtr<Task>> from_weak(const mtl::WeakPtr<Task>& weak) {
     fbl::RefPtr<Task> task = weak.Lock();
     if (!task) {
       return fit::error(errno(ESRCH));
@@ -544,7 +543,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   const fbl::RefPtr<MemoryManager>& mm() const;
 
-  util::WeakPtr<Task> get_task(pid_t pid) const;
+  mtl::WeakPtr<Task> get_task(pid_t pid) const;
 
   pid_t get_pid() const;
 
@@ -596,26 +595,11 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
     return mutable_state_.Write();
   }
 
-  class ThreadSignalObserver final : public SignalObserver {
-   public:
-    explicit ThreadSignalObserver(util::WeakPtr<Task> task) : task_(ktl::move(task)) {}
-    ~ThreadSignalObserver() final = default;
-
-   private:
-    // |SignalObserver| implementation.
-    void OnMatch(zx_signals_t signals) final;
-    void OnCancel(zx_signals_t signals) final;
-
-    fbl::Canary<fbl::magic("TTSO")> canary_;
-
-    util::WeakPtr<Task> task_;
-  };
-
-  ThreadSignalObserver* observer() { return &observer_; }
-
   ~Task() override;
 
  private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(Task);
+
   friend class TaskMutableState;
   friend class CurrentTask;
   friend class ThreadGroup;
@@ -624,7 +608,26 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   friend TaskBuilder testing::create_test_init_task(fbl::RefPtr<Kernel> kernel,
                                                     fbl::RefPtr<FsContext> fs);
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Task);
+  class ThreadSignalObserver final : public SignalObserver {
+   public:
+    ThreadSignalObserver() = default;
+    ~ThreadSignalObserver() final = default;
+
+    void set_task(mtl::WeakPtr<Task> task) {
+      ASSERT(task_ == nullptr);
+      task_ = task;
+    }
+
+   private:
+    // |SignalObserver| implementation.
+    void OnMatch(zx_signals_t signals) final;
+    void OnCancel(zx_signals_t signals) final;
+
+    fbl::Canary<fbl::magic("TTSO")> canary_;
+
+    mtl::WeakPtr<Task> task_;
+  };
+  ThreadSignalObserver observer_;
 
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
        ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
@@ -632,7 +635,10 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
        ktl::optional<Signal> exit_signal, SigSet signal_mask, bool no_new_privs,
        uint64_t timerslack_ns);
 
-  ThreadSignalObserver observer_;
+ public:
+  ThreadSignalObserver* observer() { return &observer_; }
+
+  mtl::WeakPtrFactory<Task> weak_factory_;  // must be last
 };
 
 // NOTE: This class originaly was in thread_group.rs
@@ -645,8 +651,8 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
  public:
   static ktl::unique_ptr<TaskContainer> From(const fbl::RefPtr<Task>& task) {
     fbl::AllocChecker ac;
-    ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(
-        new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info_));
+    ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(new (&ac) TaskContainer(
+        ktl::move(task->weak_factory_.GetWeakPtr()), task->persistent_info_));
     ZX_ASSERT(ac.check());
     return ptr;
   }
@@ -663,17 +669,17 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
     return ktl::nullopt;
   }
 
-  util::WeakPtr<Task> weak_clone() const { return weak_; }
+  mtl::WeakPtr<Task> weak_clone() const { return weak_; }
 
   starnix_sync::MutexGuard<TaskPersistentInfoState> info() const { return info_->Lock(); }
 
   TaskPersistentInfo into() const { return info_; }
 
  private:
-  TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)
+  TaskContainer(mtl::WeakPtr<Task> weak, TaskPersistentInfo& info)
       : weak_(ktl::move(weak)), info_(info) {}
 
-  util::WeakPtr<Task> weak_;
+  mtl::WeakPtr<Task> weak_;
 
   TaskPersistentInfo info_;
 };

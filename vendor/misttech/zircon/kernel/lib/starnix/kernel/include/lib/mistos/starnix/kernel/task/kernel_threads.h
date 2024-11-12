@@ -6,10 +6,10 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_THREADS_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_THREADS_H_
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/util/onecell.h>
-#include <lib/mistos/util/weak_wrapper.h>
 
 namespace starnix {
 
@@ -23,7 +23,7 @@ class SystemTask {
   ktl::optional<CurrentTask> system_task_;
 
   /// The system `ThreadGroup` is accessible from everywhere.
-  util::WeakPtr<ThreadGroup> system_thread_group_;
+  mtl::WeakPtr<ThreadGroup> system_thread_group_;
 
  public:
   friend KernelThreads;
@@ -39,7 +39,7 @@ class KernelThreads {
   OnceCell<SystemTask> system_task_;
 
   /// A weak reference to the kernel owning this struct.
-  util::WeakPtr<Kernel> kernel_;
+  mtl::WeakPtr<Kernel> kernel_;
 
   // impl KernelThreads
  public:
@@ -49,7 +49,7 @@ class KernelThreads {
   /// function captures the async executor for this thread for use with spawned futures.
   ///
   /// Used during kernel boot.
-  static KernelThreads New(util::WeakPtr<Kernel> kernel);
+  static KernelThreads New();
 
   /// Initialize this object with the system task that will be used for spawned threads.
   ///
@@ -62,10 +62,12 @@ class KernelThreads {
   CurrentTask& system_task();
 
   // C++
+  void set_kernel(mtl::WeakPtr<Kernel> kernel);
+
   ~KernelThreads();
 
  private:
-  explicit KernelThreads(util::WeakPtr<Kernel> kernel) : kernel_(std::move(kernel)) {}
+  explicit KernelThreads() = default;
 };
 
 }  // namespace starnix

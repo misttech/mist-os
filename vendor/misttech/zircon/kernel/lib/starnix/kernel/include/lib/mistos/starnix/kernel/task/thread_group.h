@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
@@ -17,11 +18,9 @@
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/stats.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/assert.h>
 
-#include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
@@ -122,7 +121,15 @@ class ZombieProcess : public fbl::RefCountedUpgradeable<ZombieProcess> {
  private:
   explicit ZombieProcess(pid_t pid, pid_t pgid, uid_t uid, ProcessExitInfo exit_info,
                          bool is_canonical)
-      : pid(pid), pgid(pgid), pid_tuid(uid), exit_info(exit_info), is_canonical(is_canonical) {}
+      : pid(pid),
+        pgid(pgid),
+        pid_tuid(uid),
+        exit_info(exit_info),
+        is_canonical(is_canonical),
+        weak_factory_(this) {}
+
+ public:
+  mtl::WeakPtrFactory<ZombieProcess> weak_factory_;  // must be last
 };
 
 // Represents the result of checking for a waitable child
@@ -155,7 +162,7 @@ class WaitableChildResult {
 
 class ThreadGroupParent {
  public:
-  static ThreadGroupParent New(const util::WeakPtr<ThreadGroup>& t) {
+  static ThreadGroupParent New(const mtl::WeakPtr<ThreadGroup>& t) {
     DEBUG_ASSERT(t.Lock());
     return ThreadGroupParent(t);
   }
@@ -173,19 +180,16 @@ class ThreadGroupParent {
   }
 #endif
 
-  template <typename I>
-  static ThreadGroupParent From(I&& r) {
-    return ThreadGroupParent(util::WeakPtr<ThreadGroup>(std::forward<I>(r)));
-  }
+  static ThreadGroupParent From(mtl::WeakPtr<ThreadGroup> weak) { return ThreadGroupParent(weak); }
 
   ThreadGroupParent() = default;
   ThreadGroupParent(const ThreadGroupParent&) = default;
   ThreadGroupParent& operator=(const ThreadGroupParent&) = default;
 
  private:
-  explicit ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(ktl::move(t)) {}
+  explicit ThreadGroupParent(mtl::WeakPtr<ThreadGroup> t) : inner_(ktl::move(t)) {}
 
-  util::WeakPtr<ThreadGroup> inner_;
+  mtl::WeakPtr<ThreadGroup> inner_;
 };
 
 /// A selector that can match a process. Works as a representation of the pid argument to syscalls
@@ -236,7 +240,7 @@ class ThreadGroupMutableState {
  public:
   using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, ktl::unique_ptr<TaskContainer>>;
   using BTreeMapThreadGroup =
-      fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>;
+      fbl::TaggedWAVLTree<pid_t, mtl::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>;
 
   // The parent thread group.
   //
@@ -414,12 +418,12 @@ class ThreadGroupMutableState {
 class ThreadGroup
     : public fbl::RefCountedUpgradeable<ThreadGroup>,
       public fbl::ContainableBaseClasses<
-          fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>,
-          fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>> {
+          fbl::TaggedWAVLTreeContainable<mtl::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>,
+          fbl::TaggedWAVLTreeContainable<mtl::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>> {
  public:
   /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
   /// `TempRef` from a raw `ThreadGroup`.
-  util::WeakPtr<ThreadGroup> weak_thread_group_;
+  mtl::WeakPtr<ThreadGroup> weak_thread_group_;
 
   // The kernel to which this thread group belongs.
   fbl::RefPtr<Kernel> kernel_;
@@ -560,11 +564,15 @@ class ThreadGroup
   ~ThreadGroup();
 
  private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(ThreadGroup);
   friend class ThreadGroupMutableState;
+
   class ProcessSignalObserver final : public SignalObserver {
    public:
-    explicit ProcessSignalObserver(util::WeakPtr<ThreadGroup> tg) : tg_(ktl::move(tg)) {}
+    explicit ProcessSignalObserver() = default;
     ~ProcessSignalObserver() final = default;
+
+    void set_thread_group(mtl::WeakPtr<ThreadGroup> tg) { tg_ = tg; }
 
    private:
     // |SignalObserver| implementation.
@@ -573,8 +581,9 @@ class ThreadGroup
 
     fbl::Canary<fbl::magic("PGSO")> canary_;
 
-    util::WeakPtr<ThreadGroup> tg_;
+    mtl::WeakPtr<ThreadGroup> tg_;
   };
+  ProcessSignalObserver observer_;
 
   ThreadGroup(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
@@ -582,9 +591,8 @@ class ThreadGroup
       pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
       fbl::RefPtr<SignalActions> signal_actions);
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(ThreadGroup);
-
-  ProcessSignalObserver observer_;
+ public:
+  mtl::WeakPtrFactory<ThreadGroup> weak_factory_;  // must be last
 };
 
 }  // namespace starnix

@@ -7,17 +7,15 @@
 
 #include <lib/mistos/linux_uapi/arch/x86_64.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/internal/tag.h>
 #include <lib/mistos/starnix_uapi/signals.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
-
-#include <utility>
 
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/optional.h>
@@ -31,7 +29,7 @@ class ThreadGroup;
 class ProcessGroupMutableState {
  private:
   using BTreeMapThreadGroup =
-      fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>;
+      fbl::TaggedWAVLTree<pid_t, mtl::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>;
 
   /// The thread_groups in the process group.
   ///
@@ -79,7 +77,7 @@ class Session;
 class ProcessGroup
     : public fbl::RefCountedUpgradeable<ProcessGroup>,
       public fbl::ContainableBaseClasses<
-          fbl::TaggedWAVLTreeContainable<util::WeakPtr<ProcessGroup>, internal::SessionTag>,
+          fbl::TaggedWAVLTreeContainable<mtl::WeakPtr<ProcessGroup>, internal::SessionTag>,
           fbl::TaggedSinglyLinkedListable<fbl::RefPtr<ProcessGroup>, internal::ThreadGroupTag>> {
  public:
   // The session of the process group.
@@ -132,6 +130,9 @@ class ProcessGroup
 
  private:
   ProcessGroup(fbl::RefPtr<Session> session, pid_t leader);
+
+ public:
+  mtl::WeakPtrFactory<ProcessGroup> weak_factory_;
 };
 
 }  // namespace starnix

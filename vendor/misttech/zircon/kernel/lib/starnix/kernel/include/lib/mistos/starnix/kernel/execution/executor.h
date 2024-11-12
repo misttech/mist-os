@@ -64,7 +64,7 @@ template <typename PreRunFn, typename TaskCompleteFn>
 void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
                                      TaskCompleteFn&& task_complete/*,
                   std::optional<PtraceCoreState> ptrace_state*/){
-  auto weak_task = util::WeakPtr<Task>(task_builder.task().get());
+  auto weak_task = task_builder.task()->weak_factory_.GetWeakPtr();
   auto ref_task = weak_task.Lock();
 
   // Hold a lock on the task's thread slot until we have a chance to initialize it.

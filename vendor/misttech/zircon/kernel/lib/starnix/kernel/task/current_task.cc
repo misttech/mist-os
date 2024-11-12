@@ -5,6 +5,7 @@
 #include "lib/mistos/starnix/kernel/task/current_task.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/loader.h>
@@ -31,7 +32,6 @@
 #include <lib/mistos/util/bstring.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/strings/split_string.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
@@ -160,7 +160,7 @@ fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPt
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
     const fbl::RefPtr<Kernel>& kernel, const ktl::string_view& initial_name) {
   LTRACE;
-  util::WeakPtr<Task> weak_init = kernel->pids_.Read()->get_task(1);
+  mtl::WeakPtr<Task> weak_init = kernel->pids_.Read()->get_task(1);
   fbl::RefPtr<Task> init_task = weak_init.Lock();
   if (!init_task) {
     return fit::error(errno(EINVAL));
@@ -178,8 +178,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
   {
     auto init_writer = init_task->thread_group_->Write();
     auto new_process_writer = task->thread_group_->Write();
-    new_process_writer->parent_ = ThreadGroupParent::From(init_task->thread_group_.get());
-    init_writer->children_.insert(util::WeakPtr(task->thread_group_.get()));
+    new_process_writer->parent_ =
+        ThreadGroupParent::From(init_task->thread_group_->weak_factory_.GetWeakPtr());
+    init_writer->children_.insert(task->thread_group_->weak_factory_.GetWeakPtr());
   }
 
   // A child process created via fork(2) inherits its parent's
@@ -675,9 +676,9 @@ CurrentTask CurrentTask::New(fbl::RefPtr<Task> task, ThreadState thread_state) {
   return CurrentTask(ktl::move(task), thread_state);
 }
 
-util::WeakPtr<Task> CurrentTask::weak_task() const {
+mtl::WeakPtr<Task> CurrentTask::weak_task() const {
   ASSERT(task_);
-  return util::WeakPtr<Task>(task_.get());
+  return task_->weak_factory_.GetWeakPtr();
 }
 
 void CurrentTask::set_creds(Credentials creds) const {}

@@ -10,13 +10,13 @@
 #include <lib/mistos/starnix/kernel/fs/sysfs/fs.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/vec_directory.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 
 namespace starnix {
 
 class KObjectSymlinkDirectory : public FsNodeOps {
  public:
-  static KObjectSymlinkDirectory* New(const util::WeakPtr<KObject>& kobject) {
+  static KObjectSymlinkDirectory* New(const mtl::WeakPtr<KObject>& kobject) {
     fbl::AllocChecker ac;
     auto ptr = new (&ac) KObjectSymlinkDirectory(kobject);
     ZX_ASSERT(ac.check());
@@ -60,9 +60,9 @@ class KObjectSymlinkDirectory : public FsNodeOps {
   }
 
  private:
-  explicit KObjectSymlinkDirectory(const util::WeakPtr<KObject>& kobject) : kobject_(kobject) {}
+  explicit KObjectSymlinkDirectory(const mtl::WeakPtr<KObject>& kobject) : kobject_(kobject) {}
 
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 };
 
 }  // namespace starnix

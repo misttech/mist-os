@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/vfs/file_system.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -15,7 +16,6 @@
 #include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 #include <zircon/assert.h>
 
@@ -63,12 +63,13 @@ FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode ca
 
 FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSystemOps> ops,
                        FileSystemOptions options, Entries entries)
-    : kernel_(kernel.get()),
+    : kernel_(kernel->weak_factory_.GetWeakPtr()),
       next_node_id_(1),
       ops_(ktl::move(ops)),
       options_(ktl::move(options)),
       dev_id_(kernel->device_registry_.next_anonymous_dev_id()),
-      entries_(ktl::move(entries)) {}
+      entries_(ktl::move(entries)),
+      weak_factory_(this) {}
 
 ino_t FileSystem::next_node_id() const {
   ZX_ASSERT(!ops_->generate_node_ids());
@@ -91,7 +92,7 @@ DirEntryHandle FileSystem::insert_node(FsNode* node) {
   }
   node->set_fs(self);
   FsNodeHandle handle = node->into_handle();
-  self->nodes_.Lock()->insert(util::WeakPtr(handle.get()));
+  self->nodes_.Lock()->insert(ktl::move(handle->weak_factory_.GetWeakPtr()));
   return DirEntry::New(handle, {}, FsString());
 }
 
@@ -110,7 +111,7 @@ WeakFsNodeHandle FileSystem::prepare_node_for_insertion(const CurrentTask& curre
         );
     }
   */
-  return util::WeakPtr(node.get());
+  return node->weak_factory_.GetWeakPtr();
 }
 
 FsNodeHandle FileSystem::create_node_with_id(const CurrentTask& current_task,
@@ -127,7 +128,7 @@ FsNodeHandle FileSystem::create_node_with_id_and_creds(
     const starnix_uapi::Credentials& credentials) {
   auto node = FsNode::new_uncached_with_creds(ktl::move(ops), fbl::RefPtr<FileSystem>(this), id,
                                               info, credentials);
-  nodes_.Lock()->insert(util::WeakPtr(node.get()));
+  nodes_.Lock()->insert(node->weak_factory_.GetWeakPtr());
   return node;
 }
 

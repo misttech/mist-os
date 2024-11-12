@@ -7,7 +7,6 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 #include <zircon/errors.h>
 
@@ -23,10 +22,12 @@
 namespace starnix {
 
 Kernel::Kernel(const ktl::string_view& cmdline)
-    : kthreads_(KernelThreads::New(util::WeakPtr(this))),
+    : kthreads_(KernelThreads::New()),
       cmdline_{cmdline},
-      device_registry_(DeviceRegistry::Default()) {
+      device_registry_(DeviceRegistry::Default()),
+      weak_factory_(this) {
   LTRACE_ENTRY_OBJ;
+  kthreads_.set_kernel(weak_factory_.GetWeakPtr());
 }
 
 Kernel::~Kernel() { LTRACE_ENTRY_OBJ; }

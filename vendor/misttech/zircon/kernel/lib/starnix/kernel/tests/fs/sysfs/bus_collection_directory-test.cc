@@ -3,13 +3,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/fs/sysfs/bus_collection_directory.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/lookup_context.h>
 #include <lib/mistos/starnix/testing/testing.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {
@@ -33,7 +33,7 @@ bool bus_collection_directory_contains_expected_files() {
   auto root_kobject = starnix::KObject::new_root("");
   root_kobject->get_or_create_child<FsNodeOps>("0", starnix::KObjectDirectory::New);
   auto test_fs = starnix::testing::create_fs(
-      kernel, starnix::BusCollectionDirectory::New(util::WeakPtr(root_kobject.get())));
+      kernel, starnix::BusCollectionDirectory::New(root_kobject->weak_factory_.GetWeakPtr()));
 
   auto device_entry = lookup_node(*current_task, test_fs, "devices");
   ASSERT_TRUE(device_entry.is_ok(), "devices");
@@ -50,7 +50,7 @@ bool bus_devices_directory_contains_device_links() {
   auto root_kobject = starnix::KObject::new_root("");
   root_kobject->get_or_create_child<FsNodeOps>("0", starnix::KObjectDirectory::New);
   auto test_fs = starnix::testing::create_fs(
-      kernel, starnix::BusCollectionDirectory::New(util::WeakPtr(root_kobject.get())));
+      kernel, starnix::BusCollectionDirectory::New(root_kobject->weak_factory_.GetWeakPtr()));
 
   auto device_entry = lookup_node(*current_task, test_fs, "devices/0");
   ASSERT_TRUE(device_entry.is_ok(), "device 0 directory");

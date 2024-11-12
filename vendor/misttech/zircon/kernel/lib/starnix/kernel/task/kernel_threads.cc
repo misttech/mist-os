@@ -5,14 +5,15 @@
 
 #include <lib/mistos/starnix/kernel/task/kernel_threads.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/task/thread_group.h>
 
 namespace starnix {
 
 SystemTask::SystemTask(CurrentTask system_task)
     : system_task_(ktl::move(system_task)),
-      system_thread_group_(util::WeakPtr<ThreadGroup>((*system_task_)->thread_group_.get())) {}
+      system_thread_group_((*system_task_)->thread_group_->weak_factory_.GetWeakPtr()) {}
 
-KernelThreads KernelThreads::New(util::WeakPtr<Kernel> kernel) { return KernelThreads(kernel); }
+KernelThreads KernelThreads::New() { return KernelThreads(); }
 
 KernelThreads::~KernelThreads() {
   auto system_task = system_task_.take();
@@ -30,5 +31,10 @@ fit::result<Errno> KernelThreads::Init(CurrentTask system_task) {
 }
 
 CurrentTask& KernelThreads::system_task() { return system_task_.get().system_task_.value(); }
+
+void KernelThreads::set_kernel(mtl::WeakPtr<Kernel> kernel) {
+  ASSERT(kernel_ == nullptr);
+  kernel_ = kernel;
+}
 
 }  // namespace starnix

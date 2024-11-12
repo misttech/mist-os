@@ -6,11 +6,11 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_DEVICE_KOBJECT_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_DEVICE_KOBJECT_H_
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/device/device_mode.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/util/btree_map.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <utility>
@@ -40,7 +40,7 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   FsString name_;
 
   // The weak reference to its parent kobject.
-  ktl::optional<util::WeakPtr<KObject>> parent_;
+  ktl::optional<mtl::WeakPtr<KObject>> parent_;
 
   // A collection of the children of this kobject.
   //
@@ -49,7 +49,7 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   mutable starnix_sync::Mutex<util::BTreeMap<FsString, fbl::RefPtr<KObject>>> children_;
 
   // Function to create the associated FsNodeOps.
-  using CreateFsNodeOpsFn = std::function<ktl::unique_ptr<FsNodeOps>(util::WeakPtr<KObject>)>;
+  using CreateFsNodeOpsFn = std::function<ktl::unique_ptr<FsNodeOps>(mtl::WeakPtr<KObject>)>;
   CreateFsNodeOpsFn create_fs_node_ops_;
 
  public:
@@ -57,12 +57,12 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   static KObjectHandle new_root(const FsString& name);
 
   template <typename N, typename F>
-    requires std::is_convertible_v<std::invoke_result_t<F, util::WeakPtr<KObject>>, N*> &&
+    requires std::is_convertible_v<std::invoke_result_t<F, mtl::WeakPtr<KObject>>, N*> &&
              std::is_base_of_v<FsNodeOps, N>
   static KObjectHandle new_root_with_dir(const FsString& name, F&& create_fs_node_ops) {
     fbl::AllocChecker ac;
     auto kobject = fbl::AdoptRef(new (&ac) KObject(
-        name, {}, [&](const util::WeakPtr<KObject>& kobject) -> ktl::unique_ptr<N> {
+        name, {}, [&](const mtl::WeakPtr<KObject>& kobject) -> ktl::unique_ptr<N> {
           return ktl::unique_ptr<N>(create_fs_node_ops(kobject));
         }));
     ZX_ASSERT(ac.check());
@@ -71,14 +71,14 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   }
 
   template <typename N, typename F>
-    requires std::is_convertible_v<std::invoke_result_t<F, util::WeakPtr<KObject>>, N*> &&
+    requires std::is_convertible_v<std::invoke_result_t<F, mtl::WeakPtr<KObject>>, N*> &&
              std::is_base_of_v<FsNodeOps, N>
   static KObjectHandle new_child(const FsString& name, KObjectHandle parent,
                                  F&& create_fs_node_ops) {
     fbl::AllocChecker ac;
     auto kobject = fbl::AdoptRef(
-        new (&ac) KObject(name, util::WeakPtr<KObject>(parent.get()),
-                          [&](const util::WeakPtr<KObject>& kobject) -> ktl::unique_ptr<N> {
+        new (&ac) KObject(name, parent->weak_factory_.GetWeakPtr(),
+                          [&](const mtl::WeakPtr<KObject>& kobject) -> ktl::unique_ptr<N> {
                             return ktl::unique_ptr<N>(create_fs_node_ops(kobject));
                           }));
     ZX_ASSERT(ac.check());
@@ -113,7 +113,7 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
 
   // Get or create a child with the given name and create_fs_node_ops function.
   template <typename N, typename F>
-    requires std::is_convertible_v<std::invoke_result_t<F, util::WeakPtr<KObject>>, N*> &&
+    requires std::is_convertible_v<std::invoke_result_t<F, mtl::WeakPtr<KObject>>, N*> &&
              std::is_base_of_v<FsNodeOps, N>
   KObjectHandle get_or_create_child(const FsString& name, F&& create_fs_node_ops) {
     auto guard = children_.Lock();
@@ -143,8 +143,14 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   void remove();
 
  private:
-  KObject(FsString name, ktl::optional<util::WeakPtr<KObject>> parent, CreateFsNodeOpsFn fn)
-      : name_(ktl::move(name)), parent_(ktl::move(parent)), create_fs_node_ops_(ktl::move(fn)) {}
+  KObject(FsString name, ktl::optional<mtl::WeakPtr<KObject>> parent, CreateFsNodeOpsFn fn)
+      : name_(ktl::move(name)),
+        parent_(ktl::move(parent)),
+        create_fs_node_ops_(ktl::move(fn)),
+        weak_factory_(this) {}
+
+ public:
+  mtl::WeakPtrFactory<KObject> weak_factory_;  // must be last
 };
 
 using KObjectHandle = fbl::RefPtr<KObject>;
@@ -172,10 +178,10 @@ class KObjectBased {
 // Used for grouping devices in the sysfs subsystem.
 class Collection : public KObjectBased {
  private:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 
  public:
-  explicit Collection(KObjectHandle kobject) : kobject_(kobject.get()) {}
+  explicit Collection(KObjectHandle kobject) : kobject_(kobject->weak_factory_.GetWeakPtr()) {}
 
   IMPL_KOBJECT_BASED(Collection);
 };
@@ -183,14 +189,14 @@ class Collection : public KObjectBased {
 // A Bus identifies how the devices are connected to the processor.
 class Bus : public KObjectBased {
  private:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 
  public:
   ktl::optional<Collection> collection_;
 
  public:
   Bus(KObjectHandle kobject, ktl::optional<Collection> collection)
-      : kobject_(kobject.get()), collection_(ktl::move(collection)) {}
+      : kobject_(kobject->weak_factory_.GetWeakPtr()), collection_(ktl::move(collection)) {}
 
   IMPL_KOBJECT_BASED(Bus);
 };
@@ -200,7 +206,7 @@ class Bus : public KObjectBased {
 // It groups devices based on what they do, rather than how they are connected.
 class Class : public KObjectBased {
  private:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 
  public:
   /// Physical bus that the devices belong to
@@ -209,7 +215,9 @@ class Class : public KObjectBased {
 
  public:
   Class(KObjectHandle kobject, Bus bus, Collection collection)
-      : kobject_(kobject.get()), bus_(ktl::move(bus)), collection_(ktl::move(collection)) {}
+      : kobject_(kobject->weak_factory_.GetWeakPtr()),
+        bus_(ktl::move(bus)),
+        collection_(ktl::move(collection)) {}
 
   // Physical bus that the devices belong to.
   Bus bus() const { return bus_; }
@@ -234,13 +242,15 @@ class DeviceMetadata {
 
 class Device : public KObjectBased {
  public:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
   /// Class kobject that the device belongs to.
   Class class_;
   DeviceMetadata metadata_;
 
   Device(KObjectHandle kobject, Class class_, DeviceMetadata metadata)
-      : kobject_(kobject.get()), class_(ktl::move(class_)), metadata_(ktl::move(metadata)) {}
+      : kobject_(kobject->weak_factory_.GetWeakPtr()),
+        class_(ktl::move(class_)),
+        metadata_(ktl::move(metadata)) {}
 
   IMPL_KOBJECT_BASED(Device);
 };

@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/task/thread_group.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/signals/signal_handling.h>
 #include <lib/mistos/starnix/kernel/signals/syscalls.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
@@ -15,7 +16,6 @@
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix_uapi/signals.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <trace.h>
 #include <zircon/assert.h>
@@ -411,7 +411,7 @@ void ThreadGroupMutableState::send_signal(SignalInfo signal_info) {
   auto action = action_for_signal(signal_info, sigaction);
 
   base_->pending_signals_.Lock()->enqueue(signal_info);
-  fbl::Vector<util::WeakPtr<Task>> tasks;
+  fbl::Vector<mtl::WeakPtr<Task>> tasks;
   for (auto& t : tasks_) {
     fbl::AllocChecker ac;
     tasks.push_back(t.weak_clone(), &ac);
@@ -482,15 +482,17 @@ ThreadGroup::ThreadGroup(
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
     pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
     fbl::RefPtr<SignalActions> signal_actions)
-    : weak_thread_group_(util::WeakPtr<ThreadGroup>(this)),
-      kernel_(ktl::move(kernel)),
+    : kernel_(ktl::move(kernel)),
       process_(ktl::move(process)),
       leader_(leader),
       signal_actions_(ktl::move(signal_actions)),
       stop_state_(AtomicStopState(StopState::Awake)),
-      observer_(util::WeakPtr(this)) {
+      weak_factory_(this) {
   LTRACE_ENTRY_OBJ;
   ktl::optional<ThreadGroupParent> tgp;
+
+  weak_thread_group_ = weak_factory_.GetWeakPtr();
+  observer_.set_thread_group(weak_factory_.GetWeakPtr());
 
   if (parent.has_value()) {
     // A child process created via fork(2) inherits its parent's
@@ -605,7 +607,7 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     ZX_ASSERT_MSG(state->leader_exit_info_.has_value(), "Failed to capture leader exit status");
     auto exit_info = state->leader_exit_info_.value();
     auto zombie = ZombieProcess::New(*state, persistent_info->Lock()->creds(), exit_info);
-    pids->kill_process(leader_, util::WeakPtr(zombie.get()));
+    pids->kill_process(leader_, zombie->weak_factory_.GetWeakPtr());
 
     state->leave_process_group(*pids);
 

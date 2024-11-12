@@ -4,11 +4,11 @@
 
 #include "lib/mistos/starnix/kernel/task/pid_table.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -25,10 +25,10 @@ namespace starnix {
 
 ProcessEntry ProcessEntry::None() { return ProcessEntry({}); }
 
-ProcessEntry ProcessEntry::ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group) {
+ProcessEntry ProcessEntry::ThreadGroupCtor(mtl::WeakPtr<ThreadGroup> thread_group) {
   return ProcessEntry(thread_group);
 }
-ProcessEntry ProcessEntry::ZombieProcessCtor(util::WeakPtr<ZombieProcess> zombie_process) {
+ProcessEntry ProcessEntry::ZombieProcessCtor(mtl::WeakPtr<ZombieProcess> zombie_process) {
   return ProcessEntry(zombie_process);
 }
 
@@ -37,10 +37,10 @@ ProcessEntry::ProcessEntry(Variant variant) : variant_(ktl::move(variant)) {}
 
 bool ProcessEntry::is_none() const { return ktl::holds_alternative<ktl::monostate>(variant_); }
 
-ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> ProcessEntry::thread_group()
+ktl::optional<std::reference_wrapper<const mtl::WeakPtr<ThreadGroup>>> ProcessEntry::thread_group()
     const {
-  if (auto* ptr = ktl::get_if<util::WeakPtr<ThreadGroup>>(&variant_)) {
-    return std::reference_wrapper<const util::WeakPtr<ThreadGroup>>(*ptr);
+  if (auto* ptr = ktl::get_if<mtl::WeakPtr<ThreadGroup>>(&variant_)) {
+    return std::reference_wrapper<const mtl::WeakPtr<ThreadGroup>>(*ptr);
   }
   return ktl::nullopt;
 }
@@ -108,18 +108,18 @@ pid_t PidTable::last_pid() const { return last_pid_; }
 
 size_t PidTable::len() const { return table_.size(); }
 
-util::WeakPtr<Task> PidTable::get_task(pid_t pid) const {
+mtl::WeakPtr<Task> PidTable::get_task(pid_t pid) const {
   auto entry = get_entry(pid);
   if (entry.has_value()) {
-    return entry.value().get().task_.value_or(util::WeakPtr<Task>());
+    return entry.value().get().task_.value_or(mtl::WeakPtr<Task>());
   }
-  return util::WeakPtr<Task>();
+  return mtl::WeakPtr<Task>();
 }
 
 void PidTable::add_task(const fbl::RefPtr<Task>& task) {
   auto& entry = get_entry_mut(task->id_);
   ASSERT(!entry.task_.has_value());
-  entry.task_ = util::WeakPtr<Task>(task.get());
+  entry.task_ = task->weak_factory_.GetWeakPtr();
 }
 
 void PidTable::remove_task(pid_t pid) {
@@ -144,13 +144,13 @@ ktl::optional<ProcessEntryRef> PidTable::get_process(pid_t pid) const {
   return ktl::visit(
       ProcessEntry::overloaded{
           [](const ktl::monostate&) -> ktl::optional<ProcessEntryRef> { return ktl::nullopt; },
-          [](const util::WeakPtr<ThreadGroup>& thread_group) -> ktl::optional<ProcessEntryRef> {
+          [](const mtl::WeakPtr<ThreadGroup>& thread_group) -> ktl::optional<ProcessEntryRef> {
             if (auto locked = thread_group.Lock()) {
               return ProcessEntryRef::Process(ktl::move(locked));
             }
             return ktl::nullopt;
           },
-          [](const util::WeakPtr<ZombieProcess>& zombie) -> ktl::optional<ProcessEntryRef> {
+          [](const mtl::WeakPtr<ZombieProcess>& zombie) -> ktl::optional<ProcessEntryRef> {
             if (auto locked = zombie.Lock()) {
               return ProcessEntryRef::Zombie(ktl::move(locked));
             }
@@ -176,10 +176,10 @@ fbl::Vector<fbl::RefPtr<ThreadGroup>> PidTable::get_thread_groups() const {
 void PidTable::add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group) {
   auto& entry = get_entry_mut(thread_group->leader_);
   ASSERT(entry.process_.is_none());
-  entry.process_ = ProcessEntry::ThreadGroupCtor(util::WeakPtr<ThreadGroup>(thread_group.get()));
+  entry.process_ = ProcessEntry::ThreadGroupCtor(thread_group->weak_factory_.GetWeakPtr());
 }
 
-void PidTable::kill_process(pid_t pid, util::WeakPtr<ZombieProcess> zombie) {
+void PidTable::kill_process(pid_t pid, mtl::WeakPtr<ZombieProcess> zombie) {
   auto& entry = get_entry_mut(pid);
   ZX_ASSERT(entry.process_.thread_group().has_value());
 
@@ -192,7 +192,7 @@ void PidTable::kill_process(pid_t pid, util::WeakPtr<ZombieProcess> zombie) {
 
 void PidTable::remove_zombie(pid_t pid) {
   remove_item(pid, [](auto& entry) {
-    ZX_ASSERT(ktl::get_if<util::WeakPtr<ZombieProcess>>(&entry.process_.variant_));
+    ZX_ASSERT(ktl::get_if<mtl::WeakPtr<ZombieProcess>>(&entry.process_.variant_));
     entry.process_ = ProcessEntry::None();
   });
 
@@ -206,7 +206,7 @@ void PidTable::remove_zombie(pid_t pid) {
 void PidTable::add_process_group(const fbl::RefPtr<ProcessGroup>& process_group) {
   auto& entry = get_entry_mut(process_group->leader_);
   ASSERT(!entry.process_group_.has_value());
-  entry.process_group_ = util::WeakPtr<ProcessGroup>(process_group.get());
+  entry.process_group_ = process_group->weak_factory_.GetWeakPtr();
 }
 
 ktl::optional<fbl::RefPtr<ProcessGroup>> PidTable::get_process_group(pid_t pid) const {

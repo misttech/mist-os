@@ -5,6 +5,7 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_SYNC_INCLUDE_LIB_STARNIX_SYNC_LOCKS_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_SYNC_INCLUDE_LIB_STARNIX_SYNC_LOCKS_H_
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <zircon/compiler.h>
 
 #include <fbl/ref_counted_upgradeable.h>
@@ -20,8 +21,8 @@ class MutexGuard;
 template <typename Data>
 class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
  public:
-  Mutex() = default;
-  explicit Mutex(Data&& data) : data_(data) {}
+  Mutex() : weak_factory_(this) {}
+  explicit Mutex(Data&& data) : data_(data), weak_factory_(this) {}
 
   MutexGuard<Data> Lock() { return MutexGuard(this); }
 
@@ -33,6 +34,9 @@ class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
 
   DECLARE_MUTEX(Mutex) lock_;
   Data data_ __TA_GUARDED(lock_);
+
+ public:
+  mtl::WeakPtrFactory<Mutex<Data>> weak_factory_;  // must be last
 };
 
 /// An RAII mutex guard returned by `MutexGuard::map`, which can point to a

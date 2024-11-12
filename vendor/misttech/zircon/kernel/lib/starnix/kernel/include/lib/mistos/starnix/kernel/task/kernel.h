@@ -204,6 +204,9 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
 
  private:
   Kernel(const ktl::string_view& cmdline);
+
+ public:
+  mtl::WeakPtrFactory<Kernel> weak_factory_;  // must be last
 };
 
 }  // namespace starnix

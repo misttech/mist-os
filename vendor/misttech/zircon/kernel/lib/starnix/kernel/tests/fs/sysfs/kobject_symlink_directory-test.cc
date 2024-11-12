@@ -34,7 +34,7 @@ bool kobject_symlink_directory_contains_device_links() {
   root_kobject->get_or_create_child<FsNodeOps>("0", starnix::KObjectDirectory::New);
   root_kobject->get_or_create_child<FsNodeOps>("0", starnix::KObjectDirectory::New);
   auto test_fs = starnix::testing::create_fs(
-      kernel, starnix::KObjectSymlinkDirectory::New(util::WeakPtr(root_kobject.get())));
+      kernel, starnix::KObjectSymlinkDirectory::New(root_kobject->weak_factory_.GetWeakPtr()));
 
   auto device_entry = lookup_node(*current_task, test_fs, "0");
   ASSERT_TRUE(device_entry.is_ok(), "device 0 directory");

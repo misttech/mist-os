@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
@@ -18,7 +19,6 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
@@ -39,7 +39,7 @@ class CurrentTask;
 using PipeHandle = fbl::RefPtr<Pipe>;
 using starnix_uapi::Credentials;
 
-class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
+class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
                      public fbl::RefCountedUpgradeable<FsNode> {
  public:
   /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
@@ -55,10 +55,10 @@ class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
 
   /// The current kernel.
   // TODO(https://fxbug.dev/42080557): This is a temporary measure to access a task on drop.
-  util::WeakPtr<Kernel> kernel_;
+  mtl::WeakPtr<Kernel> kernel_;
 
   /// The FileSystem that owns this FsNode's tree.
-  util::WeakPtr<FileSystem> fs_;
+  mtl::WeakPtr<FileSystem> fs_;
 
  public:
   // The node idenfier for this FsNode. By default, this will be used as the inode number of
@@ -135,8 +135,8 @@ class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
   static FsNode* new_root_with_properties(FsNodeOps* ops, F&& info_updater) {
     auto info = FsNodeInfo::New(0, FILE_MODE(IFDIR, 0777), FsCred::root());
     info_updater(info);
-    return FsNode::new_internal(ktl::unique_ptr<FsNodeOps>(ops), util::WeakPtr<Kernel>(),
-                                util::WeakPtr<FileSystem>(), 0, info, Credentials::root());
+    return FsNode::new_internal(ktl::unique_ptr<FsNodeOps>(ops), mtl::WeakPtr<Kernel>(),
+                                mtl::WeakPtr<FileSystem>(), 0, info, Credentials::root());
   }
 
   /// Create a node without inserting it into the FileSystem node cache. This is usually not what
@@ -151,13 +151,13 @@ class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
 
   FsNodeHandle into_handle() {
     FsNodeHandle handle = fbl::AdoptRef(this);
-    weak_handle_ = util::WeakPtr<FsNode>(handle.get());
+    weak_handle_ = handle->weak_factory_.GetWeakPtr();
     return ktl::move(handle);
   }
 
  private:
-  static FsNode* new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kernel> kernel,
-                              util::WeakPtr<FileSystem> fs, ino_t node_id, FsNodeInfo info,
+  static FsNode* new_internal(ktl::unique_ptr<FsNodeOps> ops, mtl::WeakPtr<Kernel> kernel,
+                              mtl::WeakPtr<FileSystem> fs, ino_t node_id, FsNodeInfo info,
                               const Credentials& credentials);
 
  public:
@@ -178,7 +178,7 @@ class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
   }
 
   void set_fs(const FileSystemHandle& fs) {
-    fs_ = util::WeakPtr<FileSystem>(fs.get());
+    fs_ = fs->weak_factory_.GetWeakPtr();
     kernel_ = fs->kernel_;
   }
 
@@ -239,8 +239,11 @@ class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
   ~FsNode();
 
  private:
-  FsNode(WeakFsNodeHandle weak_handle, util::WeakPtr<Kernel> kernel, ktl::unique_ptr<FsNodeOps> ops,
-         util::WeakPtr<FileSystem> fs, ino_t node_id, ktl::optional<PipeHandle>, FsNodeInfo info);
+  FsNode(WeakFsNodeHandle weak_handle, mtl::WeakPtr<Kernel> kernel, ktl::unique_ptr<FsNodeOps> ops,
+         mtl::WeakPtr<FileSystem> fs, ino_t node_id, ktl::optional<PipeHandle>, FsNodeInfo info);
+
+ public:
+  mtl::WeakPtrFactory<FsNode> weak_factory_;  // must be last
 };
 
 }  // namespace starnix

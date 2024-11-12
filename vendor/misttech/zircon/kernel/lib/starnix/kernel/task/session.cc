@@ -4,10 +4,10 @@
 
 #include "lib/mistos/starnix/kernel/task/session.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/errors.h>
 
 #include <fbl/alloc_checker.h>
@@ -17,7 +17,7 @@ namespace starnix {
 void SessionMutableState::remove(pid_t pid) { process_groups_.erase(pid); }
 
 void SessionMutableState::insert(fbl::RefPtr<ProcessGroup> process_group) {
-  process_groups_.insert(util::WeakPtr(process_group.get()));
+  process_groups_.insert(process_group->weak_factory_.GetWeakPtr());
 }
 
 SessionMutableState::~SessionMutableState() = default;

@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/execution/executor.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
@@ -15,7 +16,6 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix_uapi/errors.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_zircon/task_wrapper.h>
 #include <trace.h>
 #include <zircon/assert.h>

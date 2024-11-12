@@ -32,8 +32,6 @@
 
 #include <linux/errno.h>
 
-// #include <ktl/enforce.h>
-
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
@@ -45,21 +43,21 @@ FsNode* FsNode::new_root(FsNodeOps* ops) {
 FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                   const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info) {
   auto creds = current_task->creds();
-  return FsNode::new_internal(ktl::move(ops), fs->kernel_, util::WeakPtr(fs.get()), node_id, info,
-                              creds)
+  return FsNode::new_internal(ktl::move(ops), fs->kernel_, fs->weak_factory_.GetWeakPtr(), node_id,
+                              info, creds)
       ->into_handle();
 }
 
 FsNodeHandle FsNode::new_uncached_with_creds(ktl::unique_ptr<FsNodeOps> ops,
                                              const FileSystemHandle& fs, ino_t node_id,
                                              FsNodeInfo info, const Credentials& credentials) {
-  return FsNode::new_internal(ktl::move(ops), fs->kernel_, util::WeakPtr(fs.get()), node_id, info,
-                              credentials)
+  return FsNode::new_internal(ktl::move(ops), fs->kernel_, fs->weak_factory_.GetWeakPtr(), node_id,
+                              info, credentials)
       ->into_handle();
 }
 
-FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kernel> kernel,
-                             util::WeakPtr<FileSystem> fs, ino_t node_id, FsNodeInfo info,
+FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, mtl::WeakPtr<Kernel> kernel,
+                             mtl::WeakPtr<FileSystem> fs, ino_t node_id, FsNodeInfo info,
                              const Credentials& credentials) {
   // Allow the FsNodeOps to populate initial info.
   auto new_info = info;
@@ -100,8 +98,8 @@ FsNode::~FsNode() {
   LTRACE_EXIT_OBJ;
 }
 
-FsNode::FsNode(WeakFsNodeHandle weak_handle, util::WeakPtr<Kernel> kernel,
-               ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t node_id,
+FsNode::FsNode(WeakFsNodeHandle weak_handle, mtl::WeakPtr<Kernel> kernel,
+               ktl::unique_ptr<FsNodeOps> ops, mtl::WeakPtr<FileSystem> fs, ino_t node_id,
                ktl::optional<PipeHandle> fifo, FsNodeInfo info)
     : weak_handle_(ktl::move(weak_handle)),
       ops_(ktl::move(ops)),
@@ -109,7 +107,8 @@ FsNode::FsNode(WeakFsNodeHandle weak_handle, util::WeakPtr<Kernel> kernel,
       fs_(ktl::move(fs)),
       node_id_(node_id),
       fifo_(ktl::move(fifo)),
-      info_(ktl::move(info)) {}
+      info_(ktl::move(info)),
+      weak_factory_(this) {}
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::create_file_ops(
     const CurrentTask& current_task, OpenFlags flags) const {

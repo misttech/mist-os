@@ -14,7 +14,7 @@
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_counted_upgradeable.h>
@@ -41,7 +41,7 @@ struct MountState {
   /// NamespaceNode because the Mount pointer has to be weak because this is the pointer to the
   /// parent mount, the parent has a pointer to the children too, and making both strong would be
   /// a cycle.
-  ktl::optional<ktl::pair<util::WeakPtr<Mount>, DirEntryHandle>> mountpoint;
+  ktl::optional<ktl::pair<mtl::WeakPtr<Mount>, DirEntryHandle>> mountpoint;
 
   // The keys of this map are always descendants of this mount's root.
   //

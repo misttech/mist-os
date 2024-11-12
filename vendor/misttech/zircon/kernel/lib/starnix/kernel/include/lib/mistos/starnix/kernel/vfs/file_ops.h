@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
@@ -18,7 +19,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/util/weak_wrapper.h>
 
 #include <asm/stat.h>
 
@@ -30,7 +30,7 @@ class OutputBuffer;
 class InputBuffer;
 class DirectSink;
 
-using WeakFileHandle = util::WeakPtr<FileObject>;
+using WeakFileHandle = mtl::WeakPtr<FileObject>;
 using starnix_syscalls::SyscallResult;
 using starnix_uapi::UserAddress;
 

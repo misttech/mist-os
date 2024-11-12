@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
@@ -16,7 +17,6 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/util/onecell.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
@@ -84,12 +84,12 @@ class FileSystemOps;
 class Kernel;
 class FsNodeOps;
 class FsNode;
-using WeakFsNodeHandle = util::WeakPtr<FsNode>;
+using WeakFsNodeHandle = mtl::WeakPtr<FsNode>;
 
 /// A file system that can be mounted in a namespace.
 class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
  public:
-  util::WeakPtr<Kernel> kernel_;
+  mtl::WeakPtr<Kernel> kernel_;
 
  private:
   OnceCell<DirEntryHandle> root_;
@@ -245,6 +245,9 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
  private:
   FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSystemOps> ops,
              FileSystemOptions options, Entries entries);
+
+ public:
+  mtl::WeakPtrFactory<FileSystem> weak_factory_;
 };
 
 }  // namespace starnix

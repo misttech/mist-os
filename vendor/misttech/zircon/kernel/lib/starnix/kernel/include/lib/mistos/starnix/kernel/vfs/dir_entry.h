@@ -7,12 +7,12 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/error_propagation.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <utility>
@@ -136,10 +136,10 @@ overloaded(Ts...) -> overloaded<Ts...>;
 /// A directory cannot have more than one hard link, which means there is a
 /// single DirEntry for each Directory FsNode. That invariant lets us store the
 /// children for a directory in the DirEntry rather than in the FsNode.
-class DirEntry : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>>,
+class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
                  public fbl::RefCountedUpgradeable<DirEntry> {
  public:
-  using DirEntryChildren = fbl::WAVLTree<FsString, util::WeakPtr<DirEntry>>;
+  using DirEntryChildren = fbl::WAVLTree<FsString, mtl::WeakPtr<DirEntry>>;
 
   /// The FsNode referenced by this DirEntry.
   ///
@@ -245,7 +245,7 @@ class DirEntry : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>>,
             return result.take_error();
           } else {
             auto [child, create_result] = result.value();
-            children_->insert(util::WeakPtr(child.get()));
+            children_->insert(child->weak_factory_.GetWeakPtr());
             return fit::ok(ktl::pair(child, create_result));
           }
         } else {
@@ -263,7 +263,7 @@ class DirEntry : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>>,
             return result.take_error();
           } else {
             auto [new_child, create_result] = result.value();
-            children_->insert(util::WeakPtr(new_child.get()));
+            children_->insert(new_child->weak_factory_.GetWeakPtr());
             return fit::ok(ktl::pair(new_child, create_result));
           }
         }
@@ -498,6 +498,9 @@ class DirEntry : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>>,
   friend bool unit_testing::test_tmpfs();
 
   DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state);
+
+ public:
+  mtl::WeakPtrFactory<DirEntry> weak_factory_;  // must be last
 };
 
 }  // namespace starnix

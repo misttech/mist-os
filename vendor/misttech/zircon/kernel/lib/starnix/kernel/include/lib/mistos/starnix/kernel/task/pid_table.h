@@ -7,9 +7,9 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PIDTABLE_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/signals.h>
-#include <lib/mistos/util/weak_wrapper.h>
 
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
@@ -30,16 +30,16 @@ class ZombieProcess;
 class ProcessEntry {
  public:
   using Variant =
-      ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>>;
+      ktl::variant<ktl::monostate, mtl::WeakPtr<ThreadGroup>, mtl::WeakPtr<ZombieProcess>>;
 
   static ProcessEntry None();
-  static ProcessEntry ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group);
-  static ProcessEntry ZombieProcessCtor(util::WeakPtr<ZombieProcess> zombie_process);
+  static ProcessEntry ThreadGroupCtor(mtl::WeakPtr<ThreadGroup> thread_group);
+  static ProcessEntry ZombieProcessCtor(mtl::WeakPtr<ZombieProcess> zombie_process);
 
   // impl ProcessEntry
   bool is_none() const;
 
-  ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> thread_group() const;
+  ktl::optional<std::reference_wrapper<const mtl::WeakPtr<ThreadGroup>>> thread_group() const;
 
   // C++
   ~ProcessEntry();
@@ -64,11 +64,11 @@ class ProcessEntry {
 
 class PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
  private:
-  ktl::optional<util::WeakPtr<Task>> task_;
+  ktl::optional<mtl::WeakPtr<Task>> task_;
 
   ProcessEntry process_ = ProcessEntry::None();
 
-  ktl::optional<util::WeakPtr<ProcessGroup>> process_group_;
+  ktl::optional<mtl::WeakPtr<ProcessGroup>> process_group_;
 
  public:
   using HashTable = fbl::HashTable<pid_t, ktl::unique_ptr<PidEntry>>;
@@ -146,7 +146,7 @@ class PidTable {
 
   size_t len() const;
 
-  util::WeakPtr<Task> get_task(pid_t pid) const;
+  mtl::WeakPtr<Task> get_task(pid_t pid) const;
 
   void add_task(const fbl::RefPtr<Task>& task);
 
@@ -159,7 +159,7 @@ class PidTable {
   void add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group);
 
   /// Replace process with the specified `pid` with the `zombie`.
-  void kill_process(pid_t pid, util::WeakPtr<ZombieProcess> zombie);
+  void kill_process(pid_t pid, mtl::WeakPtr<ZombieProcess> zombie);
 
   void remove_zombie(pid_t pid);
 

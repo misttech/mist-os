@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/vfs/file_object.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
@@ -15,7 +16,6 @@
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/util/weak_wrapper.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -56,7 +56,8 @@ FileObject::FileObject(WeakFileHandle weak_handle, FileObjectId id, NamespaceNod
       name_(ktl::move(name)),
       fs_(ktl::move(fs)),
       offset_(0),
-      flags_(flags - OpenFlagsEnum::CREAT) {}
+      flags_(flags - OpenFlagsEnum::CREAT),
+      weak_factory_(this) {}
 
 FileObject::~FileObject() = default;
 
@@ -89,7 +90,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
-  file->weak_handle_ = util::WeakPtr<FileObject>(file.get());
+  file->weak_handle_ = file->weak_factory_.GetWeakPtr();
 
   return fit::ok(file);
 }

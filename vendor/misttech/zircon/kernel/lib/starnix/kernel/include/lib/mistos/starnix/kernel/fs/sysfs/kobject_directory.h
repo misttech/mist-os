@@ -9,13 +9,13 @@
 #include <lib/mistos/starnix/kernel/device/kobject.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/vec_directory.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 
 namespace starnix {
 
 class KObjectDirectory : public FsNodeOps {
  public:
-  static KObjectDirectory* New(const util::WeakPtr<KObject>& kobject) {
+  static KObjectDirectory* New(const mtl::WeakPtr<KObject>& kobject) {
     fbl::AllocChecker ac;
     auto ptr = new (&ac) KObjectDirectory(kobject);
     ZX_ASSERT(ac.check());
@@ -50,7 +50,7 @@ class KObjectDirectory : public FsNodeOps {
   }
 
  private:
-  explicit KObjectDirectory(const util::WeakPtr<KObject>& kobject) : kobject_(kobject) {}
+  explicit KObjectDirectory(const mtl::WeakPtr<KObject>& kobject) : kobject_(kobject) {}
 
   KObjectHandle kobject() const {
     auto obj = kobject_.Lock();
@@ -58,7 +58,7 @@ class KObjectDirectory : public FsNodeOps {
     return obj;
   }
 
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 };
 
 }  // namespace starnix

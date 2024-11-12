@@ -8,16 +8,16 @@
 #include <lib/mistos/starnix/kernel/device/kobject.h>
 #include <lib/mistos/starnix/kernel/fs/sysfs/fs.h>
 #include <lib/mistos/starnix/kernel/vfs/vec_directory.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 
 namespace starnix {
 
 class BusDevicesDirectory : public FsNodeOps {
  private:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 
  public:
-  static BusDevicesDirectory* New(util::WeakPtr<KObject> kobject) {
+  static BusDevicesDirectory* New(mtl::WeakPtr<KObject> kobject) {
     fbl::AllocChecker ac;
     auto ptr = new (&ac) BusDevicesDirectory(ktl::move(kobject));
     if (!ac.check()) {
@@ -75,15 +75,15 @@ class BusDevicesDirectory : public FsNodeOps {
   }
 
  private:
-  explicit BusDevicesDirectory(util::WeakPtr<KObject> kobject) : kobject_(ktl::move(kobject)) {}
+  explicit BusDevicesDirectory(mtl::WeakPtr<KObject> kobject) : kobject_(ktl::move(kobject)) {}
 };
 
 class BusCollectionDirectory : public FsNodeOps {
  private:
-  util::WeakPtr<KObject> kobject_;
+  mtl::WeakPtr<KObject> kobject_;
 
  public:
-  static BusCollectionDirectory* New(util::WeakPtr<KObject> kobject) {
+  static BusCollectionDirectory* New(mtl::WeakPtr<KObject> kobject) {
     fbl::AllocChecker ac;
     auto ptr = new (&ac) BusCollectionDirectory(ktl::move(kobject));
     if (!ac.check()) {
@@ -127,7 +127,7 @@ class BusCollectionDirectory : public FsNodeOps {
   }
 
  private:
-  explicit BusCollectionDirectory(util::WeakPtr<KObject> kobject) : kobject_(ktl::move(kobject)) {}
+  explicit BusCollectionDirectory(mtl::WeakPtr<KObject> kobject) : kobject_(ktl::move(kobject)) {}
 };
 
 }  // namespace starnix

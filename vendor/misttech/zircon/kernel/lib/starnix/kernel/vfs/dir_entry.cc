@@ -6,13 +6,13 @@
 #include "lib/mistos/starnix/kernel/vfs/dir_entry.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 #include <zircon/assert.h>
 
@@ -104,7 +104,7 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
 FsString DirEntry::GetKey() const { return local_name(); }
 
 DirEntry::DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state)
-    : node_(ktl::move(node)), ops_(ktl::move(ops)), state_(ktl::move(state)) {}
+    : node_(ktl::move(node)), ops_(ktl::move(ops)), state_(ktl::move(state)), weak_factory_(this) {}
 
 fit::result<Errno, DirEntryHandle> DirEntry::create_dir(const CurrentTask& current_task,
                                                         const FsStr& name) {

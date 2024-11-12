@@ -10,7 +10,7 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/testing/unittest.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/unittest/unittest.h>
 #include <zircon/assert.h>
 
@@ -107,7 +107,7 @@ bool test_no_error_when_zombie() {
 }
 
 struct thread_args {
-  util::WeakPtr<starnix::Task> task;
+  mtl::WeakPtr<starnix::Task> task;
   starnix::TaskBuilder task_builder;
 };
 

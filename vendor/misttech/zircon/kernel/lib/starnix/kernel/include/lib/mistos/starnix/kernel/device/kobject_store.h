@@ -123,7 +123,7 @@ class KObjectStore {
     auto metadata_cloned = metadata;
     auto device_kobject = clazz.kobject()->get_or_create_child<N>(
         name,
-        [&create_device_sysfs_ops, class_cloned, metadata_cloned](util::WeakPtr<KObject> kobject) {
+        [&create_device_sysfs_ops, class_cloned, metadata_cloned](mtl::WeakPtr<KObject> kobject) {
           return create_device_sysfs_ops(Device(kobject.Lock(), class_cloned, metadata_cloned));
         });
 

@@ -4,6 +4,7 @@
 
 #include "lib/mistos/starnix/kernel/task/task.h"
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -14,7 +15,6 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/default_construct.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_zircon/task_wrapper.h>
 #include <trace.h>
 #include <zircon/compiler.h>
@@ -226,10 +226,11 @@ Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
           no_new_privs, timerslack_ns,
           /*The default timerslack is set to the current timerslack of the creating thread.*/
           timerslack_ns))),
-      observer_(util::WeakPtr(this)) {
-  *thread_.Write() = ktl::move(thread);
-
+      weak_factory_(this) {
   LTRACE_ENTRY_OBJ;
+  observer_.set_task(weak_factory_.GetWeakPtr());
+  *thread_.Write() = ktl::move(thread);
+  LTRACE_EXIT_OBJ;
 }
 
 Task::~Task() { LTRACE_ENTRY_OBJ; }
@@ -274,9 +275,7 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
 
 fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel_; }
 
-util::WeakPtr<Task> Task::get_task(pid_t pid) const {
-  return kernel()->pids_.Read()->get_task(pid);
-}
+mtl::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids_.Read()->get_task(pid); }
 
 pid_t Task::get_pid() const { return thread_group_->leader_; }
 

@@ -7,7 +7,7 @@
 
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/internal/tag.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/canary.h>
@@ -28,7 +28,7 @@ struct SessionMutableState {
   /// The references to ProcessGroup is weak to prevent cycles as ProcessGroup have a Arc reference
   /// to their session. It is still expected that these weak references are always valid, as process
   /// groups must unregister themselves before they are deleted.
-  fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ProcessGroup>, internal::SessionTag> process_groups_;
+  fbl::TaggedWAVLTree<pid_t, mtl::WeakPtr<ProcessGroup>, internal::SessionTag> process_groups_;
 
   /// The leader of the foreground process group. This is necessary because the leader must
   /// be returned even if the process group has already been deleted.

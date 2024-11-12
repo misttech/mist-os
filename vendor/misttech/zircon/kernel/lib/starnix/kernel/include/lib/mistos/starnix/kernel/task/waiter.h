@@ -6,21 +6,18 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_WAITER_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_WAITER_H_
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 #include <lib/mistos/util/dense_map.h>
 #include <lib/mistos/util/small_vector.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/interruptible_event.h>
 #include <lib/starnix_sync/locks.h>
 #include <lib/starnix_sync/port_event.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
-#include <limits>
-
-#include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
@@ -260,8 +257,8 @@ class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
   ///
   /// This lock is nested inside the WaitQueue.waiters lock.
   using WaitQueueMap = std::map<
-      WaitKey, util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>, std::less<>,
-      util::Allocator<std::pair<const WaitKey, util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>>>>;
+      WaitKey, mtl::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>, std::less<>,
+      util::Allocator<std::pair<const WaitKey, mtl::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>>>>;
 
   starnix_sync::Mutex<WaitQueueMap> wait_queues_;
 
@@ -305,30 +302,33 @@ class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
   ~PortWaiter();
 
  private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(PortWaiter);
+
   friend class Waiter;
   friend class WaitQueue;
   friend class WaiterRef;
 
   explicit PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals);
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(PortWaiter);
+ public:
+  mtl::WeakPtrFactory<PortWaiter> weak_factory_;
 };
 
 class AbortHandle : public fbl::RefCountedUpgradeable<AbortHandle> {};
 
 class WaiterKind {
  public:
-  using Variant = ktl::variant<util::WeakPtr<PortWaiter>, util::WeakPtr<InterruptibleEvent>,
-                               util::WeakPtr<AbortHandle>>;
+  using Variant = ktl::variant<mtl::WeakPtr<PortWaiter>, mtl::WeakPtr<InterruptibleEvent>,
+                               mtl::WeakPtr<AbortHandle>>;
 
-  static WaiterKind PortWaiter(util::WeakPtr<PortWaiter> waiter) {
+  static WaiterKind PortWaiter(mtl::WeakPtr<PortWaiter> waiter) {
     return WaiterKind(ktl::move(waiter));
   }
-  static WaiterKind Event(util::WeakPtr<InterruptibleEvent> waiter) {
+  static WaiterKind Event(mtl::WeakPtr<InterruptibleEvent> waiter) {
     return WaiterKind(ktl::move(waiter));
   }
 
-  static WaiterKind AbortHandle(util::WeakPtr<AbortHandle> waiter) {
+  static WaiterKind AbortHandle(mtl::WeakPtr<AbortHandle> waiter) {
     return WaiterKind(ktl::move(waiter));
   }
 
@@ -357,7 +357,7 @@ class Waiter;
 class WaiterRef {
  public:
   static WaiterRef from_port(fbl::RefPtr<PortWaiter> waiter) {
-    return WaiterRef(WaiterKind::PortWaiter(util::WeakPtr(waiter.get())));
+    return WaiterRef(WaiterKind::PortWaiter(waiter->weak_factory_.GetWeakPtr()));
   }
   static WaiterRef from_event(fbl::RefPtr<InterruptibleEvent> waiter);
   static WaiterRef from_abort_handle(fbl::RefPtr<AbortHandle> waiter);
@@ -365,9 +365,9 @@ class WaiterRef {
   bool is_valid() const {
     return ktl::visit(
         WaiterKind::overloaded{
-            [](const util::WeakPtr<PortWaiter>& waiter) { return waiter.Lock() != nullptr; },
-            [](const util::WeakPtr<InterruptibleEvent>& event) { return event.Lock() != nullptr; },
-            [](const util::WeakPtr<AbortHandle>& handle) { return handle.Lock() != nullptr; }},
+            [](const mtl::WeakPtr<PortWaiter>& waiter) { return waiter.Lock() != nullptr; },
+            [](const mtl::WeakPtr<InterruptibleEvent>& event) { return event.Lock() != nullptr; },
+            [](const mtl::WeakPtr<AbortHandle>& handle) { return handle.Lock() != nullptr; }},
         waiter_kind_.waiter_);
   }
 
@@ -395,12 +395,12 @@ class WaiterRef {
 
   bool operator==(const WaiterRef& other) const {
     return ktl::visit(WaiterKind::overloaded{
-                          [](const util::WeakPtr<PortWaiter>& lhs,
-                             const util::WeakPtr<PortWaiter>& rhs) { return lhs == rhs; },
-                          [](const util::WeakPtr<InterruptibleEvent>& lhs,
-                             const util::WeakPtr<InterruptibleEvent>& rhs) { return lhs == rhs; },
-                          [](const util::WeakPtr<AbortHandle>& lhs,
-                             const util::WeakPtr<AbortHandle>& rhs) { return lhs == rhs; },
+                          [](const mtl::WeakPtr<PortWaiter>& lhs,
+                             const mtl::WeakPtr<PortWaiter>& rhs) { return lhs == rhs; },
+                          [](const mtl::WeakPtr<InterruptibleEvent>& lhs,
+                             const mtl::WeakPtr<InterruptibleEvent>& rhs) { return lhs == rhs; },
+                          [](const mtl::WeakPtr<AbortHandle>& lhs,
+                             const mtl::WeakPtr<AbortHandle>& rhs) { return lhs == rhs; },
                           [](const auto&, const auto&) { return false; }},
                       waiter_kind_.waiter_, other.waiter_kind_.waiter_);
   }
@@ -462,7 +462,7 @@ class PortWaiter;
 /// per wait.
 class HandleWaitCanceler {
  private:
-  util::WeakPtr<PortWaiter> waiter_;
+  mtl::WeakPtr<PortWaiter> waiter_;
 
   WaitKey key_;
 
@@ -639,19 +639,19 @@ class WaitQueue {
 };
 
 struct WaitCancelerQueue {
-  util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>> wait_queue;
+  mtl::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>> wait_queue;
   WaiterRef waiter;
   WaitKey wait_key;
   WaitEntryId waiter_id;
 };
 
 struct WaitCancelerZxio {
-  // util::WeakPtr<Zxio> zxio;
+  // mtl::WeakPtr<Zxio> zxio;
   HandleWaitCanceler inner;
 };
 
 struct WaitCancelerEvent {
-  // util::WeakPtr<zx::Event> event;
+  // mtl::WeakPtr<zx::Event> event;
   HandleWaitCanceler inner;
 };
 
@@ -717,7 +717,7 @@ class WaitCanceler {
 
   static WaitCanceler new_zxio(HandleWaitCanceler inner);
 
-  static WaitCanceler new_event(util::WeakPtr<WaitQueue> wait_queue, WaiterRef waiter,
+  static WaitCanceler new_event(mtl::WeakPtr<WaitQueue> wait_queue, WaiterRef waiter,
                                 WaitKey wait_key, WaitEntryId waiter_id);
 
   static WaitCanceler new_event(HandleWaitCanceler inner);

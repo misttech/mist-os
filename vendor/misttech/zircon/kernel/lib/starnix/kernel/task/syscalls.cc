@@ -23,7 +23,7 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/num.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -51,7 +51,7 @@ using starnix_uapi::UserAddress;
 using starnix_uapi::UserCString;
 using starnix_uapi::UserRef;
 
-util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
+mtl::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
                                                  pid_t pid) {
   if (pid == 0) {
     return current_task.weak_task();
@@ -337,7 +337,7 @@ fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
 }
 
 fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
-  util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
+  mtl::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // security::check_task_getsid(current_task, &target_task)?;
   auto sid = task->thread_group_->Read()->process_group_->session_->leader_;
@@ -345,7 +345,7 @@ fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid)
 }
 
 fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid) {
-  util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
+  mtl::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
   auto pgid = task->thread_group_->Read()->process_group_->leader_;

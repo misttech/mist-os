@@ -8,13 +8,13 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
-#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_ptr.h>
@@ -38,7 +38,7 @@ class FileOps;
 class FileSystem;
 
 using FileSystemHandle = fbl::RefPtr<FileSystem>;
-using WeakFileHandle = util::WeakPtr<FileObject>;
+using WeakFileHandle = mtl::WeakPtr<FileObject>;
 using starnix_uapi::OpenFlagsImpl;
 
 enum class SeekTargetType : uint8_t {
@@ -208,6 +208,9 @@ class FileObject : public fbl::RefCounted<FileObject> {
  private:
   FileObject(WeakFileHandle weak_handle, FileObjectId id, NamespaceNode name, FileSystemHandle fs,
              ktl::unique_ptr<FileOps> ops, OpenFlags flags);
+
+ public:
+  mtl::WeakPtrFactory<FileObject> weak_factory_;
 };
 
 }  // namespace starnix

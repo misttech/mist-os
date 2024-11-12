@@ -25,7 +25,7 @@
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
-#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
@@ -108,7 +108,7 @@ class CurrentTask : public TaskMemoryAccessor {
   /// impl CurrentTask
   static CurrentTask New(fbl::RefPtr<Task> task, ThreadState thread_state);
 
-  util::WeakPtr<Task> weak_task() const;
+  mtl::WeakPtr<Task> weak_task() const;
 
   void set_creds(Credentials creds) const;
 
