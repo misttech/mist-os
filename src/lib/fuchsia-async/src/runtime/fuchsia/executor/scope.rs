@@ -25,7 +25,7 @@ use std::{fmt, hash};
 // # Public API
 //
 
-/// A scope for async tasks. This scope is cancelled when dropped.
+/// A scope for managing async tasks. This scope is cancelled when dropped.
 ///
 /// Scopes are how fuchsia-async implements [structured concurrency][sc]. Every
 /// task is spawned on a scope, and runs until either the task completes or the
@@ -81,8 +81,24 @@ impl Scope {
     }
 
     /// Create a [`ScopeHandle`] that may be used to spawn tasks on this scope.
-    pub fn as_handle(&self) -> ScopeHandle {
+    ///
+    /// This is a shorthand for `scope.as_handle().clone()`.
+    ///
+    /// Scope holds a `ScopeHandle` and implements Deref to make its methods
+    /// available. Note that you should _not_ call `scope.clone()`, even though
+    /// the compiler allows it due to the Deref impl. Call this method instead.
+    pub fn to_handle(&self) -> ScopeHandle {
         self.inner.clone()
+    }
+
+    /// Get a reference to a [`ScopeHandle`] that may be used to spawn tasks on
+    /// this scope.
+    ///
+    /// Scope holds a `ScopeHandle` and implements Deref to make its methods
+    /// available. If you have a `Scope` but need a `&ScopeHandle`, prefer
+    /// calling this method over the less readable `&*scope`.
+    pub fn as_handle(&self) -> &ScopeHandle {
+        &self.inner
     }
 
     /// Wait for all tasks in the scope and its children to complete.
@@ -148,9 +164,7 @@ impl Drop for Scope {
 
 impl IntoFuture for Scope {
     type Output = ();
-
     type IntoFuture = Join;
-
     fn into_future(self) -> Self::IntoFuture {
         self.join()
     }
@@ -242,6 +256,20 @@ pub struct ScopeHandle {
 }
 
 impl ScopeHandle {
+    /// Create a child scope.
+    pub fn new_child(&self) -> Scope {
+        let mut state = self.lock();
+        let child = ScopeHandle {
+            inner: Arc::new(ScopeInner {
+                executor: self.inner.executor.clone(),
+                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
+            }),
+        };
+        let weak = child.downgrade();
+        state.insert_child(weak.clone());
+        Scope { inner: child }
+    }
+
     /// Spawn a new task on the scope.
     // This does not have the must_use attribute because it's common to detach and the lifetime of
     // the task is bound to the scope: when the scope is dropped, the task will be cancelled.
@@ -286,20 +314,6 @@ impl ScopeHandle {
                 state: Condition::new(ScopeState::new(None, Status::default())),
             }),
         }
-    }
-
-    /// Create a child scope.
-    pub fn new_child(&self) -> Scope {
-        let mut state = self.lock();
-        let child = ScopeHandle {
-            inner: Arc::new(ScopeInner {
-                executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
-            }),
-        };
-        let weak = child.downgrade();
-        state.insert_child(weak.clone());
-        Scope { inner: child }
     }
 
     /// Cancel all the scope's tasks.
@@ -936,7 +950,7 @@ mod tests {
     fn tasks_do_not_spawn_on_cancelled_scopes() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         assert_eq!(executor.run_until_stalled(&mut pin!(scope.cancel())), Poll::Ready(()));
         let mut task = pin!(handle.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
@@ -1102,7 +1116,7 @@ mod tests {
     fn detached_scope_can_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         scope.detach();
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Ready(1));
     }
@@ -1111,7 +1125,7 @@ mod tests {
     fn dropped_scope_cannot_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Pending);
     }
@@ -1120,7 +1134,7 @@ mod tests {
     fn dropped_scope_with_running_task_cannot_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         let _running_task = handle.spawn(pending::<()>());
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Pending);
@@ -1130,7 +1144,7 @@ mod tests {
     fn joined_scope_cannot_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Pending);
@@ -1140,7 +1154,7 @@ mod tests {
     fn joining_scope_with_running_task_can_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         let _running_task = handle.spawn(pending::<()>());
         let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
@@ -1151,7 +1165,7 @@ mod tests {
     fn joined_scope_child_cannot_spawn() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         let child_before_join = scope.new_child();
         assert_eq!(
             executor.run_until_stalled(&mut child_before_join.compute(async { 1 })),
@@ -1224,7 +1238,7 @@ mod tests {
     fn cancel_completes_while_task_holds_handle() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let handle = scope.as_handle();
+        let handle = scope.to_handle();
         let mut task = scope.compute(async move {
             loop {
                 pending::<()>().await; // never returns
@@ -1252,7 +1266,7 @@ mod tests {
             let mut no_tasks = pin!(scope.on_no_tasks());
             assert_eq!(executor.run_until_stalled(&mut no_tasks), Poll::Pending);
 
-            let handle = scope.as_handle();
+            let handle = scope.to_handle();
             scope.spawn(async move {
                 handle.cancel().await;
                 panic!("cancel() should never complete");
