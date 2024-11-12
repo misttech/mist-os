@@ -206,6 +206,9 @@ template("fidl_library") {
     "fuchsia.audio.device",
     "fuchsia.bluetooth.pandora",
     "fuchsia.drm",
+
+    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
+    "fuchsia.fdomain",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
     "fuchsia.session.power",

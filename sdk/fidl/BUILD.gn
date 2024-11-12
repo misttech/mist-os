@@ -272,6 +272,7 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
   "//sdk/fidl/fuchsia.drm:fuchsia.drm",
+  "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain",
   "//sdk/fidl/fuchsia.fs:fuchsia.fs",
   "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
   "//sdk/fidl/fuchsia.media2:fuchsia.media2",
