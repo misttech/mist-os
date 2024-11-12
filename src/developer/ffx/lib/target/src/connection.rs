@@ -11,12 +11,12 @@ use fdomain_client::fidl::DiscoverableProtocolMarker;
 use fdomain_fuchsia_developer_remotecontrol::{
     RemoteControlMarker as FDRemoteControlMarker, RemoteControlProxy as FDRemoteControlProxy,
 };
-use fdomain_fuchsia_io as fio;
 use ffx_ssh::parse::HostAddr;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use {fdomain_fuchsia_io as fio, fidl_fuchsia_io as fio_f};
 
 #[derive(Debug)]
 struct RcsInfo {
@@ -29,7 +29,7 @@ struct RcsInfo {
 #[derive(Debug)]
 pub struct Connection {
     overnet: Option<OvernetClient>,
-    fdomain: Option<Arc<fdomain_client::Client>>,
+    fdomain: Mutex<Option<Arc<fdomain_client::Client>>>,
     fidl_pipe: FidlPipe,
     rcs_info: Mutex<Option<RcsInfo>>,
 }
@@ -67,7 +67,7 @@ impl Connection {
             ConnectionError::ConnectionStartError(connector_debug_string, e.to_string())
         })?;
         let overnet = node.map(|node| OvernetClient { node });
-        Ok(Self { overnet, fdomain: client, fidl_pipe, rcs_info: Default::default() })
+        Ok(Self { overnet, fdomain: Mutex::new(client), fidl_pipe, rcs_info: Default::default() })
     }
 
     /// Attempts to retrieve an instance of the remote control proxy. When invoked for the first
@@ -108,8 +108,15 @@ impl Connection {
     /// time, this function will run indefinitely until it finds a remote control proxy, so it is
     /// the caller's responsibility to time out.
     pub async fn rcs_proxy_fdomain(&self) -> Result<FDRemoteControlProxy, ConnectionError> {
-        let Some(fdomain) = &self.fdomain else {
-            todo!("overnet passthrough unsupported");
+        let fdomain = {
+            let mut fdomain = self.fdomain.lock().await;
+            if let Some(fdomain) = fdomain.clone() {
+                fdomain
+            } else {
+                let client = self.pass_thru_client().await?;
+                *fdomain = Some(client);
+                fdomain.clone().unwrap()
+            }
         };
 
         let (proxy, server_end) = fdomain
@@ -154,6 +161,26 @@ impl Connection {
     /// The ssh host address from the perspective of the device.
     pub fn host_ssh_address(&self) -> Option<HostAddr> {
         self.fidl_pipe.host_ssh_address()
+    }
+
+    /// Get an FDomain client that just forwards to Overnet.
+    async fn pass_thru_client(&self) -> Result<Arc<fdomain_client::Client>, ConnectionError> {
+        let rcs = self.rcs_proxy().await?;
+        let toolbox =
+            rcs::toolbox::open_toolbox(&rcs).await.map_err(ConnectionError::InternalError)?;
+
+        Ok(fdomain_local::local_client(move || {
+            let (client, server) = fidl::endpoints::create_endpoints();
+            if let Err(error) = toolbox.open3(
+                ".",
+                fio_f::Flags::PROTOCOL_DIRECTORY,
+                &fio_f::Options::default(),
+                server.into(),
+            ) {
+                tracing::debug!(?error, "Could not open svc folder in toolbox namespace");
+            };
+            Ok(client)
+        }))
     }
 }
 
