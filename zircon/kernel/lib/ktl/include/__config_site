@@ -21,41 +21,53 @@
 
 // These two are what <__config_site> for Fuchsia userland defines.
 #define _LIBCPP_ABI_VERSION 2
-#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS
+#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS 1
 
 // This has to be defined to some `__*` string but what doesn't really matter.
 #define _LIBCPP_ABI_NAMESPACE __ktl
 
 // When compiling in the UEFI environment, the predefines look like Windows
 // but there is no Windows runtime environment to use.
-#define _LIBCPP_NO_VCRUNTIME
+#define _LIBCPP_NO_VCRUNTIME 1
 
 // This tells the headers not to use `extern template` declarations that
 // expect specific instantiations/specializations to come from the libc++
 // library rather than the headers.  In the kernel, only the headers are
 // ever going to be available.
-#define _LIBCPP_DISABLE_EXTERN_TEMPLATE
+#define _LIBCPP_DISABLE_EXTERN_TEMPLATE 1
 
 // This tells <atomic> not to use threading APIs.
-#define _LIBCPP_HAS_NO_PLATFORM_WAIT
+#define _LIBCPP_HAS_NO_PLATFORM_WAIT 1
 
 // This tells <atomic> et al to use <__external_threading> instead
 // of expecting either POSIX or C11 threading APIs.
-#define _LIBCPP_HAS_THREAD_API_EXTERNAL
-#define _LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL
+#define _LIBCPP_HAS_THREAD_API_EXTERNAL 1
+#define _LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL 1
+
+// <__config> requires that these be set if _LIBCPP_HAS_THREAD_API_EXTERNAL is.
+#define _LIBCPP_HAS_THREADS 1
+#define _LIBCPP_HAS_MONOTONIC_CLOCK 1
 
 // This tells <new> not to use `aligned_alloc` from <stdlib.h>.
-#define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC
+#define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC 1
 
 // This tells various headers to be strict about what includes what.
-#define _LIBCPP_REMOVE_TRANSITIVE_INCLUDES
+#define _LIBCPP_REMOVE_TRANSITIVE_INCLUDES 1
 
 // This tells libc++ not to expect full locale APIs in some places.
-#define _LIBCPP_HAS_NO_LOCALIZATION
+#define _LIBCPP_HAS_NO_LOCALIZATION 1
+
+// This is unfortunately required even though the kernel does not use wide
+// characters.
+#define _LIBCPP_HAS_WIDE_CHARACTERS 1
 
 // This tells pstl headers to use serial algorithms and not try to
 // do any multithreading.
-#define _LIBCPP_PSTL_CPU_BACKEND_SERIAL
+#define _LIBCPP_PSTL_CPU_BACKEND_SERIAL 1
+
+// This will probably never be used in code that ktl actually uses.
+// But define it for completeness.
+#define _LIBCPP_INSTRUMENTED_WITH_ASAN __has_feature(address_sanitizer)
 
 // TODO(https://fxbug.dev/42082322): make the hardening mode selectable through build
 // configurations.
