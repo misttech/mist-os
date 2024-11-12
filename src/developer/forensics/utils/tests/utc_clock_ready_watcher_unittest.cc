@@ -85,7 +85,9 @@ TEST_F(UtcClockReadyWatcherTest, Check_NotReadyOnClockStart) {
   utc_clock_ready_watcher_->OnClockReady([&] { clock_started = true; });
   ASSERT_FALSE(clock_started);
 
-  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  ASSERT_EQ(
+      clock_handle_.update(zx::clock::update_args().set_value(zx::time_monotonic(kTime.get()))),
+      ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(clock_started);

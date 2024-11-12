@@ -80,8 +80,9 @@ TEST_F(TimeProviderTest, Check_NotReadyOnClockStarted) {
   SetUpTimeProvider();
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 
-  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kUtcTime.get()))),
-            ZX_OK);
+  ASSERT_EQ(
+      clock_handle_.update(zx::clock::update_args().set_value(zx::time_monotonic(kUtcTime.get()))),
+      ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());

@@ -10,7 +10,7 @@
 namespace forensics::stubs {
 
 UIStateProvider::UIStateProvider(async_dispatcher_t* dispatcher, fuchsia::ui::activity::State state,
-                                 zx::time time)
+                                 zx::time_monotonic time)
     : dispatcher_(dispatcher), state_(state), time_(time) {}
 
 void UIStateProvider::WatchState(
@@ -23,7 +23,7 @@ void UIStateProvider::WatchState(
   OnStateChanged();
 }
 
-void UIStateProvider::SetState(fuchsia::ui::activity::State state, zx::time time) {
+void UIStateProvider::SetState(fuchsia::ui::activity::State state, zx::time_monotonic time) {
   state_ = state;
   time_ = time;
 

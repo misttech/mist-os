@@ -72,8 +72,8 @@ TEST_F(CobaltTest, Check_Log) {
 }
 
 TEST_F(CobaltTest, Check_Timer) {
-  constexpr zx::time kStartTime(0);
-  constexpr zx::time kEndTime(kStartTime + zx::usec(5));
+  constexpr zx::time_monotonic kStartTime(0);
+  constexpr zx::time_monotonic kEndTime(kStartTime + zx::usec(5));
 
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
 

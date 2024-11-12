@@ -145,7 +145,7 @@ std::vector<testing::internal::PairMatcher<K, V>> Linearize(const std::map<K, V>
 class CrashReporterTest : public UnitTestFixture {
  public:
   void SetUp() override {
-    clock_.SetMonotonic(zx::time(0u));
+    clock_.SetMonotonic(zx::time_monotonic(0u));
     info_context_ =
         std::make_shared<InfoContext>(&InspectRoot(), &clock_, dispatcher(), services());
     crash_register_ = std::make_unique<CrashRegister>(info_context_, RegisterJsonPath());

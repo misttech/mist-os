@@ -51,7 +51,7 @@ bool SpawnCrasher(ExceptionContext* pe, const std::string& process_name) {
 
   // Wait for the exception.
   zx_port_packet_t packet;
-  if (zx_status_t res = pe->port.wait(zx::time::infinite(), &packet); res != ZX_OK) {
+  if (zx_status_t res = pe->port.wait(zx::time_monotonic::infinite(), &packet); res != ZX_OK) {
     FX_PLOGS(ERROR, res) << "Could not wait on port.";
     return false;
   }

@@ -44,7 +44,7 @@ class MonotonicBackoff : public backoff::Backoff {
 class UIStateProviderTest : public UnitTestFixture {
  public:
   UIStateProviderTest()
-      : server_(dispatcher(), fuchsia::ui::activity::State::UNKNOWN, zx::time(0)) {
+      : server_(dispatcher(), fuchsia::ui::activity::State::UNKNOWN, zx::time_monotonic(0)) {
     InjectServiceProvider(&server_);
     ui_state_provider_ = std::make_unique<UIStateProvider>(
         dispatcher(), services(), std::make_unique<timekeeper::AsyncTestClock>(dispatcher()),
@@ -69,7 +69,7 @@ TEST_F(UIStateProviderTest, Get_NoStateChanges) {
 TEST_F(UIStateProviderTest, Get) {
   EXPECT_THAT(ui_state_provider_->Get(), IsEmpty());
 
-  server_.SetState(fuchsia::ui::activity::State::IDLE, zx::time(zx::sec(1).get()));
+  server_.SetState(fuchsia::ui::activity::State::IDLE, zx::time_monotonic(zx::sec(1).get()));
   RunLoopFor((zx::sec(3)));
 
   EXPECT_THAT(ui_state_provider_->Get(),
@@ -88,7 +88,7 @@ TEST_F(UIStateProviderTest, GetOnUpdate) {
   EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
                                                            ErrorOrString("unknown"))}));
 
-  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time(0));
+  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time_monotonic(0));
 
   // The change hasn't propagated yet.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
@@ -98,7 +98,7 @@ TEST_F(UIStateProviderTest, GetOnUpdate) {
   EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
                                                            ErrorOrString("active"))}));
 
-  server_.SetState(fuchsia::ui::activity::State::IDLE, zx::time(0));
+  server_.SetState(fuchsia::ui::activity::State::IDLE, zx::time_monotonic(0));
 
   // The change hasn't propagated yet.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
@@ -132,7 +132,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnProviderDisconnect) {
   server_.CloseConnection();
   ASSERT_FALSE(server_.IsBound());
 
-  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time(0));
+  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time_monotonic(0));
 
   // Connection should stay closed until Backoff allows it to reconnect
   RunLoopUntilIdle();
@@ -171,7 +171,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnListenerDisconnect) {
                            }));
 
   server_.UnbindListener();
-  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time(0));
+  server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time_monotonic(0));
 
   // Connection should stay closed until Backoff allows it to reconnect
   RunLoopUntilIdle();

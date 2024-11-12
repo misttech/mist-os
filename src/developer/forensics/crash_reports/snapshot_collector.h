@@ -98,7 +98,7 @@ class SnapshotCollector {
 
   // Make a call to fuchsia.feedback.DataProvider/GetSnapshot, started at |start_time|, and return
   // the Uuid of its eventual snapshot.
-  std::string MakeNewSnapshotRequest(zx::time start_time, zx::duration timeout);
+  std::string MakeNewSnapshotRequest(zx::time_monotonic start_time, zx::duration timeout);
 
   // Use |fidl_snapshot| to update all snapshot-related state with Uuid |uuid|.
   void CompleteWithSnapshot(const std::string& uuid, feedback::Annotations annotations,

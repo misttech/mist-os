@@ -374,7 +374,7 @@ TEST_F(HandlerTest, ProcessTerminated) {
 
   // Must explicitly wait for the job to be terminated to ensure consistency between asan and
   // non-asan.
-  exception.job.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr);
+  exception.job.wait_one(ZX_TASK_TERMINATED, zx::time_monotonic::infinite(), nullptr);
 
   bool called = false;
   HandleException(std::move(exception.exception), zx::duration::infinite(),
@@ -460,7 +460,7 @@ TEST_F(HandlerTestWithPF, HoldsWakeLeaseUntilFeedbackResponse) {
 
   // Must explicitly wait for the job to be terminated to ensure consistency between asan and
   // non-asan.
-  exception_context.job.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr);
+  exception_context.job.wait_one(ZX_TASK_TERMINATED, zx::time_monotonic::infinite(), nullptr);
 
   auto wake_lease = std::make_unique<stubs::WakeLease>(dispatcher());
   stubs::WakeLease* wake_lease_ptr = wake_lease.get();
