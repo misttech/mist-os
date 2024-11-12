@@ -154,26 +154,43 @@ impl<'a> ATraceEvent<'a> {
     // function returns an Option rather than a Result. If we did return a Result, this could be
     // put in a TryFrom impl, if desired.
     fn parse(s: &'a str) -> Option<Self> {
-        let chunks: Vec<_> = s.split('|').collect();
-        if chunks.len() >= 3 && chunks[0] == "B" {
-            let pid = chunks[1].parse::<u64>().ok()?;
-            return Some(ATraceEvent::Begin { pid, name: chunks[2] });
-        } else if chunks.len() >= 2 && chunks[0] == "E" {
-            let pid = chunks[1].parse::<u64>().ok()?;
-            return Some(ATraceEvent::End { pid });
-        } else if chunks.len() >= 3 && chunks[0] == "I" {
-            return Some(ATraceEvent::Instant { name: chunks[2] });
-        } else if chunks.len() >= 4 && chunks[0] == "S" {
-            let correlation_id = chunks[3].parse::<u64>().ok()?;
-            return Some(ATraceEvent::AsyncBegin { name: chunks[2], correlation_id });
-        } else if chunks.len() >= 4 && chunks[0] == "F" {
-            let correlation_id = chunks[3].parse::<u64>().ok()?;
-            return Some(ATraceEvent::AsyncEnd { name: chunks[2], correlation_id });
-        } else if chunks.len() >= 4 && chunks[0] == "C" {
-            let value = chunks[3].parse::<i64>().ok()?;
-            return Some(ATraceEvent::Counter { name: chunks[2], value });
+        let mut chunks = s.split('|');
+        let event_type = chunks.next()?;
+        match event_type {
+            "B" => {
+                let pid = chunks.next()?.parse::<u64>().ok()?;
+                let name = chunks.next()?;
+                Some(ATraceEvent::Begin { pid, name })
+            }
+            "E" => {
+                let pid = chunks.next()?.parse::<u64>().ok()?;
+                Some(ATraceEvent::End { pid })
+            }
+            "I" => {
+                let _pid = chunks.next()?;
+                let name = chunks.next()?;
+                Some(ATraceEvent::Instant { name })
+            }
+            "S" => {
+                let _pid = chunks.next()?;
+                let name = chunks.next()?;
+                let correlation_id = chunks.next()?.parse::<u64>().ok()?;
+                Some(ATraceEvent::AsyncBegin { name, correlation_id })
+            }
+            "F" => {
+                let _pid = chunks.next()?;
+                let name = chunks.next()?;
+                let correlation_id = chunks.next()?.parse::<u64>().ok()?;
+                Some(ATraceEvent::AsyncEnd { name, correlation_id })
+            }
+            "C" => {
+                let _pid = chunks.next()?;
+                let name = chunks.next()?;
+                let value = chunks.next()?.parse::<i64>().ok()?;
+                Some(ATraceEvent::Counter { name, value })
+            }
+            _ => None,
         }
-        None
     }
 }
 
