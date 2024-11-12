@@ -81,6 +81,9 @@ pub enum Error {
 
     #[error(transparent)]
     ParseError(#[from] selectors::Error),
+
+    #[error("unknown StringSelector variant found")]
+    UnknownStringSelectorVariant,
 }
 
 const DRIVER_COLLECTION_SEGMENT: &str = "*-drivers:*";
@@ -108,7 +111,7 @@ fn verify_wildcard_restrictions(selector: &Selector, raw_selector: &str) -> Resu
                 return Ok(());
             }
         }
-        StringSelector::__SourceBreaking { .. } => unreachable!("source breaking"),
+        StringSelector::__SourceBreaking { .. } => return Err(Error::UnknownStringSelectorVariant),
     }
 
     let Some(collection_segment) = segments.next() else {
@@ -135,7 +138,7 @@ fn verify_wildcard_restrictions(selector: &Selector, raw_selector: &str) -> Resu
             return Err(Error::InvalidWildcardedSelector(raw_selector.to_string()))
         }
         StringSelector::ExactMatch(_) => {}
-        StringSelector::__SourceBreaking { .. } => unreachable!("source breaking"),
+        StringSelector::__SourceBreaking { .. } => return Err(Error::UnknownStringSelectorVariant),
     }
 
     if segments.any(|s| matches!(s, StringSelector::StringPattern(_))) {

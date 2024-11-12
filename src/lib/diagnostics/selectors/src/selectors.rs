@@ -332,9 +332,7 @@ pub fn match_tree_name_against_selector(tree_name: &str, selector: &Selector) ->
         // manager) have been updated to specify tree names or [...].
         None => true,
 
-        Some(TreeNames::__SourceBreaking { .. }) => {
-            unreachable!("FIDL convention to ensure exhaustive match")
-        }
+        Some(TreeNames::__SourceBreaking { .. }) => false,
     }
 }
 

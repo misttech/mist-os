@@ -162,7 +162,7 @@ pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvid
     Ok(results)
 }
 
-fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
+fn add_tree_name(mut selector: Selector, tree_name: String) -> Result<Selector, Error> {
     match selector.tree_names {
         None => selector.tree_names = Some(TreeNames::Some(vec![tree_name])),
         Some(ref mut names) => match names {
@@ -172,13 +172,17 @@ fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
                 }
             }
             TreeNames::All(_) => {}
-            TreeNames::__SourceBreaking { .. } => {
-                unreachable!("source breaking")
+            TreeNames::__SourceBreaking { unknown_ordinal } => {
+                let unknown_ordinal = *unknown_ordinal;
+                return Err(Error::InvalidSelector(format!(
+                    "selector had invalid TreeNames variant {unknown_ordinal}: {:?}",
+                    selector,
+                )));
             }
         },
     }
 
-    selector
+    Ok(selector)
 }
 
 /// Expand selectors.
@@ -201,7 +205,7 @@ pub fn expand_selectors(
 
     for mut selector in selectors {
         if let Some(tree_name) = &tree_name {
-            selector = add_tree_name(selector, tree_name.clone());
+            selector = add_tree_name(selector, tree_name.clone())?;
         }
         result.push(selector)
     }
