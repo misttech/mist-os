@@ -944,16 +944,12 @@ impl MemoryManagerState {
         self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
     }
 
-    // Map the memory without updating `self.mappings`.
-    fn map_internal(
+    fn select_desired_address(
         &self,
         mut addr: DesiredAddress,
-        memory: &MemoryObject,
-        memory_offset: u64,
         length: usize,
         flags: MappingFlags,
-        populate: bool,
-    ) -> Result<UserAddress, Errno> {
+    ) -> Result<DesiredAddress, Errno> {
         let adjusted_length = round_up_to_system_page_size(length)?;
 
         // If the hint is not acceptable, strip it.
@@ -987,10 +983,24 @@ impl MemoryManagerState {
 
             addr = DesiredAddress::Fixed(new_addr)
         }
+
+        Ok(addr)
+    }
+
+    // Map the memory without updating `self.mappings`.
+    fn map_internal(
+        &self,
+        addr: DesiredAddress,
+        memory: &MemoryObject,
+        memory_offset: u64,
+        length: usize,
+        flags: MappingFlags,
+        populate: bool,
+    ) -> Result<UserAddress, Errno> {
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            addr,
+            self.select_desired_address(addr, length, flags)?,
             memory,
             memory_offset,
             length,
@@ -1065,6 +1075,9 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
+        let addr = self.select_desired_address(addr, length, flags)?;
+
         let target_addr = self.private_anonymous.allocate_address_range(
             &self.user_vmar,
             &self.user_vmar_info,
@@ -1074,8 +1087,6 @@ impl MemoryManagerState {
         )?;
 
         let backing_memory_offset = target_addr.ptr();
-
-        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
 
         let mapped_addr = self.map_internal(
             DesiredAddress::FixedOverwrite(target_addr),
@@ -1414,7 +1425,7 @@ impl MemoryManagerState {
                 let dst_addr = self.private_anonymous.allocate_address_range(
                     &self.user_vmar,
                     &self.user_vmar_info,
-                    dst_addr_for_map,
+                    self.select_desired_address(dst_addr_for_map, dst_length, src_mapping.flags)?,
                     dst_length,
                     src_mapping.flags.options(),
                 )?;
