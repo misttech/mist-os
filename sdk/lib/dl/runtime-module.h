@@ -107,17 +107,25 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr AbiModule& module() { return abi_module_; }
   constexpr const AbiModule& module() const { return abi_module_; }
 
-  constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
+  size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
+
+  // The following methods satisfy the Module template API for use with
+  // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
 
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
 
-  size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
+  constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
 
-  size_type tls_module_id() const { return abi_module_.tls_modid; }
+  constexpr size_type tls_module_id() const { return abi_module_.tls_modid; }
 
   constexpr bool uses_static_tls() const { return ld::ModuleUsesStaticTls(abi_module_); }
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+
+  constexpr fit::result<bool, const typename Elf::Sym*> Lookup(  //
+      Diagnostics& diag, elfldltl::SymbolName& name) const {
+    return fit::ok(name.Lookup(symbol_info()));
+  }
 
   // Return a view of `list` with all of its elements dereferenced and made
   // constant (i.e. Vector<const RuntimeModule*> -> View<const RuntimeModule&>).

@@ -37,9 +37,6 @@ class LoadModuleRef;
 // ld::DecodedModule.  The ld::LoadModule object itself holds little more than
 // the module name.  A mutable decoded module object can be modified via the
 // `decoded()` accessor.
-//
-// TODO(https://fxbug.dev/326524302): Flesh out the indirect case with a
-// read-only decoded().
 template <typename DecodedStorage>
 class LoadModule {
  private:
@@ -89,6 +86,10 @@ class LoadModule {
 
   // This is returned by the name_ref() and soname_ref() methods.
   using Ref = LoadModuleRef<LoadModule>;
+
+  // This is the return value that the <lib/elfldltl/resolve.h> Module API
+  // requires for the Lookup method.
+  using LookupResult = fit::result<bool, const Sym*>;
 
   constexpr LoadModule() = default;
 
@@ -259,6 +260,11 @@ class LoadModule {
   template <bool M = kMutableDecoded, typename = std::enable_if_t<M>>
   constexpr size_type tls_module_id() const {
     return module().tls_modid;
+  }
+
+  // This can be overridden in a subclass for custom semantics.
+  constexpr LookupResult Lookup(auto& diag, elfldltl::SymbolName& name) const {
+    return fit::ok(name.Lookup(symbol_info()));
   }
 
  protected:
