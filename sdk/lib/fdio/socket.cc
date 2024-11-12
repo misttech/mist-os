@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "socket.h"
+
 #include <fidl/fuchsia.posix.socket/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zxio/bsdsocket.h>
@@ -13,9 +15,6 @@
 #include <zircon/types.h>
 
 #include <algorithm>
-#include <bitset>
-#include <type_traits>
-#include <utility>
 
 #include <fbl/ref_ptr.h>
 #include <netpacket/packet.h>
@@ -175,10 +174,9 @@ struct base_socket : public remote {
           return Errno(Errno::Ok);
         }
 
+        const size_t capacity = ifc.ifc_len / sizeof(struct ifreq);
         struct ifreq* ifr = ifc.ifc_req;
-        const auto buffer_full = [&] {
-          return ifr + 1 > ifc.ifc_req + ifc.ifc_len / sizeof(struct ifreq);
-        };
+        const auto buffer_full = [&] { return ifr + 1 > ifc.ifc_req + capacity; };
         for (const auto& iface : interfaces) {
           // Don't write past the caller-allocated buffer.
           // C++ doesn't support break labels, so we check this in both the inner
