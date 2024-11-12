@@ -19,10 +19,12 @@ use tracing::error;
 const SAMPLES_RECORDED: usize = 5;
 /// Empty sample with which the sample buffer is originally initialized.
 const EMPTY_SAMPLE: HttpsSample = HttpsSample {
-    utc: zx::MonotonicInstant::ZERO,
-    monotonic: zx::MonotonicInstant::ZERO,
-    standard_deviation: zx::MonotonicDuration::from_nanos(0),
-    final_bound_size: zx::MonotonicDuration::from_nanos(0),
+    // TODO: b/374817071 - this is very wrong, but a side-effect of the historic
+    // conflation of various timelines. Will be fixed in future changes.
+    utc: zx::BootInstant::ZERO,
+    reference: zx::BootInstant::ZERO,
+    standard_deviation: zx::BootDuration::from_nanos(0),
+    final_bound_size: zx::BootDuration::from_nanos(0),
     polls: vec![],
 };
 
@@ -32,7 +34,7 @@ pub struct InspectDiagnostics {
     root_node: Node,
     /// Node holding failure counts.
     failure_node: Node,
-    /// Monotonic time at which the last error occurred.
+    /// Boot time at which the last error occurred.
     last_failure_time: IntProperty,
     /// Counters for failed attempts to produce samples, keyed by error type.
     failure_counts: Mutex<HashMap<HttpsDateErrorType, UintProperty>>,
@@ -40,7 +42,7 @@ pub struct InspectDiagnostics {
     recent_successes_buffer: Mutex<SampleMetricBuffer>,
     /// The current phase the algorithm is in.
     phase: StringProperty,
-    /// Monotonic time at which the phase was last updated.
+    /// Boot time at which the phase was last updated.
     phase_update_time: IntProperty,
 }
 
@@ -58,12 +60,12 @@ impl InspectDiagnostics {
             )),
             phase: root_node.create_string("phase", &format!("{:?}", Phase::Initial)),
             phase_update_time: root_node
-                .create_int("phase_update_time", zx::MonotonicInstant::get().into_nanos()),
+                .create_int("phase_update_time", zx::BootInstant::get().into_nanos()),
         }
     }
 
     fn network_check_success(&self) {
-        self.root_node.record_int("network_check_time", zx::MonotonicInstant::get().into_nanos());
+        self.root_node.record_int("network_check_time", zx::BootInstant::get().into_nanos());
     }
 
     fn success(&self, sample: &HttpsSample) {
@@ -81,12 +83,12 @@ impl InspectDiagnostics {
                     .insert(*error, self.failure_node.create_uint(format!("{:?}_count", error), 1));
             }
         }
-        self.last_failure_time.set(zx::MonotonicInstant::get().into_nanos());
+        self.last_failure_time.set(zx::BootInstant::get().into_nanos());
     }
 
     fn phase_update(&self, phase: &Phase) {
         self.phase.set(&format!("{:?}", phase));
-        self.phase_update_time.set(zx::MonotonicInstant::get().into_nanos());
+        self.phase_update_time.set(zx::BootInstant::get().into_nanos());
     }
 }
 
@@ -139,8 +141,8 @@ struct SampleMetric {
     _node: Node,
     /// Array of measured network round trip times for the sample in nanoseconds.
     round_trip_times: IntArrayProperty,
-    /// Monotonic time at which the sample was taken.
-    monotonic: IntProperty,
+    /// Reference time at which the sample was taken.
+    reference: IntProperty,
     /// Final size of the produced UTC bound in nanoseconds.
     bound_size: IntProperty,
 }
@@ -162,9 +164,9 @@ impl SampleMetric {
             .enumerate()
             .take(SAMPLE_POLLS)
             .for_each(|(idx, poll)| round_trip_times.set(idx, poll.round_trip_time.into_nanos()));
-        let monotonic = node.create_int("monotonic", sample.monotonic.into_nanos());
+        let reference = node.create_int("reference", sample.reference.into_nanos());
         let bound_size = node.create_int("bound_size", sample.final_bound_size.into_nanos());
-        Self { _node: node, round_trip_times, monotonic, bound_size }
+        Self { _node: node, round_trip_times, reference, bound_size }
     }
 
     /// Update the recorded values in the inspect Node.
@@ -181,7 +183,7 @@ impl SampleMetric {
             self.round_trip_times.set(idx, poll.round_trip_time.into_nanos())
         });
         self.bound_size.set(sample.final_bound_size.into_nanos());
-        self.monotonic.set(sample.monotonic.into_nanos());
+        self.reference.set(sample.reference.into_nanos());
     }
 }
 
@@ -195,24 +197,23 @@ mod test {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        static ref TEST_UTC: zx::MonotonicInstant =
-            zx::MonotonicInstant::from_nanos(999_900_000_000);
-        static ref TEST_MONOTONIC: zx::MonotonicInstant =
-            zx::MonotonicInstant::from_nanos(550_000_000_000);
+        // TODO: b/374817071: This is temporarily allowed to be on a wrong timeline.
+        static ref TEST_UTC: zx::BootInstant = zx::BootInstant::from_nanos(999_900_000_000);
+        static ref TEST_REFERENCE: zx::BootInstant = zx::BootInstant::from_nanos(550_000_000_000);
     }
 
-    const TEST_STANDARD_DEVIATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(211);
+    const TEST_STANDARD_DEVIATION: zx::BootDuration = zx::BootDuration::from_millis(211);
 
-    const TEST_ROUND_TRIP_1: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
-    const TEST_ROUND_TRIP_2: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(150);
-    const TEST_ROUND_TRIP_3: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(200);
+    const TEST_ROUND_TRIP_1: zx::BootDuration = zx::BootDuration::from_millis(100);
+    const TEST_ROUND_TRIP_2: zx::BootDuration = zx::BootDuration::from_millis(150);
+    const TEST_ROUND_TRIP_3: zx::BootDuration = zx::BootDuration::from_millis(200);
 
-    const TEST_BOUND_SIZE: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(75);
+    const TEST_BOUND_SIZE: zx::BootDuration = zx::BootDuration::from_millis(75);
 
-    fn sample_with_rtts(round_trip_times: &[zx::MonotonicDuration]) -> HttpsSample {
+    fn sample_with_rtts(round_trip_times: &[zx::BootDuration]) -> HttpsSample {
         HttpsSample {
             utc: *TEST_UTC,
-            monotonic: *TEST_MONOTONIC,
+            reference: *TEST_REFERENCE,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: round_trip_times
@@ -251,7 +252,7 @@ mod test {
                         0,
                         0
                     ],
-                    monotonic: TEST_MONOTONIC.into_nanos(),
+                    reference: TEST_REFERENCE.into_nanos(),
                     bound_size: TEST_BOUND_SIZE.into_nanos(),
                 },
                 sample_1: {
@@ -263,7 +264,7 @@ mod test {
                         0,
                         0
                     ],
-                    monotonic: TEST_MONOTONIC.into_nanos(),
+                    reference: TEST_REFERENCE.into_nanos(),
                     bound_size: TEST_BOUND_SIZE.into_nanos(),
                 }
             }

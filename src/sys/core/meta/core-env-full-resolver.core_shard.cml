@@ -29,11 +29,18 @@
         },
         {
             name: "session-env",
-            extends: "realm",
+
+            // This excludes the boot-resolver and builtin-runner, which the session is not
+            // allowed access to.
+            extends: "none",
             runners: [
                 {
                     runner: "starnix",
                     from: "#starnix_runner",
+                },
+                {
+                    runner: "elf",
+                    from: "parent",
                 },
             ],
             resolvers: [
@@ -43,6 +50,9 @@
                     scheme: "fuchsia-pkg",
                 },
             ],
+
+            // Copy timeout from the parent environment
+            __stop_timeout_ms: 5000,
         },
     ],
 }

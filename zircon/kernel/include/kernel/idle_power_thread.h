@@ -127,6 +127,9 @@ class IdlePowerThread final {
   // Allow percpu to initialize this_cpu_;
   friend struct percpu;
 
+  // Allow Scheduler to get/reset the time spent in the processor idle state.
+  friend class Scheduler;
+
   struct StateMachine {
     State current{State::Active};
     State target{State::Active};
@@ -174,11 +177,15 @@ class IdlePowerThread final {
   // update after the monotonic clock is resumed.
   static void UpdateMonotonicClock(cpu_num_t current_cpu, const StateMachine& current_state);
 
-  ktl::atomic<StateMachine> state_{};
+  // Called by the scheduler when updating per-CPU and per-thread stats.
+  static zx_duration_t TakeProcessorIdleTime();
+
+  ktl::atomic<StateMachine> state_;
   AutounsignalMpUnplugEvent complete_;
 
   Thread thread_;
   cpu_num_t this_cpu_{INVALID_CPU};
+  zx_duration_t processor_idle_time_ns_{0};
 
   DECLARE_SINGLETON_MUTEX(TransitionLock);
 

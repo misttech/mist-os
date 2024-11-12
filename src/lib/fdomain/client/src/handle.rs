@@ -5,9 +5,6 @@
 use crate::responder::Responder;
 use crate::{ordinals, Client, Error};
 use fidl_fuchsia_fdomain as proto;
-use fidl_fuchsia_fdomain_ext::{
-    proto_signals_to_fidl_take, AsFDomainObjectType, AsFDomainRights, AsFDomainSignals,
-};
 use futures::FutureExt;
 use std::future::Future;
 use std::pin::Pin;
@@ -24,7 +21,7 @@ pub struct Handle {
 impl Handle {
     /// Get the FDomain client this handle belongs to.
     pub(crate) fn client(&self) -> Result<Arc<Client>, Error> {
-        self.client.upgrade().ok_or(Error::ConnectionLost)
+        self.client.upgrade().ok_or(Error::ClientLost)
     }
 
     /// Get an invalid handle.
@@ -77,16 +74,11 @@ impl HandleRef<'_> {
     /// rights.
     pub fn duplicate(
         &self,
-        rights: impl AsFDomainRights,
+        rights: fidl::Rights,
     ) -> impl Future<Output = Result<Handle, Error>> + 'static {
-        let client_and_rights = self.0.client().and_then(move |client| {
-            rights
-                .as_fdomain_rights()
-                .ok_or(Error::ProtocolRightsIncompatible)
-                .map(|rights| (client, rights))
-        });
+        let client = self.0.client();
         let handle = self.0.proto();
-        let result = client_and_rights.map(|(client, rights)| {
+        let result = client.map(|client| {
             let new_handle = client.new_hid();
             let id = new_handle.id;
             client
@@ -102,25 +94,18 @@ impl HandleRef<'_> {
     }
 
     /// Assert and deassert signals on this handle.
-    pub fn fdomain_signal(
+    pub fn signal(
         &self,
-        ty: impl AsFDomainObjectType,
-        set: impl AsFDomainSignals,
-        clear: impl AsFDomainSignals,
+        set: fidl::Signals,
+        clear: fidl::Signals,
     ) -> impl Future<Output = Result<(), Error>> {
         let handle = self.proto();
-        let params = (move || {
-            let client = self.client()?;
-            let ty = ty.as_fdomain_object_type().ok_or(Error::ProtocolObjectTypeIncompatible)?;
-            let set = set.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            let clear = clear.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            Ok((client, set, clear))
-        })();
+        let client = self.client();
 
-        let result: Result<_, Error> = params.map(|(client, set, clear)| {
+        let result: Result<_, Error> = client.map(|client| {
             client.transaction(
                 ordinals::SIGNAL,
-                proto::FDomainSignalRequest { handle, set, clear },
+                proto::FDomainSignalRequest { handle, set: set.bits(), clear: clear.bits() },
                 Responder::Signal,
             )
         });
@@ -133,14 +118,19 @@ impl HandleRef<'_> {
 /// operations that can be performed on [`HandleRef`].
 pub trait AsHandleRef {
     fn as_handle_ref(&self) -> HandleRef<'_>;
-    fn object_type() -> impl AsFDomainObjectType + Send + Sync + 'static;
+    fn object_type() -> fidl::ObjectType;
 
-    fn fdomain_signal_handle(
+    fn signal_handle(
         &self,
-        set: impl AsFDomainSignals + Send + Sync + 'static,
-        clear: impl AsFDomainSignals + Send + Sync + 'static,
+        set: fidl::Signals,
+        clear: fidl::Signals,
     ) -> impl Future<Output = Result<(), Error>> {
-        self.as_handle_ref().fdomain_signal(Self::object_type(), set, clear)
+        self.as_handle_ref().signal(set, clear)
+    }
+
+    /// Get the client supporting this handle.
+    fn client(&self) -> Result<Arc<Client>, Error> {
+        self.as_handle_ref().0.client.upgrade().ok_or(Error::ClientLost)
     }
 }
 
@@ -151,33 +141,26 @@ impl AsHandleRef for Handle {
     }
 
     /// Get the object type of this handle.
-    fn object_type() -> impl AsFDomainObjectType {
-        proto::ObjType::None
+    fn object_type() -> fidl::ObjectType {
+        fidl::ObjectType::NONE
     }
 }
 
 /// Trait for handle-based types that have a peer.
 pub trait Peered: HandleBased {
     /// Assert and deassert signals on this handle's peer.
-    fn fdomain_signal_peer(
+    fn signal_peer(
         &self,
-        ty: impl AsFDomainObjectType + Send + Sync + 'static,
-        set: impl AsFDomainSignals + Send + Sync + 'static,
-        clear: impl AsFDomainSignals + Send + Sync + 'static,
+        set: fidl::Signals,
+        clear: fidl::Signals,
     ) -> impl Future<Output = Result<(), Error>> {
         let handle = self.as_handle_ref().proto();
-        let params = (move || {
-            let client = self.as_handle_ref().client()?;
-            let ty = ty.as_fdomain_object_type().ok_or(Error::ProtocolObjectTypeIncompatible)?;
-            let set = set.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            let clear = clear.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            Ok((client, set, clear))
-        })();
+        let client = self.as_handle_ref().client();
 
-        let result: Result<_, Error> = params.map(|(client, set, clear)| {
+        let result: Result<_, Error> = client.map(|client| {
             client.transaction(
                 ordinals::SIGNAL_PEER,
-                proto::FDomainSignalPeerRequest { handle, set, clear },
+                proto::FDomainSignalPeerRequest { handle, set: set.bits(), clear: clear.bits() },
                 Responder::SignalPeer,
             )
         });
@@ -238,19 +221,21 @@ impl OnFDomainSignals {
     /// Construct a new [`OnFDomainSignals`]. The next time one of the given
     /// signals is asserted the future will return. The return value is all
     /// asserted signals intersected with the input signals.
-    pub fn new(handle: &Handle, signals: proto::Signals) -> Self {
+    pub fn new(handle: &Handle, signals: fidl::Signals) -> Self {
         let client = handle.client();
         let handle = handle.proto();
         let result = client.map(|client| {
             client
                 .transaction(
                     ordinals::WAIT_FOR_SIGNALS,
-                    proto::FDomainWaitForSignalsRequest { handle, signals },
+                    proto::FDomainWaitForSignalsRequest { handle, signals: signals.bits() },
                     Responder::WaitForSignals,
                 )
-                .map(|f| f.map(|mut x| proto_signals_to_fidl_take(&mut x.signals)))
+                .map(|f| f.map(|x| x.signals))
         });
-        OnFDomainSignals { fut: async move { result?.await }.boxed() }
+        OnFDomainSignals {
+            fut: async move { result?.await.map(fidl::Signals::from_bits_retain) }.boxed(),
+        }
     }
 }
 
@@ -292,19 +277,15 @@ impl Handle {
 
     /// Replace this handle with a new handle to the same object, with different
     /// rights.
-    pub fn replace(
-        self,
-        rights: impl AsFDomainRights,
-    ) -> impl Future<Output = Result<Handle, Error>> {
+    pub fn replace(self, rights: fidl::Rights) -> impl Future<Output = Result<Handle, Error>> {
         let params = (move || {
             let client = self.client()?;
             let handle = self.take_proto();
             let new_handle = client.new_hid();
-            let rights = rights.as_fdomain_rights().ok_or(Error::ProtocolRightsIncompatible)?;
-            Ok((new_handle, handle, client, rights))
+            Ok((new_handle, handle, client))
         })();
 
-        let result: Result<_, Error> = params.map(|(new_handle, handle, client, rights)| {
+        let result: Result<_, Error> = params.map(|(new_handle, handle, client)| {
             let id = new_handle.id;
             let ret = Handle { id, client: Arc::downgrade(&client) };
             (
@@ -334,7 +315,7 @@ impl Drop for Handle {
 }
 
 macro_rules! handle_type {
-    ($name:ident) => {
+    ($name:ident $objtype:ident) => {
         impl From<$name> for Handle {
             fn from(other: $name) -> Handle {
                 other.0
@@ -353,15 +334,15 @@ macro_rules! handle_type {
             }
 
             fn object_type(
-            ) -> impl ::fidl_fuchsia_fdomain_ext::AsFDomainObjectType + Send + Sync + 'static {
-                ::fidl_fuchsia_fdomain::ObjType::$name
+            ) -> fidl::ObjectType {
+                ::fidl::ObjectType::$objtype
             }
         }
 
         impl $crate::HandleBased for $name {}
     };
-    ($name:ident peered) => {
-        handle_type!($name);
+    ($name:ident $objtype:ident peered) => {
+        handle_type!($name $objtype);
 
         impl $crate::Peered for $name {}
     };

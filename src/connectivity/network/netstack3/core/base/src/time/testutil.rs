@@ -62,6 +62,10 @@ impl Instant for FakeInstant {
         self.offset.checked_add(duration).map(|offset| FakeInstant { offset })
     }
 
+    fn saturating_add(&self, duration: Duration) -> Self {
+        FakeInstant { offset: self.offset.saturating_add(duration) }
+    }
+
     fn checked_sub(&self, duration: Duration) -> Option<FakeInstant> {
         self.offset.checked_sub(duration).map(|offset| FakeInstant { offset })
     }

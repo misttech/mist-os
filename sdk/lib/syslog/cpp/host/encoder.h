@@ -16,7 +16,7 @@
 
 namespace syslog_runtime::internal {
 struct MsgHeader {
-  FuchsiaLogSeverity severity;
+  fuchsia_logging::RawLogSeverity severity;
   char* offset;
   LogBuffer* buffer;
   bool first_tag;
@@ -89,7 +89,7 @@ struct MsgHeader {
     return len;
   }
 
-  void Init(LogBuffer* log_buffer, FuchsiaLogSeverity log_severity) {
+  void Init(LogBuffer* log_buffer, fuchsia_logging::RawLogSeverity log_severity) {
     this->severity = log_severity;
     user_tag = nullptr;
     offset = reinterpret_cast<char*>(log_buffer->data());
@@ -105,7 +105,7 @@ struct MsgHeader {
 };
 
 #ifndef __Fuchsia__
-const std::string GetNameForLogSeverity(FuchsiaLogSeverity severity);
+const std::string GetNameForLogSeverity(fuchsia_logging::RawLogSeverity severity);
 #endif
 
 static_assert(sizeof(MsgHeader) <= LogBuffer::record_state_size(),

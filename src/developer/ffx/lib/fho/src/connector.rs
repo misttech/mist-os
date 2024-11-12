@@ -4,6 +4,7 @@
 
 use crate::{FfxContext, Result};
 use async_lock::{Mutex, MutexGuard};
+use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
 use ffx_config::EnvironmentContext;
 use ffx_target::connection::{Connection, ConnectionError};
 use ffx_target::ssh_connector::SshConnector;
@@ -32,6 +33,10 @@ pub trait DirectConnector: Debug {
     /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
     /// hasn't been initiated.
     fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
+
+    /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
+    /// hasn't been initiated.
+    fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>>;
 
     /// Attempts to pull any errors off of the connection and wrap the passed error in one larger
     /// error encompassing the entire connection failure. This is usually done after something
@@ -100,10 +105,10 @@ impl TryFromEnvContext for SshConnector {
     }
 }
 
-/// Encapsulates a connection to a single fuchsia device, using overnet as the FIDL communication
-/// backend.
+/// Encapsulates a connection to a single fuchsia device, using fdomain or
+/// overnet as the FIDL communication backend.
 #[derive(Debug, Clone)]
-pub struct Overnet<T: TryFromEnvContext + TargetConnector> {
+pub struct NetworkConnector<T: TryFromEnvContext + TargetConnector> {
     env: EnvironmentContext,
     connection: Arc<Mutex<Option<Connection>>>,
     target_spec: Option<String>,
@@ -135,7 +140,7 @@ async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
     }
 }
 
-impl<T: TryFromEnvContext + TargetConnector + 'static> Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector + 'static> NetworkConnector<T> {
     /// Attempts to connect. If already connected, this is a no-op.
     fn maybe_connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
@@ -145,7 +150,7 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> Overnet<T> {
     }
 }
 
-impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for NetworkConnector<T> {
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
             let mut conn = self.connection.lock().await;
@@ -165,6 +170,20 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Overn
                 .as_ref()
                 .ok_or(crate::Error::Unexpected(anyhow::anyhow!("Connection not yet initialized")))?
                 .rcs_proxy()
+                .await
+                .bug()
+                .map_err(Into::into)
+        })
+    }
+
+    fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>> {
+        Box::pin(async {
+            self.maybe_connect().await?;
+            let conn = self.connection.lock().await;
+            (*conn)
+                .as_ref()
+                .ok_or(crate::Error::Unexpected(anyhow::anyhow!("Connection not yet initialized")))?
+                .rcs_proxy_fdomain()
                 .await
                 .bug()
                 .map_err(Into::into)
@@ -202,7 +221,7 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Overn
     }
 }
 
-impl<T: TryFromEnvContext + TargetConnector> Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector> NetworkConnector<T> {
     pub async fn new(env: &EnvironmentContext) -> Result<Self> {
         let target_spec = Option::<String>::try_from_env_context(env).await?;
         Ok(Self {
@@ -249,7 +268,7 @@ mod tests {
     async fn test_connection_works_without_explicit_connect() {
         let test_env = ffx_config::test_init().await.unwrap();
         let env = &test_env.context;
-        let connector = Overnet::<RegularFakeOvernet>::new(env).await.unwrap();
+        let connector = NetworkConnector::<RegularFakeOvernet>::new(env).await.unwrap();
         assert_eq!(
             connector.rcs_proxy().await.unwrap().echo_string("foobar").await.unwrap(),
             "foobar"
@@ -260,7 +279,7 @@ mod tests {
     async fn test_connection_works_after_connecting() {
         let test_env = ffx_config::test_init().await.unwrap();
         let env = &test_env.context;
-        let connector = Overnet::<RegularFakeOvernet>::new(env).await.unwrap();
+        let connector = NetworkConnector::<RegularFakeOvernet>::new(env).await.unwrap();
         connector.connect().await.unwrap();
         assert_eq!(
             connector.rcs_proxy().await.unwrap().echo_string("foobar").await.unwrap(),
@@ -292,7 +311,7 @@ mod tests {
     async fn test_connection_fails_when_overnet_connector_cannot_be_allocated() {
         let test_env = ffx_config::test_init().await.unwrap();
         let env = &test_env.context;
-        let connector = Overnet::<FromContextFailer>::new(env).await.unwrap();
+        let connector = NetworkConnector::<FromContextFailer>::new(env).await.unwrap();
         assert!(connector.connect().await.is_err());
         assert!(connector.connect().await.is_err());
         assert!(connector.rcs_proxy().await.is_err());

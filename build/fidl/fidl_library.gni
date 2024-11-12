@@ -206,6 +206,9 @@ template("fidl_library") {
     "fuchsia.audio.device",
     "fuchsia.bluetooth.pandora",
     "fuchsia.drm",
+
+    # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
+    "fuchsia.fdomain",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
     "fuchsia.session.power",
@@ -332,9 +335,6 @@ template("fidl_library") {
                                   library_name == "fuchsia.intl.test" ||
                                   library_name == "fuchsia.settings.test"
 
-  # TODO(https://fxbug.dev/365602428): Determine an appropriate state for library and remove this.
-  _is_test_example_library = library_name == "test.example"
-
   # These are used in conditions, including within asserts, that are not always executed.
   not_needed([
                "_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf",
@@ -342,7 +342,6 @@ template("fidl_library") {
                "_is_banjo_sysmem",
                "_is_documentation_example",
                "_is_test_versioned_in_fuchsia",
-               "_is_test_example_library",
              ])
 
   assert(
@@ -361,8 +360,7 @@ template("fidl_library") {
                _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
           (fidlc_versioned_arg == "unversioned" && !is_stable &&
                !requires_compatibility_tests &&
-               (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk ||
-                    _is_test_example_library)) ||
+               (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk)) ||
           (is_testonly && !is_stable && !defined(invoker.sdk_category) &&
                !requires_compatibility_tests &&
                (fidlc_versioned_arg == "unversioned" ||

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
@@ -33,19 +34,19 @@ std::string format(const char* fmt, va_list args) {
 fuchsia_logging::LogSeverity GetSeverity(int prio) {
   switch (prio) {
     case ANDROID_LOG_VERBOSE:
-      return FUCHSIA_LOG_TRACE;
+      return fuchsia_logging::LogSeverity::Trace;
     case ANDROID_LOG_DEBUG:
-      return FUCHSIA_LOG_DEBUG;
+      return fuchsia_logging::LogSeverity::Debug;
     case ANDROID_LOG_INFO:
-      return FUCHSIA_LOG_INFO;
+      return fuchsia_logging::LogSeverity::Info;
     case ANDROID_LOG_WARN:
-      return FUCHSIA_LOG_WARNING;
+      return fuchsia_logging::LogSeverity::Warn;
     case ANDROID_LOG_ERROR:
-      return FUCHSIA_LOG_ERROR;
+      return fuchsia_logging::LogSeverity::Error;
     case ANDROID_LOG_FATAL:
-      return FUCHSIA_LOG_FATAL;
+      return fuchsia_logging::LogSeverity::Fatal;
     default:
-      return FUCHSIA_LOG_ERROR;
+      return fuchsia_logging::LogSeverity::Error;
   }
 }
 }  // namespace

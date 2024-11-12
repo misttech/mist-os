@@ -16,7 +16,6 @@ use cm_rust::{
 };
 use cm_types::{IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use futures::FutureExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
@@ -193,7 +192,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     child_component_output_dictionary_routers: HashMap<ChildName, Router<Dict>>,
     decl: &cm_rust::ComponentDecl,
     component_input: ComponentInput,
-    program_input_dict_additions: &Dict,
     program_output_dict: Dict,
     framework_dict: Dict,
     capability_sourced_capabilities_dict: Dict,
@@ -215,7 +213,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     &child_component_output_dictionary_routers,
                     &component_input,
                     environment_decl,
-                    program_input_dict_additions,
                     &program_output_dict,
                 ),
             )
@@ -253,11 +250,10 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
 
     for use_ in &decl.uses {
         extend_dict_with_use(
-            &component,
+            component,
             &child_component_output_dictionary_routers,
             &component_input,
             &program_input,
-            program_input_dict_additions,
             &program_output_dict,
             &framework_dict,
             &capability_sourced_capabilities_dict,
@@ -272,11 +268,10 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     if !decl.uses.iter().any(|u| matches!(u, cm_rust::UseDecl::Runner(_))) {
         if let Some(runner_name) = decl.program.as_ref().and_then(|p| p.runner.as_ref()) {
             extend_dict_with_use(
-                &component,
+                component,
                 &child_component_output_dictionary_routers,
                 &component_input,
                 &program_input,
-                program_input_dict_additions,
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
@@ -426,7 +421,6 @@ fn build_environment(
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
-    program_input_dict_additions: &Dict,
     program_output_dict: &Dict,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
@@ -461,13 +455,10 @@ fn build_environment(
         let source_path =
             SeparatedPath { dirname: Default::default(), basename: source_name.clone() };
         let router: Router<Connector> = match &source {
-            cm_rust::RegistrationSource::Parent => use_from_parent_router::<Connector>(
-                component_input,
-                source_path,
-                moniker,
-                program_input_dict_additions,
-            )
-            .with_porcelain_type(cap_type, moniker.clone()),
+            cm_rust::RegistrationSource::Parent => {
+                use_from_parent_router::<Connector>(component_input, source_path, moniker)
+                    .with_porcelain_type(cap_type, moniker.clone())
+            }
             cm_rust::RegistrationSource::Self_ => program_output_dict
                 .get_router_or_not_found::<Connector>(
                     &source_path,
@@ -564,7 +555,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     }
 }
 
-fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
+pub fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
     matches!(
         use_,
         cm_rust::UseDecl::Config(_) | cm_rust::UseDecl::Protocol(_) | cm_rust::UseDecl::Runner(_)
@@ -578,7 +569,6 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     program_input: &ProgramInput,
-    program_input_dict_additions: &Dict,
     program_output_dict: &Dict,
     config_use: &cm_rust::UseConfigurationDecl,
     error_reporter: impl ErrorReporter,
@@ -587,13 +577,10 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     let source_path = config_use.source_path();
     let porcelain_type = CapabilityTypeName::Config;
     let router: Router<Data> = match config_use.source() {
-        cm_rust::UseSource::Parent => use_from_parent_router::<Data>(
-            component_input,
-            source_path.to_owned(),
-            moniker,
-            program_input_dict_additions,
-        )
-        .with_porcelain_type(porcelain_type, moniker.clone()),
+        cm_rust::UseSource::Parent => {
+            use_from_parent_router::<Data>(component_input, source_path.to_owned(), moniker)
+                .with_porcelain_type(porcelain_type, moniker.clone())
+        }
         cm_rust::UseSource::Self_ => program_output_dict
             .get_router_or_not_found::<Data>(
                 &source_path,
@@ -656,24 +643,22 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     program_input: &ProgramInput,
-    program_input_dict_additions: &Dict,
     program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
     error_reporter: impl ErrorReporter,
 ) {
-    let moniker = component.moniker();
     if !is_supported_use(use_) {
         return;
     }
+    let moniker = component.moniker();
     if let cm_rust::UseDecl::Config(config) = use_ {
         return extend_dict_with_config_use(
             component,
             child_component_output_dictionary_routers,
             component_input,
             program_input,
-            program_input_dict_additions,
             program_output_dict,
             config,
             error_reporter,
@@ -683,13 +668,10 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     let source_path = use_.source_path();
     let porcelain_type = CapabilityTypeName::from(use_);
     let router: Router<Connector> = match use_.source() {
-        cm_rust::UseSource::Parent => use_from_parent_router::<Connector>(
-            component_input,
-            source_path.to_owned(),
-            moniker,
-            program_input_dict_additions,
-        )
-        .with_porcelain_type(porcelain_type, moniker.clone()),
+        cm_rust::UseSource::Parent => {
+            use_from_parent_router::<Connector>(component_input, source_path.to_owned(), moniker)
+                .with_porcelain_type(porcelain_type, moniker.clone())
+        }
         cm_rust::UseSource::Self_ => program_output_dict
             .get_router_or_not_found::<Connector>(
                 &source_path,
@@ -807,14 +789,10 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
 }
 
 /// Builds a router that obtains a capability that the program uses from `parent`.
-///
-/// The capability is usually an entry in the `component_input.capabilities` dict unless it is
-/// overridden by an eponymous capability in the `program_input_dict_additions` when started.
 fn use_from_parent_router<T>(
     component_input: &ComponentInput,
     source_path: impl IterablePath + 'static + Debug,
     moniker: &Moniker,
-    program_input_dict_additions: &Dict,
 ) -> Router<T>
 where
     T: CapabilityBound + Clone,
@@ -827,22 +805,7 @@ where
     } else {
         RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/"))
     };
-    let component_input_router =
-        component_input.capabilities().get_router_or_not_found::<T>(&source_path, err);
-
-    let program_input_dict_additions = program_input_dict_additions.clone();
-
-    Router::<T>::new(move |request: Option<Request>, debug: bool| {
-        let source_path = source_path.clone();
-        let router = match program_input_dict_additions
-            .get_capability(&source_path)
-            .and_then(|c| T::try_from(c).ok())
-        {
-            Some(c) => Router::<T>::new_ok(c),
-            None => component_input_router.clone(),
-        };
-        async move { router.route(request, debug).await }.boxed()
-    })
+    component_input.capabilities().get_router_or_not_found::<T>(&source_path, err)
 }
 
 fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {

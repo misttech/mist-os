@@ -58,13 +58,19 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
                     addresses: vec![
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("127.0.0.1/8"),
-                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            valid_until:
+                                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                            preferred_lifetime_info:
+                                fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                             assignment_state:
                                 fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
                         },
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("::1/128"),
-                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            valid_until:
+                                fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                            preferred_lifetime_info:
+                                fidl_fuchsia_net_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                             assignment_state:
                                 fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
                         },

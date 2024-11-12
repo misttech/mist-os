@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/field.h>
-#include <lib/stdcompat/bit.h>
+
+#include <bit>
 
 #include <gtest/gtest.h>
 
@@ -269,7 +270,7 @@ TEST(ElfldltlFieldTests, ByteSwap) {
   EXPECT_EQ(data.u8[0], uint8_t{0xaa});
   EXPECT_EQ(s.u8[0](), uint8_t{0xaa});
 
-  constexpr bool kLittle = cpp20::endian::native == cpp20::endian::little;
+  constexpr bool kLittle = std::endian::native == std::endian::little;
   constexpr elfldltl::UnsignedField<uint32_t, !kLittle> kConst{{4, 3, 2, 1}};
   constexpr elfldltl::UnsignedField<uint32_t, kLittle> kBigConst{{1, 2, 3, 4}};
   constexpr uint32_t kConstVal = kConst;

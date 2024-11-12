@@ -5,6 +5,7 @@
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/sdk/sdk_atom.gni")
+import("//build/testing/host_test_data.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
@@ -16,19 +17,19 @@ import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 #
 # Additional Parameters
 #
-#    sdk_target_name (optional)
+#   sdk_target_name (required if `sdk_category` is set)
 #      The target name to generate for an sdk atom definition. If not
 #      set, no sdk target will be generated.
 #
-#    sdk_category (required if `sdk_target_name` is set)
+#   sdk_category (optional)
 #      The sdk category this will be installed to.
 #      See `sdk_atom`'s `category` argument for more information.
 #
-#   sdk_area (optional)
-#     [string] The API area responsible for maintaining this tool.
+#   sdk_area (optional; only allowed if `sdk_category` is set))
+#     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
 #
-#    sdk_deps (optional, ignored if `sdk_target_name` not set)
+#   sdk_deps (optional; only allowed if `sdk_category` is set))
 #      Dependencies for inclusion in the sdk. See `sdk_atom` for more
 #      information on this.
 #
@@ -55,13 +56,17 @@ import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 #     A `host_test_data` target that includes the files necessary to make sure
 #     this tool is available to tests.
 #
-# The following target will be produced only if `sdk_target_name` is set:
+# The following target will be produced only if `sdk_category` is set:
 #
 #   `<sdk_target_name>`
 #     Include the tool in the sdk as a host tool with metadata attached.
 #     Output: (see `sdk_atom` for more information)
 #
 template("ffx_tool") {
+  assert(
+      !defined(invoker.sdk_category) || defined(invoker.sdk_target_name),
+      "Must specify an SDK target name when generating an SDK atom for ffx tool")
+
   if (!defined(invoker.output_name)) {
     output_name = target_name
   } else {
@@ -83,22 +88,6 @@ template("ffx_tool") {
   output_unversioned = "${output_name}_unversioned"
   output_metadata = "${output_name}.json"
 
-  assert_no_deps = []
-  if (defined(invoker.assert_no_deps)) {
-    assert_no_deps += invoker.assert_no_deps
-  }
-
-  # TODO(b/314822328): improve this logic to cascade properly
-  if (defined(invoker.sdk_category) && invoker.sdk_category != "internal") {
-    assert_no_deps += [
-      "//sdk:marker-cts",
-      "//sdk:marker-excluded",
-      "//sdk:marker-experimental",
-      "//sdk:marker-internal",
-      "//sdk:marker-unknown",
-    ]
-  }
-
   # Make the rust binary
   rustc_binary(target_unversioned) {
     output_name = output_unversioned
@@ -110,7 +99,6 @@ template("ffx_tool") {
                              "sdk_category",
                              "sdk_area",
                              "sdk_deps",
-                             "assert_no_deps",
                            ])
   }
 
@@ -198,7 +186,12 @@ template("ffx_tool") {
 
   # Install host tool and metadata as test data
   host_test_data(target_test_data) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
 
     data_deps = [ ":$target_host_tool" ]
     sources = [
@@ -207,7 +200,7 @@ template("ffx_tool") {
     ]
   }
 
-  if (defined(invoker.sdk_target_name)) {
+  if (defined(invoker.sdk_category)) {
     # Add to the sdk
     file_base_root = "tools/ffx_tools"
     if (host_os == "linux" || host_os == "mac") {
@@ -217,18 +210,17 @@ template("ffx_tool") {
     file_base = "$file_base_root/$output_name"
     file_base_metadata = "$file_base_root/$output_metadata"
 
-    assert(
-        defined(invoker.sdk_category),
-        "Must specify an sdk category if generating an sdk target for ffx tool")
-
     # for the moment this goes directly to sdk_atom because this is a 'weird'
     # host tool that includes a json metadata file.
     sdk_atom(invoker.sdk_target_name) {
-      forward_variables_from(invoker, [ "sdk_area" ])
-
-      id = "sdk://$file_base"
+      forward_variables_from(invoker,
+                             [
+                               "assert_no_deps",
+                               "sdk_area",
+                             ])
 
       category = invoker.sdk_category
+      id = "sdk://$file_base"
 
       _target_files = {
         executable = file_base
@@ -278,6 +270,20 @@ template("ffx_tool") {
         ":$target_metadata",
         ":$target_versioned",
       ]
+
+      # TODO(b/314822328): improve this logic to cascade properly
+      if (invoker.sdk_category != "internal") {
+        if (!defined(assert_no_deps)) {
+          assert_no_deps = []
+        }
+        assert_no_deps += [
+          "//sdk:marker-cts",
+          "//sdk:marker-excluded",
+          "//sdk:marker-experimental",
+          "//sdk:marker-internal",
+          "//sdk:marker-unknown",
+        ]
+      }
     }
   }
 }

@@ -66,6 +66,9 @@ source_set("ddktl") {
 
       # <ddktl/metadata_server.h> has #include <lib/driver/outgoing/cpp/outgoing_directory.h>
       "//sdk/lib/driver/outgoing/cpp",
+
+      # <ddktl/device.h> has #include <lib/component/incoming/cpp/protocol.h>.
+      "//sdk/lib/component/incoming/cpp",
     ]
   }
 

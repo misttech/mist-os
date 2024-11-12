@@ -7,6 +7,7 @@ use crate::ota::state_machine::{Event, EventProcessor, StateHandler};
 use fuchsia_async::{self as fasync, Task};
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+#[cfg(test)]
 use mockall::automock;
 use recovery_metrics_registry::cobalt_registry as metrics;
 
@@ -21,7 +22,7 @@ impl EventSender {
     }
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 pub trait SendEvent {
     fn send(&mut self, event: Event);
     fn send_recovery_stage_event(&mut self, status: metrics::RecoveryEventMetricDimensionResult);
@@ -55,7 +56,7 @@ impl SendEvent for EventSender {
     }
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 pub trait Controller {
     fn add_event_observer(&mut self, sender: mpsc::Sender<Event>);
     fn add_state_handler(&mut self, handler: Box<dyn StateHandler>);

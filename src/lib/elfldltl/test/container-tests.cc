@@ -8,9 +8,9 @@
 #include <lib/elfldltl/preallocated-vector.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/elfldltl/testing/diagnostics.h>
-#include <lib/stdcompat/span.h>
 
 #include <array>
+#include <span>
 #include <string_view>
 
 #include <fbl/vector.h>
@@ -82,7 +82,7 @@ template <class List>
 void CheckContainerAPI(List& list, size_t max_size = 10) {
   EXPECT_EQ(list.max_size(), max_size);
   EXPECT_EQ(list.capacity(), 10u);
-  cpp20::span<const typename List::value_type> span = list.as_span();
+  std::span<const typename List::value_type> span = list.as_span();
   EXPECT_EQ(span.size(), 0u);
   EXPECT_TRUE(list.data());
   EXPECT_EQ(list.size(), 0u);
@@ -362,7 +362,7 @@ TEST(ElfldltlContainerTests, StaticVectorCorrectlyMoves) {
 
 TEST(ElfldltlContainerTests, PreallocatedVectorStaticExtentApi) {
   std::array<int, 10> arr;
-  elfldltl::PreallocatedVector vec{cpp20::span{arr}};
+  elfldltl::PreallocatedVector vec{std::span{arr}};
   CheckContainerAPI(vec);
   CheckContainerAPI(std::cref(vec).get());
 }
@@ -371,7 +371,7 @@ TEST(ElfldltlContainerTests, PreallocatedVectorStaticExtent) {
   auto diag = ExpectOkDiagnostics();
 
   std::array<int, 5> arr{};
-  elfldltl::PreallocatedVector vec{cpp20::span{arr}};
+  elfldltl::PreallocatedVector vec{std::span{arr}};
 
   auto insert_range = {1, 5, 7, 1293, 2};
   auto it_or_err = vec.insert(diag, "", vec.begin(), insert_range.begin(), insert_range.end());
@@ -386,19 +386,19 @@ TEST(ElfldltlContainerTests, PreallocatedVectorStaticExtent) {
 
 TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtentApi) {
   std::array<int, 20> arr{};
-  elfldltl::PreallocatedVector vec{cpp20::span{arr.data(), 10}};
+  elfldltl::PreallocatedVector vec{std::span{arr.data(), 10}};
 
-  CheckContainerAPI(vec, cpp20::dynamic_extent);
-  CheckContainerAPI(std::cref(vec).get(), cpp20::dynamic_extent);
+  CheckContainerAPI(vec, std::dynamic_extent);
+  CheckContainerAPI(std::cref(vec).get(), std::dynamic_extent);
 }
 
 TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtent) {
   auto diag = ExpectOkDiagnostics();
 
   std::array<int, 5> arr{};
-  elfldltl::PreallocatedVector vec{cpp20::span{arr.data(), 5}};
+  elfldltl::PreallocatedVector vec{std::span{arr.data(), 5}};
 
-  EXPECT_EQ(vec.max_size(), cpp20::dynamic_extent);
+  EXPECT_EQ(vec.max_size(), std::dynamic_extent);
   EXPECT_EQ(vec.size(), 0u);
 
   auto insert_range = {1, 5, 7, 1293, 2};

@@ -190,8 +190,7 @@ TEST(ElfldltlSegmentWithVmoTests, MutableMemoryStore) {
                               .vaddr = kMutable3Addr,
                               .filesz = kMutable3Size,
                               .memsz = kMutable3Size}};
-  constexpr size_type kFileSize =
-      cpp20::span{kPhdrs}.back().offset + cpp20::span{kPhdrs}.back().memsz;
+  constexpr size_type kFileSize = std::span{kPhdrs}.back().offset + std::span{kPhdrs}.back().memsz;
 
   LoadInfo info;
   for (const Phdr phdr : kPhdrs) {

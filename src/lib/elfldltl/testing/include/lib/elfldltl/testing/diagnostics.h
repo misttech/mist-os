@@ -7,8 +7,8 @@
 
 #include <lib/elfldltl/diagnostics-ostream.h>
 #include <lib/elfldltl/diagnostics.h>
-#include <lib/stdcompat/source_location.h>
 
+#include <source_location>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -16,7 +16,11 @@
 #include <type_traits>
 #include <utility>
 
+#ifdef USE_ZXTEST
+#include <zxtest/zxtest.h>
+#else
 #include <gtest/gtest.h>
+#endif
 
 namespace elfldltl::testing {
 
@@ -69,8 +73,7 @@ struct ReportToString {
 // This is a Report callable object that causes a gtest failure if called.
 class ExpectNoReport {
  public:
-  explicit constexpr ExpectNoReport(
-      cpp20::source_location location = cpp20::source_location::current())
+  explicit constexpr ExpectNoReport(std::source_location location = std::source_location::current())
       : location_{location} {}
 
   template <typename... Args>
@@ -85,7 +88,7 @@ class ExpectNoReport {
   }
 
  private:
-  cpp20::source_location location_;
+  std::source_location location_;
 };
 
 // This is a Report callable object that checks for an expected sequence of
@@ -110,8 +113,8 @@ class ExpectReport {
     EXPECT_NE(state_, State::kMoved);
   }
 
-  explicit constexpr ExpectReport(
-      Args... args, cpp20::source_location location = cpp20::source_location::current())
+  explicit constexpr ExpectReport(Args... args,
+                                  std::source_location location = std::source_location::current())
       : expected_{std::forward<Args>(args)...}, location_{location} {}
 
   template <typename... Ts>
@@ -236,7 +239,7 @@ class ExpectReport {
   }
 
   ExpectedArgs expected_;
-  cpp20::source_location location_;
+  std::source_location location_;
   State state_ = State::kUncalled;
 };
 
@@ -270,7 +273,7 @@ ExpectedSingleError(Args&&...) -> ExpectedSingleError<Args...>;
 // This Diagnostics object causes a gtest failure every time it's called.
 struct ExpectOkDiagnostics : public Diagnostics<ExpectNoReport, TestingDiagnosticsFlags> {
   explicit constexpr ExpectOkDiagnostics(
-      cpp20::source_location location = cpp20::source_location::current())
+      std::source_location location = std::source_location::current())
       : Diagnostics<ExpectNoReport, TestingDiagnosticsFlags>{ExpectNoReport{location}} {}
 
   constexpr ExpectOkDiagnostics(const ExpectOkDiagnostics&) = default;
@@ -305,7 +308,7 @@ class ExpectReportList {
   ExpectReportList& operator=(const ExpectReportList&) = delete;
 
   explicit constexpr ExpectReportList(
-      Reports... reports, cpp20::source_location location = cpp20::source_location::current())
+      Reports... reports, std::source_location location = std::source_location::current())
       : reports_{std::move(reports)...}, location_{location} {}
 
   template <typename... Args>
@@ -351,7 +354,7 @@ class ExpectReportList {
   }
 
   std::tuple<Reports...> reports_;
-  cpp20::source_location location_;
+  std::source_location location_;
   size_t next_ = 0;
 };
 
@@ -365,7 +368,7 @@ struct ExpectedErrorList
   using ReportList = ExpectReportList<Reports...>;
 
   explicit constexpr ExpectedErrorList(
-      Reports... reports, cpp20::source_location location = cpp20::source_location::current())
+      Reports... reports, std::source_location location = std::source_location::current())
       : Diagnostics<ReportList, TestingDiagnosticsFlags>{
             ReportList{std::move(reports)..., location}} {}
 

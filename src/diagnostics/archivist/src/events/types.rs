@@ -84,6 +84,7 @@ impl std::fmt::Debug for LogSinkRequestedPayload {
 
 #[derive(Debug, ValidFidlTable)]
 #[fidl_table_src(fcomponent::EventHeader)]
+#[fidl_table_strict]
 pub struct ValidatedEventHeader {
     event_type: fcomponent::EventType,
     component_url: String,
@@ -93,6 +94,7 @@ pub struct ValidatedEventHeader {
 
 #[derive(Debug, ValidFidlTable)]
 #[fidl_table_src(fcomponent::Event)]
+#[fidl_table_strict]
 pub struct ValidatedEvent {
     /// Information about the component for which this event was generated.
     pub header: ValidatedEventHeader,

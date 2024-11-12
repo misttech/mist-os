@@ -167,6 +167,9 @@ pub enum WlanPolicyLayer {
     /// Use an external policy layer, which uses `wlanix` to communicate with the Fuchsia WLAN
     /// stack.
     ViaWlanix,
+    /// Do not include a policy layer. Intended for testing only and only valid on Eng
+    /// products.
+    None,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]

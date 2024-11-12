@@ -97,7 +97,7 @@ bool StreamingModeThroughput(perftest::RepeatState* state) {
       drained.wait();
       state->NextStep();
 
-      FX_CHECK(client->StopTracing({{{.write_results = {false}}}}).is_ok());
+      FX_CHECK(client->StopTracing({{.write_results = {false}}}).is_ok());
     }
 
     drainer.join();

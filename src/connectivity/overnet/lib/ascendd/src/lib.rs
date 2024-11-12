@@ -22,12 +22,6 @@ use std::time::Duration;
 
 pub static CIRCUIT_ID: [u8; 8] = *b"CIRCUIT\0";
 
-pub fn default_ascendd_path() -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push("ascendd");
-    path
-}
-
 /// If necessary, holds a tempdir open with a symlink to a socket path
 /// that is too long to fit in the system's SUN_LEN.
 #[derive(Debug)]
@@ -108,8 +102,7 @@ pub fn short_socket_path(real_path: &Path) -> std::io::Result<ShortPathLink> {
 pub struct Opt {
     #[argh(option, long = "sockpath")]
     /// path to the ascendd socket.
-    /// If not provided, this will default to a new socket-file in /tmp.
-    pub sockpath: Option<PathBuf>,
+    pub sockpath: PathBuf,
 
     #[argh(option, long = "serial")]
     /// selector for which serial devices to communicate over.
@@ -253,8 +246,6 @@ async fn bind_listener(
     node_id: overnet_core::NodeId,
 ) -> Result<(PathBuf, AscenddClientRouting, UnixListener), Error> {
     let Opt { sockpath, serial: _, client_routing, usb: _, link: _ } = opt;
-    let sockpath = sockpath.unwrap_or(default_ascendd_path());
-
     let client_routing =
         if client_routing { AscenddClientRouting::Enabled } else { AscenddClientRouting::Disabled };
     tracing::debug!(node_id = node_id.0, "starting ascendd on {}", sockpath.display(),);

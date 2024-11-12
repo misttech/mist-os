@@ -344,7 +344,8 @@ AbrResult AbrMarkSlotActive(const AbrOps* abr_ops, AbrSlotIndex slot_index) {
   return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
 }
 
-AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index) {
+AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index,
+                                AbrUnbootableReason reason) {
   AbrData abr_data, abr_data_orig;
   AbrResult result;
 
@@ -362,7 +363,7 @@ AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
     return result;
   }
 
-  set_slot_unbootable(&abr_data.slot_data[slot_index], kAbrUnbootableReasonUserRequested);
+  set_slot_unbootable(&abr_data.slot_data[slot_index], (uint8_t)reason);
 
   return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
 }

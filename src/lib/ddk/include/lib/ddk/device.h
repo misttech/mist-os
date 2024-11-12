@@ -15,7 +15,6 @@ __BEGIN_CDECLS
 
 typedef struct zx_device zx_device_t;
 typedef struct zx_driver zx_driver_t;
-typedef struct zx_device_prop zx_device_prop_t;
 
 typedef struct zx_protocol_device zx_protocol_device_t;
 

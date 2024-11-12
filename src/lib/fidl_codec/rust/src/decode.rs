@@ -262,9 +262,14 @@ fn decode_type<'t>(
             Type::Handle { object_type, nullable, rights } => {
                 return decode_handle(*object_type, *nullable, *rights)(b)
             }
-            Type::Request { identifier, rights, nullable } => {
-                return decode_server_end(identifier.clone(), *nullable, *rights)(b)
-            }
+            Type::Endpoint { protocol, rights, nullable, role } => match role {
+                library::EndpointRole::Client => {
+                    return decode_client_end(protocol.clone(), *nullable, *rights)(b)
+                }
+                library::EndpointRole::Server => {
+                    return decode_server_end(protocol.clone(), *nullable, *rights)(b)
+                }
+            },
             Type::UnknownString(s) => {
                 Err(Error::LibraryError(format!("Unresolved Type: {}", s)).into())
             }
@@ -428,13 +433,14 @@ fn decode_server_end(
 fn decode_client_end(
     interface: String,
     nullable: bool,
+    rights: fidl::Rights,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'static>> {
     decode_handle_with(
         interface,
         nullable,
         &|x, y| Value::ClientEnd(x.into(), y),
         Some(fidl::ObjectType::CHANNEL),
-        fidl::Rights::CHANNEL_DEFAULT,
+        rights,
     )
 }
 
@@ -788,7 +794,11 @@ fn decode_identifier<'s>(
         library::LookupResult::Struct(s) => decode_struct(ns, s, nullable)(bytes),
         library::LookupResult::Union(u) => decode_union(ns, u, nullable)(bytes),
         library::LookupResult::Table(t) => decode_table(ns, t)(bytes),
-        library::LookupResult::Protocol(i) => decode_client_end(i.name.clone(), nullable)(bytes),
+        library::LookupResult::Protocol(_) => Err(Error::DecodeError(format!(
+            "Protocol names cannot be used as identifiers: {}",
+            name
+        ))
+        .into()),
     }
 }
 

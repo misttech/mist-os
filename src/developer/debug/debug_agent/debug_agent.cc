@@ -674,10 +674,6 @@ debug::Status DebugAgent::AddDebuggedJob(DebuggedJobCreateInfo&& create_info, De
   FX_DCHECK(create_info.handle);
 
   zx_koid_t job_koid = create_info.handle->GetKoid();
-  if (jobs_.find(job_koid) != jobs_.end()) {
-    return debug::Status(std::format("Already attached to job {}", job_koid));
-  }
-
   auto unique = std::make_unique<DebuggedJob>(this);
   *added = unique.get();
 
@@ -766,9 +762,6 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   if (request.config.target == debug_ipc::AttachConfig::Target::kJob) {
     if (!IsAttachedToParentOrAncestorOf(request.koid)) {
       reply->status = AttachToExistingJob(request.koid, request.config, reply);
-      if (reply->status.ok()) {
-        DEBUG_LOG(Agent) << "Could not attach to job: " << reply->status.message();
-      }
     } else {
       reply->status =
           debug::Status(debug::Status::kAlreadyExists, "Already attached to ancestor job.");
@@ -992,6 +985,13 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   // If we have a job only filter then we only watch for exceptions from the parent job and do not
   // attach to the process (but we do create a DebuggedProcess object for it below).
   if (job_only) {
+    // Already attached, nothing to do. This path is quite common when we are attaching to jobs
+    // located relatively high in a job tree which can spawn many processes. We will get many
+    // notifications of new processes.
+    if (GetDebuggedJob(process_handle->GetJobKoid())) {
+      return;
+    }
+
     // There's nothing to stop a user from installing a filter that matches a child component with
     // its own unique job_id and then another filter that matches a parent, so this won't completely
     // stop you from attaching to multiple jobs in the job tree. If this happens, releasing an

@@ -4215,7 +4215,7 @@ pub fn alias_or_path<'a>(alias: Option<&'a Path>, path: &'a Path) -> &'a Path {
     alias.unwrap_or(path)
 }
 
-pub fn format_cml(buffer: &str, file: &std::path::Path) -> Result<Vec<u8>, Error> {
+pub fn format_cml(buffer: &str, file: Option<&std::path::Path>) -> Result<Vec<u8>, Error> {
     let general_order = PathOption::PropertyNameOrder(vec![
         "name",
         "url",
@@ -4285,7 +4285,7 @@ pub fn format_cml(buffer: &str, file: &std::path::Path) -> Result<Vec<u8>, Error
         ..Default::default()
     };
 
-    json5format::format(buffer, Some(file.to_string_lossy().to_string()), Some(options))
+    json5format::format(buffer, file.map(|f| f.to_string_lossy().to_string()), Some(options))
         .map_err(|e| Error::json5(e, file))
 }
 

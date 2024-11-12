@@ -575,9 +575,9 @@ async fn main() {
             res.expect("stop tracing")
         };
         // NB: Terminating tracing is essentially infallible right now, since
-        // TerminateResult is not a result, but a FIDL table with no fields in it,
+        // StopResult is not a result, but a FIDL table with no fields in it,
         // thus it's safe to ignore.
-        let (_, _): (ftracing_controller::TerminateResult, usize) = futures::future::join(
+        let (_, _): (ftracing_controller::StopResult, usize) = futures::future::join(
             stop_and_terminate_fut,
             tracing_socket.read_to_end(&mut trace).map(|r| r.expect("read trace")),
         )

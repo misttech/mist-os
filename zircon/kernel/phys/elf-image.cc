@@ -28,13 +28,18 @@ namespace {
 
 constexpr ktl::string_view kDiagnosticsPrefix = "Cannot load ELF image: ";
 
+auto PanicDiagnostics() {
+  return elfldltl::Diagnostics{elfldltl::PrintfDiagnosticsReport(__zx_panic, kDiagnosticsPrefix),
+                               elfldltl::DiagnosticsPanicFlags()};
+}
+
 // TODO(mcgrathr): BFD ld produces a spurious empty .eh_frame with its own
 // empty PT_LOAD segment. This is harmless enough to the actual layout,
 // but triggers a FormatWarning.
 #ifdef __clang__
-auto GetDiagnostics() { return elfldltl::PanicDiagnostics(kDiagnosticsPrefix); }
+auto GetDiagnostics() { return PanicDiagnostics(); }
 #else
-constexpr auto kPanicReport = elfldltl::PanicDiagnosticsReport(kDiagnosticsPrefix);
+constexpr auto kPanicReport = elfldltl::PrintfDiagnosticsReport(__zx_panic, kDiagnosticsPrefix);
 using DiagBase = elfldltl::Diagnostics<decltype(kPanicReport), elfldltl::DiagnosticsPanicFlags>;
 struct NoWarnings : public DiagBase {
   constexpr NoWarnings() : DiagBase(kPanicReport) {}
@@ -269,7 +274,7 @@ void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, u
   image_.set_base(memory.base());
   load_bias_ = load_bias;
 
-  auto diag = elfldltl::PanicDiagnostics();
+  auto diag = PanicDiagnostics();
   ZX_ASSERT(load_info_.AddSegment(diag, ZX_PAGE_SIZE, load_segment));
 
   elfldltl::ElfNoteSegment<> notes(build_id_note);

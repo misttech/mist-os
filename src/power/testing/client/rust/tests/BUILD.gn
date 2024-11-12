@@ -7,10 +7,10 @@ import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":power_framework_test_realm_test" ]
+  deps = [ ":power_framework_test_realm_test_rust" ]
 }
 
-rustc_test("power_framework_test_realm_test_bin") {
+rustc_test("power_framework_test_realm_test_rust_bin") {
   edition = "2021"
   testonly = true
   sources = [ "src/lib.rs" ]
@@ -29,7 +29,7 @@ rustc_test("power_framework_test_realm_test_bin") {
   ]
 }
 
-fuchsia_unittest_package("power_framework_test_realm_test") {
-  deps = [ ":power_framework_test_realm_test_bin" ]
+fuchsia_unittest_package("power_framework_test_realm_test_rust") {
+  deps = [ ":power_framework_test_realm_test_rust_bin" ]
   subpackages = [ "//src/power/testing/client:power-framework" ]
 }

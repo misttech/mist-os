@@ -2577,12 +2577,16 @@ mod tests {
             addresses: vec![
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("1.2.3.0/24"),
-                    valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                    valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                    preferred_lifetime_info:
+                        fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("123::4/64"),
-                    valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                    valid_until: fnet_interfaces_ext::PositiveMonotonicInstant::INFINITE_FUTURE,
+                    preferred_lifetime_info:
+                        fnet_interfaces_ext::PreferredLifetimeInfo::preferred_forever(),
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
             ],

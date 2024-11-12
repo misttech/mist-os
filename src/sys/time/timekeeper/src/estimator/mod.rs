@@ -19,10 +19,9 @@ use tracing::{info, warn};
 /// The maximum change in Kalman filter estimate that can occur before we discard any previous
 /// samples being used as part of a long term frequency assessment. This is similar to the value
 /// used by the ClockManager to determine when to step the externally visible clock but it need
-/// not be identical. Since the steps are measured at different monotonic times there would always
+/// not be identical. Since the steps are measured at different reference times there would always
 /// be the possibility of an inconsistency.
-const MAX_STEP_FOR_FREQUENCY_CONTINUITY: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_seconds(1);
+const MAX_STEP_FOR_FREQUENCY_CONTINUITY: zx::BootDuration = zx::BootDuration::from_seconds(1);
 
 /// Converts a floating point frequency to a rate adjustment in PPM.
 fn frequency_to_adjust_ppm(frequency: f64) -> i32 {
@@ -34,7 +33,7 @@ fn clamp_frequency(input: f64, max_frequency_error: f64) -> f64 {
     input.clamp(1.0f64 - max_frequency_error, 1.0f64 + max_frequency_error)
 }
 
-/// Maintains an estimate of the relationship between true UTC time and monotonic time on this
+/// Maintains an estimate of the relationship between true UTC time and reference time on this
 /// device, based on time samples received from one or more time sources.
 #[derive(Debug)]
 pub struct Estimator<D: Diagnostics> {
@@ -57,7 +56,7 @@ impl<D: Diagnostics> Estimator<D> {
         let filter = KalmanFilter::new(&sample, Arc::clone(&config));
         diagnostics.record(Event::KalmanFilterUpdated {
             track,
-            monotonic: filter.monotonic(),
+            reference: filter.reference(),
             utc: filter.utc(),
             sqrt_covariance: filter.sqrt_covariance(),
         });
@@ -78,7 +77,7 @@ impl<D: Diagnostics> Estimator<D> {
         let sqrt_covariance = self.filter.sqrt_covariance();
         self.diagnostics.record(Event::KalmanFilterUpdated {
             track: self.track,
-            monotonic: self.filter.monotonic(),
+            reference: self.filter.reference(),
             utc: self.filter.utc(),
             sqrt_covariance,
         });
@@ -110,7 +109,7 @@ impl<D: Diagnostics> Estimator<D> {
                 self.filter.update_frequency(clamped_frequency);
                 self.diagnostics.record(Event::FrequencyUpdated {
                     track: self.track,
-                    monotonic: sample.monotonic,
+                    reference: sample.reference,
                     rate_adjust_ppm: frequency_to_adjust_ppm(clamped_frequency),
                     window_count,
                 });
@@ -129,7 +128,7 @@ impl<D: Diagnostics> Estimator<D> {
     }
 
     /// Returns a `UtcTransform` describing the estimated synthetic time and error as a function
-    /// of the monotonic time.
+    /// of the reference time.
     pub fn transform(&self) -> UtcTransform {
         self.filter.transform()
     }
@@ -144,25 +143,25 @@ mod test {
     use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.
-    const TIME_1: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_010_000_000_000);
-    const TIME_2: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_020_000_000_000);
-    const TIME_3: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_030_000_000_000);
-    const OFFSET_1: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(777);
-    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(999);
-    const STD_DEV_1: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(22);
+    const TIME_1: zx::BootInstant = zx::BootInstant::from_nanos(100_010_000_000_000);
+    const TIME_2: zx::BootInstant = zx::BootInstant::from_nanos(100_020_000_000_000);
+    const TIME_3: zx::BootInstant = zx::BootInstant::from_nanos(100_030_000_000_000);
+    const OFFSET_1: zx::BootDuration = zx::BootDuration::from_seconds(777);
+    const OFFSET_2: zx::BootDuration = zx::BootDuration::from_seconds(999);
+    const STD_DEV_1: zx::BootDuration = zx::BootDuration::from_millis(22);
     const TEST_TRACK: Track = Track::Primary;
     const SQRT_COV_1: u64 = STD_DEV_1.into_nanos() as u64;
 
     fn create_filter_event(
-        monotonic: zx::MonotonicInstant,
-        offset: zx::MonotonicDuration,
+        reference: zx::BootInstant,
+        offset: zx::BootDuration,
         sqrt_covariance: u64,
     ) -> Event {
         Event::KalmanFilterUpdated {
             track: TEST_TRACK,
-            monotonic: monotonic,
-            utc: UtcInstant::from_nanos((monotonic + offset).into_nanos()),
-            sqrt_covariance: zx::MonotonicDuration::from_nanos(sqrt_covariance as i64),
+            reference,
+            utc: UtcInstant::from_nanos((reference + offset).into_nanos()),
+            sqrt_covariance: zx::BootDuration::from_nanos(sqrt_covariance as i64),
         }
     }
 
@@ -209,12 +208,12 @@ mod test {
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
         assert_eq!(
-            transform.error_bound(TIME_1 - zx::MonotonicDuration::from_seconds(1)),
+            transform.error_bound(TIME_1 - zx::BootDuration::from_seconds(1)),
             2 * SQRT_COV_1
         );
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + zx::MonotonicDuration::from_seconds(1)),
+            transform.error_bound(TIME_1 + zx::BootDuration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
     }
@@ -240,7 +239,7 @@ mod test {
         ));
 
         // Expected offset is biased slightly towards the second estimate.
-        let expected_offset = zx::MonotonicDuration::from_nanos(88_8002_580_002);
+        let expected_offset = zx::BootDuration::from_nanos(88_8002_580_002);
         let expected_sqrt_cov = 15_556_529u64;
         assert_eq!(
             estimator.transform().synthetic(TIME_3).into_nanos(),
@@ -295,7 +294,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn earlier_monotonic_ignored() {
+    fn earlier_reference_ignored() {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config();
         let mut estimator = Estimator::new(
@@ -339,13 +338,13 @@ mod test {
         {
             let test_frequency = 1.000003;
             let utc_spacing = UtcDuration::from_hours(1) + UtcDuration::from_millis(1);
-            let monotonic_spacing = zx::MonotonicDuration::from_nanos(
+            let reference_spacing = zx::BootDuration::from_nanos(
                 (utc_spacing.into_nanos() as f64 / test_frequency) as i64,
             );
             for i in 1..48 {
                 samples.push(Sample::new(
                     reference_sample.utc + utc_spacing * i,
-                    reference_sample.monotonic + monotonic_spacing * i,
+                    reference_sample.reference + reference_spacing * i,
                     reference_sample.std_dev,
                 ));
             }
@@ -357,24 +356,23 @@ mod test {
             Estimator::new(TEST_TRACK, reference_sample, Arc::clone(&diagnostics), config);
 
         // Run through these samples, asking the estimator to predict the utc of each sample based
-        // on the sample's monotonic value, before feeding that sample into the estimator.
+        // on the sample's reference value, before feeding that sample into the estimator.
         for (i, sample) in samples.into_iter().enumerate() {
-            let estimate = estimator.transform().synthetic(sample.monotonic);
-            let error =
-                zx::MonotonicDuration::from_nanos((sample.utc - estimate).into_nanos().abs());
+            let estimate = estimator.transform().synthetic(sample.reference);
+            let error = zx::BootDuration::from_nanos((sample.utc - estimate).into_nanos().abs());
 
             // For the first day of samples the estimator will perform imperfectly until its been
             // able to estimate the long term frequency. After this it should get much better.
             // We calculated the new frequency after consuming the first window outside the first
             // day (i=23) and it begins to help on the next sample (i=24).
             let expected_error = match i {
-                0 => zx::MonotonicDuration::from_millis(11),
-                _ if i <= 23 => zx::MonotonicDuration::from_millis(12),
-                24 => zx::MonotonicDuration::from_millis(2),
-                _ => zx::MonotonicDuration::from_millis(0),
+                0 => zx::BootDuration::from_millis(11),
+                _ if i <= 23 => zx::BootDuration::from_millis(12),
+                24 => zx::BootDuration::from_millis(2),
+                _ => zx::BootDuration::from_millis(0),
             };
 
-            assert_near!(error, expected_error, zx::MonotonicDuration::from_millis(1));
+            assert_near!(error, expected_error, zx::BootDuration::from_millis(1));
             estimator.update(sample);
         }
     }

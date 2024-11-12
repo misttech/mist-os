@@ -3,33 +3,45 @@
 // found in the LICENSE file.
 
 #include <lib/fake-resource/resource.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/pci/pciroot.h>
 #include <lib/pci/root_host.h>
 #include <lib/zx/resource.h>
 #include <zircon/limits.h>
 #include <zircon/syscalls/object.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
+#include "lib/inspect/cpp/hierarchy.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
-class TestPciroot final : public PcirootBase, public inspect::InspectTestHelper {
+class InspectHelper {
+ public:
+  void ReadInspect(const zx::vmo& vmo) {
+    hierarchy_ = inspect::ReadFromVmo(vmo);
+    ASSERT_TRUE(hierarchy_.is_ok());
+  }
+  inspect::Hierarchy& hierarchy() { return hierarchy_.value(); }
+
+ private:
+  fpromise::result<inspect::Hierarchy> hierarchy_;
+};
+
+class TestPciroot final : public PcirootBase, public InspectHelper {
  public:
   TestPciroot(PciRootHost* root_host, zx_device_t* parent, const char* name)
       : PcirootBase(root_host) {}
-  ~TestPciroot() final = default;
 };
 
-class PcirootTests : public zxtest::Test {
+class PcirootTests : public testing::Test {
  public:
-  PcirootTests() {
-    ASSERT_OK(fake_root_resource_create(fake_root_resource_.reset_and_get_address()));
-  }
   PciRootHost& root_host() { return *root_host_; }
 
  protected:
   void SetUp() final {
+    ASSERT_OK(fake_root_resource_create(fake_root_resource_.reset_and_get_address()));
     root_host_ =
         std::make_unique<PciRootHost>(fake_root_resource_.borrow(), fake_root_resource_.borrow(),
                                       fake_root_resource_.borrow(), PCI_ADDRESS_SPACE_IO);

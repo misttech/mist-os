@@ -40,7 +40,7 @@ class TestSettingsFixture : public ::testing::Test {
   }
 
  private:
-  fuchsia_logging::LogSeverity old_severity_;
+  fuchsia_logging::RawLogSeverity old_severity_;
   fbl::unique_fd old_stderr_;
   char *random_seed_;
 };

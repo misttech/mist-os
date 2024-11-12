@@ -24,6 +24,7 @@ source_set("usb") {
     "usb.c",
   ]
   public_deps = [
+    ":descriptors",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
 
@@ -45,6 +46,11 @@ source_set("usb") {
   public_configs = [ ":includes" ]
 }
 
+source_set("descriptors") {
+  public = [ "include/usb/descriptors.h" ]
+  public_configs = [ ":includes" ]
+}
+
 config("enable_dfv2_compat_logging") {
   defines = [ "DFV2_COMPAT_LOGGING" ]
 }
@@ -62,6 +68,7 @@ source_set("usb-dfv2-compat-logging") {
     "usb.c",
   ]
   public_deps = [
+    ":descriptors",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
 
@@ -94,6 +101,8 @@ source_set("usb-fidl") {
     "include/usb/usb.h",
   ]
   public_deps = [
+    ":descriptors",
+
     # usb-fidl needs these for now. May be removed in a future where we don't hack usb_request_physmap, etc.
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_c",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
@@ -109,6 +118,7 @@ source_set("usb-header") {
   public = [ "include/usb/usb.h" ]
   public_configs = [ ":includes" ]
   public_deps = [
+    ":descriptors",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_c",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_c",

@@ -10,7 +10,7 @@ if (is_host) {
     sources = [ "main.cc" ]
 
     deps = [
-      "//src/lib/fxl:fxl_cli",
+      "//src/lib/fxl:cli_no_logging",
       "//third_party/rapidjson",
       "//third_party/re2",
     ]

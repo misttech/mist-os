@@ -48,7 +48,7 @@ zx::vmo LoaderService::LoadObject(std::string_view name) {
     vmo = TryLoadObject(name, false);
   }
   if (!vmo) {
-    fail(log_, "cannot find shared library '%.*s'", static_cast<int>(name.size()), name.data());
+    printl(log_, "cannot find shared library '%.*s'", static_cast<int>(name.size()), name.data());
   }
   return vmo;
 }
@@ -93,6 +93,10 @@ bool LoaderService::HandleRequest(const zx::channel& channel) {
 
     case LDMSG_OP_LOAD_OBJECT:
       vmo = LoadObject({string, string_len});
+      if (!vmo) {
+        rsp.rv = ZX_ERR_NOT_FOUND;
+        goto error_reply;
+      }
       break;
 
     case LDMSG_OP_CLONE:

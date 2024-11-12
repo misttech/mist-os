@@ -167,13 +167,12 @@ network_unified_binary("bin") {
   ]
   add_configs = []
 
-  # Build debug on the larger builders to prevent build time from becoming
-  # unreasonably large.
-  if (is_debug) {
-    _concurrent_jobs = concurrent_jobs.rust_highmem
-    bin_add_configs += _concurrent_jobs.configs
-    bin_build_job_vars = _concurrent_jobs.vars
-  }
+  # Both debug and release NS3 builds take a long while to run because of
+  # optimizations. Build these on the larger build machines to prevent build
+  # times from becoming unreasonably large.
+  _concurrent_jobs = concurrent_jobs.rust_highmem
+  add_configs += _concurrent_jobs.configs
+  build_job_vars = _concurrent_jobs.vars
 
   # Profile the binary and GUB library builds when requested.
   if (netstack3_profile_rustc) {

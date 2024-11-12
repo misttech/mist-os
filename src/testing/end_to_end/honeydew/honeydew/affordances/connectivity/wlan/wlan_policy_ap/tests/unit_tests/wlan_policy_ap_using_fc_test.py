@@ -184,7 +184,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
             yield ap_controller_client
 
     def test_verify_supported(self) -> None:
-        """Verify _verify_supported fails."""
+        """Verify verify_supported fails."""
         self.ffx_transport_obj.run.return_value = ""
 
         with self.assertRaises(NotSupportedError):

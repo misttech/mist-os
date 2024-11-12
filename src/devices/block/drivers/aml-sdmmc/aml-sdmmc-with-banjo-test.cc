@@ -42,6 +42,8 @@ using fdf_power::testing::FakeElementControl;
 
 class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
  public:
+  static constexpr char kInstance[] = "-mmc@ff000000";
+
   TestAmlSdmmcWithBanjo(fdf::DriverStartArgs start_args,
                         fdf::UnownedSynchronizedDispatcher dispatcher)
       : AmlSdmmcWithBanjo(std::move(start_args), std::move(dispatcher)) {}
@@ -57,7 +59,7 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
   }
 
   void ExpectInspectBoolPropertyValue(const std::string& name, bool value) {
-    const auto* root = GetInspectRoot("-unknown");
+    const auto* root = GetInspectRoot(kInstance);
     ASSERT_NOT_NULL(root);
 
     const auto* property = root->node().get_property<inspect::BoolPropertyValue>(name);
@@ -66,7 +68,7 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
   }
 
   void ExpectInspectPropertyValue(const std::string& name, uint64_t value) {
-    const auto* root = GetInspectRoot("-unknown");
+    const auto* root = GetInspectRoot(kInstance);
     ASSERT_NOT_NULL(root);
 
     const auto* property = root->node().get_property<inspect::UintPropertyValue>(name);
@@ -76,7 +78,7 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
 
   void ExpectInspectPropertyValue(const std::string& path, const std::string& name,
                                   std::string_view value) {
-    const auto* root = GetInspectRoot("-unknown");
+    const auto* root = GetInspectRoot(kInstance);
     ASSERT_NOT_NULL(root);
 
     const auto* property =
@@ -663,7 +665,7 @@ TEST_F(AmlSdmmcWithBanjoTest, Init) {
 
   AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   EXPECT_EQ(AmlSdmmcClock::Get().ReadFrom(&*mmio_).reg_value(), AmlSdmmcClock::Get()
                                                                     .FromValue(0)
@@ -679,7 +681,7 @@ TEST_F(AmlSdmmcWithBanjoTest, Init) {
 TEST_F(AmlSdmmcWithBanjoTest, Tuning) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -699,7 +701,7 @@ TEST_F(AmlSdmmcWithBanjoTest, Tuning) {
 TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningAllPass) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -753,7 +755,7 @@ TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningFailingPoint) {
       "||||||||||||||||||||-------------------------------|||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||------------------------");
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -807,7 +809,7 @@ TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningEvenDivider) {
       "||||||||||-------------------------------|||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||-------------------------------|||");
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -860,7 +862,7 @@ TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningOddDivider) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(9).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -908,7 +910,7 @@ TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(5).WriteTo(&*mmio_);
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -943,7 +945,7 @@ TEST_F(AmlSdmmcWithBanjoTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
 TEST_F(AmlSdmmcWithBanjoTest, SetBusFreq) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
   dut_->ExpectInspectPropertyValue("bus_clock_frequency", 400'000);
 
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
@@ -973,7 +975,7 @@ TEST_F(AmlSdmmcWithBanjoTest, SetBusFreq) {
 TEST_F(AmlSdmmcWithBanjoTest, ClearStatus) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   // Set end_of_chain to indicate we're done and to have something to clear
   dut_->SetRequestInterruptStatus(1 << 13);
@@ -989,7 +991,7 @@ TEST_F(AmlSdmmcWithBanjoTest, ClearStatus) {
 TEST_F(AmlSdmmcWithBanjoTest, TxCrcError) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   // Set TX CRC error bit (8) and desc_busy bit (30)
   dut_->SetRequestInterruptStatus(1 << 8 | 1 << 30);
@@ -1007,7 +1009,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosBlockMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmos[10] = {};
   sdmmc_buffer_region_t buffers[10];
@@ -1072,7 +1074,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosNotBlockSizeMultiple) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmos[10] = {};
   sdmmc_buffer_region_t buffers[10];
@@ -1109,7 +1111,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmosByteMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmos[10] = {};
   sdmmc_buffer_region_t buffers[10];
@@ -1173,7 +1175,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoByteModeMultiBlock) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1235,7 +1237,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoOffsetNotAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1270,7 +1272,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferMultipleDescriptors) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeSingleVmoPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1335,7 +1337,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferNotPageAligned) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1370,7 +1372,7 @@ TEST_F(AmlSdmmcWithBanjoTest, UnownedVmoSingleBufferPageAligned) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1434,7 +1436,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosBlockMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   sdmmc_buffer_region_t buffers[10];
   for (uint32_t i = 0; i < std::size(buffers); i++) {
@@ -1512,7 +1514,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosNotBlockSizeMultiple) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   sdmmc_buffer_region_t buffers[10];
   for (uint32_t i = 0; i < std::size(buffers); i++) {
@@ -1550,7 +1552,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmosByteMode) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   sdmmc_buffer_region_t buffers[10];
   for (uint32_t i = 0; i < std::size(buffers); i++) {
@@ -1615,7 +1617,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoByteModeMultiBlock) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1678,7 +1680,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoOffsetNotAligned) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(1);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -1714,7 +1716,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferMultipleDescriptors) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeSingleVmoPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1782,7 +1784,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferNotPageAligned) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1819,7 +1821,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoSingleBufferPageAligned) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1886,7 +1888,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoWritePastEnd) {
   const size_t pages = ((32 * 514) / zx_system_get_page_size()) + 1;
   InitializeNonContiguousPaddrs(pages);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(pages * zx_system_get_page_size(), 0, &vmo));
@@ -1953,7 +1955,7 @@ TEST_F(AmlSdmmcWithBanjoTest, OwnedVmoWritePastEnd) {
 TEST_F(AmlSdmmcWithBanjoTest, SeparateClientVmoSpaces) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -2000,7 +2002,7 @@ TEST_F(AmlSdmmcWithBanjoTest, RequestWithOwnedAndUnownedVmos) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   zx::vmo vmos[5] = {};
   sdmmc_buffer_region_t buffers[10];
@@ -2120,7 +2122,7 @@ TEST_F(AmlSdmmcWithBanjoTest, RequestWithOwnedAndUnownedVmos) {
 TEST_F(AmlSdmmcWithBanjoTest, ResetCmdInfoBits) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   // Start at 1 because one paddr has already been read to create the DMA descriptor buffer.
   bti_paddrs_[1] = 0x1897'7000;
@@ -2193,7 +2195,7 @@ TEST_F(AmlSdmmcWithBanjoTest, WriteToReadOnlyVmo) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   sdmmc_buffer_region_t buffers[10];
   for (uint32_t i = 0; i < std::size(buffers); i++) {
@@ -2230,7 +2232,7 @@ TEST_F(AmlSdmmcWithBanjoTest, ReadFromWriteOnlyVmo) {
   StartDriver(/*create_fake_bti_with_paddrs=*/true);
   InitializeContiguousPaddrs(10);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   sdmmc_buffer_region_t buffers[10];
   for (uint32_t i = 0; i < std::size(buffers); i++) {
@@ -2266,7 +2268,7 @@ TEST_F(AmlSdmmcWithBanjoTest, ReadFromWriteOnlyVmo) {
 TEST_F(AmlSdmmcWithBanjoTest, ConsecutiveErrorLogging) {
   StartDriver();
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   // First data error.
   dut_->SetRequestInterruptStatus(1 << 8);
@@ -2324,7 +2326,7 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
 
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
   // Initial power level is kPowerLevelOff.
   runtime_.PerformBlockingWork([&] {
     bool clock_enabled;
@@ -2379,7 +2381,7 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
 TEST_F(AmlSdmmcWithBanjoTest, PowerTokenProvider) {
   StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
 
-  ASSERT_OK(dut_->Init({}));
+  ASSERT_OK(dut_->Init(TestAmlSdmmcWithBanjo::kInstance));
 
   auto client_end =
       component::ConnectAtMember<fuchsia_hardware_power::PowerTokenService::TokenProvider>(

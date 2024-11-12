@@ -10,10 +10,10 @@
 // https://github.com/google/fuzzing/blob/HEAD/docs/split-inputs.md).
 
 #include <lib/elfldltl/layout.h>
-#include <lib/stdcompat/span.h>
 
 #include <array>
 #include <memory>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -57,8 +57,8 @@ struct ElfFuzzer {
 template <size_t Align, typename... T>
 class FuzzerInput {
  public:
-  using Inputs = std::tuple<cpp20::span<const T>...>;
-  using InputBytes = std::array<cpp20::span<const std::byte>, sizeof...(T)>;
+  using Inputs = std::tuple<std::span<const T>...>;
+  using InputBytes = std::array<std::span<const std::byte>, sizeof...(T)>;
 
   explicit FuzzerInput(FuzzedDataProvider& provider) : FuzzerInput(provider, kSequence) {}
 
@@ -67,9 +67,7 @@ class FuzzerInput {
 
   // Return the array of span<byte> [span_1, span_2, ...].
   InputBytes as_bytes() const {
-    constexpr auto get_bytes = [](auto&&... input) {
-      return InputBytes{cpp20::as_bytes(input)...};
-    };
+    constexpr auto get_bytes = [](auto&&... input) { return InputBytes{std::as_bytes(input)...}; };
     return std::apply(get_bytes, inputs());
   }
 

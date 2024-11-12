@@ -1043,15 +1043,16 @@ pub(crate) mod ipv6_source_address_selection {
 
     use super::*;
 
-    use crate::internal::device::state::Ipv6AddressFlags;
     use netstack3_base::Ipv6DeviceAddr;
 
     /// A source address selection candidate.
     pub struct SasCandidate<D> {
         /// The candidate address and subnet.
         pub addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        /// The address' assignment flags.
-        pub flags: Ipv6AddressFlags,
+        /// True if the address is assigned (i.e. non tentative).
+        pub assigned: bool,
+        /// True if the address is deprecated (i.e. not preferred).
+        pub deprecated: bool,
         /// The device this address belongs to.
         pub device: D,
     }
@@ -1087,9 +1088,9 @@ pub(crate) mod ipv6_source_address_selection {
         let addr = addresses
             // Tentative addresses are not considered available to the source
             // selection algorithm.
-            .filter(|SasCandidate { addr_sub: _, flags, device: _ }| flags.assigned)
+            .filter(|SasCandidate { addr_sub: _, assigned, deprecated: _, device: _ }| *assigned)
             .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
-            .map(|SasCandidate { addr_sub, flags: _, device: _ }| addr_sub.addr());
+            .map(|SasCandidate { addr_sub, .. }| addr_sub.addr());
         match addr {
             Some(addr) => Ipv6SourceAddr::Unicast(addr),
             None => Ipv6SourceAddr::Unspecified,
@@ -1117,12 +1118,12 @@ pub(crate) mod ipv6_source_address_selection {
 
         // Addresses that are not considered assigned are not valid source
         // addresses.
-        debug_assert!(a.flags.assigned);
-        debug_assert!(b.flags.assigned);
+        debug_assert!(a.assigned);
+        debug_assert!(b.assigned);
 
         rule_1(remote_ip, a_addr, b_addr)
             .then_with(|| rule_2(remote_ip, a_addr, b_addr))
-            .then_with(|| rule_3(a.flags.deprecated, b.flags.deprecated))
+            .then_with(|| rule_3(a.deprecated, b.deprecated))
             .then_with(|| rule_5(outbound_device, &a.device, &b.device))
             .then_with(|| rule_8(remote_ip, a.addr_sub, b.addr_sub))
     }
@@ -1335,7 +1336,8 @@ pub(crate) mod ipv6_source_address_selection {
             {
                 let new_addr_entry = |addr, device| SasCandidate {
                     addr_sub: AddrSubnet::new(addr, 128).unwrap(),
-                    flags: Ipv6AddressFlags { deprecated: false, assigned: true },
+                    deprecated: false,
+                    assigned: true,
                     device,
                 };
 
@@ -1365,7 +1367,8 @@ pub(crate) mod ipv6_source_address_selection {
 
             let new_addr_entry = |addr, deprecated, device| SasCandidate {
                 addr_sub: AddrSubnet::new(addr, 128).unwrap(),
-                flags: Ipv6AddressFlags { deprecated, assigned: true },
+                deprecated,
+                assigned: true,
                 device,
             };
 

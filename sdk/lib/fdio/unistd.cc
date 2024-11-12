@@ -84,7 +84,7 @@ constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::Ope
                                        fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
 
 // Map POSIX O_* flags to equivalent fuchsia.io OpenFlags.
-fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
+fio::OpenFlags posix_flags_to_fio(int32_t flags) {
   fio::OpenFlags rights = {};
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
@@ -95,6 +95,8 @@ fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
       break;
     case O_RDWR:
       rights |= fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable;
+      break;
+    default:
       break;
   }
 
@@ -108,8 +110,8 @@ fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
 }
 
 // Map fuchsia.io OpenFlags to equivalent POSIX O_* flags.
-uint32_t fio_flags_to_posix(fio::OpenFlags flags) {
-  uint32_t result = 0;
+int32_t fio_flags_to_posix(fio::OpenFlags flags) {
+  int32_t result = static_cast<int32_t>(static_cast<uint32_t>(flags & kZxioFsMask));
   if ((flags & (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) ==
       (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) {
     result |= O_RDWR;
@@ -118,8 +120,6 @@ uint32_t fio_flags_to_posix(fio::OpenFlags flags) {
   } else {
     result |= O_RDONLY;
   }
-
-  result |= static_cast<uint32_t>(flags & kZxioFsMask);
   return result;
 }
 
@@ -165,7 +165,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  fio::OpenFlags fio_flags = posix_flags_to_fio(static_cast<uint32_t>(flags));
+  fio::OpenFlags fio_flags = posix_flags_to_fio(flags);
   if (S_ISDIR(mode)) {
     fio_flags |= fio::OpenFlags::kDirectory;
   }
@@ -431,14 +431,14 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
   memset(s, 0, sizeof(struct stat));
   s->st_mode = zxio_get_posix_mode(attr.protocols, attr.abilities);
   s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
-  s->st_size = attr.content_size;
+  s->st_size = static_cast<off_t>(attr.content_size);
   s->st_blksize = VNATTR_BLKSIZE;
-  s->st_blocks = attr.storage_size / VNATTR_BLKSIZE;
+  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / VNATTR_BLKSIZE;
   s->st_nlink = attr.link_count;
-  s->st_ctim.tv_sec = attr.creation_time / ZX_SEC(1);
-  s->st_ctim.tv_nsec = attr.creation_time % ZX_SEC(1);
-  s->st_mtim.tv_sec = attr.modification_time / ZX_SEC(1);
-  s->st_mtim.tv_nsec = attr.modification_time % ZX_SEC(1);
+  s->st_ctim.tv_sec = static_cast<time_t>(attr.creation_time / ZX_SEC(1));
+  s->st_ctim.tv_nsec = static_cast<int64_t>(attr.creation_time % ZX_SEC(1));
+  s->st_mtim.tv_sec = static_cast<time_t>(attr.modification_time / ZX_SEC(1));
+  s->st_mtim.tv_nsec = static_cast<int64_t>(attr.modification_time % ZX_SEC(1));
   return ZX_OK;
 }
 
@@ -707,7 +707,7 @@ ssize_t preadv(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
     if (status != ZX_OK) {
       return ERROR(status);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -751,7 +751,7 @@ ssize_t pwritev(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
     if (status != ZX_OK) {
       return ERROR(status);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -901,7 +901,7 @@ int fcntl(int fd, int cmd, ...) {
       if (status != ZX_OK) {
         return ERROR(status);
       }
-      uint32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
+      int32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
       if (io->ioflag() & IOFLAG_NONBLOCK) {
         fdio_flags |= O_NONBLOCK;
       }
@@ -1004,7 +1004,8 @@ off_t lseek(int fd, off_t offset, int whence) {
   return status != ZX_OK ? ERROR(status) : static_cast<off_t>(result);
 }
 
-static int truncateat(int dirfd, const char* path, off_t len) {
+namespace {
+int truncateat(int dirfd, const char* path, off_t len) {
   zx::result io = fdio_internal::open_at(dirfd, path, O_WRONLY, 0);
   if (io.is_error()) {
     return ERROR(io.status_value());
@@ -1014,6 +1015,7 @@ static int truncateat(int dirfd, const char* path, off_t len) {
   }
   return STATUS(io->truncate(static_cast<uint64_t>(len)));
 }
+}  // namespace
 
 __EXPORT
 int truncate(const char* path, off_t len) { return truncateat(AT_FDCWD, path, len); }
@@ -1046,8 +1048,9 @@ int ftruncate(int fd, off_t len) {
 // Using zircon kernel primitives (cookies) to authenticate the vnode token, this
 // allows these multi-path operations to mix absolute / relative paths and cross
 // mount points with ease.
-static int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const char* newpath,
-                          two_path_op fdio_t::* op_getter) {
+namespace {
+int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const char* newpath,
+                   two_path_op fdio_t::* op_getter) {
   fdio_internal::NameBuffer oldname;
   zx::result io_oldparent =
       fdio_internal::opendir_containing_at(olddirfd, oldpath, &oldname, nullptr);
@@ -1069,6 +1072,7 @@ static int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const
   }
   return STATUS((io_oldparent.value().get()->*op_getter)(oldname, token, newname));
 }
+}  // namespace
 
 __EXPORT
 int renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath) {
@@ -1098,7 +1102,8 @@ int link(const char* oldpath, const char* newpath) {
 __EXPORT
 int unlink(const char* path) { return unlinkat(AT_FDCWD, path, 0); }
 
-static int vopenat(int dirfd, const char* path, int flags, va_list args) {
+namespace {
+int vopenat(int dirfd, const char* path, int flags, va_list args) {
   uint32_t mode = 0;
   if (flags & O_CREAT) {
     if (flags & O_DIRECTORY) {
@@ -1122,6 +1127,7 @@ static int vopenat(int dirfd, const char* path, int flags, va_list args) {
   }
   return ERRNO(EMFILE);
 }
+}  // namespace
 
 __EXPORT
 int open(const char* path, int flags, ...) {
@@ -1186,17 +1192,13 @@ int fstat(int fd, struct stat* s) {
   return STATUS(fdio_internal::stat_impl(io, s));
 }
 
-int fstatat(int dirfd, std::string_view filename, struct stat* s, int flags) {
-  zx::result io = fdio_internal::open_at(dirfd, filename.data(), O_PATH, 0);
+__EXPORT
+int fstatat(int dirfd, const char* fn, struct stat* s, int flags) {
+  zx::result io = fdio_internal::open_at(dirfd, fn, O_PATH, 0);
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
   return STATUS(fdio_internal::stat_impl(io.value(), s));
-}
-
-__EXPORT
-int fstatat(int dirfd, const char* fn, struct stat* s, int flags) {
-  return fstatat(dirfd, std::string_view(fn), s, flags);
 }
 
 __EXPORT
@@ -1241,7 +1243,7 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
   }
   if (do_stat) {
     struct stat s;
-    const int ret = fstatat(AT_FDCWD, clean_buffer, &s, 0);
+    const int ret = fstatat(AT_FDCWD, clean_buffer.c_str(), &s, 0);
     if (ret < 0) {
       return nullptr;
     }
@@ -1249,7 +1251,8 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
   return resolved ? strcpy(resolved, clean_buffer.c_str()) : strdup(clean_buffer.c_str());
 }
 
-static zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], int flags) {
+namespace {
+zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], int flags) {
   zxio_node_attributes_t attr = {};
 
   zx_time_t modification_time;
@@ -1272,6 +1275,7 @@ static zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], 
   // set time(s) on underlying object
   return io->set_attr(&attr);
 }
+}  // namespace
 
 __EXPORT
 int utimensat(int dirfd, const char* path, const struct timespec times[2], int flags) {
@@ -1296,7 +1300,8 @@ int futimens(int fd, const struct timespec times[2]) {
   return STATUS(zx_utimens(io, times, 0));
 }
 
-static int socketpair_create(int fd[2], uint32_t options, int flags) {
+namespace {
+int socketpair_create(int fd[2], uint32_t options, int flags) {
   constexpr int allowed_flags = O_NONBLOCK | O_CLOEXEC;
   if (flags & ~allowed_flags) {
     return ERRNO(EINVAL);
@@ -1333,6 +1338,7 @@ static int socketpair_create(int fd[2], uint32_t options, int flags) {
   }
   return ERRNO(EMFILE);
 }
+}  // namespace
 
 __EXPORT
 int pipe2(int pipefd[2], int flags) { return socketpair_create(pipefd, 0, flags); }
@@ -1398,7 +1404,7 @@ int faccessat(int dirfd, const char* filename, int amode, int flag) {
   // Check that the file has each of the permissions in mode.
   // Ignore X_OK, since it does not apply to our permission model
   amode &= ~X_OK;
-  uint32_t rights_flags = 0;
+  int32_t rights_flags = 0;
   switch (amode & (R_OK | W_OK)) {
     case R_OK:
       rights_flags = O_RDONLY;
@@ -1408,6 +1414,8 @@ int faccessat(int dirfd, const char* filename, int amode, int flag) {
       break;
     case R_OK | W_OK:
       rights_flags = O_RDWR;
+      break;
+    default:
       break;
   }
   return STATUS(
@@ -1462,7 +1470,8 @@ int chdir(const char* path) {
   return 0;
 }
 
-static bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved) {
+namespace {
+bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved) {
   bool is_dir = false;
   if (relative[0] == '/') {
     return fdio_internal::CleanPath(relative, out_resolved, &is_dir);
@@ -1484,6 +1493,7 @@ static bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_re
   buffer.Append(relative, relative_length);
   return fdio_internal::CleanPath(buffer.c_str(), out_resolved, &is_dir);
 }
+}  // namespace
 
 __EXPORT
 int chroot(const char* path) {
@@ -1523,7 +1533,7 @@ int chroot(const char* path) {
     // cwd.
     if (root_path.length() > 1) {
       const std::string_view cwd_view(fdio_cwd_path);
-      if (cwd_view.find(root_path) == 0u && fdio_cwd_path[root_path.length()] == '/') {
+      if (cwd_view.starts_with(root_path) && fdio_cwd_path[root_path.length()] == '/') {
         fdio_cwd_path.RemovePrefix(root_path.length());
       } else {
         fdio_cwd_path.Set(kUnreachable);
@@ -1598,7 +1608,8 @@ int closedir(DIR* dir) {
   return 0;
 }
 
-static zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
+namespace {
+zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr& io) {
   if (dir->iterator != nullptr) {
     return ZX_OK;
   }
@@ -1611,6 +1622,7 @@ static zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
 
   return status;
 }
+}  // namespace
 
 __EXPORT
 struct dirent* readdir(DIR* dir) {
@@ -1826,7 +1838,7 @@ int ppoll(struct pollfd* fds, nfds_t n, const struct timespec* timeout_ts,
       ++items_index;
     }
     // Mask unrequested events. Avoid clearing events that are ignored in pollfd::events.
-    pfd.revents &= static_cast<int16_t>(pfd.events | POLLNVAL | POLLHUP | POLLERR);
+    pfd.revents = static_cast<int16_t>(pfd.revents & (pfd.events | POLLNVAL | POLLHUP | POLLERR));
     if (pfd.revents != 0) {
       ++nfds;
     }
@@ -1839,7 +1851,7 @@ __EXPORT
 int poll(struct pollfd* fds, nfds_t n, int timeout) {
   struct timespec timeout_ts = {
       .tv_sec = timeout / 1000,
-      .tv_nsec = (timeout % 1000) * 1000000,
+      .tv_nsec = static_cast<int64_t>(timeout % 1000) * 1000000,
   };
   struct timespec* ts = timeout >= 0 ? &timeout_ts : nullptr;
   return ppoll(fds, n, ts, nullptr);
@@ -2048,6 +2060,9 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
           if (status == ZX_ERR_TIMED_OUT) {
             status = ZX_ERR_SHOULD_WAIT;
           }
+          break;
+        default:
+          break;
       }
     }
     if (status != ZX_OK) {
@@ -2060,7 +2075,7 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
     if (out_code) {
       return ERRNO(out_code);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -2099,6 +2114,9 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
           if (status == ZX_ERR_TIMED_OUT) {
             status = ZX_ERR_SHOULD_WAIT;
           }
+          break;
+        default:
+          break;
       }
     }
     if (status != ZX_OK) {
@@ -2107,7 +2125,7 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
     if (out_code) {
       return ERRNO(out_code);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 

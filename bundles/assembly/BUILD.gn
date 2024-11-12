@@ -124,7 +124,6 @@ assembly_input_bundle("embeddable") {
     "//src/bringup/bin/critical-services:package",
     "//src/diagnostics/archivist:package",
     "//src/power/shutdown-shim:package",
-    "//src/sys/startup:package",
   ]
 
   compiled_packages = [
@@ -860,7 +859,10 @@ assembly_input_bundle("partitioning_tools") {
 # All children in `/core` receive InspectSink and LogSink.
 #
 assembly_input_bundle("core_realm") {
-  bootfs_packages = [ "//src/sys/pkg/bin/pkg-cache" ]
+  bootfs_packages = [
+    "//src/sys/pkg/bin/pkg-cache",
+    "//src/sys/startup:package",
+  ]
   base_packages = [
     # This is a required dependency of pkg-cache
     "//src/sys/pkg/bin/system-update-committer",
@@ -4429,6 +4431,42 @@ assembly_input_bundle("tee_manager") {
           label = "//src/security/bin/tee_manager:bin"
           source = "${root_out_dir}/tee_manager"
           destination = "bin/tee_manager"
+        },
+        {
+          label = "//zircon/system/ulib/c:libc_fshost"
+          source = system_libc_stripped
+          destination = "lib/ld.so.1"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source =
+              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
+          destination = "lib/libc++.so.2"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
+          destination = "lib/libc++abi.so.1"
+        },
+        {
+          label = "//sdk/lib/fdio($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
+          destination = "lib/libfdio.so"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
+          source = "${rust_libstd_path}"
+          destination = "lib/${rust_libstd_so_name}"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
+          destination = "lib/libunwind.so.1"
+        },
+        {
+          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
+          destination = "lib/libtrace-engine.so"
         },
       ]
 

@@ -279,10 +279,16 @@ impl HrTimerManager {
             // Note: This fidl::QueryResponseFut is scheduled when created. To prevent suspend
             // before the next hrtimer is started, it needs to be created before
             // `reset_timer_event` is called.
+            // TODO(373928684): Make use of the setup_event to guarantee the timer is setup
+            // before suspension.
+            let setup_event = zx::Event::create();
+            let duplicate_event =
+                setup_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into();
             let start_and_wait = device_async_proxy.start_and_wait(
                 HRTIMER_DEFAULT_ID,
                 &fhrtimer::Resolution::Duration(resolution_nsecs),
                 ticks as u64,
+                duplicate_event,
             );
             // The hrtimer client is responsible for clearing the timer fired
             // signal, so we clear it here right before starting the next
@@ -356,7 +362,7 @@ impl HrTimerManager {
 
     /// Make sure the proxy to HrTimer device is active.
     fn check_connection(&self) -> Result<&fhrtimer::DeviceSynchronousProxy, Errno> {
-        self.device_proxy.as_ref().ok_or(errno!(EINVAL, "No connection to HrTimer driver"))
+        self.device_proxy.as_ref().ok_or_else(|| errno!(EINVAL, "No connection to HrTimer driver"))
     }
 
     #[cfg(test)]
@@ -408,7 +414,11 @@ impl HrTimerManager {
         guard.current_deadline = Some(new_deadline);
 
         // Notify the worker thread that a new hrtimer is added to the front.
-        self.start_next_sender.get().ok_or(errno!(EINVAL))?.send(()).map_err(|_| errno!(EINVAL))
+        self.start_next_sender
+            .get()
+            .ok_or_else(|| errno!(EINVAL))?
+            .send(())
+            .map_err(|_| errno!(EINVAL))
     }
 
     fn stop(
@@ -550,7 +560,7 @@ impl TimerOps for HrTimerHandle {
         current_task.kernel().hrtimer_manager.add_timer(
             source,
             self,
-            deadline.estimate_boot().ok_or(errno!(EINVAL))?,
+            deadline.estimate_boot().ok_or_else(|| errno!(EINVAL))?,
         )?;
         Ok(())
     }

@@ -1,5 +1,5 @@
 diff --git b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
-index 65da32a7d60..7131273314a 100644
+index 591db79aaf6..109c5cc90ed 100644
 --- b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
 +++ a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
 @@ -3,11 +3,15 @@
@@ -23,8 +23,8 @@ index 65da32a7d60..7131273314a 100644
  
    declare_args() {
      # Compiles with ares.
-@@ -22,6 +26,11 @@
-     grpc_use_static_linking = is_android || is_win || is_chromeos || is_mac
+@@ -23,6 +27,11 @@
+         is_android || is_win || is_chromeos || is_mac || is_ios
    }
  
 +  if (defined(is_fuchsia_tree) && is_fuchsia_tree) {
@@ -35,50 +35,44 @@ index 65da32a7d60..7131273314a 100644
    if (is_android) {
      import("//build/config/android/config.gni")
      import("//build/config/android/rules.gni")
-@@ -36,6 +45,7 @@
+@@ -37,6 +46,7 @@
        "./third_party/cares",
-       "//third_party/cares",
+       "//third_party/cares/include",
        "./third_party/upb",
 +      "./third_party/xxhash",
        "//third_party/abseil-cpp",
      ]
  
-@@ -53,13 +63,6 @@
-       defines += [ "GRPC_NO_BINDER", ]
-     }
- 
--    cflags = [
--      "-Wno-implicit-fallthrough",
--      "-Wno-shadow",
--      "-Wno-unreachable-code-return",
--      "-Wno-unreachable-code-break",
--    ]
--
-     if (is_android) {
-       libs = [ "log" ]  # For __android_log_write
-     }
-@@ -91,10 +94,20 @@
+@@ -86,13 +96,28 @@
      cflags = [
        "-Wno-c++98-compat-extra-semi",
+       "-Wno-deprecated-copy",
++      "-Wno-enum-enum-conversion",
        "-Wno-extra-semi",
 +      "-Wno-float-conversion",
-+      "-Wno-implicit-fallthrough",
+       "-Wno-implicit-fallthrough",
 +      "-Wno-implicit-float-conversion",
 +      "-Wno-implicit-int-conversion",
 +      "-Wno-implicit-int-float-conversion",
-+      "-Wno-shadow",
++      "-Wno-newline-eof",
+       "-Wno-shadow",
 +      "-Wno-shorten-64-to-32",
        "-Wno-sign-compare",
 +      "-Wno-strict-prototypes",
-       "-Wno-sometimes-uninitialized",
-       "-Wno-string-concatenation",
++      "-Wno-sometimes-uninitialized",
++      "-Wno-string-concatenation",
        "-Wno-unreachable-code",
-+      "-Wno-unreachable-code-break",
-+      "-Wno-unreachable-code-return",
-       "-Wno-unused-variable",
+       "-Wno-unreachable-code-break",
+       "-Wno-unreachable-code-return",
++      "-Wno-unused-variable",
++
++      # TODO(https://fxbug.dev/42063413): Remove after integrating
++      # https://github.com/grpc/grpc/pull/31306
++      "-Wno-thread-safety-analysis",
      ]
-   }
-@@ -205,10 +218,6 @@
+ 
+     # TODO(b/260740023): Remove when gRPC has CFI checks enabled.
+@@ -220,10 +245,6 @@
          out_sources.append('# gRPC memcpy wrapping logic isn\'t useful here.')
          out_sources.append('# See https://crbug.com/661171')
          out_sources.append('# "{}",'.format(s))
@@ -86,10 +80,10 @@ index 65da32a7d60..7131273314a 100644
 -        out_sources.append('# Disabling some default plugins.')
 -        out_sources.append('# "{}",'.format(s))
 -        out_sources.append('"plugin_registry/grpc_plugin_registry.cc",')
-       elif s == './src/core/lib/gprpp/status_helper.cc':
-         out_sources.append('# "{}",'.format(s))
        elif s == './src/core/lib/matchers/matchers.cc':
-@@ -288,16 +297,9 @@
+         # matchers are disabled to reduce binary size
+         out_sources.append('# "{}",'.format(s))
+@@ -301,16 +322,9 @@
  
  
    def strip_sources(sources):
@@ -107,7 +101,7 @@ index 65da32a7d60..7131273314a 100644
              and not re.match("./src/core/ext/filters/client_channel/resolver/xds/.*",f)
              and not re.match("./src/core/ext/xds/.*",f)
              ]
-@@ -496,6 +498,7 @@
+@@ -536,6 +550,7 @@
      % endif
    ${indent}  public_configs = [
    ${indent}    ":grpc_config",
@@ -115,7 +109,7 @@ index 65da32a7d60..7131273314a 100644
    ${indent}  ]
      % if extra_configs:
    ${indent}  configs += [
-@@ -538,6 +541,7 @@
+@@ -578,6 +593,7 @@
    ${indent}  ]
    ${indent}  configs += [
    ${indent}    "//third_party/protobuf:protobuf_config",

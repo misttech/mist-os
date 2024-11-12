@@ -25,6 +25,7 @@ use crate::ConversionError;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
 
 /// The trait which remotes Capabilities, either by turning them into
 /// FIDL or serving them in a VFS.
@@ -33,7 +34,10 @@ pub trait RemotableCapability: Into<fsandbox::Capability> {
     /// VFS.
     ///
     /// The default implementation always returns an error.
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        _scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Err(ConversionError::NotSupported)
     }
 }

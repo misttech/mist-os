@@ -415,7 +415,6 @@ class Scheduler {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
     return power_level_control_.GetPowerLevel();
   }
-
   // Sends a power level request through this scheduler's power level controller for testing. This
   // method is called from thread and IRQ context to ensure that the underlying machinery can be
   // safely called within Block, Unblock, and other scheduling operations.
@@ -424,7 +423,18 @@ class Scheduler {
   // Returns the current power domain for this scheduler instance.
   fbl::RefPtr<PowerDomain> GetPowerDomainForTesting() TA_EXCL(queue_lock_) {
     Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
-    return power_level_control_.GetPowerDomain();
+    return power_level_control_.domain();
+  }
+
+  // Returns the current active power coefficient.
+  ktl::optional<uint64_t> GetActivePowerCoefficientNwForTesting() const TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.active_power_coefficient_nw();
+  }
+  // Returns the max idle power coefficient.
+  ktl::optional<uint64_t> GetMaxIdlePowerCoefficientNwForTesting() const TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.max_idle_power_coefficient_nw();
   }
 
  private:
@@ -763,6 +773,12 @@ class Scheduler {
   // Updates to total deadline utilization estimator and exports the atomic
   // shadow variable for cross-CPU readers.
   inline void UpdateTotalDeadlineUtilization(SchedUtilization delta_ns) TA_REQ(queue_lock_);
+
+  // Computes the estimated energy consumed since the last reschedule and
+  // updates the current thread and CPU energy accumulators.
+  inline void UpdateEstimatedEnergyConsumption(Thread* current_thread,
+                                               SchedDuration actual_runtime_ns)
+      TA_REQ(current_thread->get_lock(), queue_lock_);
 
   // Utilities to scale up or down the given value by the performance scale of the CPU.
   template <typename T>
@@ -1135,9 +1151,6 @@ class Scheduler {
    public:
     explicit PowerLevelControl(Scheduler* scheduler) : request_dpc_{DpcHandler, scheduler} {}
 
-    // Gets the power domain associated with this scheduler.
-    const fbl::RefPtr<PowerDomain>& GetPowerDomain() const { return power_state_.domain(); }
-
     // Sets the power domain associated with this scheduler.
     fbl::RefPtr<PowerDomain> ExchangePowerDomain(fbl::RefPtr<PowerDomain> domain) {
       // Clear the request to ensure that a DPC racing with a domain change cannot latch a pending
@@ -1153,7 +1166,7 @@ class Scheduler {
     // power level control interface) for the domain associated with this scheduler to acknowledge
     // that a power level request has been completed.
     zx::result<> UpdatePowerLevel(uint8_t power_level) {
-      return power_state_.UpdatePowerLevel(power_level);
+      return power_state_.UpdateActivePowerLevel(power_level);
     }
 
     // Called by the scheduler to request a power level change for the domain associated with this
@@ -1167,6 +1180,17 @@ class Scheduler {
         request_timer_.Cancel();
         request_timer_.Set(Deadline::infinite_past(), TimerHandler, this);
       }
+    }
+
+    // Gets the power domain associated with this scheduler.
+    const fbl::RefPtr<PowerDomain>& domain() const { return power_state_.domain(); }
+
+    uint64_t active_power_coefficient_nw() const {
+      return power_state_.active_power_coefficient_nw();
+    }
+
+    uint64_t max_idle_power_coefficient_nw() const {
+      return power_state_.max_idle_power_coefficient_nw();
     }
 
    private:

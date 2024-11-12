@@ -259,9 +259,6 @@ template("run_fuchsia_bazel_sdk_tests") {
         } else if (_remote_build_strategy == "local") {
           args += [ "--bazel-config=remote_cache_only" ]
         }
-        if (is_hwasan || is_asan) {
-          args += [ "--bazel-config=link_local" ]  # Workaround for b/353675498
-        }
       } else {
         not_needed([ "_remote_build_strategy" ])
       }

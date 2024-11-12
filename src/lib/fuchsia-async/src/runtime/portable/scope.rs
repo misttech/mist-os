@@ -15,8 +15,7 @@ use std::task::{Poll, Waker};
 use std::{fmt, hash};
 use tokio::task::AbortHandle;
 
-/// A unique handle to a scope. When this handle is dropped, the scope is
-/// cancelled.
+/// A scope for async tasks. This scope is cancelled when dropped.
 ///
 /// See the [Fuchsia target documentation on this type][docs] for more
 /// information about scopes. This version of the Scope API is a limited subset
@@ -24,14 +23,14 @@ use tokio::task::AbortHandle;
 ///
 /// [docs]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Scope.html
 pub struct Scope {
-    inner: ScopeRef,
+    inner: ScopeHandle,
 }
 
 impl Scope {
     /// Returns a new scope that is a child of the root scope of the executor.
     pub fn new() -> Self {
         Self {
-            inner: ScopeRef {
+            inner: ScopeHandle {
                 inner: Arc::new(ScopeInner {
                     state: Condition::new(ScopeState { all_tasks: HashMap::new() }),
                 }),
@@ -40,7 +39,7 @@ impl Scope {
     }
 
     /// Creates a [`ScopeRef`] to this scope.
-    pub fn make_ref(&self) -> ScopeRef {
+    pub fn make_ref(&self) -> ScopeHandle {
         self.inner.clone()
     }
 }
@@ -54,19 +53,19 @@ impl Drop for Scope {
 }
 
 impl Deref for Scope {
-    type Target = ScopeRef;
+    type Target = ScopeHandle;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-/// A reference to a scope, which may be used to spawn tasks.
+/// A handle to a scope, which may be used to spawn tasks.
 #[derive(Clone)]
-pub struct ScopeRef {
+pub struct ScopeHandle {
     inner: Arc<ScopeInner>,
 }
 
-impl ScopeRef {
+impl ScopeHandle {
     /// Spawns a task on the scope.
     pub fn spawn(
         &self,
@@ -193,7 +192,7 @@ impl ScopeRef {
     }
 }
 
-impl fmt::Debug for ScopeRef {
+impl fmt::Debug for ScopeHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Scope").finish()
     }
@@ -207,8 +206,8 @@ struct WeakScopeRef {
 
 impl WeakScopeRef {
     /// Upgrades to a [`ScopeRef`] if the scope still exists.
-    pub fn upgrade(&self) -> Option<ScopeRef> {
-        self.inner.upgrade().map(|inner| ScopeRef { inner })
+    pub fn upgrade(&self) -> Option<ScopeHandle> {
+        self.inner.upgrade().map(|inner| ScopeHandle { inner })
     }
 }
 

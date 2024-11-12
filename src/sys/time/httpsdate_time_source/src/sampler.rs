@@ -23,11 +23,13 @@ const NANOS_IN_SECONDS: i64 = 1_000_000_000;
 pub trait HttpsDateClient {
     /// Poll |uri| once to obtain the current UTC time. The time is quantized to a second due to
     /// the format of the HTTP date header.
+    ///
+    /// The timeout is on the monotonic timeline, to ensure no timer storms after a wakeup.
     async fn request_utc(
         &mut self,
         uri: &Uri,
-        https_timeout: zx::MonotonicDuration,
-    ) -> Result<zx::MonotonicInstant, HttpsDateError>;
+        https_timeout: zx::BootDuration,
+    ) -> Result<zx::BootInstant, HttpsDateError>;
 }
 
 #[async_trait]
@@ -35,16 +37,16 @@ impl HttpsDateClient for NetworkTimeClient {
     async fn request_utc(
         &mut self,
         uri: &Uri,
-        https_timeout: zx::MonotonicDuration,
-    ) -> Result<zx::MonotonicInstant, HttpsDateError> {
+        https_timeout: zx::BootDuration,
+    ) -> Result<zx::BootInstant, HttpsDateError> {
         let utc = self
             .get_network_time(uri.clone())
-            .on_timeout(fasync::MonotonicInstant::after(https_timeout), || {
+            .on_timeout(fasync::BootInstant::after(https_timeout), || {
                 Err(HttpsDateError::new(HttpsDateErrorType::NetworkError)
                     .with_source(format_err!("Timed out after {:?}", https_timeout)))
             })
             .await?;
-        Ok(zx::MonotonicInstant::from_nanos(utc.timestamp_nanos_opt().unwrap()))
+        Ok(zx::BootInstant::from_nanos(utc.timestamp_nanos_opt().unwrap()))
     }
 }
 
@@ -126,7 +128,7 @@ impl<C: HttpsDateClient + Send> HttpsSampler for HttpsSamplerImpl<'_, C> {
 
             HttpsSample {
                 utc: bound.center(),
-                monotonic: bound.monotonic,
+                reference: bound.reference,
                 standard_deviation: bound.size() * self.config.standard_deviation_bound_percentage
                     / 100,
                 final_bound_size: bound.size(),
@@ -142,10 +144,10 @@ impl<C: HttpsDateClient + Send> HttpsSamplerImpl<'_, C> {
     /// Poll the server once to produce a fresh bound on the UTC time. Returns a bound and the
     /// observed round trip time.
     async fn poll_server(&self) -> Result<(Bound, Poll), HttpsDateError> {
-        let monotonic_before = zx::MonotonicInstant::get();
+        let monotonic_before = zx::BootInstant::get();
         let reported_utc =
             self.client.lock().await.request_utc(&self.uri, self.config.https_timeout).await?;
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
         let round_trip_time = monotonic_after - monotonic_before;
         let monotonic_center = monotonic_before + round_trip_time / 2;
         // We assume here that the time reported by an HTTP server is truncated down to the second.
@@ -153,9 +155,9 @@ impl<C: HttpsDateClient + Send> HttpsSamplerImpl<'_, C> {
         // Network latency adds additional uncertainty and is accounted for by expanding the bound
         // in either direction by half the observed round trip time.
         let bound = Bound {
-            monotonic: monotonic_center,
+            reference: monotonic_center,
             utc_min: reported_utc - round_trip_time / 2,
-            utc_max: reported_utc + zx::MonotonicDuration::from_seconds(1) + round_trip_time / 2,
+            utc_max: reported_utc + zx::BootDuration::from_seconds(1) + round_trip_time / 2,
         };
         let poll = Poll { round_trip_time };
         Ok((bound, poll))
@@ -168,9 +170,9 @@ fn ideal_next_poll_time<'a, I>(
     bound: &Bound,
     mut observed_rtt: I,
     first_rtt_time_factor: u16,
-) -> zx::MonotonicInstant
+) -> zx::BootInstant
 where
-    I: Iterator<Item = &'a zx::MonotonicDuration> + ExactSizeIterator,
+    I: Iterator<Item = &'a zx::BootDuration> + ExactSizeIterator,
 {
     // Estimate the ideal monotonic time we'd like the server to check time.
     // ideal_server_check_time is a monotonic time at which bound's projection is centered
@@ -180,52 +182,52 @@ where
     // ideal_server_check_time must be [n-1, n) or [n, n + 1). In either case combining with
     // the original bound results in a bound half the size of the original.
     let ideal_server_check_time =
-        bound.monotonic + zx::MonotonicDuration::from_seconds(1) - time_subs(bound.center());
+        bound.reference + zx::BootDuration::from_seconds(1) - time_subs(bound.center());
 
     // Since there is actually network latency, try to guess what it'll be and start polling
     // early so the server checks at the ideal time. The first poll takes longer than subsequent
     // polls due to TLS handshaking, so we make a best effort to account for that when the first
     // poll is the only one available. Otherwise, we discard the first poll rtt.
     let rtt_guess = match observed_rtt.len() {
-        0 => return zx::MonotonicInstant::get(),
+        0 => return zx::BootInstant::get(),
         1 => *observed_rtt.next().unwrap() / first_rtt_time_factor,
         _ => avg(observed_rtt.skip(1)),
     };
     let ideal_poll_start_time = ideal_server_check_time - rtt_guess / 2;
 
     // Adjust the time in case it has already passed.
-    let now = zx::MonotonicInstant::get();
+    let now = zx::BootInstant::get();
     if now < ideal_poll_start_time {
         ideal_poll_start_time
     } else {
         ideal_poll_start_time
-            + zx::MonotonicDuration::from_seconds(1)
+            + zx::BootDuration::from_seconds(1)
             + seconds(now - ideal_poll_start_time)
     }
 }
 
-/// Calculates the average of a set of small zx::MonotonicDurations. May overflow for large durations.
-fn avg<'a, I>(durations: I) -> zx::MonotonicDuration
+/// Calculates the average of a set of small zx::BootDurations. May overflow for large durations.
+fn avg<'a, I>(durations: I) -> zx::BootDuration
 where
-    I: ExactSizeIterator + Iterator<Item = &'a zx::MonotonicDuration>,
+    I: ExactSizeIterator + Iterator<Item = &'a zx::BootDuration>,
 {
     let count = durations.len() as i64;
-    zx::MonotonicDuration::from_nanos(durations.map(|d| d.into_nanos()).sum::<i64>() / count)
+    zx::BootDuration::from_nanos(durations.map(|d| d.into_nanos()).sum::<i64>() / count)
 }
 
-/// Returns the whole second component of a zx::MonotonicDuration.
-fn seconds(duration: zx::MonotonicDuration) -> zx::MonotonicDuration {
+/// Returns the whole second component of a zx::BootDuration.
+fn seconds(duration: zx::BootDuration) -> zx::BootDuration {
     duration - subs(duration)
 }
 
-/// Returns the subsecond component of a zx::MonotonicDuration.
-fn subs(duration: zx::MonotonicDuration) -> zx::MonotonicDuration {
-    zx::MonotonicDuration::from_nanos(duration.into_nanos() % NANOS_IN_SECONDS)
+/// Returns the subsecond component of a zx::BootDuration.
+fn subs(duration: zx::BootDuration) -> zx::BootDuration {
+    zx::BootDuration::from_nanos(duration.into_nanos() % NANOS_IN_SECONDS)
 }
 
-/// Returns the subsecond component of a zx::MonotonicInstant.
-fn time_subs(time: zx::MonotonicInstant) -> zx::MonotonicDuration {
-    zx::MonotonicDuration::from_nanos(time.into_nanos() % NANOS_IN_SECONDS)
+/// Returns the subsecond component of a zx::BootInstant.
+fn time_subs(time: zx::BootInstant) -> zx::BootDuration {
+    zx::BootDuration::from_nanos(time.into_nanos() % NANOS_IN_SECONDS)
 }
 
 #[cfg(test)]
@@ -311,28 +313,28 @@ mod test {
         static ref TEST_URI: hyper::Uri = "https://localhost/".parse().unwrap();
     }
 
-    const ONE_SECOND: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
-    const RTT_TIMES_ZERO_LATENCY: [zx::MonotonicDuration; 2] =
-        [zx::MonotonicDuration::from_nanos(0), zx::MonotonicDuration::from_nanos(0)];
-    const RTT_TIMES_100_MS_LATENCY: [zx::MonotonicDuration; 4] = [
-        zx::MonotonicDuration::from_millis(500), // ignored
-        zx::MonotonicDuration::from_millis(50),
-        zx::MonotonicDuration::from_millis(100),
-        zx::MonotonicDuration::from_millis(150),
+    const ONE_SECOND: zx::BootDuration = zx::BootDuration::from_seconds(1);
+    const RTT_TIMES_ZERO_LATENCY: [zx::BootDuration; 2] =
+        [zx::BootDuration::from_nanos(0), zx::BootDuration::from_nanos(0)];
+    const RTT_TIMES_100_MS_LATENCY: [zx::BootDuration; 4] = [
+        zx::BootDuration::from_millis(500), // ignored
+        zx::BootDuration::from_millis(50),
+        zx::BootDuration::from_millis(100),
+        zx::BootDuration::from_millis(150),
     ];
-    const DURATION_50_MS: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(50);
+    const DURATION_50_MS: zx::BootDuration = zx::BootDuration::from_millis(50);
 
-    const TEST_UTC_OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(72);
+    const TEST_UTC_OFFSET: zx::BootDuration = zx::BootDuration::from_hours(72);
 
     /// An |HttpsDateClient| which responds with fake (quantized) UTC times at specified offsets
     /// from the monotonic time.
     struct TestClient {
-        enqueued_offsets: VecDeque<Result<zx::MonotonicDuration, HttpsDateError>>,
+        enqueued_offsets: VecDeque<Result<zx::BootDuration, HttpsDateError>>,
     }
 
     fn make_test_config() -> Config {
         Config {
-            https_timeout: zx::MonotonicDuration::from_seconds(10),
+            https_timeout: zx::BootDuration::from_seconds(10),
             standard_deviation_bound_percentage: 30,
             first_rtt_time_factor: 5,
             use_pull_api: false,
@@ -345,10 +347,10 @@ mod test {
         async fn request_utc(
             &mut self,
             _uri: &Uri,
-            _https_timeout: zx::MonotonicDuration,
-        ) -> Result<zx::MonotonicInstant, HttpsDateError> {
+            _https_timeout: zx::BootDuration,
+        ) -> Result<zx::BootInstant, HttpsDateError> {
             let offset = self.enqueued_offsets.pop_front().unwrap()?;
-            let unquantized_time = zx::MonotonicInstant::get() + offset;
+            let unquantized_time = zx::BootInstant::get() + offset;
             Ok(unquantized_time - time_subs(unquantized_time))
         }
     }
@@ -356,7 +358,7 @@ mod test {
     impl TestClient {
         /// Create a test client that calculates responses with the provided offsets.
         fn with_offset_responses(
-            offsets: impl IntoIterator<Item = Result<zx::MonotonicDuration, HttpsDateError>>,
+            offsets: impl IntoIterator<Item = Result<zx::BootDuration, HttpsDateError>>,
         ) -> Self {
             TestClient { enqueued_offsets: VecDeque::from_iter(offsets) }
         }
@@ -371,15 +373,15 @@ mod test {
             TestClient::with_offset_responses(vec![Ok(TEST_UTC_OFFSET)]),
             &config,
         );
-        let monotonic_before = zx::MonotonicInstant::get();
+        let monotonic_before = zx::BootInstant::get();
         let sample = sampler.produce_sample(1).await.unwrap().await;
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
 
         assert!(sample.utc >= monotonic_before + TEST_UTC_OFFSET - ONE_SECOND);
         assert!(sample.utc <= monotonic_after + TEST_UTC_OFFSET + ONE_SECOND);
 
-        assert!(sample.monotonic >= monotonic_before);
-        assert!(sample.monotonic <= monotonic_after);
+        assert!(sample.reference >= monotonic_before);
+        assert!(sample.reference <= monotonic_after);
         assert_eq!(
             sample.standard_deviation,
             sample.final_bound_size * standard_deviation_bound_percentage / 100
@@ -402,15 +404,15 @@ mod test {
             ]),
             &config,
         );
-        let monotonic_before = zx::MonotonicInstant::get();
+        let monotonic_before = zx::BootInstant::get();
         let sample = sampler.produce_sample(3).await.unwrap().await;
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
 
         assert!(sample.utc >= monotonic_before + TEST_UTC_OFFSET - ONE_SECOND);
         assert!(sample.utc <= monotonic_after + TEST_UTC_OFFSET + ONE_SECOND);
 
-        assert!(sample.monotonic >= monotonic_before);
-        assert!(sample.monotonic <= monotonic_after);
+        assert!(sample.reference >= monotonic_before);
+        assert!(sample.reference <= monotonic_after);
         assert_eq!(
             sample.standard_deviation,
             sample.final_bound_size * standard_deviation_bound_percentage / 100
@@ -459,7 +461,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_produce_sample_takes_later_poll_if_polls_disagree() {
-        let expected_offset = TEST_UTC_OFFSET + zx::MonotonicDuration::from_hours(1);
+        let expected_offset = TEST_UTC_OFFSET + zx::BootDuration::from_hours(1);
         let config = &make_test_config();
         let sampler = HttpsSamplerImpl::new_with_client(
             TEST_URI.clone(),
@@ -471,9 +473,9 @@ mod test {
             config,
         );
 
-        let monotonic_before = zx::MonotonicInstant::get();
+        let monotonic_before = zx::BootInstant::get();
         let sample = sampler.produce_sample(3).await.unwrap().await;
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
 
         assert_eq!(sample.polls.len(), 1);
         assert!(sample.utc >= monotonic_before + expected_offset - ONE_SECOND);
@@ -482,60 +484,60 @@ mod test {
 
     #[fuchsia::test]
     fn test_ideal_poll_time_in_future() {
-        let future_monotonic = zx::MonotonicInstant::get() + zx::MonotonicDuration::from_hours(100);
+        let future_monotonic = zx::BootInstant::get() + zx::BootDuration::from_hours(100);
         let first_rtt_time_factor = make_test_config().first_rtt_time_factor;
         let bound_1 = Bound {
-            monotonic: future_monotonic,
-            utc_min: zx::MonotonicInstant::from_nanos(3_000_000_000),
-            utc_max: zx::MonotonicInstant::from_nanos(4_000_000_000),
+            reference: future_monotonic,
+            utc_min: zx::BootInstant::from_nanos(3_000_000_000),
+            utc_max: zx::BootInstant::from_nanos(4_000_000_000),
         };
         assert_eq!(
             ideal_next_poll_time(&bound_1, RTT_TIMES_ZERO_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(500),
+            future_monotonic + zx::BootDuration::from_millis(500),
         );
         assert_eq!(
             ideal_next_poll_time(&bound_1, RTT_TIMES_100_MS_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(500) - DURATION_50_MS,
+            future_monotonic + zx::BootDuration::from_millis(500) - DURATION_50_MS,
         );
 
         let bound_2 = Bound {
-            monotonic: future_monotonic,
-            utc_min: zx::MonotonicInstant::from_nanos(3_600_000_000),
-            utc_max: zx::MonotonicInstant::from_nanos(3_800_000_000),
+            reference: future_monotonic,
+            utc_min: zx::BootInstant::from_nanos(3_600_000_000),
+            utc_max: zx::BootInstant::from_nanos(3_800_000_000),
         };
         assert_eq!(
             ideal_next_poll_time(&bound_2, RTT_TIMES_ZERO_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(300),
+            future_monotonic + zx::BootDuration::from_millis(300),
         );
         assert_eq!(
             ideal_next_poll_time(&bound_2, RTT_TIMES_100_MS_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(300) - DURATION_50_MS,
+            future_monotonic + zx::BootDuration::from_millis(300) - DURATION_50_MS,
         );
 
         let bound_3 = Bound {
-            monotonic: future_monotonic,
-            utc_min: zx::MonotonicInstant::from_nanos(0_500_000_000),
-            utc_max: zx::MonotonicInstant::from_nanos(2_500_000_000),
+            reference: future_monotonic,
+            utc_min: zx::BootInstant::from_nanos(0_500_000_000),
+            utc_max: zx::BootInstant::from_nanos(2_500_000_000),
         };
         assert_eq!(
             ideal_next_poll_time(&bound_3, RTT_TIMES_ZERO_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(500),
+            future_monotonic + zx::BootDuration::from_millis(500),
         );
         assert_eq!(
             ideal_next_poll_time(&bound_3, RTT_TIMES_100_MS_LATENCY.iter(), first_rtt_time_factor),
-            future_monotonic + zx::MonotonicDuration::from_millis(500) - DURATION_50_MS,
+            future_monotonic + zx::BootDuration::from_millis(500) - DURATION_50_MS,
         );
     }
 
     #[fuchsia::test]
     fn test_ideal_poll_time_in_past() {
-        let monotonic_now = zx::MonotonicInstant::get();
-        let past_monotonic = zx::MonotonicInstant::from_nanos(0);
+        let monotonic_now = zx::BootInstant::get();
+        let past_monotonic = zx::BootInstant::from_nanos(0);
         let first_rtt_time_factor = make_test_config().first_rtt_time_factor;
         let bound = Bound {
-            monotonic: past_monotonic,
-            utc_min: zx::MonotonicInstant::from_nanos(3_000_000_000),
-            utc_max: zx::MonotonicInstant::from_nanos(4_000_000_000),
+            reference: past_monotonic,
+            utc_min: zx::BootInstant::from_nanos(3_000_000_000),
+            utc_max: zx::BootInstant::from_nanos(4_000_000_000),
         };
         // The returned time should be in the future, but the subsecond component should match
         // the otherwise ideal time in the past.
@@ -549,7 +551,7 @@ mod test {
                 RTT_TIMES_ZERO_LATENCY.iter(),
                 first_rtt_time_factor
             )),
-            time_subs(past_monotonic + zx::MonotonicDuration::from_millis(500)),
+            time_subs(past_monotonic + zx::BootDuration::from_millis(500)),
         );
     }
 
@@ -557,11 +559,11 @@ mod test {
     async fn test_fake_sampler() {
         let expected_responses = vec![
             Ok(HttpsSample {
-                utc: zx::MonotonicInstant::from_nanos(999),
-                monotonic: zx::MonotonicInstant::from_nanos(888_888_888),
-                standard_deviation: zx::MonotonicDuration::from_nanos(22),
-                final_bound_size: zx::MonotonicDuration::from_nanos(44),
-                polls: vec![Poll { round_trip_time: zx::MonotonicDuration::from_nanos(55) }],
+                utc: zx::BootInstant::from_nanos(999),
+                reference: zx::BootInstant::from_nanos(888_888_888),
+                standard_deviation: zx::BootDuration::from_nanos(22),
+                final_bound_size: zx::BootDuration::from_nanos(44),
+                polls: vec![Poll { round_trip_time: zx::BootDuration::from_nanos(55) }],
             }),
             Err(HttpsDateErrorType::NetworkError),
             Err(HttpsDateErrorType::NoCertificatesPresented),

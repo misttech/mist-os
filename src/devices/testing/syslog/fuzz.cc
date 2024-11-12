@@ -29,10 +29,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     kMaxValue = kDoubleField,
     kBooleanField,
   };
-  auto severity = provider.ConsumeIntegral<fuchsia_logging::LogSeverity>();
+  auto severity = provider.ConsumeIntegral<fuchsia_logging::RawLogSeverity>();
   // Fatal crashes...
-  if (severity == FUCHSIA_LOG_FATAL) {
-    severity = FUCHSIA_LOG_ERROR;
+  if (severity == fuchsia_logging::LogSeverity::Fatal) {
+    severity = fuchsia_logging::LogSeverity::Error;
   }
   auto file = provider.ConsumeRandomLengthString();
   auto line = provider.ConsumeIntegral<unsigned int>();

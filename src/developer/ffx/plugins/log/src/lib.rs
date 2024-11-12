@@ -9,11 +9,12 @@ use fho::{Connector, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
+use fidl_fuchsia_sys2::RealmQueryProxy;
 use log_command::log_formatter::{
     dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
     Symbolize, Timestamp, WriterContainer,
 };
-use log_command::{InstanceGetter, LogProcessingResult, LogSubCommand, WatchCommand};
+use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
@@ -67,8 +68,6 @@ pub async fn log_impl(
     rcs_connector: Connector<RemoteControlProxy>,
     include_timestamp: bool,
 ) -> Result<(), LogError> {
-    let rcs_proxy = connect_to_rcs(&rcs_connector).await?;
-    let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
     // Remove them when possible.
     let symbolize_disabled = cmd.symbolize.is_symbolize_disabled();
@@ -83,7 +82,6 @@ pub async fn log_impl(
                 RealSymbolizerProcess::new(!prettification_disabled).await?,
             )?)
         },
-        instance_getter,
         rcs_connector,
         include_timestamp,
     )
@@ -95,7 +93,6 @@ async fn log_main<W>(
     writer: W,
     cmd: LogCommand,
     symbolizer: Option<impl Symbolize>,
-    instance_getter: impl InstanceGetter,
     rcs_connector: Connector<RemoteControlProxy>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
@@ -103,8 +100,7 @@ where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
 {
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(cmd, formatter, symbolizer, &instance_getter, rcs_connector, include_timestamp)
-        .await?;
+    log_loop(cmd, formatter, symbolizer, rcs_connector, include_timestamp).await?;
     Ok(())
 }
 
@@ -113,6 +109,7 @@ struct DeviceConnection {
     log_socket: fuchsia_async::Socket,
     log_settings_client: LogSettingsProxy,
     boot_id: Option<u64>,
+    realm_query: RealmQueryProxy,
 }
 
 async fn connect_to_rcs(
@@ -134,6 +131,7 @@ async fn connect_to_target(
 
     let boot_timestamp = host_id.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
     let boot_id = host_id.boot_id;
+    let realm_query = rcs::root_realm_query(&rcs_client, TIMEOUT).await?;
 
     // If we detect a reboot we want to SnapshotThenSubscribe so
     // we get all of the logs from the reboot. If not, we use Snapshot
@@ -184,6 +182,7 @@ async fn connect_to_target(
         log_socket: fuchsia_async::Socket::from_socket(local),
         log_settings_client,
         boot_id,
+        realm_query,
     })
 }
 
@@ -191,7 +190,6 @@ async fn log_loop<W>(
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
     symbolizer: Option<impl Symbolize>,
-    realm_query: &impl InstanceGetter,
     rcs_connector: Connector<RemoteControlProxy>,
     include_timestamp: bool,
 ) -> Result<(), LogError>
@@ -244,7 +242,7 @@ where
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
         prev_boot_id = connection.boot_id;
-        cmd.maybe_set_interest(&connection.log_settings_client, realm_query).await?;
+        cmd.maybe_set_interest(&connection.log_settings_client, &connection.realm_query).await?;
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),
         ));
@@ -590,6 +588,7 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
+        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
             messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
                 "1980-01-01T00:00:03",
@@ -606,6 +605,7 @@ ffx log --force-set-severity.
                 ..parse_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
+            set_severity: selectors.clone(),
             ..LogCommand::default()
         };
 
@@ -627,6 +627,9 @@ ffx log --force-set-severity.
             Some(TestEvent::Connected(StreamMode::Subscribe))
         );
 
+        // Interest should be set
+        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors.clone())));
+
         environment.reboot_target(Some(42));
 
         // Device is paused when we exit the loop because there's nothing
@@ -643,6 +646,9 @@ ffx log --force-set-severity.
         );
 
         environment.disconnect_target();
+
+        // Interest should be set again
+        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }

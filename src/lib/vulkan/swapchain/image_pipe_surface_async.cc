@@ -535,12 +535,10 @@ void ImagePipeSurfaceAsync::PresentImage(uint32_t image_id,
 
   queue_.push_back({image_id, std::move(acquire_events), std::move(release_fence_signalers)});
 
-  if (!present_pending_) {
-    async::PostTask(loop_.dispatcher(), [this]() {
-      std::lock_guard<std::mutex> lock(mutex_);
-      PresentNextImageLocked();
-    });
-  }
+  async::PostTask(loop_.dispatcher(), [this]() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    PresentNextImageLocked();
+  });
 }
 
 SupportedImageProperties& ImagePipeSurfaceAsync::GetSupportedImageProperties() {
@@ -548,15 +546,9 @@ SupportedImageProperties& ImagePipeSurfaceAsync::GetSupportedImageProperties() {
 }
 
 void ImagePipeSurfaceAsync::PresentNextImageLocked() {
-  if (present_pending_)
-    return;
   if (queue_.empty())
     return;
   TRACE_DURATION("gfx", "ImagePipeSurfaceAsync::PresentNextImageLocked");
-
-  // To guarantee FIFO mode, we can't have Scenic drop any of our frames.
-  // We accomplish that by setting unsquashable flag.
-  uint64_t presentation_time = zx_clock_get_monotonic();
 
   auto& present = queue_.front();
   TRACE_FLOW_END("gfx", "image_pipe_swapchain_to_present", present.image_id);
@@ -575,10 +567,13 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
     // the previous frame's release fences and swapping ensure we set the correct ones. When the
     // current frame's OnFramePresented callback is called, it is safe to stop tracking the
     // previous frame's |release_fences|.
-    previous_present_release_fences_.swap(present.release_fences);
+    previous_present_release_fence_signalers_.swap(present.release_fences);
 
+    // To guarantee FIFO mode, we can't have Scenic drop any of our frames.
+    // We accomplish that by setting unsquashable flag.
     fuchsia_ui_composition::PresentArgs present_args;
-    present_args.requested_presentation_time(presentation_time)
+    // Use 0 as the requested presentation time to present as soon as possible.
+    present_args.requested_presentation_time(0)
         .acquire_fences(std::move(present.acquire_fences))
         .release_fences(std::move(release_events))
         .unsquashable(true);
@@ -593,7 +588,6 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
                                   [this, release_fences = std::move(present.release_fences)](
                                       zx_time_t actual_presentation_time) {
                                     std::lock_guard<std::mutex> lock(mutex_);
-                                    present_pending_ = false;
                                     for (auto& fence : release_fences) {
                                       fence->reset();
                                     }
@@ -602,14 +596,13 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
   }
 
   queue_.erase(queue_.begin());
-  present_pending_ = true;
 }
 
 void ImagePipeSurfaceAsync::OnErrorLocked() {
   channel_closed_ = true;
   queue_.clear();
   flatland_connection_.reset();
-  previous_present_release_fences_.clear();
+  previous_present_release_fence_signalers_.clear();
 }
 
 }  // namespace image_pipe_swapchain

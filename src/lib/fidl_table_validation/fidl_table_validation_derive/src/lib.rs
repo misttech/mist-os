@@ -22,13 +22,19 @@ const INVALID_FIDL_FIELD_ATTRIBUTE_MSG: &str = concat!(
 
 #[proc_macro_derive(
     ValidFidlTable,
-    attributes(fidl_table_src, fidl_field_type, fidl_table_validator, fidl_field_with_default)
+    attributes(
+        fidl_table_src,
+        fidl_field_type,
+        fidl_table_validator,
+        fidl_field_with_default,
+        fidl_table_strict
+    )
 )]
 pub fn validate_fidl_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
     match input.data {
         Data::Struct(DataStruct { fields: syn::Fields::Named(fields), .. }) => {
-            match impl_valid_fidl_table(&input.ident, fields.named, &input.attrs) {
+            match impl_valid_fidl_table(&input.ident, &input.generics, fields.named, &input.attrs) {
                 Ok(v) => v.into(),
                 Err(e) => e.to_compile_error().into(),
             }
@@ -39,7 +45,7 @@ pub fn validate_fidl_table(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
 }
 
-fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<Meta>> {
+fn unique_attr<'a>(attrs: &'a [Attribute], call: &str) -> Result<Option<&'a Attribute>> {
     let mut attrs = attrs.iter().filter(|attr| attr.path().is_ident(call));
     let attr = match attrs.next() {
         Some(attr) => attr,
@@ -51,6 +57,12 @@ fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<Meta>>
             &format!("The {} attribute should only be declared once.", call),
         ));
     }
+    Ok(Some(attr))
+}
+
+fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<Meta>> {
+    let Some(attr) = unique_attr(attrs, call)? else { return Ok(None) };
+
     let mut nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
     if nested.len() > 1 {
         return Err(Error::new(
@@ -60,6 +72,39 @@ fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<Meta>>
     }
 
     return Ok(nested.pop().map(|pair| pair.into_value()));
+}
+
+fn fidl_table_strict(attrs: &[Attribute]) -> Result<Option<Vec<Ident>>> {
+    let Some(attr) = unique_attr(attrs, "fidl_table_strict")? else {
+        return Ok(None);
+    };
+    let list = match &attr.meta {
+        Meta::Path(_) => return Ok(Some(vec![])),
+        Meta::NameValue(_) => {
+            return Err(Error::new(
+                attr.span(),
+                &format!(
+                    "fidl_table_strict expects either no arguments or a list of \
+                    fields from the FIDL table that are omitted from the validated type"
+                ),
+            ))
+        }
+        Meta::List(list) => list,
+    };
+    let ignored = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    let idents = ignored
+        .into_iter()
+        .map(|meta| {
+            match &meta {
+                Meta::Path(p) => p.get_ident().cloned(),
+                _ => None,
+            }
+            .ok_or_else(move || {
+                Error::new(meta.span(), "fidl_table_strict expects list of identifiers")
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Some(idents))
 }
 
 fn fidl_table_path(span: Span, attrs: &[Attribute]) -> Result<Path> {
@@ -167,15 +212,20 @@ impl FidlField {
         Ident::new(&name, Span::call_site())
     }
 
+    fn src_ident(&self) -> Ident {
+        Ident::new(&format!("src_{}", &self.ident), Span::call_site())
+    }
+
     fn generate_try_from(&self, missing_field_error_type: &Ident) -> TokenStream {
         let ident = &self.ident;
+        let src_ident = self.src_ident();
         match &self.kind {
             FidlFieldKind::Required => {
                 let camel_case = self.camel_case();
                 match self.in_vec {
                     true => quote!(
                         #ident: {
-                            let src_vec = src.#ident.ok_or(#missing_field_error_type::#camel_case)?;
+                            let src_vec = #src_ident.ok_or(#missing_field_error_type::#camel_case)?;
                             src_vec
                                 .into_iter()
                                 .map(std::convert::TryFrom::try_from)
@@ -185,14 +235,14 @@ impl FidlField {
                     ),
                     false => quote!(
                         #ident: std::convert::TryFrom::try_from(
-                            src.#ident.ok_or(#missing_field_error_type::#camel_case)?
+                            #src_ident.ok_or(#missing_field_error_type::#camel_case)?
                         ).map_err(anyhow::Error::from)?,
                     ),
                 }
             }
             FidlFieldKind::Optional => match self.in_vec {
                 true => quote!(
-                    #ident: if let Some(src_vec) = src.#ident {
+                    #ident: if let Some(src_vec) = #src_ident {
                         Some(
                             src_vec
                                 .into_iter()
@@ -205,7 +255,7 @@ impl FidlField {
                     },
                 ),
                 false => quote!(
-                    #ident: if let Some(field) = src.#ident {
+                    #ident: if let Some(field) = #src_ident {
                         Some(
                             std::convert::TryFrom::try_from(
                                 field
@@ -217,29 +267,41 @@ impl FidlField {
                 ),
             },
             FidlFieldKind::Default => quote!(
-                #ident: src
-                    .#ident
+                #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
                     .map_err(anyhow::Error::from)?
                     .unwrap_or_default(),
             ),
             FidlFieldKind::ExprDefault(default_ident) => quote!(
-                #ident: src
-                    .#ident
+                #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
                     .map_err(anyhow::Error::from)?
                     .unwrap_or(#default_ident),
             ),
             FidlFieldKind::HasDefault(value) => quote!(
-                #ident: src
-                    .#ident
+                #ident: #src_ident
                     .map(std::convert::TryFrom::try_from)
                     .transpose()
                     .map_err(anyhow::Error::from)?
                     .unwrap_or(#value),
             ),
+            FidlFieldKind::Converter(path) => {
+                let camel_case = self.camel_case();
+                quote!(
+                    #ident: <#path as ::fidl_table_validation::Converter>::try_from_fidl(
+                        #src_ident.ok_or(#missing_field_error_type::#camel_case)?
+                    )?,
+                )
+            }
+            FidlFieldKind::OptionalConverter(path) => {
+                quote!(
+                    #ident: <#path as ::fidl_table_validation::Converter>::try_from_fidl(
+                        #src_ident
+                    )?,
+                )
+            }
         }
     }
 }
@@ -251,6 +313,8 @@ enum FidlFieldKind {
     Default,
     ExprDefault(Ident),
     HasDefault(Lit),
+    Converter(Path),
+    OptionalConverter(Path),
 }
 
 impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
@@ -272,6 +336,22 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
                     return Err(Error::new(default_value.span(), "expected literal value"));
                 }
             }
+            Some(Meta::NameValue(ref converter)) if converter.path.is_ident("converter") => {
+                if let Expr::Path(ExprPath { ref path, .. }) = converter.value {
+                    Some(FidlFieldKind::Converter(path.clone()))
+                } else {
+                    return Err(Error::new(converter.span(), "expected path"));
+                }
+            }
+            Some(Meta::NameValue(ref converter))
+                if converter.path.is_ident("optional_converter") =>
+            {
+                if let Expr::Path(ExprPath { ref path, .. }) = converter.value {
+                    Some(FidlFieldKind::OptionalConverter(path.clone()))
+                } else {
+                    return Err(Error::new(converter.span(), "expected path"));
+                }
+            }
             _ => None,
         } {
             return Ok(kind);
@@ -290,10 +370,12 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
 
 fn impl_valid_fidl_table(
     name: &Ident,
+    generics: &Generics,
     fields: Punctuated<Field, Comma>,
     attrs: &[Attribute],
 ) -> Result<TokenStream> {
     let fidl_table_path = fidl_table_path(name.span(), attrs)?;
+    let fidl_table_strict = fidl_table_strict(attrs)?;
     let fidl_table_type = match fidl_table_path.segments.last() {
         Some(segment) => segment.ident.clone(),
         None => {
@@ -344,6 +426,38 @@ fn impl_valid_fidl_table(
         .map(FidlField::try_from)
         .collect::<Result<Vec<FidlField>>>()?;
 
+    let trailing_destructure = fidl_table_strict
+        .as_ref()
+        .map(|ignored| {
+            itertools::Either::Left(
+                ignored
+                    .iter()
+                    .map(|ident| quote!(#ident: _,))
+                    .chain(std::iter::once(quote!(__source_breaking: _,))),
+            )
+        })
+        .unwrap_or_else(|| itertools::Either::Right(std::iter::once(quote!(..))));
+
+    let fidl_table_destructure = fields
+        .iter()
+        .map(|field| {
+            let ident = &field.ident;
+            let src_ident = field.src_ident();
+            quote!(#ident: #src_ident,)
+        })
+        .chain(trailing_destructure)
+        .collect::<TokenStream>();
+    let fidl_table_construct_trailing = fidl_table_strict
+        .as_ref()
+        .map(|ignored| {
+            ignored
+                .iter()
+                .map(|ident| quote!(#ident: Default::default(),))
+                .chain(std::iter::once(quote!(__source_breaking: Default::default(),)))
+                .collect::<TokenStream>()
+        })
+        .unwrap_or_else(|| quote!(..Default::default()));
+
     let mut field_validations = TokenStream::new();
     field_validations.extend(fields.iter().map(|f| f.generate_try_from(&missing_field_error_type)));
 
@@ -367,6 +481,16 @@ fn impl_valid_fidl_table(
                     },
                 ),
             },
+            FidlFieldKind::Converter(path) => {
+                quote!(#ident: Some(
+                    <#path as ::fidl_table_validation::Converter>::from_validated(src.#ident)
+                ),)
+            }
+            FidlFieldKind::OptionalConverter(path) => {
+                quote!(#ident:
+                    <#path as ::fidl_table_validation::Converter>::from_validated(src.#ident),
+                )
+            }
             _ => match field.in_vec {
                 true => quote!(
                     #ident: Some(
@@ -387,7 +511,7 @@ fn impl_valid_fidl_table(
         fields
             .iter()
             .filter(|field| match field.kind {
-                FidlFieldKind::Required => true,
+                FidlFieldKind::Required | FidlFieldKind::Converter(_) => true,
                 _ => false,
             })
             .map(|field| {
@@ -402,6 +526,7 @@ fn impl_valid_fidl_table(
 
     let missing_error_doc = format!("Missing fields in `{}`.", fidl_table_type);
     let error_doc = format!("Errors validating `{}`.", fidl_table_type);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     Ok(quote!(
         #[doc = #missing_error_doc]
         #[derive(Debug, Clone, Copy, PartialEq)]
@@ -441,10 +566,11 @@ fn impl_valid_fidl_table(
 
         #custom_validator_error_from_impl
 
-        impl std::convert::TryFrom<#fidl_table_path> for #name {
+        impl #impl_generics std::convert::TryFrom<#fidl_table_path> for #name #ty_generics #where_clause {
             type Error = #error_type_name;
             fn try_from(src: #fidl_table_path) -> std::result::Result<Self, Self::Error> {
                 use ::fidl_table_validation::Validate;
+                let #fidl_table_path { #fidl_table_destructure } = src;
                 let maybe_valid = Self {
                     #field_validations
                 };
@@ -453,11 +579,11 @@ fn impl_valid_fidl_table(
             }
         }
 
-        impl std::convert::From<#name> for #fidl_table_path {
-            fn from(src: #name) -> #fidl_table_path {
+        impl #impl_generics std::convert::From<#name #ty_generics> for #fidl_table_path #where_clause {
+            fn from(src: #name #ty_generics) -> #fidl_table_path {
                 Self {
                     #field_intos
-                    ..#fidl_table_path::default()
+                    #fidl_table_construct_trailing
                 }
             }
         }

@@ -68,7 +68,8 @@ class TraceSession {
                std::vector<std::string> categories, size_t buffer_size_megabytes,
                fuchsia::tracing::BufferingMode buffering_mode,
                TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
-               zx::duration stop_timeout, fit::closure abort_handler, AlertCallback alert_callback);
+               zx::duration stop_timeout, controller::FxtVersion fxt_version,
+               fit::closure abort_handler, AlertCallback alert_callback);
 
   // Frees all allocated resources and closes the outgoing
   // connection.
@@ -184,6 +185,8 @@ class TraceSession {
   controller::Session::StartTracingCallback start_callback_;
   fit::function<void(controller::Session_StopTracing_Result)> stop_callback_;
   fit::closure terminate_callback_;
+
+  controller::FxtVersion fxt_version_;
 
   fit::closure abort_handler_;
   AlertCallback alert_callback_;

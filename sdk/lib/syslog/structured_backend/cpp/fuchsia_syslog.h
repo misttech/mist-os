@@ -28,11 +28,11 @@ namespace internal {
 // clean state.
 struct LogBufferData {
   // Record state (for keeping track of backend-specific details)
-  uint64_t record_state[FUCHSIA_SYSLOG_STATE_SIZE];
+  uint64_t record_state[15];
 
   // Log data (used by the backend to encode the log into). The format
   // for this is backend-specific.
-  uint64_t data[FUCHSIA_SYSLOG_BUFFER_SIZE];
+  uint64_t data[4096];
 };
 
 }  // namespace internal

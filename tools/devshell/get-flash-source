@@ -75,16 +75,23 @@ function _build_gn_label {
 
 use_bazel_images_only="$(_query_manifest "${ARGS_JSON}" .use_bazel_images_only)"
 if [[ "${use_bazel_images_only}" == "true" ]]; then
-    product="$(_query_manifest "${ARGS_JSON}" .build_info_product)"
-    board="$(_query_manifest "${ARGS_JSON}" .build_info_board)"
-    product_bundle_name="${product}.${board}"
-    product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'") | .path')"
-    if [[ -z "${product_bundle}" ]]; then
-      fx-error "Failed to find a product bundle"
-      exit 1
+    main_product_label="$(_query_manifest "${ARGS_JSON}" .main_product_label)"
+    if [[ "${main_product_label}" != "null" ]]; then
+      product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.label | startswith("'${main_product_label}'")) | .path')"
+      product_bundle_label=${main_product_label}
+    else
+      product="$(_query_manifest "${ARGS_JSON}" .build_info_product)"
+      board="$(_query_manifest "${ARGS_JSON}" .build_info_board)"
+      product_bundle_name="${product}.${board}"
+      product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'") | .path')"
+      product_bundle_label="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'")| .label')"
+      if [[ -z "${product_bundle}" ]]; then
+        fx-error "Failed to find a product bundle."
+        fx-error "Use \"ffx product list\" to see the list of available product bundles then run \"ffx target flash -b <product-bundle>\"."
+        exit 1
+      fi
     fi
     if $build ; then
-      product_bundle_label="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'")| .label')"
       _build_gn_label "${product_bundle_label}"
     fi
     echo "product-bundle:${product_bundle}"

@@ -96,7 +96,7 @@ class HdmiHost {
   bool IsDisplayTimingSupported(const display::DisplayTiming& timing) const;
 
   // Configures the video encoder to replace the output pixels of the Video
-  // Input Unit (VIU) with black pixels iff `enabled` is true.
+  // Input Unit (VIU) with the given `color` iff `enabled` is true.
   void ReplaceEncoderPixelColorWithColor(bool enabled, YCbCrColor color);
 
  private:

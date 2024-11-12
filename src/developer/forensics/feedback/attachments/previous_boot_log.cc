@@ -25,23 +25,35 @@ PreviousBootLog::PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clo
     return;
   }
 
+  delete_previous_boot_log_at_ = zx::time_boot(0) + *delete_previous_boot_log_at;
+
+  // The previous boot logs will eventually be lazily deleted, but we should still try to
+  // proactively delete them to save space.
   auto self = weak_factory_.GetWeakPtr();
   async::PostDelayedTask(
       dispatcher_,
       [self] {
-        if (self) {
-          FX_LOGS(INFO) << "Deleting previous boot logs after 24 hours of device uptime";
+        if (self && !self->is_file_deleted_) {
+          FX_LOGS(INFO) << "Deleting previous boot logs after 24 hours of device runtime";
           self->is_file_deleted_ = true;
           files::DeletePath(self->path_, /*recursive=*/true);
         }
       },
-      // The previous boot logs are deleted after |delete_previous_boot_log_at| of device uptime,
-      // not component uptime.
-      *delete_previous_boot_log_at - zx::nsec(clock_->MonotonicNow().get()));
+      // The previous boot logs are proactively deleted after |delete_previous_boot_log_at| of
+      // device runtime, not component runtime.
+      zx::time_monotonic(0) + *delete_previous_boot_log_at - clock_->MonotonicNow());
 }
 
 ::fpromise::promise<AttachmentValue> PreviousBootLog::Get(const uint64_t ticket) {
-  AttachmentValue previous_boot_log(Error::kNotSet);
+  // Lazily check if the previous boot log should be deleted because we have no easy way to schedule
+  // async work based on the boot clock.
+  if (!is_file_deleted_ && delete_previous_boot_log_at_.has_value() &&
+      (clock_->BootNow() >= *delete_previous_boot_log_at_)) {
+    FX_LOGS(INFO) << "Lazily deleting previous boot logs after 24 hours of device uptime";
+    is_file_deleted_ = true;
+    files::DeletePath(path_, /*recursive=*/true);
+  }
+
   if (is_file_deleted_) {
     return fpromise::make_ok_promise(AttachmentValue(Error::kCustom));
   }

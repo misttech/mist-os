@@ -94,10 +94,10 @@ import("plugins.gni")
 #     specified.
 #     See //build/sdk/sdk_atom.gni.
 template("ffx_plugin") {
-  output_name = target_name
-
   if (defined(invoker.name)) {
-    output_name = invoker.name
+    crate_name = invoker.name
+  } else {
+    crate_name = target_name
   }
 
   tests_deps = []
@@ -128,13 +128,13 @@ template("ffx_plugin") {
         json_merge_deps += [ get_label_info(d, "dir") + ":config.json" ]
       }
 
-      sub_cmd_gen = output_name + "_sub_command_gen"
+      sub_cmd_gen = crate_name + "_sub_command_gen"
       command(sub_cmd_gen) {
         output_name = "cmd_args.rs"
         plugin_deps = invoker.plugin_deps
       }
 
-      sub_cmd = output_name + "_sub_command"
+      sub_cmd = crate_name + "_sub_command"
       rustc_library(sub_cmd) {
         edition = "2018"
         source_root = "$target_gen_dir/cmd_args.rs"
@@ -163,18 +163,6 @@ template("ffx_plugin") {
                                  "with_unit_tests",
                                  "original_target_name",
                                ])
-
-        # make sure no fidl libraries not in the SDK are used if it's public
-        # TODO(b/314822328): improve this logic to cascade properly
-        if (sdk_category != "internal") {
-          assert_no_deps = [
-            "//sdk:marker-cts",
-            "//sdk:marker-excluded",
-            "//sdk:marker-experimental",
-            "//sdk:marker-internal",
-            "//sdk:marker-unknown",
-          ]
-        }
         deps += [ "//sdk:marker-$sdk_category" ]
       }
 
@@ -183,7 +171,7 @@ template("ffx_plugin") {
       not_needed([ "cmd_deps" ])
     }
 
-    args = output_name + "_args"
+    args_target_name = crate_name + "_args"
     args_source_root = "src/args.rs"
     if (defined(invoker.args_source_root)) {
       args_source_root = invoker.args_source_root
@@ -211,12 +199,13 @@ template("ffx_plugin") {
     } else {
       _original_target_name = target_name
     }
-    rustc_library(args) {
+    rustc_library(args_target_name) {
       source_root = args_source_root
 
       # Due to size constraints, RBE slows down the build of plugins
       # rather than speeding it up. Disable RBE for plugins.
       disable_rbe = true
+
       deps = args_deps + [
                "//src/developer/ffx/core:lib",
                "//third_party/rust_crates:argh",
@@ -253,16 +242,13 @@ template("ffx_plugin") {
                              ])
     }
     if (defined(invoker.args_with_unit_tests) && invoker.args_with_unit_tests) {
-      tests_deps += [ ":" + args + "_test" ]
+      tests_deps += [ ":" + args_target_name + "_test" ]
     }
 
     lib_deps = [
-      ":" + args,
+      ":" + args_target_name,
       "//src/developer/ffx/core:lib",
     ]
-
-    plugins_name = output_name + "_plugins"
-    execution_lib = output_name
 
     includes_execution = false
     if (defined(invoker.sources)) {
@@ -277,26 +263,25 @@ template("ffx_plugin") {
       }
     }
 
+    plugins_name = crate_name + "_plugins"
     plugins(plugins_name) {
       output_name = "plugins.rs"
-      args = args
+      args = args_target_name
       if (defined(invoker.plugin_deps)) {
         sub_command = sub_cmd
       }
-      execution_lib = execution_lib
+      execution_lib = crate_name
       forward_variables_from(invoker,
                              "*",
                              [
                                "name",
                                "config_data",
-                               "output_name",
-                               "args",
                              ])
     }
 
     suite_deps = lib_deps + p_deps
     suite_deps += [
-      ":" + args,
+      ":" + args_target_name,
       ":" + plugins_name,
       "//src/developer/ffx/lib/fho:lib",
     ]
@@ -305,7 +290,7 @@ template("ffx_plugin") {
     }
 
     if (includes_execution) {
-      rustc_library(output_name) {
+      rustc_library(crate_name) {
         deps = lib_deps
         if (defined(invoker.deps)) {
           deps += invoker.deps
@@ -334,29 +319,16 @@ template("ffx_plugin") {
                                  "original_target_name",
                                ])
         original_target_name = _original_target_name
-
-        # make sure no fidl libraries not in the SDK are used if it's public
-        # TODO(b/314822328): improve this logic to cascade properly
-        if (sdk_category != "internal") {
-          assert_no_deps = [
-            "//sdk:marker-cts",
-            "//sdk:marker-excluded",
-            "//sdk:marker-experimental",
-            "//sdk:marker-internal",
-            "//sdk:marker-unknown",
-          ]
-        }
         deps += [ "//sdk:marker-$sdk_category" ]
       }
-      suite_deps += [ ":" + execution_lib ]
+      suite_deps += [ ":" + crate_name ]
 
       if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
-        tests_deps += [ ":" + output_name + "_test" ]
+        tests_deps += [ ":" + crate_name + "_test" ]
       }
     }
 
-    suite_name = output_name + "_suite"
-    rustc_library(suite_name) {
+    rustc_library(crate_name + "_suite") {
       source_root = "$target_gen_dir/plugins.rs"
       edition = "2018"
       with_unit_tests = false
@@ -379,6 +351,23 @@ template("ffx_plugin") {
                                "with_unit_tests",
                                "original_target_name",
                              ])
+
+      # make sure no fidl libraries not in the SDK are used if it's public
+      # This target includes all other targets defined above, so this
+      # `assert_no_deps` covers all of them.
+      # TODO(b/314822328): improve this logic to cascade properly
+      if (sdk_category != "internal") {
+        if (!defined(assert_no_deps)) {
+          assert_no_deps = []
+        }
+        assert_no_deps += [
+          "//sdk:marker-cts",
+          "//sdk:marker-excluded",
+          "//sdk:marker-experimental",
+          "//sdk:marker-internal",
+          "//sdk:marker-unknown",
+        ]
+      }
     }
   } else {
     not_needed(invoker, "*")
@@ -392,7 +381,7 @@ template("ffx_plugin") {
     }
   }
 
-  group(output_name + "_tests") {
+  group(crate_name + "_tests") {
     testonly = true
     deps = tests_deps
   }

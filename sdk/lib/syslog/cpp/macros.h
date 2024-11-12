@@ -7,14 +7,23 @@
 
 #include <lib/syslog/cpp/log_message_impl.h>
 
+#define __FX_LOG_SEVERITY_TRACE (fuchsia_logging::LogSeverity::Trace)
+#define __FX_LOG_SEVERITY_DEBUG (fuchsia_logging::LogSeverity::Debug)
+#define __FX_LOG_SEVERITY_INFO (fuchsia_logging::LogSeverity::Info)
+#define __FX_LOG_SEVERITY_WARNING (fuchsia_logging::LogSeverity::Warn)
+#define __FX_LOG_SEVERITY_ERROR (fuchsia_logging::LogSeverity::Error)
+#define __FX_LOG_SEVERITY_FATAL (fuchsia_logging::LogSeverity::Fatal)
+
 /// Used for stream-based logging with a custom tag.
-#define FX_LOG_STREAM(severity, tag) \
-  ::fuchsia_logging::LogMessage(FUCHSIA_LOG_##severity, __FILE__, __LINE__, nullptr, tag).stream()
+#define FX_LOG_STREAM(severity, tag)                                                            \
+  ::fuchsia_logging::LogMessage(__FX_LOG_SEVERITY_##severity, __FILE__, __LINE__, nullptr, tag) \
+      .stream()
 
 /// Used for stream-based logging of a zx_status_t combined
 /// with a log message.
-#define FX_LOG_STREAM_STATUS(severity, status, tag)                                               \
-  ::fuchsia_logging::LogMessage(FUCHSIA_LOG_##severity, __FILE__, __LINE__, nullptr, tag, status) \
+#define FX_LOG_STREAM_STATUS(severity, status, tag)                                             \
+  ::fuchsia_logging::LogMessage(__FX_LOG_SEVERITY_##severity, __FILE__, __LINE__, nullptr, tag, \
+                                status)                                                         \
       .stream()
 
 // Internal macro used by other macros
@@ -22,15 +31,16 @@
   !(condition) ? (void)0 : ::fuchsia_logging::LogMessageVoidify() & (stream)
 
 // Internal macro used by other macros
-#define FX_EAT_STREAM_PARAMETERS(ignored)        \
-  true || (ignored)                              \
-      ? (void)0                                  \
-      : ::fuchsia_logging::LogMessageVoidify() & \
-            ::fuchsia_logging::LogMessage(FUCHSIA_LOG_FATAL, 0, 0, nullptr, nullptr).stream()
+#define FX_EAT_STREAM_PARAMETERS(ignored)                                                  \
+  true || (ignored)                                                                        \
+      ? (void)0                                                                            \
+      : ::fuchsia_logging::LogMessageVoidify() &                                           \
+            ::fuchsia_logging::LogMessage(__FX_LOG_SEVERITY_FATAL, 0, 0, nullptr, nullptr) \
+                .stream()
 
 // Checks if a given severity level is enabled.
 // Intended for use by other macros in this file.
-#define FX_LOG_IS_ON(severity) (::fuchsia_logging::IsSeverityEnabled(FUCHSIA_LOG_##severity))
+#define FX_LOG_IS_ON(severity) (::fuchsia_logging::IsSeverityEnabled(__FX_LOG_SEVERITY_##severity))
 
 /// Logs a message with a given severity level
 #define FX_LOGS(severity) FX_LOGST(severity, nullptr)
@@ -68,10 +78,10 @@
 
 #define FX_CHECK(condition) FX_CHECKT(condition, nullptr)
 
-#define FX_CHECKT(condition, tag)                                                           \
-  FX_LAZY_STREAM(                                                                           \
-      ::fuchsia_logging::LogMessage(FUCHSIA_LOG_FATAL, __FILE__, __LINE__, #condition, tag) \
-          .stream(),                                                                        \
+#define FX_CHECKT(condition, tag)                                                                 \
+  FX_LAZY_STREAM(                                                                                 \
+      ::fuchsia_logging::LogMessage(__FX_LOG_SEVERITY_FATAL, __FILE__, __LINE__, #condition, tag) \
+          .stream(),                                                                              \
       !(condition))
 
 // Macros used to log based on whether or not NDEBUG is defined
@@ -107,6 +117,6 @@
 /// message, and optional key-value pairs.
 /// Example usage:
 /// FX_LOG_KV(INFO, "Test message", FX_KV("meaning_of_life", 42));
-#define FX_LOG_KV(severity, msg...) FX_LOG_KV_ETC(FUCHSIA_LOG_##severity, msg)
+#define FX_LOG_KV(severity, msg...) FX_LOG_KV_ETC(__FX_LOG_SEVERITY_##severity, msg)
 
 #endif  // LIB_SYSLOG_CPP_MACROS_H_

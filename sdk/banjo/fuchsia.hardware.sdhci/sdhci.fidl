@@ -68,4 +68,20 @@ closed protocol Sdhci {
     });
     /// platform specific HW reset
     strict HwReset() -> ();
+
+    /// SDHCI defines two clocks: the clock delivered to the external card ("SD clock") and the
+    /// internal clock (upstream of the SD clock).
+    ///
+    /// `VendorSetBusClock()` always enables the internal clock, and if `frequency_hz` is nonzero,
+    /// enables the SD clock with the given frequency (the SD clock is disabled if `frequency_hz` is
+    /// zero). The driver must wait for all clocks to be stable before returning.
+    ///
+    /// This method is optional. If no vendor-specific clock configuration is needed, `ZX_ERR_STOP`
+    /// should be returned, after which the SDHCI driver will configure the Clock Control register
+    /// as recommended by the SDHCI specification.
+    strict VendorSetBusClock(struct {
+        frequency_hz uint32;
+    }) -> (struct {
+        s zx.Status;
+    });
 };

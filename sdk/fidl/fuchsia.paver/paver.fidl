@@ -35,6 +35,19 @@ type ConfigurationStatus = strict enum {
     UNBOOTABLE = 3;
 };
 
+/// Reasons why a configuration may be marked unbootable.
+type UnbootableReason = flexible enum {
+    /// No reason known; generally indicates that whatever code wrote the underlying metadata does
+    /// not yet support unbootable reasons.
+    NONE = 0;
+    /// The configuration ran out of boot attempts without being marked `HEALTHY`.
+    NO_MORE_TRIES = 1;
+    /// The OS set the configuration unbootable via `BootManager::SetConfigurationUnbootable`.
+    OS_REQUESTED = 2;
+    /// Kernel verification failed.
+    VERIFICATION_FAILURE = 3;
+};
+
 /// The maximum number of times the firmware will attempt to boot into a `PENDING` configuration.
 ///
 /// If the boot attempts are all exhausted without the configuration being updated to `HEALTHY`,
@@ -324,13 +337,21 @@ closed protocol BootManager {
 
     /// Queries status of `configuration`.
     ///
-    /// The returned table will always contain the current `ConfigurationStatus`. Additionally, if
-    /// the status is `ConfigurationStatus::PENDING`, the table will also contain the number of
-    /// times this configuration has attempted to boot, including the current attempt.
+    /// The returned table contains:
     ///
-    /// If `boot_attempts` is provided, it will be in the range `[0, MAX_PENDING_BOOT_ATTEMPTS]`.
-    /// 0 indicates the configuration was just set active and has not attempted any boots yet, and
-    /// `MAX_PENDING_BOOT_ATTEMPTS` indicates that all attempts have been used.
+    /// * `status`: the current `ConfigurationStatus`
+    ///
+    /// * `boot_attempts`: if `status` is `ConfigurationStatus::PENDING`, this will be the number of
+    ///   times this configuration has attempted to boot, including the current attempt. For any
+    ///   other `status` this value will not be provided.
+    ///
+    ///   If provided, this value will be in the range `[0, MAX_PENDING_BOOT_ATTEMPTS]`. 0 indicates
+    ///   the configuration was just set active and has not attempted any boots yet, and
+    ///   `MAX_PENDING_BOOT_ATTEMPTS` indicates that all attempts have been used.
+    ///
+    /// * `unbootable_reason`: if `status` is `ConfigurationStatus::UNBOOTABLE`, this will be the
+    ///   reported reason for why the configuration is unbootable. For any other `status` this value
+    ///   will not be provided.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
     strict QueryConfigurationStatusAndBootAttempts(struct {
@@ -338,6 +359,7 @@ closed protocol BootManager {
     }) -> (table {
         1: status ConfigurationStatus;
         2: boot_attempts uint8;
+        3: unbootable_reason UnbootableReason;
     }) error zx.Status;
 
     /// Updates persistent metadata identifying which configuration should be selected as 'primary'

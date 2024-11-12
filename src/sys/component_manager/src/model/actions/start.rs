@@ -13,6 +13,7 @@ use ::namespace::Entry as NamespaceEntry;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
 use ::routing::DictExt;
+use anyhow::Context;
 use async_trait::async_trait;
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::ComponentDecl;
@@ -27,12 +28,13 @@ use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::runner_metadata;
-use sandbox::{Capability, Connector, Dict, Message, Request, Router, RouterResponse};
+use sandbox::{
+    Capability, Connector, Dict, Message, RemotableCapability, Request, Router, RouterResponse,
+};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
 use tracing::warn;
 use vfs::directory::entry::OpenRequest;
-use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
@@ -46,7 +48,6 @@ pub struct StartAction {
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     incoming: IncomingCapabilities,
     abort_handle: AbortHandle,
-    namespace_scope: ExecutionScope,
     abortable_scope: AbortableScope,
 }
 
@@ -56,34 +57,8 @@ impl StartAction {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         incoming: IncomingCapabilities,
     ) -> Self {
-        Self::new_inner(start_reason, execution_controller_task, incoming, ExecutionScope::new())
-    }
-
-    fn new_inner(
-        start_reason: StartReason,
-        execution_controller_task: Option<controller::ExecutionControllerTask>,
-        incoming: IncomingCapabilities,
-        namespace_scope: ExecutionScope,
-    ) -> Self {
         let (abortable_scope, abort_handle) = AbortableScope::new();
-        Self {
-            start_reason,
-            execution_controller_task,
-            incoming,
-            namespace_scope,
-            abort_handle,
-            abortable_scope,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_with_scope(
-        start_reason: StartReason,
-        execution_controller_task: Option<controller::ExecutionControllerTask>,
-        incoming: IncomingCapabilities,
-        namespace_scope: ExecutionScope,
-    ) -> Self {
-        Self::new_inner(start_reason, execution_controller_task, incoming, namespace_scope)
+        Self { start_reason, execution_controller_task, incoming, abort_handle, abortable_scope }
     }
 }
 
@@ -95,7 +70,6 @@ impl Action for StartAction {
             &self.start_reason,
             self.execution_controller_task,
             self.incoming,
-            self.namespace_scope,
             self.abortable_scope,
         )
         .await
@@ -115,10 +89,8 @@ struct StartContext {
     runner: Option<RemoteRunner>,
     url: String,
     namespace_builder: NamespaceBuilder,
-    namespace_scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
-    program_input_dict_additions: Dict,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     logger: Option<ScopedLogger>,
@@ -129,7 +101,6 @@ async fn do_start(
     start_reason: &StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     incoming: IncomingCapabilities,
-    namespace_scope: ExecutionScope,
     abortable_scope: AbortableScope,
 ) -> Result<(), StartActionError> {
     // Translates the error when a long running future is aborted.
@@ -137,7 +108,7 @@ async fn do_start(
         |_: AbortError| StartActionError::Aborted { moniker: component.moniker.clone() };
 
     // Resolve the component and find the runner to use.
-    let (runner_router, runner_name, resolved_component, program_input_dict) = {
+    let (runner_router, runner_name, resolved_component, mut program_input_dict) = {
         // Obtain the runner declaration under a short lock, as `open_runner` may run for a long
         // time if components along the route need to be resolved.
         let resolved_state = component
@@ -181,13 +152,19 @@ async fn do_start(
         dict: program_input_dict_additions,
     } = incoming;
 
-    // Create the component's namespace.
+    // Create the component's namespace. If there are additions, it's necessary to install the
+    // additions into a copy of the `program_input_dict` so the original remains unchanged if the
+    // component is started again.
+    if let Some(additions) = program_input_dict_additions {
+        program_input_dict = dict_deep_copy(&program_input_dict);
+        dict_merge(&program_input_dict, additions);
+    }
     let mut namespace_builder = create_namespace(
         resolved_component.package.as_ref(),
         component,
         &resolved_component.decl,
         &program_input_dict,
-        namespace_scope.clone(),
+        component.execution_scope.clone(),
     )
     .await
     .map_err(|err| StartActionError::CreateNamespaceError {
@@ -268,16 +245,48 @@ async fn do_start(
         runner,
         url: resolved_component.resolved_url.clone(),
         namespace_builder,
-        namespace_scope,
         numbered_handles,
         encoded_config,
-        program_input_dict_additions: program_input_dict_additions.unwrap_or_default(),
         start_reason: start_reason.clone(),
         execution_controller_task,
         logger,
     };
 
     start_component(&component, resolved_component.decl, start_context).await
+}
+
+fn dict_deep_copy(dict: &Dict) -> Dict {
+    let out = Dict::new();
+    for (key, cap) in dict.enumerate() {
+        match cap {
+            Ok(Capability::Dictionary(d)) => {
+                let d = dict_deep_copy(&d);
+                let _ = out.insert(key, Capability::Dictionary(d));
+            }
+            Ok(cap) => {
+                let _ = out.insert(key, cap);
+            }
+            Err(_) => {}
+        }
+    }
+    out
+}
+
+fn dict_merge(dict1: &Dict, dict2: Dict) {
+    for (key, value) in dict2.drain() {
+        match value {
+            Capability::Dictionary(inner_dict2) => {
+                if let Ok(Some(Capability::Dictionary(inner_dict1))) = dict1.get(&key) {
+                    dict_merge(&inner_dict1, inner_dict2);
+                } else {
+                    let _ = dict1.insert(key, Capability::Dictionary(inner_dict2));
+                }
+            }
+            value => {
+                let _ = dict1.insert(key, value);
+            }
+        }
+    }
 }
 
 /// Set the Runtime in the Execution and start the exit watcher. From component manager's
@@ -311,9 +320,7 @@ async fn start_component(
             url,
             namespace_builder,
             numbered_handles,
-            namespace_scope,
             encoded_config,
-            program_input_dict_additions,
             start_reason,
             execution_controller_task,
             logger,
@@ -343,19 +350,9 @@ async fn start_component(
                 component_instance,
             };
 
-            Some(
-                Program::start(
-                    &runner,
-                    start_info,
-                    escrowed_state,
-                    diagnostics_sender,
-                    namespace_scope,
-                )
-                .map_err(|err| StartActionError::StartProgramError {
-                    moniker: moniker.clone(),
-                    err,
-                })?,
-            )
+            Some(Program::start(&runner, start_info, escrowed_state, diagnostics_sender).map_err(
+                |err| StartActionError::StartProgramError { moniker: moniker.clone(), err },
+            )?)
         } else {
             None
         };
@@ -375,16 +372,6 @@ async fn start_component(
             InstanceState::Resolved(resolved) => InstanceState::Started(resolved, started),
             other_state => panic!("starting an unresolved component: {:?}", other_state),
         });
-
-        // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState`.
-        let component_program_input_dict_additions = &state
-            .get_resolved_state()
-            .expect("expected component to be resolved")
-            .program_input_dict_additions;
-        let _ = component_program_input_dict_additions.drain();
-        for (key, value) in program_input_dict_additions.drain() {
-            component_program_input_dict_additions.insert(key, value).unwrap();
-        }
     }
 
     // Dispatch Started and DebugStarted events outside of the state lock, but under the
@@ -513,13 +500,13 @@ async fn create_config_with_capabilities(
     let mut fields = ConfigFields { fields: Vec::new(), checksum: config_decl.checksum.clone() };
     let mut overrides = component.context.get_config_developer_overrides(component.moniker()).await;
     for field in &config_decl.fields {
-        let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl) else {
+        let Some(use_config) = ::routing::config::get_use_config_from_key(&field.key, decl) else {
             return Err(StartActionError::StructuredConfigError {
                 moniker: component.moniker.clone(),
                 err: StructuredConfigError::KeyNotFound { key: field.key.clone() },
             });
         };
-        let value = match routing::config::route_config_value(use_config, component).await {
+        let value = match ::routing::config::route_config_value(use_config, component).await {
             Ok(Some(v)) => v,
             Ok(None) => {
                 return Err(StartActionError::StructuredConfigError {
@@ -568,16 +555,15 @@ async fn update_config_fields(
             if !has_config_caps {
                 continue;
             }
-            let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl)
+            let Some(use_config) = ::routing::config::get_use_config_from_key(&field.key, decl)
             else {
                 continue;
             };
-            let value =
-                routing::config::route_config_value(use_config, component).await.map_err(|e| {
-                    StartActionError::StructuredConfigError {
-                        moniker: component.moniker.clone(),
-                        err: e.into(),
-                    }
+            let value = ::routing::config::route_config_value(use_config, component)
+                .await
+                .map_err(|e| StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: e.into(),
                 })?;
             let Some(value) = value else {
                 continue;
@@ -632,27 +618,15 @@ async fn create_scoped_logger(
     component: &Arc<ComponentInstance>,
     program_input_dict: &Dict,
 ) -> Result<ScopedLogger, anyhow::Error> {
-    let router = program_input_dict.get_capability(&logsink_decl.target_path).ok_or_else(|| {
-        anyhow::format_err!(
-            "router for logsink {} is missing from program input dictionary for \
-                 component {}",
-            logsink_decl.target_path,
-            component.moniker
-        )
-    })?;
-    let Capability::ConnectorRouter(router) = router else {
-        anyhow::bail!(
-            "program input dictionary for component {} had an entry with an unexpected \
-                         type: {:?}",
-            component.moniker,
-            router
-        );
+    let Capability::ConnectorRouter(router) = program_input_dict
+        .get_capability(&logsink_decl.target_path)
+        .context("no logger in namespace")?
+    else {
+        anyhow::bail!("LogSink has wrong type in namespace?");
     };
-    let dir_entry = router.into_directory_entry(
-        fio::DirentType::Service,
-        component.execution_scope.clone(),
-        move |_: &RouterError| None,
-    );
+    let dir_entry = router
+        .try_into_directory_entry(component.execution_scope.clone())
+        .context("LogSink could not convert to DirEntry?")?;
     let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>().unwrap();
     let flags = fio::OpenFlags::empty();
     flags.to_object_request(server.into_channel()).handle(|object_request| {
@@ -675,6 +649,8 @@ mod tests {
     use crate::model::testing::routing_test_helpers::RoutingTestBuilder;
     use crate::model::testing::test_helpers::{self, ActionsTest};
     use crate::model::testing::test_hook::Lifecycle;
+    use ::routing::bedrock::structured_dict::ComponentInput;
+    use ::routing::resolving::ComponentAddress;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
     use cm_rust_testing::{ChildBuilder, ComponentDeclBuilder};
@@ -685,8 +661,6 @@ mod tests {
     use futures::{FutureExt, StreamExt};
     use hooks::{Event, EventType, Hook, HooksRegistration};
     use rand::seq::SliceRandom;
-    use routing::bedrock::structured_dict::ComponentInput;
-    use routing::resolving::ComponentAddress;
     use std::sync::{Mutex, Weak};
 
     // Child name for test child components instantiated during tests.

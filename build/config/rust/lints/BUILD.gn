@@ -2,6 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# These are lints which should be applied to all non-test code.
+config("clippy_warn_production") {
+  # Use -W instead of -D to treat as a warning while iterating.
+  rustflags = [
+    # go/keep-sorted start
+    # go/keep-sorted end
+  ]
+}
+
 config("deny_unused_crate_dependencies") {
   # Use -W instead of -D to treat as a warning while iterating
   # Unused crate dependencies will still be denied in CQ because of -Dwarnings

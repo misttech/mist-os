@@ -31,6 +31,10 @@ rustc_library("fidl_fuchsia_net_interfaces_ext") {
     "//third_party/rust_crates:test-case",
   ]
 
+  if (is_fuchsia) {
+    deps += [ "//sdk/rust/zx" ]
+  }
+
   sources = [
     "src/admin.rs",
     "src/lib.rs",

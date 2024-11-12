@@ -18,21 +18,11 @@
 					sag_execution_inactive: inactive-level {
 						level = <0>;
 					};
-					sag_execution_handling: wake-handling-level {
+					sag_execution_suspending: suspending-level {
 						level = <1>;
 					};
 					sag_execution_active: active-level {
 						level = <2>;
-					};
-				};
-			};
-			wake-handling-element {
-				power-levels {
-					sag_wake_inactive: inactive-level {
-						level = <0>;
-					};
-					sag_wake_active: active-level {
-						level = <1>;
 					};
 				};
 			};
@@ -64,34 +54,6 @@
 	};
 };
 
-&bt_uart {
-	power-elements {
-		aml-uart-wake-on-interrupt-element {
-			power-levels {
-				off-level {
-					level = <0>;
-					level-transition-table {
-						transition-to-handling {
-							target-level = <1>;
-							latency-us = <0>;
-						};
-					};
-				};
-				handling-level {
-					level = <1>;
-					level-dependencies = <&sag_wake_active 1>;
-					level-transition-table {
-						transition-to-off {
-							target-level = <0>;
-							latency-us = <0>;
-						};
-					};
-				};
-			};
-		};
-	};
-};
-
 &audio {
 	power-elements {
 		audio-hw-element {
@@ -107,7 +69,6 @@
 		};
 	};
 };
-
 
 &sd_emmc_c {
 	power-elements {

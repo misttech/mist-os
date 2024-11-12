@@ -275,8 +275,9 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}()
 	}
 
-	// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola.
-	useFastbootFlashing := os.Getenv("FUCHSIA_DEVICE_TYPE") == "Kola" && t.config.FastbootSernum != ""
+	// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola/Sorrel.
+	deviceType := os.Getenv("FUCHSIA_DEVICE_TYPE")
+	useFastbootFlashing := t.config.FastbootSernum != "" && (deviceType == "Kola" || deviceType == "Sorrel")
 
 	// Boot Fuchsia.
 	if t.config.FastbootSernum != "" {

@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/shared/logging/debug.h"
 
+#include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -28,6 +29,11 @@ std::set<LogCategory>& GetLogCategories() {
 }
 
 bool IsLogCategoryActive(LogCategory category) {
+  // If TRACE-level logging is enabled, always log all debug log categories.
+  if (fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LogSeverity::Trace)) {
+    return true;
+  }
+
   if (!IsDebugLoggingActive())
     return false;
 
@@ -75,6 +81,8 @@ const char* LogCategoryToString(LogCategory category) {
       return "WorkerPool";
     case LogCategory::kDebugAdapter:
       return "DebugAdapter";
+    case LogCategory::kBuildIDIndex:
+      return "BuildIDIndex";
     case LogCategory::kAll:
       return "All";
     case LogCategory::kNone:
@@ -92,12 +100,14 @@ double SecondsSinceStart() {
 
 }  // namespace
 
-bool IsDebugLoggingActive() { return fuchsia_logging::IsSeverityEnabled(FUCHSIA_LOG_DEBUG); }
+bool IsDebugLoggingActive() {
+  return fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LogSeverity::Debug);
+}
 
 void SetDebugLogging(bool activate) {
   fuchsia_logging::LogSettingsBuilder builder;
   if (activate) {
-    builder.WithMinLogSeverity(FUCHSIA_LOG_DEBUG);
+    builder.WithMinLogSeverity(fuchsia_logging::LogSeverity::Debug);
   }
   builder.BuildAndInitialize();
 }

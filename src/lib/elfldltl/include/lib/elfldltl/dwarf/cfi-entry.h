@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_CFI_ENTRY_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_CFI_ENTRY_H_
 
-#include <lib/stdcompat/span.h>
-#include <lib/stdcompat/string_view.h>
-
 #include <cstdint>
+#include <span>
+#include <string_view>
 
 #include "../diagnostics.h"
 #include "encoding.h"
@@ -61,7 +60,7 @@ struct CfiCie {
   // and fixed registers, DW_CFA_undefined for all call-clobbered
   // registers, and an appropriate definition of the CFA for the entry
   // point to a function on this machine).
-  cpp20::span<const std::byte> initial_instructions;
+  std::span<const std::byte> initial_instructions;
 
   // The augmentation string is DWARF CFI's main extension mechanism.
   // It's always a NUL terminated UTF-8 string, though the NUL is not
@@ -79,7 +78,7 @@ struct CfiCie {
   // This is the augmentation data, not including its own size ULEB128.
   // If there were any unrecognized augmentation letters and no "z", then
   // no augmentation data can be decoded and this will be empty.
-  cpp20::span<const std::byte> augmentation_data;
+  std::span<const std::byte> augmentation_data;
 
   // If there is no "z" augmentation, then this indicates the size of known
   // augmentation data included in FDEs, if any.  If it's kUnknownAugmentation
@@ -129,7 +128,7 @@ struct CfiFde {
 
   // This all the FDE's augmentation data, whose exact interpretation is
   // determined by the CIE's augmentation string.
-  cpp20::span<const std::byte> augmentation_data;
+  std::span<const std::byte> augmentation_data;
 
   // This is set only if the CIE uses "L" augmentation to indicate the FDE
   // has an LSDA pointer (set by the .cfi_lsda assembly directive).
@@ -138,7 +137,7 @@ struct CfiFde {
   // These are the DWARF CFI instructions for the FDE.  They modify the
   // initial state the CIE yields, and advance the PC from initial_location
   // to define additional rows.
-  cpp20::span<const std::byte> instructions;
+  std::span<const std::byte> instructions;
 };
 
 struct CfiEntry {
@@ -149,7 +148,7 @@ struct CfiEntry {
   // parameter indicates the byte order.
   template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
   static constexpr std::optional<CfiEntry> Read(  //
-      Diagnostics& diag, cpp20::span<const std::byte> bytes, ErrorArgs&&... error_args) {
+      Diagnostics& diag, std::span<const std::byte> bytes, ErrorArgs&&... error_args) {
     // The error_args are passed by reference since they may be used again.
     std::optional data = SectionData::Read<Elf>(diag, bytes, error_args...);
     if (!data) {
@@ -194,19 +193,19 @@ struct CfiEntry {
         // Sign-extend from 32 bits, though it's stored as uint64_t and was
         // zero-extended from uint32_t by SectionData::read_offset().
         const uint32_t renarrowed = static_cast<uint32_t>(cie_pointer_);
-        const int32_t offset_back = cpp20::bit_cast<int32_t>(renarrowed);
+        const int32_t offset_back = std::bit_cast<int32_t>(renarrowed);
         const int64_t sign_extended = static_cast<int64_t>(offset_back);
-        cie_pointer_ = cpp20::bit_cast<uint64_t>(sign_extended);
+        cie_pointer_ = std::bit_cast<uint64_t>(sign_extended);
       }
       // The stored cie_pointer_ is signed 64 bits, though stored as uint64_t.
-      cie_pointer_ = vaddr - cpp20::bit_cast<int64_t>(cie_pointer_);
+      cie_pointer_ = vaddr - std::bit_cast<int64_t>(cie_pointer_);
     }
   }
 
   // Like Read, but with NormalizeEhFrame applied to the results.
   template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
   static constexpr std::optional<CfiEntry> ReadEhFrame(  //
-      Diagnostics& diag, cpp20::span<const std::byte> bytes, typename Elf::size_type vaddr,
+      Diagnostics& diag, std::span<const std::byte> bytes, typename Elf::size_type vaddr,
       ErrorArgs&&... error_args) {
     std::optional<CfiEntry> result = Read<Elf>(diag, bytes, std::forward<ErrorArgs>(error_args)...);
     if (result) {
@@ -288,7 +287,7 @@ struct CfiEntry {
     };
 
     // Skip the common header already read.
-    cpp20::span<const std::byte> bytes = data_.contents().subspan(data_.offset_size());
+    std::span<const std::byte> bytes = data_.contents().subspan(data_.offset_size());
 
     if (bytes.size_bytes() < 2) [[unlikely]] {
       return truncated();
@@ -333,7 +332,7 @@ struct CfiEntry {
 
     // In the ancient G++ v2 format, there is a pointer right after the
     // augmentation string, before the standard fields.
-    if (cpp20::starts_with(cie.augmentation, "eh")) {
+    if (cie.augmentation.starts_with("eh")) {
       if (bytes.size_bytes() < cie.address_size) [[unlikely]] {
         return truncated();
       }
@@ -386,7 +385,7 @@ struct CfiEntry {
     }
 
     // Grok the augmentation string, starting with "z".
-    if (cpp20::starts_with(cie.augmentation, 'z')) {
+    if (cie.augmentation.starts_with('z')) {
       cie.fde_augmentation_sized = true;
       auto data_size = Uleb128::Read(bytes);
       if (!data_size || bytes.size_bytes() - data_size->size_bytes < data_size->value)
@@ -505,7 +504,7 @@ struct CfiEntry {
     auto normalize = [fde_vaddr = vaddr, &diag, &error_args...](  //
                          uint64_t encoding_vaddr, EncodedPtr& encoded) {
       if (EncodedPtr::Signed(encoded.encoding)) {
-        encoded.ptr = cpp20::bit_cast<uint64_t>(encoded.sptr);
+        encoded.ptr = std::bit_cast<uint64_t>(encoded.sptr);
       }
       switch (EncodedPtr::Modifier(encoded.encoding)) {
         case EncodedPtr::kAbs:
@@ -524,7 +523,7 @@ struct CfiEntry {
     };
 
     // Skip the common header already read.
-    cpp20::span<const std::byte> bytes = data_.contents().subspan(data_.offset_size());
+    std::span<const std::byte> bytes = data_.contents().subspan(data_.offset_size());
 
     // The data_.contents() started after the initial length header, and then
     // the CIE_pointer was just skipped to reach the vaddr of the encoded PC.

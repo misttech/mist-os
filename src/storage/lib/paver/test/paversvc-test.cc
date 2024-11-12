@@ -544,7 +544,8 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   void TestQueryConfigurationStatusAndBootAttempts(
       AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
       fuchsia_paver::wire::ConfigurationStatus expected_status,
-      std::optional<uint8_t> expected_boot_attempts);
+      std::optional<uint8_t> expected_boot_attempts,
+      std::optional<fuchsia_paver::wire::UnbootableReason> expected_unbootable_reason);
 
   fidl::WireSyncClient<fuchsia_paver::BootManager> boot_manager_;
   fidl::WireSyncClient<fuchsia_paver::DataSink> data_sink_;
@@ -879,10 +880,12 @@ void PaverServiceSkipBlockTest::TestQueryConfigurationStatus(
 // * configuration: which `Configuration` slot to query.
 // * expected_status: the expected returned configuration status.
 // * expected_boot_attempts: the expected reported boot attempts.
+// * expected_unbootable_reason: the expected reported unbootable reason.
 void PaverServiceSkipBlockTest::TestQueryConfigurationStatusAndBootAttempts(
     AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
     fuchsia_paver::wire::ConfigurationStatus expected_status,
-    std::optional<uint8_t> expected_boot_attempts) {
+    std::optional<uint8_t> expected_boot_attempts,
+    std::optional<fuchsia_paver::wire::UnbootableReason> expected_unbootable_reason) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   ComputeCrc(&abr_data);
@@ -893,13 +896,22 @@ void PaverServiceSkipBlockTest::TestQueryConfigurationStatusAndBootAttempts(
   auto result = boot_manager_->QueryConfigurationStatusAndBootAttempts(configuration);
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok());
+
   ASSERT_TRUE((*result)->has_status());
   ASSERT_EQ((*result)->status(), expected_status);
+
   if (expected_boot_attempts.has_value()) {
     ASSERT_TRUE((*result)->has_boot_attempts());
     ASSERT_EQ((*result)->boot_attempts(), expected_boot_attempts.value());
   } else {
     ASSERT_FALSE((*result)->has_boot_attempts());
+  }
+
+  if (expected_unbootable_reason.has_value()) {
+    ASSERT_TRUE((*result)->has_unbootable_reason());
+    ASSERT_EQ((*result)->unbootable_reason(), expected_unbootable_reason.value());
+  } else {
+    ASSERT_FALSE((*result)->has_unbootable_reason());
   }
 }
 
@@ -912,7 +924,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusHealthy) {
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsHealthy) {
   TestQueryConfigurationStatusAndBootAttempts(
       kAbrDataAUnbootableBSuccessful, fuchsia_paver::wire::Configuration::kB,
-      fuchsia_paver::wire::ConfigurationStatus::kHealthy, std::nullopt);
+      fuchsia_paver::wire::ConfigurationStatus::kHealthy, std::nullopt, std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusPending) {
@@ -930,8 +942,8 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPending
   abr_data.slot_data[1].tries_remaining = kAbrMaxTriesRemaining;
 
   TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
-                                              fuchsia_paver::wire::ConfigurationStatus::kPending,
-                                              0);
+                                              fuchsia_paver::wire::ConfigurationStatus::kPending, 0,
+                                              std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPendingSomeAttempts) {
@@ -941,7 +953,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPending
 
   TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
                                               fuchsia_paver::wire::ConfigurationStatus::kPending,
-                                              kAbrMaxTriesRemaining - 1);
+                                              kAbrMaxTriesRemaining - 1, std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootA) {
@@ -950,7 +962,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBo
   TestQueryConfigurationStatusAndBootAttempts(
       AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
       fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kPending,
-      kAbrMaxTriesRemaining);
+      kAbrMaxTriesRemaining, std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootB) {
@@ -959,7 +971,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBo
   TestQueryConfigurationStatusAndBootAttempts(
       AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
       fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kPending,
-      kAbrMaxTriesRemaining);
+      kAbrMaxTriesRemaining, std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootLegacyReason) {
@@ -968,7 +980,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBo
   SetArgResponse("_a");
   TestQueryConfigurationStatusAndBootAttempts(
       AbrDataBothUnbootable(kAbrUnbootableReasonNone), fuchsia_paver::wire::Configuration::kA,
-      fuchsia_paver::wire::ConfigurationStatus::kPending, kAbrMaxTriesRemaining);
+      fuchsia_paver::wire::ConfigurationStatus::kPending, kAbrMaxTriesRemaining, std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootAQueryB) {
@@ -977,7 +989,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBo
   TestQueryConfigurationStatusAndBootAttempts(
       AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
       fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
-      std::nullopt);
+      std::nullopt, fuchsia_paver::wire::UnbootableReason::kNoMoreTries);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootBQueryA) {
@@ -986,20 +998,69 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBo
   TestQueryConfigurationStatusAndBootAttempts(
       AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
       fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
-      std::nullopt);
+      std::nullopt, fuchsia_paver::wire::UnbootableReason::kNoMoreTries);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusUnbootable) {
-  TestQueryConfigurationStatus(AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested),
+  TestQueryConfigurationStatus(AbrDataBothUnbootable(kAbrUnbootableReasonOsRequested),
                                fuchsia_paver::wire::Configuration::kA,
                                fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
 }
 
-TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsUnbootable) {
+// This one is mostly a compile-time test to trigger a breakage if any new enum variants are added,
+// so that we can be sure to add them to the paver as well.
+//
+// If this test starts breaking:
+// 1. Update this switch statements to include the new enum variants.
+// 2. Add a unittest below to verify the libabr -> paver variant translation.
+TEST_F(PaverServiceSkipBlockTest, UnbootableReasonEnums) {
+  AbrUnbootableReason abr_reason = kAbrUnbootableReasonNone;
+  switch (abr_reason) {
+    case kAbrUnbootableReasonNone:
+      break;
+    case kAbrUnbootableReasonNoMoreTries:
+      break;
+    case kAbrUnbootableReasonOsRequested:
+      break;
+    case kAbrUnbootableReasonVerificationFailure:
+      break;
+      // Do not add default - the whole point is to compile-time catch any missing variants.
+  }
+}
+
+// kAbrUnbootableReasonNone -> UnbootableReason::kNone
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsUnbootableReasonNone) {
   TestQueryConfigurationStatusAndBootAttempts(
-      AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested),
-      fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
-      std::nullopt);
+      AbrDataBothUnbootable(kAbrUnbootableReasonNone), fuchsia_paver::wire::Configuration::kB,
+      fuchsia_paver::wire::ConfigurationStatus::kUnbootable, std::nullopt,
+      fuchsia_paver::wire::UnbootableReason::kNone);
+}
+
+// kAbrUnbootableReasonNoMoreTries -> UnbootableReason::kNoMoreTries
+TEST_F(PaverServiceSkipBlockTest,
+       QueryConfigurationStatusAndBootAttemptsUnbootableReasonNoMoreTries) {
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
+      fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt, fuchsia_paver::wire::UnbootableReason::kNoMoreTries);
+}
+
+// kAbrUnbootableReasonOsRequested -> UnbootableReason::kOsRequested
+TEST_F(PaverServiceSkipBlockTest,
+       QueryConfigurationStatusAndBootAttemptsUnbootableReasonOsRequested) {
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonOsRequested),
+      fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt, fuchsia_paver::wire::UnbootableReason::kOsRequested);
+}
+
+// kAbrUnbootableReasonVerificationFailure -> UnbootableReason::kVerificationFailure
+TEST_F(PaverServiceSkipBlockTest,
+       QueryConfigurationStatusAndBootAttemptsUnbootableReasonVerificationFailure) {
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonVerificationFailure),
+      fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt, fuchsia_paver::wire::UnbootableReason::kVerificationFailure);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsInvalidBootAttempts) {
@@ -1010,8 +1071,8 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsInvalid
   // The A/B/R data gets fixed up on load, so even though the on-disk data was invalid it should now
   // be snapped into the valid range.
   TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
-                                              fuchsia_paver::wire::ConfigurationStatus::kPending,
-                                              0);
+                                              fuchsia_paver::wire::ConfigurationStatus::kPending, 0,
+                                              std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, SetConfigurationActive) {
@@ -1084,7 +1145,7 @@ TEST_F(PaverServiceSkipBlockTest, SetConfigurationUnbootableSlotA) {
 
   abr_data.slot_data[0].tries_remaining = 0;
   abr_data.slot_data[0].successful_boot = 0;
-  abr_data.slot_data[0].unbootable_reason = kAbrUnbootableReasonUserRequested;
+  abr_data.slot_data[0].unbootable_reason = kAbrUnbootableReasonOsRequested;
   ComputeCrc(&abr_data);
 
   ASSERT_NO_FATAL_FAILURE(FindBootManager());
@@ -1115,7 +1176,7 @@ TEST_F(PaverServiceSkipBlockTest, SetConfigurationUnbootableSlotB) {
 
   abr_data.slot_data[1].tries_remaining = 0;
   abr_data.slot_data[1].successful_boot = 0;
-  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonUserRequested;
+  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonOsRequested;
   ComputeCrc(&abr_data);
 
   ASSERT_NO_FATAL_FAILURE(FindBootManager());
@@ -1279,7 +1340,7 @@ TEST_F(PaverServiceSkipBlockTest, SetConfigurationHealthyOtherHealthy) {
 
 TEST_F(PaverServiceSkipBlockTest, SetUnbootableConfigurationHealthyFails) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-  AbrData abr_data = AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested);
+  AbrData abr_data = AbrDataBothUnbootable(kAbrUnbootableReasonOsRequested);
   ComputeCrc(&abr_data);
   SetAbr(abr_data);
 
@@ -1390,7 +1451,7 @@ TEST_F(PaverServiceSkipBlockTest, BootManagerBuffered) {
   abr_data.slot_data[0].successful_boot = 1;
   abr_data.slot_data[1].tries_remaining = 0;
   abr_data.slot_data[1].successful_boot = 0;
-  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonUserRequested;
+  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonOsRequested;
   ComputeCrc(&abr_data);
 
   abr = GetAbr();
@@ -1564,7 +1625,7 @@ TEST_F(PaverServiceSkipBlockTest, AbrWearLevelingLayoutNotUpdated) {
   abr_data.slot_data[0].tries_remaining = 0;
   abr_data.slot_data[0].successful_boot = 0;
   abr_data.slot_data[0].priority = 0;
-  abr_data.slot_data[0].unbootable_reason = kAbrUnbootableReasonUserRequested;
+  abr_data.slot_data[0].unbootable_reason = kAbrUnbootableReasonOsRequested;
   abr_data.slot_data[1].tries_remaining = 0;
   abr_data.slot_data[1].successful_boot = 1;
   abr_data.slot_data[1].priority = 1;

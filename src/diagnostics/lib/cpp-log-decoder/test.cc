@@ -20,7 +20,7 @@ namespace {
 TEST(LogDecoder, DecodesCorrectly) {
   zx::socket logger_socket, our_socket;
   zx::socket::create(ZX_SOCKET_DATAGRAM, &logger_socket, &our_socket);
-  syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_INFO);
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Info);
   auto buffer = builder.WithSocket(logger_socket.release())
                     .WithMsg("test message")
                     .WithFile(__FILE__, __LINE__)

@@ -5,6 +5,7 @@
 
 import abc
 
+from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.wlan.utils.types import (
     Authentication,
     BssDescription,
@@ -15,7 +16,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
 )
 
 
-class Wlan(abc.ABC):
+class Wlan(affordance.Affordance):
     """Abstract base class for Wlan driver affordance."""
 
     # List all the public methods

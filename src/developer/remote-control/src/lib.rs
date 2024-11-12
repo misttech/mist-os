@@ -154,7 +154,11 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
-                responder.send(zx::MonotonicInstant::get().into_nanos())?;
+                responder.send(zx::MonotonicInstant::get())?;
+                Ok(())
+            }
+            rcs::RemoteControlRequest::GetBootTime { responder } => {
+                responder.send(zx::BootInstant::get())?;
                 Ok(())
             }
             rcs::RemoteControlRequest::_UnknownMethod { ordinal, .. } => {
@@ -578,6 +582,7 @@ mod tests {
                                                         addr,
                                                         valid_until: Some(1),
                                                         assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
+                                                        preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(1)),
                                                         ..Default::default()
                                                     })
                                                     .collect(),

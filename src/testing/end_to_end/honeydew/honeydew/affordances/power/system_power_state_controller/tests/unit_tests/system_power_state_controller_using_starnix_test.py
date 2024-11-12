@@ -15,7 +15,7 @@ import fuchsia_inspect
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.affordances.ffx import inspect
+from honeydew.affordances.ffx import inspect as inspect_impl
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
@@ -168,7 +168,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         self.mock_device_logger = mock.MagicMock(
             spec=affordances_capable.FuchsiaDeviceLogger
         )
-        self.mock_inspect = mock.MagicMock(spec=inspect.Inspect)
+        self.mock_inspect = mock.MagicMock(spec=inspect_impl.Inspect)
 
         with mock.patch.object(
             system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,

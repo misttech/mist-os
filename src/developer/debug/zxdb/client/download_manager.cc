@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
 #include "src/developer/debug/zxdb/client/process.h"
@@ -51,7 +52,9 @@ class Download {
       : build_id_(build_id),
         file_type_(file_type),
         result_cb_(std::move(result_cb)),
-        weak_factory_(this) {}
+        weak_factory_(this) {
+    LOGS(Info) << "Starting download for " << build_id_;
+  }
 
   ~Download() { Finish(); }
 
@@ -100,6 +103,13 @@ void Download::Finish() {
                     failed_server_count_);
   }
 
+  if (final_err.has_error()) {
+    LOGS(Info) << "Download for " << build_id_ << " failed(" << ErrTypeToString(final_err.type())
+               << "): " << final_err.msg();
+  } else {
+    LOGS(Info) << "Download for " << build_id_ << " succeeded.";
+  }
+
   if (debug::MessageLoop::Current()) {
     debug::MessageLoop::Current()->PostTask(
         FROM_HERE, [result_cb = std::move(result_cb_), final_err,
@@ -113,8 +123,9 @@ void Download::AddServer(SymbolServer* server) {
   if (!result_cb_) {
     return;
   }
+  LOGS(Info) << "Adding server " << server->name() << " to download for " << build_id_;
 
-  SymbolServer::FetchCallback cb = [weak_this = weak_factory_.GetWeakPtr()](
+  SymbolServer::FetchCallback cb = [weak_this = weak_factory_.GetWeakPtr(), server](
                                        const Err& err, const std::string& path) {
     if (!weak_this)
       return;
@@ -122,6 +133,13 @@ void Download::AddServer(SymbolServer* server) {
     weak_this->download_in_progress_ = false;
 
     if (path.empty()) {
+      if (err.msg().empty()) {
+        LOGS(Info) << "Error downloading " << weak_this->build_id_ << " from " << server->name()
+                   << ": " << ErrTypeToString(err.type());
+      } else {
+        LOGS(Info) << "Error downloading " << weak_this->build_id_ << " from " << server->name()
+                   << ": " << ErrTypeToString(err.type()) << ", " << err.msg();
+      }
       weak_this->Error(err);
     } else {
       weak_this->errors_.clear();

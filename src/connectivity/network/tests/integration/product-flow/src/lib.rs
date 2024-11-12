@@ -114,8 +114,8 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                 addresses.iter().find_map(
                     |&fnet_interfaces_ext::Address {
                          addr: fnet::Subnet { addr, prefix_len: _ },
-                         valid_until: _,
                          assignment_state,
+                         ..
                      }| {
                         assert_eq!(
                             assignment_state,
@@ -225,7 +225,7 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                     return None;
                 }
                 addresses.iter().find_map(
-                    |&fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }| {
+                    |&fnet_interfaces_ext::Address { addr, assignment_state, .. }| {
                         assert_eq!(
                             assignment_state,
                             fnet_interfaces::AddressAssignmentState::Assigned

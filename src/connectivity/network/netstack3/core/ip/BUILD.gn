@@ -25,6 +25,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/device/router_solicitation.rs",
     "src/device/slaac.rs",
     "src/device/state.rs",
+    "src/fragmentation.rs",
     "src/gmp.rs",
     "src/gmp/igmp.rs",
     "src/gmp/mld.rs",

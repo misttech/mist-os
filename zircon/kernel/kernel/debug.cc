@@ -165,9 +165,10 @@ RecurringCallback g_threadload_callback([]() {
   printf(
       "cpu    load"
       " sched (cs ylds pmpts irq_pmpts)"
-      "  sysc"
+      "   sysc"
       " ints (hw  tmr tmr_cb)"
-      " ipi (rs  gen)\n");
+      " ipi (rs  gen)"
+      " pwr (active   idle)\n");
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     const Thread& idle_power_thread = percpu::Get(i).idle_power_thread.thread();
     struct cpu_stats stats;
@@ -210,13 +211,27 @@ RecurringCallback g_threadload_callback([]() {
         (ZX_SEC(1) > delta_time) ? zx_duration_sub_duration(ZX_SEC(1), delta_time) : 0;
     zx_duration_t busypercent = zx_duration_mul_int64(busy_time, 10000) / ZX_SEC(1);
 
+    const uint64_t kNanosToMillis = 1'000'000u;
+    const uint64_t kRoundNanosToMillis = 500'000u;
+
+    const uint64_t active_energy_delta_nj =
+        stats.active_energy_consumption_nj - old_stats[i].active_energy_consumption_nj;
+    const uint64_t active_power_mw =
+        (active_energy_delta_nj + kRoundNanosToMillis) / kNanosToMillis / ZX_SEC(1);
+
+    const uint64_t idle_energy_delta_nj =
+        stats.idle_energy_consumption_nj - old_stats[i].idle_energy_consumption_nj;
+    const uint64_t idle_power_mw =
+        (idle_energy_delta_nj + kRoundNanosToMillis) / kNanosToMillis / ZX_SEC(1);
+
     printf(
         "%3u"
         " %3u.%02u%%"
         " %9lu %4lu %5lu %9lu"
-        " %5lu"
+        " %7lu"
         " %8lu %4lu %6lu"
         " %8lu %4lu"
+        " %8u.%03u %2u.%03u"
         "\n",
         i, static_cast<uint>(busypercent / 100), static_cast<uint>(busypercent % 100),
         stats.context_switches - old_stats[i].context_switches, stats.yields - old_stats[i].yields,
@@ -224,7 +239,9 @@ RecurringCallback g_threadload_callback([]() {
         stats.syscalls - old_stats[i].syscalls, stats.interrupts - old_stats[i].interrupts,
         stats.timer_ints - old_stats[i].timer_ints, stats.timers - old_stats[i].timers,
         stats.reschedule_ipis - old_stats[i].reschedule_ipis,
-        stats.generic_ipis - old_stats[i].generic_ipis);
+        stats.generic_ipis - old_stats[i].generic_ipis, static_cast<uint>(active_power_mw / 1000),
+        static_cast<uint>(active_power_mw % 1000), static_cast<uint>(idle_power_mw / 1000),
+        static_cast<uint>(idle_power_mw % 1000));
 
     old_stats[i] = stats;
     last_idle_time[i] = idle_time;
@@ -352,8 +369,13 @@ static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
   if (!strcmp(argv[1].str, "dump")) {
     percpu::ForEach([](cpu_num_t cpu, percpu* percpu) {
       Scheduler& scheduler = percpu->scheduler;
+
       fbl::RefPtr domain = scheduler.GetPowerDomainForTesting();
       ktl::optional<uint8_t> current_power_level = scheduler.GetPowerLevel();
+      ktl::optional<uint64_t> active_power_coefficient_nw =
+          scheduler.GetActivePowerCoefficientNwForTesting();
+      ktl::optional<uint64_t> max_idle_power_coefficient_nw =
+          scheduler.GetMaxIdlePowerCoefficientNwForTesting();
 
       printf("CPU %u:\n", cpu);
 
@@ -372,6 +394,18 @@ static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
         printf("  Current power level %u.\n", *current_power_level);
       } else {
         printf("  Current power level not set.\n");
+      }
+
+      if (active_power_coefficient_nw.has_value()) {
+        printf("  Active power coefficient %" PRIu64 " nw\n", *active_power_coefficient_nw);
+      } else {
+        printf("  Active power coefficient not set.\n");
+      }
+
+      if (max_idle_power_coefficient_nw.has_value()) {
+        printf("  Max idle power coefficient %" PRIu64 " nw\n", *max_idle_power_coefficient_nw);
+      } else {
+        printf("  Max idle power coefficient not set.\n");
       }
     });
     return 0;

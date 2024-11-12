@@ -10,6 +10,7 @@ use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::{AlreadyExists, DirectlyMutable};
 use vfs::directory::immutable::simple as pfs;
+use vfs::execution_scope::ExecutionScope;
 use vfs::name::Name;
 
 impl From<Dict> for fsandbox::DictionaryRef {
@@ -50,15 +51,17 @@ impl TryFrom<fidl::Channel> for Dict {
 }
 
 impl RemotableCapability for Dict {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.enumerate() {
             let Ok(value) = value else {
                 continue;
             };
             let remote: Arc<dyn DirectoryEntry> = match value {
-                Capability::Directory(d) => d.into_remote(),
-                value => value.try_into_directory_entry().map_err(|err| {
+                value => value.try_into_directory_entry(scope.clone()).map_err(|err| {
                     ConversionError::Nested { key: key.to_string(), err: Box::new(err) }
                 })?,
             };
@@ -968,8 +971,9 @@ mod tests {
         let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()))
             .expect("dict entry already exists");
+        let scope = ExecutionScope::new();
         assert_matches!(
-            dict.try_into_directory_entry().err(),
+            dict.try_into_directory_entry(scope).err(),
             Some(ConversionError::Nested { .. })
         );
     }
@@ -1004,8 +1008,8 @@ mod tests {
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         dict.insert(CAP_KEY.clone(), Capability::DirEntry(DirEntry::new(mock_dir.clone())))
             .expect("dict entry already exists");
-        let remote = dict.try_into_directory_entry().unwrap();
         let scope = ExecutionScope::new();
+        let remote = dict.try_into_directory_entry(scope.clone()).unwrap();
 
         let dir_client_end =
             serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
@@ -1028,8 +1032,10 @@ mod tests {
         let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
 
-        let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
         let scope = ExecutionScope::new();
+        let remote = dict
+            .try_into_directory_entry(scope.clone())
+            .expect("convert dict into Open capability");
 
         let dir_client_end =
             serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
@@ -1069,20 +1075,20 @@ mod tests {
     #[fuchsia::test]
     async fn try_into_open_with_directory() {
         let dir_entry = DirEntry::new(endpoint(|_scope, _channel| {}));
+        let scope = ExecutionScope::new();
         let fs = pseudo_directory! {
-            "a" => dir_entry.clone().try_into_directory_entry().unwrap(),
-            "b" => dir_entry.clone().try_into_directory_entry().unwrap(),
-            "c" => dir_entry.try_into_directory_entry().unwrap(),
+            "a" => dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap(),
+            "b" => dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap(),
+            "c" => dir_entry.try_into_directory_entry(scope.clone()).unwrap(),
         };
         let directory = Directory::from(serve_vfs_dir(fs));
         let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Directory(directory))
             .expect("dict entry already exists");
 
-        let remote = dict.try_into_directory_entry().unwrap();
+        let remote = dict.try_into_directory_entry(scope.clone()).unwrap();
 
         // List the inner directory and verify its contents.
-        let scope = ExecutionScope::new();
         {
             let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
                 .unwrap()

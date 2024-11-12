@@ -52,12 +52,7 @@ class AmlUartV2 : public fdf::DriverBase {
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 
   aml_uart_dfv2_config::Config driver_config_;
-
-  // Client ends for talking to power broker.
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_end_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_end_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end_;
+  std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag_;
 };
 
 }  // namespace serial

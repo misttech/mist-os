@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
@@ -9,8 +10,8 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, PathBuilder,
+    UnlinkKind, ValueOrSize, XattrOp,
 };
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -28,8 +29,6 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
-use starnix_uapi::mount_flags::MountFlags;
-use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -37,33 +36,6 @@ use std::sync::Arc;
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
-
-/// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
-/// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
-pub(super) fn sb_mount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _dev_name: &bstr::BStr,
-    _path: &NamespaceNode,
-    _fs_type: &bstr::BStr,
-    _flags: MountFlags,
-    _data: &bstr::BStr,
-) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/352507622"), "sb_mount: validate permission");
-    Ok(())
-}
-
-/// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
-/// `_node` using the unmount flags `_flags`.
-pub(super) fn sb_umount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _node: &NamespaceNode,
-    _flags: UnmountFlags,
-) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/353936182"), "sb_umount: validate permission");
-    Ok(())
-}
 
 /// Returns the relative path from the root of the file system containing this `DirEntry`.
 fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
@@ -91,7 +63,7 @@ where
     // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
     // the `FsNode` may already have been labeled.
     let fs_node = &dir_entry.node;
-    if fs_node.info().security_state.label.is_initialized() {
+    if fs_node.security_state.lock().label.is_initialized() {
         return Ok(());
     }
 
@@ -101,7 +73,7 @@ where
     let parent = dir_entry.parent();
     if let Some(parent) = parent {
         let parent_node = &parent.node;
-        if let FsNodeLabel::FromTask { weak_task } = parent_node.info().security_state.label.clone()
+        if let FsNodeLabel::FromTask { weak_task } = parent_node.security_state.lock().label.clone()
         {
             fs_node_set_label_with_task(fs_node, weak_task);
             return Ok(());
@@ -251,7 +223,7 @@ pub(super) fn fs_node_init_on_create(
     // By definition this is a new `FsNode` so should not have already been labeled
     // (unless we're working in the context of overlayfs and affected by
     // https://fxbug.dev/369067922).
-    if new_node.info().security_state.label.is_initialized() {
+    if new_node.security_state.lock().label.is_initialized() {
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
@@ -273,13 +245,10 @@ pub(super) fn fs_node_init_on_create(
     // Compute both the SID to store on the in-memory node and the xattr to persist on-disk
     // (or None if this circumstance is such that there's no xattr to persist).
     let (sid, xattr) = match label.scheme {
-        FileSystemLabelingScheme::Mountpoint => {
-            return Ok(None);
-        }
         FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
             let current_task_sid = current_task.read().security_state.attrs.current_sid;
             if fs_use_type == FsUseType::Task {
-                // TODO: https://fxbug.dev/355180447 - verify that this is how fs_use_task is
+                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
                 // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
                 (current_task_sid, None)
             } else {
@@ -290,7 +259,7 @@ pub(super) fn fs_node_init_on_create(
                         parent_sid,
                         file_class_from_file_mode(new_node.info().mode)?,
                     )
-                    // TODO: https://fxbug.dev/355180447 - is EPERM right here? What does it mean
+                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
                     .map_err(|_| errno!(EPERM))?;
                 let xattr = (fs_use_type == FsUseType::Xattr)
@@ -299,7 +268,7 @@ pub(super) fn fs_node_init_on_create(
                 (sid, xattr)
             }
         }
-        FileSystemLabelingScheme::GenFsCon => {
+        FileSystemLabelingScheme::Mountpoint | FileSystemLabelingScheme::GenFsCon => {
             // The label in this case is decided in the `fs_node_init_with_dentry` hook.
             return Ok(None);
         }
@@ -412,7 +381,7 @@ fn may_unlink_or_rmdir(
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
 
     todo_check_permission!(
-        TODO("https://fxbug.dev/375590486", "Check rmdir permission."),
+        TODO("https://fxbug.dev/375590486", "Check remove_name permission."),
         &permission_check,
         current_sid,
         parent_sid,
@@ -639,23 +608,90 @@ pub(super) fn fs_node_setsecurity<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    fs_node.ops().set_xattr(
+    if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
+        return fs_node.ops().set_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            fs_node,
+            current_task,
+            name,
+            value,
+            op,
+        );
+    }
+
+    // If the "security.selinux" attribute is being modified then the result depends on the
+    // `FileSystem`'s labeling scheme.
+    let fs = fs_node.fs();
+    let fs_label = match &mut *fs.security_state.state.0.lock() {
+        FileSystemLabelState::Unlabeled { .. } => {
+            // If the `FileSystem` has not yet been labeled then store the xattr but leave the
+            // label on the in-memory `fs_node` to be set up when the `FileSystem`'s labeling state
+            // has been initialized, during load of the initial policy.
+            return fs_node.ops().set_xattr(
+                &mut locked.cast_locked::<FileOpsCore>(),
+                fs_node,
+                current_task,
+                name,
+                value,
+                op,
+            );
+        }
+        FileSystemLabelState::Labeled { label } => label.clone(),
+    };
+
+    // If the "mountpoint"-labeling is used by this filesystem then setting labels is not supported.
+    // TODO: https://fxbug.dev/377915469 - Is re-labeling of "genfscon" nodes allowed?
+    if fs_label.scheme == FileSystemLabelingScheme::Mountpoint {
+        return error!(ENOTSUP);
+    }
+
+    // TODO: https://fxbug.dev/367585803 - Lock the `fs_node` security label here, to ensure consistency.
+
+    // Verify that the requested modification is permitted by the loaded policy.
+    let new_sid = security_server.security_context_to_sid(value.into()).ok();
+    if security_server.is_enforcing() {
+        let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
+        let task_sid = current_task.read().security_state.attrs.current_sid;
+        let old_sid = fs_node_effective_sid(fs_node);
+        let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+        let permission_check = security_server.as_permission_check();
+        check_permission(
+            &permission_check,
+            task_sid,
+            old_sid,
+            CommonFilePermission::RelabelFrom.for_class(file_class),
+        )?;
+        check_permission(
+            &permission_check,
+            task_sid,
+            new_sid,
+            CommonFilePermission::RelabelTo.for_class(file_class),
+        )?;
+        check_permission(
+            &permission_check,
+            new_sid,
+            fs_label.sid,
+            FileSystemPermission::Associate,
+        )?;
+    }
+
+    // Apply the change to the file node.
+    let result = fs_node.ops().set_xattr(
         &mut locked.cast_locked::<FileOpsCore>(),
         fs_node,
         current_task,
         name,
         value,
         op,
-    )?;
-    if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
-        // If the new value is a valid Security Context then label the node with the corresponding
-        // SID, otherwise use the policy's "unlabeled" SID.
-        let sid = security_server
-            .security_context_to_sid(value.into())
-            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
-        set_cached_sid(fs_node, sid)
+    );
+
+    // If the operation succeeded then update the label cached on the file node.
+    if result.is_ok() {
+        let effective_new_sid = new_sid.unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+        set_cached_sid(fs_node, effective_new_sid);
     }
-    Ok(())
+
+    result
 }
 
 /// Returns the `SecurityId` that should be used for SELinux access control checks against `fs_node`.
@@ -978,15 +1014,14 @@ impl FsNodeLabel {
 /// cause the security id to *not* be recomputed by the SELinux LSM when determining the effective
 /// security id of this [`FsNode`].
 pub(super) fn set_cached_sid(fs_node: &FsNode, sid: SecurityId) {
-    fs_node.update_info(|info| info.security_state.label = FsNodeLabel::SecurityId { sid });
+    fs_node.security_state.lock().label = FsNodeLabel::SecurityId { sid };
 }
 
 /// Sets the Task associated with `fs_node` to `task`.
 /// The effective security id of the [`FsNode`] will be that of the task, even if the security id
 /// of the task changes.
 pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>) {
-    fs_node
-        .update_info(|info| info.security_state.label = FsNodeLabel::FromTask { weak_task: task });
+    fs_node.security_state.lock().label = FsNodeLabel::FromTask { weak_task: task };
 }
 
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
@@ -994,7 +1029,7 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 /// current value before engaging logic that may compute a new value. Access control enforcement
 /// code should use `get_effective_fs_node_security_id()`, *not* this function.
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
-    match fs_node.info().security_state.label.clone() {
+    match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
         FsNodeLabel::FromTask { weak_task } => {
             weak_task.upgrade().map(|t| t.read().security_state.attrs.current_sid)
@@ -1016,7 +1051,7 @@ mod tests {
 
     /// Clears the cached security id on `fs_node`.
     fn clear_cached_sid(fs_node: &FsNode) {
-        fs_node.update_info(|info| info.security_state.label = FsNodeLabel::Uninitialized);
+        fs_node.security_state.lock().label = FsNodeLabel::Uninitialized;
     }
 
     #[fuchsia::test]
@@ -1127,8 +1162,10 @@ mod tests {
                 let dir_entry = &testing::create_test_file(locked, current_task).entry;
                 let node = &dir_entry.node;
 
-                // Store a valid Security Context in the attribute, and ensure any label cached on the `FsNode`
-                // is removed, to force the effective-SID query to resolve the label again.
+                // Store a valid Security Context in the attribute, then clear the cached label and
+                // re-resolve it. The hooks test policy defines that "tmpfs" use "fs_use_xattr"
+                // labeling, which should result in the (valid) label being read from the file, and
+                // the corresponding SID cached.
                 node.ops()
                     .set_xattr(
                         &mut locked.cast_locked::<FileOpsCore>(),
@@ -1139,8 +1176,6 @@ mod tests {
                         XattrOp::Set,
                     )
                     .expect("setxattr");
-
-                // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
@@ -1178,7 +1213,7 @@ mod tests {
                 let expected_sid = security_server
                     .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
                     .expect("no SID for VALID_SECURITY_CONTEXT");
-                let node = &testing::create_unlabeled_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 node.set_xattr(
                     &mut locked.cast_locked::<FileOpsCore>(),

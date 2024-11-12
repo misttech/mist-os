@@ -30,6 +30,11 @@ pub struct ModelParams {
     pub top_instance: Arc<ComponentManagerInstance>,
     /// The [`InstanceRegistry`] to attach to the model.
     pub instance_registry: Arc<InstanceRegistry>,
+    /// The execution scope to assign to components, for dependency injection in tests.
+    /// If `None`, use the default.
+    #[cfg(test)]
+    pub scope_factory:
+        Option<Box<dyn Fn() -> vfs::execution_scope::ExecutionScope + Send + Sync + 'static>>,
 }
 
 /// The component model holds authoritative state about a tree of component instances, including
@@ -53,7 +58,12 @@ impl Model {
         params: ModelParams,
         root_component_input: ComponentInput,
     ) -> Result<Arc<Model>, ModelError> {
-        let context = Arc::new(ModelContext::new(params.runtime_config, params.instance_registry)?);
+        let context = Arc::new(ModelContext::new(
+            params.runtime_config,
+            params.instance_registry,
+            #[cfg(test)]
+            params.scope_factory,
+        )?);
         let root = ComponentInstance::new_root(
             root_component_input,
             params.root_environment,

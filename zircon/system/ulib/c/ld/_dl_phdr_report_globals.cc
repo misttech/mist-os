@@ -4,6 +4,7 @@
 
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/sanitizer.h>
 
 #include <cstdint>

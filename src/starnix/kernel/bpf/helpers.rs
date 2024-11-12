@@ -6,8 +6,8 @@ use crate::bpf::map::{Map, RingBufferWakeupPolicy};
 use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
-    new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldMapping, FieldType,
-    FunctionSignature, MemoryId, MemoryParameterSize, Type,
+    new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldDescriptor, FieldMapping,
+    FieldType, FunctionSignature, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_csum_update,
@@ -848,43 +848,67 @@ pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContex
 #[derive(Debug, Default)]
 struct ArgBuilder {
     id: Option<MemoryId>,
-    fields: Vec<FieldType>,
-    mappings: Vec<FieldMapping>,
+    descriptor: StructDescriptor,
 }
 
 impl ArgBuilder {
     fn set_id(&mut self, id: MemoryId) {
         self.id = Some(id);
     }
-    fn add_field(&mut self, field_type: FieldType) {
-        self.fields.push(field_type);
+    fn add_scalar(&mut self, offset: usize, size: usize) {
+        self.add_field(FieldDescriptor { offset, field_type: FieldType::Scalar { size } });
     }
-    fn add_mapping(&mut self, mapping: FieldMapping) {
-        self.mappings.push(mapping);
+    fn add_mut_scalar(&mut self, offset: usize, size: usize) {
+        self.add_field(FieldDescriptor { offset, field_type: FieldType::MutableScalar { size } });
     }
-    fn build<T: IntoBytes>(self) -> Vec<Type> {
-        let buffer_size = std::mem::size_of::<T>() as u64;
-        vec![
-            Type::PtrToMemory {
-                id: self.id.unwrap_or_else(new_bpf_type_identifier),
-                offset: 0,
-                buffer_size,
-                fields: self.fields,
-                mappings: self.mappings,
-            },
-            Type::from(buffer_size),
-        ]
+    fn add_u32_scalar(&mut self, offset: usize) {
+        self.add_scalar(offset, 4);
     }
-}
 
-fn build_bpf_args<T: IntoBytes>() -> Vec<Type> {
-    ArgBuilder::default().build::<T>()
+    fn add_array_32(
+        &mut self,
+        start_offset: usize,
+        end_offset: usize,
+        remapped_start_offset: usize,
+        remapped_end_offset: usize,
+    ) {
+        // Create a memory id for the data array
+        let array_id = new_bpf_type_identifier();
+
+        self.add_field(FieldDescriptor {
+            offset: start_offset,
+            field_type: FieldType::PtrToArray { id: array_id.clone(), is_32_bit: true },
+        });
+        self.add_mapping(start_offset, remapped_start_offset);
+        self.add_field(FieldDescriptor {
+            offset: end_offset,
+            field_type: FieldType::PtrToEndArray { id: array_id, is_32_bit: true },
+        });
+        self.add_mapping(end_offset, remapped_end_offset);
+    }
+
+    fn add_field(&mut self, descriptor: FieldDescriptor) {
+        self.descriptor.fields.push(descriptor);
+    }
+    fn add_mapping(&mut self, source_offset: usize, target_offset: usize) {
+        self.descriptor.mappings.push(FieldMapping { source_offset, target_offset });
+    }
+    fn build(self) -> Vec<Type> {
+        let Self { id, descriptor } = self;
+        vec![Type::PtrToStruct {
+            id: id.unwrap_or_else(new_bpf_type_identifier),
+            offset: 0,
+            descriptor: Arc::new(descriptor),
+        }]
+    }
 }
 
 fn build_bpf_args_with_id<T: IntoBytes>(id: MemoryId) -> Vec<Type> {
-    let mut builder = ArgBuilder::default();
-    builder.set_id(id);
-    builder.build::<T>()
+    vec![Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }]
+}
+
+fn build_bpf_args<T: IntoBytes>() -> Vec<Type> {
+    build_bpf_args_with_id::<T>(new_bpf_type_identifier())
 }
 
 #[repr(C)]
@@ -936,27 +960,31 @@ static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
     // Set the id of the main struct.
     builder.set_id(SK_BUF_ID.clone());
-    // Create a memory id for the data array
-    let array_id = new_bpf_type_identifier();
-    // Map and define the data field
-    builder.add_mapping(FieldMapping::new_size_mapping(
-        std::mem::offset_of!(__sk_buff, data).try_into().unwrap(),
-        std::mem::offset_of!(SkBuf, data).try_into().unwrap(),
-    ));
-    builder.add_field(FieldType {
-        offset: std::mem::offset_of!(SkBuf, data).try_into().unwrap(),
-        field_type: Box::new(Type::PtrToArray { id: array_id.clone(), offset: 0 }),
-    });
-    // Map and define the data_end field
-    builder.add_mapping(FieldMapping::new_size_mapping(
-        std::mem::offset_of!(__sk_buff, data_end).try_into().unwrap(),
-        std::mem::offset_of!(SkBuf, data_end).try_into().unwrap(),
-    ));
-    builder.add_field(FieldType {
-        offset: std::mem::offset_of!(SkBuf, data_end).try_into().unwrap(),
-        field_type: Box::new(Type::PtrToEndArray { id: array_id }),
-    });
-    builder.build::<SkBuf>()
+
+    let cb_offset = std::mem::offset_of!(__sk_buff, cb);
+    let hash_offset = std::mem::offset_of!(__sk_buff, hash);
+
+    // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
+    builder.add_scalar(0, cb_offset);
+
+    // `cb` is a mutable array.
+    builder.add_mut_scalar(cb_offset, hash_offset - cb_offset);
+
+    builder.add_u32_scalar(std::mem::offset_of!(__sk_buff, hash));
+    builder.add_u32_scalar(std::mem::offset_of!(__sk_buff, napi_id));
+    builder.add_u32_scalar(std::mem::offset_of!(__sk_buff, tstamp));
+    builder.add_u32_scalar(std::mem::offset_of!(__sk_buff, gso_segs));
+    builder.add_u32_scalar(std::mem::offset_of!(__sk_buff, gso_size));
+
+    // Add and remap `data` and `data_end` fields.
+    builder.add_array_32(
+        std::mem::offset_of!(__sk_buff, data),
+        std::mem::offset_of!(__sk_buff, data_end),
+        std::mem::offset_of!(SkBuf, data),
+        std::mem::offset_of!(SkBuf, data_end),
+    );
+
+    builder.build()
 });
 
 #[repr(C)]
@@ -971,27 +999,20 @@ struct XdpMd {
 }
 static XDP_MD_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
-    // Create a memory id for the data array
-    let array_id = new_bpf_type_identifier();
-    // Map and define the data field
-    builder.add_mapping(FieldMapping::new_size_mapping(
-        std::mem::offset_of!(xdp_md, data).try_into().unwrap(),
-        std::mem::offset_of!(XdpMd, data).try_into().unwrap(),
-    ));
-    builder.add_field(FieldType {
-        offset: std::mem::offset_of!(XdpMd, data).try_into().unwrap(),
-        field_type: Box::new(Type::PtrToArray { id: array_id.clone(), offset: 0 }),
-    });
-    // Map and define the data_end field
-    builder.add_mapping(FieldMapping::new_size_mapping(
-        std::mem::offset_of!(xdp_md, data_end).try_into().unwrap(),
-        std::mem::offset_of!(XdpMd, data_end).try_into().unwrap(),
-    ));
-    builder.add_field(FieldType {
-        offset: std::mem::offset_of!(XdpMd, data_end).try_into().unwrap(),
-        field_type: Box::new(Type::PtrToEndArray { id: array_id }),
-    });
-    builder.build::<XdpMd>()
+
+    // Define and map `data` and `data_end` fields.
+    builder.add_array_32(
+        std::mem::offset_of!(xdp_md, data),
+        std::mem::offset_of!(xdp_md, data_end),
+        std::mem::offset_of!(XdpMd, data),
+        std::mem::offset_of!(XdpMd, data_end),
+    );
+
+    // All fields starting from data_meta are readable
+    let data_meta_offset = std::mem::offset_of!(xdp_md, data_meta);
+    builder.add_scalar(data_meta_offset, std::mem::size_of::<xdp_md>() - data_meta_offset);
+
+    builder.build()
 });
 
 static BPF_USER_PT_REGS_T_ARGS: Lazy<Vec<Type>> =
@@ -1007,22 +1028,26 @@ static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_s
 
 static BPF_FUSE_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
-    builder.add_field(FieldType {
+    builder.add_field(FieldDescriptor {
         offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
-            + std::mem::offset_of!(fuse_bpf_arg, value))
-        .try_into()
-        .unwrap(),
-        field_type: Box::new(build_bpf_args::<fuse_entry_out>().into_iter().nth(0).unwrap()),
+            + std::mem::offset_of!(fuse_bpf_arg, value)),
+        field_type: FieldType::PtrToMemory {
+            id: new_bpf_type_identifier(),
+            buffer_size: std::mem::size_of::<fuse_entry_out>(),
+            is_32_bit: false,
+        },
     });
-    builder.add_field(FieldType {
+    builder.add_field(FieldDescriptor {
         offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
             + std::mem::size_of::<fuse_bpf_arg>()
-            + std::mem::offset_of!(fuse_bpf_arg, value))
-        .try_into()
-        .unwrap(),
-        field_type: Box::new(build_bpf_args::<fuse_entry_bpf_out>().into_iter().nth(0).unwrap()),
+            + std::mem::offset_of!(fuse_bpf_arg, value)),
+        field_type: FieldType::PtrToMemory {
+            id: new_bpf_type_identifier(),
+            buffer_size: std::mem::size_of::<fuse_entry_bpf_out>(),
+            is_32_bit: false,
+        },
     });
-    builder.build::<fuse_bpf_args>()
+    builder.build()
 });
 
 #[repr(C)]

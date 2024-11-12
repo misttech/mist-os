@@ -279,7 +279,7 @@ configuration capabilities before the component is started.
 A side effect of this means that the Component Framework is unable to start a
 component that has a "broken route" (a route that does not successfully end in a
 capability definition) for a configuration capability. For example, if you
-request `fuchsai.config.MyBool` but your parent does not offer it to you, you
+request `fuchsia.config.MyBool` but your parent does not offer it to you, you
 will not be able to start. This is different than other capabilities, where the
 component will discover at runtime that it may not exist.
 
@@ -291,11 +291,14 @@ will not see any updates if the capability route changes while the component is 
 In order to launch a component with a different configuration the following things need to
 happen:
 
-1) Update the CML providing the configuration capbility (likely by re-resolving it).
-2) Stop and then Start the component that is using the configuration capbility.
+1. Either:
+    * Update the CML providing the configuration capability (likely by re-resolving it).
+    * Use the [`ffx component config`][ffx-component-config] tool to update the configuration values from the command line.
+2. Stop and then Start the component that is using the configuration capability.
 
 
 [structured-configuration]: /docs/reference/components/structured_config.md
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
 [consuming-optional-capabilities]: /docs/development/components/connect.md#consuming-optional-capabilities
 [docs-capability]: https://fuchsia.dev/reference/cml#capabilities
+[ffx-component-config]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_component_config

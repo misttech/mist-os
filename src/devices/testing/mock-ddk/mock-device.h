@@ -165,7 +165,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   void ChildPreReleaseOp(void* child_ctx);
   bool HasUnbindOp() { return ops_->unbind != nullptr; }
 
-  cpp20::span<const zx_device_prop_t> GetProperties() const { return props_; }
   cpp20::span<const zx_device_str_prop_t> GetStringProperties() const { return str_props_; }
 
   const zx::vmo& GetInspectVmo() const { return inspect_; }
@@ -359,7 +358,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   std::string name_;
 
-  std::vector<zx_device_prop_t> props_;
   std::vector<zx_device_str_prop_t> str_props_;
   zx::vmo inspect_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_;

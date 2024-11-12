@@ -17,8 +17,6 @@ rustc_library("container") {
     "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain_rust",
     "//sdk/fidl/fuchsia.fdomain($fidl_toolchain)",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/rust/zx",
-    "//src/lib/fdomain/fidl_fuchsia_fdomain_ext",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl/rust/fidl_message",
     "//src/lib/fuchsia-async",
@@ -27,6 +25,10 @@ rustc_library("container") {
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:rand",
   ]
+
+  if (is_fuchsia) {
+    deps += [ "//sdk/rust/zx" ]
+  }
 
   inputs = [ "${root_build_dir}/fidling/gen/sdk/fidl/fuchsia.fdomain/fuchsia.fdomain.fidl.json" ]
   rustenv = [ "FDOMAIN_FIDL_PATH=" +

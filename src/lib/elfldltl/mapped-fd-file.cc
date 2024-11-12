@@ -9,7 +9,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <zircon/assert.h>
 
 namespace elfldltl {
 
@@ -41,9 +40,8 @@ fit::result<int> MappedFdFile::Init(int fd) {
 }
 
 MappedFdFile::~MappedFdFile() {
-  if (!image().empty() && munmap(image().data(), image().size_bytes()) < 0) {
-    ZX_DEBUG_ASSERT_MSG(false, "munmap(%p, %#zx): %s", image().data(), image().size_bytes(),
-                        strerror(errno));
+  if (!image().empty()) {
+    munmap(image().data(), image().size_bytes());
   }
 }
 

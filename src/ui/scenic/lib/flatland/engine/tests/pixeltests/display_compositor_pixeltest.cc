@@ -817,7 +817,11 @@ class DisplayCompositorParameterizedPixelTest
 // data and then pass the data along to the display-coordinator interface
 // to be composited directly in hardware. The Astro display coordinator
 // only handles full screen rects.
-VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
+//
+// TODO(https://fxbug.dev/377979329): re-enable after display coordinator relaxes image reuse
+// constraints, and `flatland::DisplayCompositor` has been modified to reflect this.  Note: there
+// will likely be changes needed to the expected call sequence in the mock display coordinator.
+VK_TEST_P(DisplayCompositorParameterizedPixelTest, DISABLED_FullscreenRectangleTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_coordinator(), renderer,
@@ -2286,7 +2290,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   render_frame_result = display_compositor->RenderFrame(3, zx::time(1), blue_display_list, {},
                                                         [](const scheduling::Timestamps&) {},
                                                         {.force_gpu_composition = false});
-  EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
+  // TODO(https://fxbug.dev/377979329): re-enable after direct-to-display is re-enabled.
+  // EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
 
   // Grab the capture vmo data, and compare to the texture data.
   CaptureDisplayOutput(capture_info, capture_image_id, &read_values,
@@ -2300,7 +2305,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   render_frame_result = display_compositor->RenderFrame(4, zx::time(1), green_display_list, {},
                                                         [](const scheduling::Timestamps&) {},
                                                         {.force_gpu_composition = false});
-  EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
+  // TODO(https://fxbug.dev/377979329): re-enable after direct-to-display is re-enabled.
+  // EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
 
   // Grab the capture vmo data, and compare to the texture data.
   CaptureDisplayOutput(capture_info, capture_image_id, &read_values,
@@ -2328,7 +2334,8 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   render_frame_result = display_compositor->RenderFrame(6, zx::time(1), green_display_list, {},
                                                         [](const scheduling::Timestamps&) {},
                                                         {.force_gpu_composition = false});
-  EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
+  // TODO(https://fxbug.dev/377979329): re-enable after direct-to-display is re-enabled.
+  // EXPECT_EQ(render_frame_result, DisplayCompositor::RenderFrameResult::kDirectToDisplay);
 
   // Grab the capture vmo data, and compare to the texture data.
   CaptureDisplayOutput(capture_info, capture_image_id, &read_values,

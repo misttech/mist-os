@@ -38,15 +38,15 @@ paths, such as:
   keys whose values are supplied by the product. Product integrators supply
   values in their product configuration and these are built into the component
   package where they can be verified during release signing.
+- **Development overrides**. This [ffx tool][ffx_component_config] lets
+  developers change configuration at runtime on engineering builds, for example
+  to use pre-release features.
 
 [RFC-0127][rfc0127] described several other ways to specify structured
 configuration values, but these have not yet been built pending near-term use
 cases. If your use case requires any of these features, please comment on the
 tracking bug linked below for the feature:
 
-- **Development overrides ([https://fxbug.dev/42178358][bug.96260]**). This would let
-  developers change configuration at runtime on engineering builds, for example
-  to use pre-release features.
 - **Vbmeta ([https://fxbug.dev/42178359][bug.96261]**). This would let signed configuration
   be modified for a release without building a new image.
 - **Parent component ([https://fxbug.dev/42178351][bug.96254]**). This would let a
@@ -207,3 +207,4 @@ Service-based configuration does not work well for the following problems:
 [settings_service]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/settings/service/
 [structured_config]: structured_config.md
 [providing_data_files]: /docs/development/components/data.md
+[ffx_component_config]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_component_config

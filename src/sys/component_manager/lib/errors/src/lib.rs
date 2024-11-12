@@ -803,6 +803,8 @@ pub enum StartActionError {
         #[source]
         err: PolicyError,
     },
+    #[error("creating program input dictionary for `{moniker}`")]
+    InputDictionaryError { moniker: Moniker },
     #[error("creating namespace for `{moniker}`: {err}")]
     CreateNamespaceError {
         moniker: Moniker,
@@ -843,6 +845,7 @@ impl StartActionError {
             StartActionError::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
             StartActionError::ResolveRunnerError { err, .. } => err.as_zx_status(),
             StartActionError::CreateNamespaceError { err, .. } => err.as_zx_status(),
+            StartActionError::InputDictionaryError { .. } => zx::Status::NOT_FOUND,
             StartActionError::ResolveActionError { err, .. } => err.as_zx_status(),
             StartActionError::Aborted { .. } => zx::Status::NOT_FOUND,
         }

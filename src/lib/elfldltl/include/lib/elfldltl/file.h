@@ -6,9 +6,9 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FILE_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -24,14 +24,14 @@ inline auto DefaultMakeInvalidHandle() {
 
 // elfldltl::File<Handle, Offset, Read, MakeInvalidHandle> implements the File
 // API (see memory.h) by holding a Handle object and calling Read as a function
-// fit::result<...>(Handle&, Offset, cpp20::span<byte>) that returns some error
+// fit::result<...>(Handle&, Offset, std::span<byte>) that returns some error
 // value that Diagnostics::SystemError can handle.  MakeInvalidHandle can be
 // supplied if default-construction isn't the way.
 template <class Diagnostics, typename Handle, typename Offset, auto Read,
           auto MakeInvalidHandle = &DefaultMakeInvalidHandle<Handle>>
 class File {
  public:
-  static_assert(std::is_invocable_v<decltype(Read), Handle&, Offset, cpp20::span<std::byte>>);
+  static_assert(std::is_invocable_v<decltype(Read), Handle&, Offset, std::span<std::byte>>);
   static_assert(std::is_convertible_v<decltype(MakeInvalidHandle()), Handle>);
 
   using offset_type = Offset;
@@ -55,7 +55,7 @@ class File {
   template <typename T>
   std::optional<T> ReadFromFile(Offset offset) {
     std::optional<T> result{std::in_place};
-    cpp20::span<T> data{std::addressof(result.value()), 1};
+    std::span<T> data{std::addressof(result.value()), 1};
     FinishReadFromFile(offset, data, result);
     return result;
   }
@@ -64,7 +64,7 @@ class File {
   auto ReadArrayFromFile(off_t offset, Allocator&& allocator, size_t count) {
     auto result = allocator(count);
     if (result) {
-      cpp20::span<T> data = *result;
+      std::span<T> data = *result;
       FinishReadFromFile(offset, data, result);
     }
     return result;
@@ -76,9 +76,9 @@ class File {
 
  private:
   template <typename T, typename Result>
-  void FinishReadFromFile(Offset offset, cpp20::span<T> data, Result& result) {
+  void FinishReadFromFile(Offset offset, std::span<T> data, Result& result) {
     using namespace std::string_view_literals;
-    auto read = Read(handle_, offset, cpp20::as_writable_bytes(data));
+    auto read = Read(handle_, offset, std::as_writable_bytes(data));
     if (read.is_error()) {
       // FileOffset takes an unsigned type, but off_t is signed.
       // No value passed to Read should be negative.

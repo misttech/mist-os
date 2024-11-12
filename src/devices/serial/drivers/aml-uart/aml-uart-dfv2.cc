@@ -128,67 +128,14 @@ void AmlUartV2::OnReceivedMetadata(
 
 zx_status_t AmlUartV2::GetPowerConfiguration(
     const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
-  auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
-  if (power_broker.is_error() || !power_broker->is_valid()) {
-    FDF_LOG(WARNING, "Failed to connect to power broker: %s", power_broker.status_string());
-    return power_broker.status_value();
+  auto sag = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
+  if (sag.is_error() || !sag->is_valid()) {
+    FDF_LOG(WARNING, "Failed to connect to activity governor: %s", sag.status_string());
+    return sag.status_value();
   }
 
-  // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
-  // once it supports it.
-  const auto result_power_config = pdev->GetPowerConfiguration();
-  if (!result_power_config.ok()) {
-    FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
-    return result_power_config.status();
-  }
-  if (result_power_config->is_error()) {
-    FDF_LOG(INFO, "GetPowerConfiguration failed: %s",
-            zx_status_get_string(result_power_config->error_value()));
-    return result_power_config->error_value();
-  }
-  if (result_power_config->value()->config.count() != 1) {
-    FDF_LOG(INFO, "Unexpected number of power configurations: %zu",
-            result_power_config->value()->config.count());
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  sag_ = std::move(sag.value());
 
-  const auto& wire_config = result_power_config->value()->config[0];
-  if (wire_config.element().name().get() != "aml-uart-wake-on-interrupt") {
-    FDF_LOG(ERROR, "Unexpected power element: %s",
-            std::string(wire_config.element().name().get()).c_str());
-    return ZX_ERR_BAD_STATE;
-  }
-
-  fuchsia_hardware_power::PowerElementConfiguration natural_config = fidl::ToNatural(wire_config);
-  zx::result config = fdf_power::PowerElementConfiguration::FromFidl(natural_config);
-  if (config.is_error()) {
-    FDF_SLOG(ERROR, "Failed to convert power element configuration from fidl.",
-             KV("stauts", config.status_string()));
-    return config.status_value();
-  }
-
-  // Get dependency tokens from the config, these tokens represent the dependency from the current
-  // element to its parent(s).
-  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config.value());
-  if (tokens.is_error()) {
-    FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
-            static_cast<uint8_t>(tokens.error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-
-  fdf_power::ElementDesc description =
-      fdf_power::ElementDescBuilder(config.value(), std::move(tokens.value())).Build();
-  auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
-  if (result_add_element.is_error()) {
-    FDF_LOG(ERROR, "Failed to add power element: %u",
-            static_cast<uint8_t>(result_add_element.error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-
-  element_control_client_end_ = std::move(*description.element_control_client);
-  lessor_client_end_ = std::move(*description.lessor_client);
-  current_level_client_end_ = std::move(*description.current_level_client);
-  required_level_client_end_ = std::move(*description.required_level_client);
   return ZX_OK;
 }
 
@@ -264,9 +211,7 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   timer_dispatcher_.emplace(std::move(timer_dispatcher_result.value()));
   aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
                     irq_dispatcher_->borrow(), timer_dispatcher_->borrow(),
-                    driver_config_.enable_suspend() ? true : false, std::move(lessor_client_end_),
-                    std::move(current_level_client_end_), std::move(required_level_client_end_),
-                    std::move(element_control_client_end_));
+                    driver_config_.enable_suspend(), std::move(sag_));
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;

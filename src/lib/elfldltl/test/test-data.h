@@ -6,17 +6,16 @@
 #define SRC_LIB_ELFLDLTL_TEST_TEST_DATA_H_
 
 #include <stddef.h>
-#include <zircon/compiler.h>
 
 #include <string_view>
 
 extern "C" int Return24();
 
-extern "C" const int foo;
+extern "C" [[gnu::visibility("default")]] const int foo;
 
-extern "C" __EXPORT int BasicSymbol();
-extern "C" __EXPORT int NeedsPlt();
-extern "C" __EXPORT int NeedsGot();
+extern "C" [[gnu::visibility("default")]] int BasicSymbol();
+extern "C" [[gnu::visibility("default")]] int NeedsPlt();
+extern "C" [[gnu::visibility("default")]] int NeedsGot();
 
 struct TestData {
   const int* rodata;

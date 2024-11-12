@@ -32,7 +32,7 @@ pub enum ConversionError {
     #[error("conversion to type is not supported")]
     NotSupported,
 
-    #[error("value at `{key}` could not be converted")]
+    #[error("value at `{key}` could not be converted: {err}")]
     Nested {
         key: String,
         #[source]

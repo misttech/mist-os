@@ -89,6 +89,7 @@ impl<'a> Node<'a> {
                  &fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     preferred_lifetime_info: _,
                      assignment_state,
                  }| {
                     assert_eq!(

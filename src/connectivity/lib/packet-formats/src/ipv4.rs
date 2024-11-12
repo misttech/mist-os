@@ -17,6 +17,7 @@ use internet_checksum::Checksum;
 use log::debug;
 use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::{OptionSequenceBuilder, OptionsRaw};
+use packet::records::RecordsIter;
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
@@ -203,6 +204,23 @@ pub trait Ipv4Header {
     fn dst_ip(&self) -> Ipv4Addr {
         self.get_header_prefix().dst_ip
     }
+
+    /// Construct a builder with the same contents as this header.
+    fn builder(&self) -> Ipv4PacketBuilder {
+        let mut s = Ipv4PacketBuilder {
+            id: self.id(),
+            dscp_and_ecn: self.dscp_and_ecn(),
+            flags: 0,
+            frag_off: self.fragment_offset().into_raw(),
+            ttl: self.ttl(),
+            proto: self.get_header_prefix().proto.into(),
+            src_ip: self.src_ip(),
+            dst_ip: self.dst_ip(),
+        };
+        s.df_flag(self.df_flag());
+        s.mf_flag(self.mf_flag());
+        s
+    }
 }
 
 /// Packet metadata which is present only in the IPv4 protocol's packet format.
@@ -349,23 +367,6 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
         bytes[IPV4_FRAGMENT_DATA_BYTE_RANGE].copy_from_slice(&[0; 4][..]);
 
         bytes
-    }
-
-    /// Construct a builder with the same contents as this packet.
-    pub fn builder(&self) -> Ipv4PacketBuilder {
-        let mut s = Ipv4PacketBuilder {
-            id: self.id(),
-            dscp_and_ecn: self.dscp_and_ecn(),
-            flags: 0,
-            frag_off: self.fragment_offset().into_raw(),
-            ttl: self.ttl(),
-            proto: self.hdr_prefix.proto.into(),
-            src_ip: self.src_ip(),
-            dst_ip: self.dst_ip(),
-        };
-        s.df_flag(self.df_flag());
-        s.mf_flag(self.mf_flag());
-        s
     }
 
     /// Performs the header translation part of NAT64 as described in [RFC
@@ -675,6 +676,13 @@ impl<B: SplitByteSlice> ParsablePacket<B, ()> for Ipv4PacketRaw<B> {
     }
 }
 
+impl<B> Ipv4PacketRaw<B> {
+    /// Gets the maybe parsed options from the raw packet.
+    pub fn options(&self) -> &MaybeParsed<OptionsRaw<B, Ipv4OptionsImpl>, B> {
+        &self.options
+    }
+}
+
 impl<B: SplitByteSlice> Ipv4PacketRaw<B> {
     /// Return the body.
     ///
@@ -683,6 +691,13 @@ impl<B: SplitByteSlice> Ipv4PacketRaw<B> {
     /// length" fields), and [`MaybeParsed::Incomplete`] otherwise.
     pub fn body(&self) -> MaybeParsed<&[u8], &[u8]> {
         self.body.as_ref().map(|b| b.deref()).map_incomplete(|b| b.deref())
+    }
+
+    /// Consumes `self` returning the body.
+    ///
+    /// See [`Ipv4PacketRaw::body`] for details on parsing completeness.
+    pub fn into_body(self) -> MaybeParsed<B, B> {
+        self.body
     }
 }
 
@@ -713,7 +728,7 @@ impl<B: SplitByteSliceMut> Ipv4PacketRaw<B> {
 /// See [`Options`] for more details.
 ///
 /// [`Options`]: packet::records::options::Options
-type Options<B> = packet::records::options::Options<B, Ipv4OptionsImpl>;
+pub type Options<B> = packet::records::options::Options<B, Ipv4OptionsImpl>;
 
 /// Options provided to [`Ipv4PacketBuilderWithOptions::new`] exceed
 /// [`MAX_OPTIONS_LEN`] when serialized.
@@ -751,6 +766,55 @@ where
     fn aligned_options_len(&self) -> usize {
         // Round up to the next 4-byte boundary.
         crate::utils::round_to_next_multiple_of_four(self.options.serialized_len())
+    }
+
+    /// Returns a reference to the prefix builder.
+    pub fn prefix_builder(&self) -> &Ipv4PacketBuilder {
+        &self.prefix_builder
+    }
+
+    /// Returns a mutable reference to the prefix builder.
+    pub fn prefix_builder_mut(&mut self) -> &mut Ipv4PacketBuilder {
+        &mut self.prefix_builder
+    }
+
+    /// Returns a reference to the options used to create this builder.
+    pub fn options(&self) -> &I {
+        self.options.records()
+    }
+
+    /// Maps this builder optionally maintaining only the options that are meant
+    /// to be copied on all fragments.
+    ///
+    /// If `first_fragment` is `true`, all options are maintained, otherwise
+    /// only the options meant to be copied on all fragments will be yielded.
+    pub fn with_fragment_options(
+        self,
+        first_fragment: bool,
+    ) -> Ipv4PacketBuilderWithOptions<'a, impl Iterator<Item: Borrow<Ipv4Option<'a>>> + Clone> {
+        let Self { prefix_builder, options } = self;
+        Ipv4PacketBuilderWithOptions {
+            prefix_builder,
+            // We don't need to run the check on the builder options again since
+            // we're strictly removing options.
+            options: OptionSequenceBuilder::new(
+                options
+                    .records()
+                    .clone()
+                    .filter(move |opt| first_fragment || opt.borrow().copied()),
+            ),
+        }
+    }
+}
+
+impl<'a, B> Ipv4PacketBuilderWithOptions<'a, RecordsIter<'a, B, Ipv4OptionsImpl>> {
+    /// Creates a new `Ipv4PacketBuilderWithOptions` with a known-to-be-valid
+    /// iterator of IPv4 options records.
+    pub fn new_with_records_iter(
+        prefix_builder: Ipv4PacketBuilder,
+        iter: RecordsIter<'a, B, Ipv4OptionsImpl>,
+    ) -> Self {
+        Self { prefix_builder, options: OptionSequenceBuilder::new(iter) }
     }
 }
 
@@ -883,6 +947,11 @@ impl Ipv4PacketBuilder {
     /// Set the fragment offset.
     pub fn fragment_offset(&mut self, fragment_offset: FragmentOffset) {
         self.frag_off = fragment_offset.into_raw();
+    }
+
+    /// Returns the configured Don't Fragment (DF) flag.
+    pub fn read_df_flag(&self) -> bool {
+        (self.flags & (1 << DF_FLAG_OFFSET)) != 0
     }
 }
 
@@ -1089,7 +1158,7 @@ pub mod options {
     }
 
     /// An implementation of [`OptionsImpl`] for IPv4 options.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct Ipv4OptionsImpl;
 
     impl OptionLayout for Ipv4OptionsImpl {

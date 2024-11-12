@@ -49,6 +49,9 @@ __attribute__((__visibility__("hidden"))) extern "C" char time_values;
 // invoke a full clock_gettime syscall.
 int64_t calculate_monotonic_time_nsec();
 
+// Similar to above, but uses the boot clock timeline for the calculation instead.
+int64_t calculate_boot_time_nsec();
+
 // Returns utc time in nanoseconds
 int64_t calculate_utc_time_nsec();
 

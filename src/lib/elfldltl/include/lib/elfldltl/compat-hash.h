@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_COMPAT_HASH_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_COMPAT_HASH_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
-
+#include <bit>
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 #include "abi-span.h"
@@ -22,7 +21,7 @@ namespace elfldltl {
 inline constexpr uint32_t CompatHashString(std::string_view name) {
   uint_fast32_t hash = 0;
   for (char c : name) {
-    hash = (hash << 4) + cpp20::bit_cast<unsigned char>(c);
+    hash = (hash << 4) + std::bit_cast<unsigned char>(c);
     hash ^= (hash >> 24) & 0xf0;
   }
   return hash & 0x0fffffff;
@@ -47,10 +46,10 @@ class CompatHash {
 
   class BucketIterator;
 
-  constexpr explicit CompatHash(cpp20::span<const Word> table)
+  constexpr explicit CompatHash(std::span<const Word> table)
       : buckets_(table.subspan(2, table[0])), chain_(table.subspan(2 + table[0], table[1])) {}
 
-  static constexpr bool Valid(cpp20::span<const Word> table) {
+  static constexpr bool Valid(std::span<const Word> table) {
     if (table.size() < 2) {
       return false;
     }
@@ -73,7 +72,7 @@ class CompatHash {
   constexpr size_t size() const { return buckets_.size(); }
 
  private:
-  AbiSpan<const Word, cpp20::dynamic_extent, Elf, AbiTraits> buckets_, chain_;
+  AbiSpan<const Word, std::dynamic_extent, Elf, AbiTraits> buckets_, chain_;
 
  public:
   // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
@@ -139,7 +138,7 @@ class CompatHash<Elf, AbiTraits>::BucketIterator {
     return 0;
   }
 
-  cpp20::span<const typename Elf::Word> chain_;
+  std::span<const typename Elf::Word> chain_;
   uint32_t i_ = 0;
   uint32_t count_ = 0;
 };
@@ -169,7 +168,7 @@ class CompatHash<Elf, AbiTraits>::iterator {
   friend CompatHash<Elf, AbiTraits>;
 
   const CompatHash<Elf, AbiTraits>* table_ = nullptr;
-  typename cpp20::span<const typename Elf::Word>::iterator it_;
+  typename std::span<const typename Elf::Word>::iterator it_;
 };
 
 template <class Elf, class AbiTraits>

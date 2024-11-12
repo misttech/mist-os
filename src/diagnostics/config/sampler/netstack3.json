@@ -6,7 +6,7 @@
             ],
             "metric_id": 39,
             "metric_type": "Occurrence",
-            "selector": "core/network/netstack:root/Counters/IPv4/Fragments:NeedMoreFragments"
+            "selector": "core/network/netstack:root/Counters/IPv4/FragmentsRx:NeedMoreFragments"
         },
         {
             "event_codes": [
@@ -14,7 +14,7 @@
             ],
             "metric_id": 39,
             "metric_type": "Occurrence",
-            "selector": "core/network/netstack:root/Counters/IPv6/Fragments:NeedMoreFragments"
+            "selector": "core/network/netstack:root/Counters/IPv6/FragmentsRx:NeedMoreFragments"
         },
         {
             "event_codes": [

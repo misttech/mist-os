@@ -111,7 +111,9 @@ TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcBootDifference) {
 }
 
 TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockStarted) {
-  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  ASSERT_EQ(
+      clock_handle_.update(zx::clock::update_args().set_value(zx::time_monotonic(kTime.get()))),
+      ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(utc_provider_->CurrentUtcBootDifference().has_value());

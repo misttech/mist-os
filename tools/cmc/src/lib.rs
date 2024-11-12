@@ -7,8 +7,8 @@
 use anyhow::{ensure, Error};
 use cml::{error, features, Document};
 use reference_doc::MarkdownReferenceDocGenerator;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 mod compile;
 mod debug_print_cm;
@@ -91,11 +91,19 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
             let _pretty = pretty;
             let _cml = cml;
 
-            path_exists(&file)?;
-            if inplace {
-                output = Some(file.clone());
-            }
-            format::format(&file, output)?;
+            let input = if let Some(file) = &file {
+                path_exists(&file)?;
+                if inplace {
+                    output = Some(file.clone());
+                }
+                format::Input::File(file)
+            } else {
+                if inplace {
+                    return Err(error::Error::invalid_args("--inplace (-i) requires a file").into());
+                }
+                format::Input::Stdin(io::stdin().lock())
+            };
+            format::format(input, output)?;
         }
         opts::Commands::Compile {
             file,

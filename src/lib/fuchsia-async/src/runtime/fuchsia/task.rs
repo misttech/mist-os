@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::scope::ScopeRef;
+use crate::scope::ScopeHandle;
 use crate::EHandle;
 use futures::prelude::*;
 use std::marker::PhantomData;
@@ -22,7 +22,7 @@ use std::task::{Context, Poll};
 #[derive(Debug)]
 // LINT.IfChange
 pub struct JoinHandle<T> {
-    scope: ScopeRef,
+    scope: ScopeHandle,
     task_id: usize,
     phantom: PhantomData<T>,
 }
@@ -31,7 +31,7 @@ pub struct JoinHandle<T> {
 impl<T> Unpin for JoinHandle<T> {}
 
 impl<T> JoinHandle<T> {
-    pub(crate) fn new(scope: ScopeRef, task_id: usize) -> Self {
+    pub(crate) fn new(scope: ScopeHandle, task_id: usize) -> Self {
         Self { scope, task_id, phantom: PhantomData }
     }
 

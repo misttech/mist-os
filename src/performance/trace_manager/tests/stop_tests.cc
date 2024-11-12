@@ -24,7 +24,7 @@ TEST_F(TraceManagerTest, RetryAfterFailedStop) {
   controller()->StopTracing(std::move(stop_options),
                             [](controller::Session_StopTracing_Result result) {
                               ASSERT_TRUE(result.is_err());
-                              ASSERT_EQ(result.err(), controller::StopErrorCode::ABORTED);
+                              ASSERT_EQ(result.err(), controller::StopError::ABORTED);
                             });
   RunLoopUntilIdle();
   ASSERT_EQ(GetSessionState(), SessionState::kStopping);
@@ -78,7 +78,7 @@ void TryExtraStop(TraceManagerTest* fixture, const T& interface_ptr) {
       std::move(stop_options),
       [fixture, &stop_completed](controller::Session_StopTracing_Result result) {
         ASSERT_TRUE(result.is_err());
-        ASSERT_EQ(result.err(), controller::StopErrorCode::NOT_STARTED);
+        ASSERT_EQ(result.err(), controller::StopError::NOT_STARTED);
         stop_completed = true;
         fixture->QuitLoop();
       });
@@ -131,7 +131,7 @@ TEST_F(TraceManagerTest, StopWhileStopping) {
   controller()->StopTracing(std::move(stop2_options),
                             [this, &stop_completed](controller::Session_StopTracing_Result result) {
                               ASSERT_TRUE(result.is_err());
-                              ASSERT_EQ(result.err(), controller::StopErrorCode::NOT_STARTED);
+                              ASSERT_EQ(result.err(), controller::StopError::NOT_STARTED);
                               stop_completed = true;
                               QuitLoop();
                             });

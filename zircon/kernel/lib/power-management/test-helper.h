@@ -17,6 +17,8 @@
 
 constexpr uint8_t kDomainIndependantPowerLevel = 0;
 constexpr uint8_t kDefaultMaxPowerLevels = 10;
+constexpr uint8_t kMaxIdlePowerLevel = 2;
+constexpr uint8_t kMinActivePowerLevel = kMaxIdlePowerLevel + 1;
 
 // Makes a power model of `power_levels` using the helpers below to determine
 // the level properties. In many cases costs are defined in an arbitrary way based on
@@ -66,14 +68,17 @@ void ForEachCpuIn(zx_cpu_set_t cpus, CpuVisitor&& visitor) {
 }
 
 constexpr power_management::ControlInterface ControlInterfaceIdForLevel(size_t i) {
-  if (i < 4) {
-    return power_management::ControlInterface::kArmWfi;
-  }
-
-  if (i < 8) {
+  // PSCI retention and powerdown levels.
+  if (i < kMaxIdlePowerLevel) {
     return power_management::ControlInterface::kArmPsci;
   }
 
+  // WFI power level. This idle state can also be entered via PSCI standby, which is redundant.
+  if (i == kMaxIdlePowerLevel) {
+    return power_management::ControlInterface::kArmWfi;
+  }
+
+  // Active power levels.
   return power_management::ControlInterface::kCpuDriver;
 }
 

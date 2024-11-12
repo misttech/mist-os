@@ -57,8 +57,8 @@ impl AddressMatcher {
             .map(
                 |&fidl_fuchsia_net_interfaces_ext::Address {
                      addr: subnet,
-                     valid_until: _,
                      assignment_state,
+                     ..
                  }| {
                     assert_eq!(
                         assignment_state,
@@ -176,8 +176,8 @@ async fn inspect_nic(name: &str) {
                     |(v4_count, v6_count),
                      fidl_fuchsia_net_interfaces_ext::Address {
                          addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
-                         valid_until: _,
                          assignment_state,
+                         ..
                      }| {
                         assert_eq!(
                             *assignment_state,

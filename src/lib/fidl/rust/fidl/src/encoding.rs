@@ -100,7 +100,11 @@ pub trait ProxyChannelFor<D: ResourceDialect>:
 /// Handle disposition struct used for a particular dialect.
 pub trait HandleDispositionFor<D: ResourceDialect>: std::fmt::Debug {
     /// Wrap a handle in a handle disposition.
-    fn from_handle(handle: D::Handle, object_type: D::ObjectType, rights: D::Rights) -> Self;
+    fn from_handle(
+        handle: D::Handle,
+        object_type: crate::ObjectType,
+        rights: crate::Rights,
+    ) -> Self;
 }
 
 /// Handle type used for a particular dialect.
@@ -125,8 +129,8 @@ pub trait HandleInfoFor<D: ResourceDialect>: std::fmt::Debug {
     /// extracts the `D::Handle` from it.
     fn consume(
         &mut self,
-        expected_object_type: D::ObjectType,
-        expected_rights: D::Rights,
+        expected_object_type: crate::ObjectType,
+        expected_rights: crate::Rights,
     ) -> Result<D::Handle>;
 
     /// Destroy the given handle info, leaving it invalid.
@@ -144,20 +148,8 @@ pub trait ResourceDialect: 'static + Sized + Default + std::fmt::Debug + Copy + 
     /// Channel type used for proxies in this dialect.
     type ProxyChannel: ProxyChannelFor<Self>;
 
-    /// `zx::ObjectType` equivalent used in this dialect.
-    type ObjectType: 'static;
-
-    /// `zx::Rights` equivalent used in this dialect.
-    type Rights: 'static;
-
     /// Get a thread-local common instance of `TlsBuf`
     fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R;
-
-    /// Get an `ObjectType` from the native representation.
-    fn obj_type_from_local(ty: ObjectType) -> Self::ObjectType;
-
-    /// Get a `Rights` from the native representation.
-    fn rights_from_local(rights: Rights) -> Self::Rights;
 }
 
 /// Indicates a type is encodable as a handle in a given resource dialect.
@@ -389,25 +381,13 @@ pub struct DefaultFuchsiaResourceDialect;
 impl ResourceDialect for DefaultFuchsiaResourceDialect {
     type Handle = Handle;
     type MessageBufEtc = crate::MessageBufEtc;
-    type ObjectType = ObjectType;
     type ProxyChannel = crate::AsyncChannel;
-    type Rights = Rights;
 
     #[inline]
     fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R {
         thread_local!(static TLS_BUF: RefCell<TlsBuf<DefaultFuchsiaResourceDialect>> =
             RefCell::new(TlsBuf::default()));
         TLS_BUF.with(|buf| f(&mut buf.borrow_mut()))
-    }
-
-    #[inline(always)]
-    fn obj_type_from_local(ty: ObjectType) -> Self::ObjectType {
-        ty
-    }
-
-    #[inline(always)]
-    fn rights_from_local(rights: Rights) -> Self::Rights {
-        rights
     }
 }
 
@@ -556,25 +536,13 @@ pub struct NoHandleResourceDialect;
 impl ResourceDialect for NoHandleResourceDialect {
     type Handle = NoHandles;
     type MessageBufEtc = NoHandles;
-    type ObjectType = NoHandles;
     type ProxyChannel = NoHandles;
-    type Rights = NoHandles;
 
     #[inline]
     fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R {
         thread_local!(static TLS_BUF: RefCell<TlsBuf<NoHandleResourceDialect>> =
             RefCell::new(TlsBuf::default()));
         TLS_BUF.with(|buf| f(&mut buf.borrow_mut()))
-    }
-
-    #[inline(always)]
-    fn obj_type_from_local(_ty: ObjectType) -> Self::ObjectType {
-        unreachable!()
-    }
-
-    #[inline(always)]
-    fn rights_from_local(_rights: Rights) -> Self::Rights {
-        unreachable!()
     }
 }
 
@@ -632,8 +600,8 @@ impl HandleFor<NoHandleResourceDialect> for NoHandles {
 impl HandleDispositionFor<NoHandleResourceDialect> for NoHandles {
     fn from_handle(
         _handle: <NoHandleResourceDialect as ResourceDialect>::Handle,
-        _object_type: <NoHandleResourceDialect as ResourceDialect>::ObjectType,
-        _rights: <NoHandleResourceDialect as ResourceDialect>::Rights,
+        _object_type: crate::ObjectType,
+        _rights: crate::Rights,
     ) -> Self {
         unreachable!()
     }
@@ -643,8 +611,8 @@ impl HandleDispositionFor<NoHandleResourceDialect> for NoHandles {
 impl HandleInfoFor<NoHandleResourceDialect> for NoHandles {
     fn consume(
         &mut self,
-        _expected_object_type: <NoHandleResourceDialect as ResourceDialect>::ObjectType,
-        _expected_rights: <NoHandleResourceDialect as ResourceDialect>::Rights,
+        _expected_object_type: crate::ObjectType,
+        _expected_rights: crate::Rights,
     ) -> Result<<NoHandleResourceDialect as ResourceDialect>::Handle> {
         unreachable!()
     }
@@ -1276,8 +1244,8 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     #[inline]
     pub fn take_next_handle(
         &mut self,
-        expected_object_type: D::ObjectType,
-        expected_rights: D::Rights,
+        expected_object_type: crate::ObjectType,
+        expected_rights: crate::Rights,
     ) -> Result<D::Handle> {
         let Some(next_handle) = self.handles.get_mut(self.next_handle) else {
             return Err(Error::OutOfRange);
@@ -2313,8 +2281,8 @@ unsafe impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS
         encoder.debug_check_bounds::<HandleType<T, OBJECT_TYPE, RIGHTS>>(offset);
         encode_handle(
             self.into(),
-            T::Dialect::obj_type_from_local(crate::ObjectType::from_raw(OBJECT_TYPE)),
-            T::Dialect::rights_from_local(crate::Rights::from_bits_retain(RIGHTS)),
+            crate::ObjectType::from_raw(OBJECT_TYPE),
+            crate::Rights::from_bits_retain(RIGHTS),
             encoder,
             offset,
         )
@@ -2338,8 +2306,8 @@ impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32>
     ) -> Result<()> {
         decoder.debug_check_bounds::<HandleType<T, OBJECT_TYPE, RIGHTS>>(offset);
         *self = decode_handle(
-            T::Dialect::obj_type_from_local(crate::ObjectType::from_raw(OBJECT_TYPE)),
-            T::Dialect::rights_from_local(crate::Rights::from_bits_retain(RIGHTS)),
+            crate::ObjectType::from_raw(OBJECT_TYPE),
+            crate::Rights::from_bits_retain(RIGHTS),
             decoder,
             offset,
         )?
@@ -2351,8 +2319,8 @@ impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32>
 #[inline]
 unsafe fn encode_handle<D: ResourceDialect>(
     handle: D::Handle,
-    object_type: D::ObjectType,
-    rights: D::Rights,
+    object_type: crate::ObjectType,
+    rights: crate::Rights,
     encoder: &mut Encoder<'_, D>,
     offset: usize,
 ) -> Result<()> {
@@ -2370,8 +2338,8 @@ unsafe fn encode_handle<D: ResourceDialect>(
 
 #[inline]
 unsafe fn decode_handle<D: ResourceDialect>(
-    object_type: D::ObjectType,
-    rights: D::Rights,
+    object_type: crate::ObjectType,
+    rights: crate::Rights,
     decoder: &mut Decoder<'_, D>,
     offset: usize,
 ) -> Result<D::Handle> {

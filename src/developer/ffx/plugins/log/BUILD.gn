@@ -19,6 +19,7 @@ ffx_plugin("ffx_log") {
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -49,7 +50,6 @@ ffx_plugin("ffx_log") {
   ]
 
   test_deps = [
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/data/rust",

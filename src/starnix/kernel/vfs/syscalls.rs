@@ -93,7 +93,7 @@ pub fn sys_read(
         current_task,
         &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
     )
-    .map_eintr(errno!(ERESTARTSYS))
+    .map_eintr(|| errno!(ERESTARTSYS))
 }
 
 pub fn sys_write(
@@ -109,7 +109,7 @@ pub fn sys_write(
         current_task,
         &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
     )
-    .map_eintr(errno!(ERESTARTSYS))
+    .map_eintr(|| errno!(ERESTARTSYS))
 }
 
 pub fn sys_close(

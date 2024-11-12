@@ -190,14 +190,14 @@
         post_args \nargs
     END_FUNCTION(x86_syscall_call_\name)
     .popsection
-    .pushsection .rodata.syscall-table,"a",%progbits
+    .pushsection .data.rel.ro.syscall-table,"aw",%progbits
         .quad x86_syscall_call_\name
     .popsection
 .endm
 
 // Adds the label for the jump table.
 .macro start_syscall_dispatch
-    .pushsection .rodata.syscall-table,"a",%progbits
+    .pushsection .data.rel.ro.syscall-table,"aw",%progbits
     .balign 8
     .Lcall_wrapper_table:
     .popsection

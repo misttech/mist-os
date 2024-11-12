@@ -71,12 +71,15 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             reboot_affordance: Object that implements RebootCapableDevice.
             fuchsia_device_close: Object that implements FuchsiaDeviceClose.
         """
-        super().__init__()
-        self._verify_supported(device_name, ffx)
+        AsyncAdapter.__init__(self)
 
+        self._device_name: str = device_name
+        self._ffx: ffx_transport.FFX = ffx
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
         self._fuchsia_device_close = fuchsia_device_close
+
+        self.verify_supported()
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
@@ -94,29 +97,29 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             self.loop().run_forever()  # Handle pending tasks
             self.loop().close()
 
-    def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
-        """Check if WLAN is supported on the DUT.
+    def verify_supported(self) -> None:
+        """Verifies that the WLAN affordance using FuchsiaController is supported by the Fuchsia
+        device.
 
-        Args:
-            device: Device name returned by `ffx target list`.
-            ffx: FFX transport
+        This method should be called in `__init__()` so that if this affordance was called on a
+        Fuchsia device that does not support it, it will raise NotSupportedError.
 
         Raises:
-            NotSupportedError: A required component capability is not available.
+            NotSupportedError: If affordance is not supported.
         """
         for capability in _REQUIRED_CAPABILITIES:
             # TODO(http://b/359342196): This is a maintenance burden; find a
             # better way to detect FIDL component capabilities.
-            if capability not in ffx.run(
+            if capability not in self._ffx.run(
                 ["component", "capability", capability]
             ):
                 _LOGGER.warning(
                     "All available WLAN component capabilities:\n%s",
-                    ffx.run(["component", "capability", "fuchsia.wlan"]),
+                    self._ffx.run(["component", "capability", "fuchsia.wlan"]),
                 )
                 raise errors.NotSupportedError(
                     f'Component capability "{capability}" not exposed by device '
-                    f"{device}; this build of Fuchsia does not support the "
+                    f"{self._device_name}; this build of Fuchsia does not support the "
                     "WLAN FC affordance."
                 )
 

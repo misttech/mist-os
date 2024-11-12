@@ -138,15 +138,15 @@ std::vector<controller::ProviderSpec> TranslateProviderSpecs(
   return uniquified_specs;
 }
 
-const char* StartErrorCodeToString(controller::StartErrorCode code) {
+const char* StartErrorCodeToString(controller::StartError code) {
   switch (code) {
-    case controller::StartErrorCode::kNotInitialized:
+    case controller::StartError::kNotInitialized:
       return "not initialized";
-    case controller::StartErrorCode::kAlreadyStarted:
+    case controller::StartError::kAlreadyStarted:
       return "already started";
-    case controller::StartErrorCode::kStopping:
+    case controller::StartError::kStopping:
       return "stopping";
-    case controller::StartErrorCode::kTerminating:
+    case controller::StartError::kTerminating:
       return "terminating";
     default:
       return "<unknown>";

@@ -133,6 +133,22 @@ closed protocol Sandbox {
                                 CACHE = 1;
                                 /// The `tmp` storage capability variant.
                                 TMP = 2;
+                                /// The `custom_artifacts` storage capability variant.
+                                ///
+                                /// NB: due to the fact that per-component isolated storage is
+                                /// destroyed along with the component, the `custom_artifacts`
+                                /// storage capability is actually proxied as a *directory*
+                                /// capability to components created in a `ManagedRealm`, in order
+                                /// to ensure that artifacts are not destroyed when the realm is
+                                /// torn down and can be extracted by the test framework. This
+                                /// implies that a component that would like to use
+                                /// `custom_artifacts` must use it as a directory rather than a
+                                /// storage capability.
+                                ///
+                                /// The netemul sandbox routes a separate subdirectory of its
+                                /// `custom_artifacts` storage to each component that requests it to
+                                /// ensure per-component isolation.
+                                CUSTOM_ARTIFACTS = 3;
                             };
 
                             /// The path at which the storage capability will be

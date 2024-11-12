@@ -69,6 +69,7 @@ rustc_library("component_debug") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/sys/lib/cm_rust/testing",

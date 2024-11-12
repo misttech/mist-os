@@ -28,7 +28,11 @@ if (icu_config_use_jiri_hook) {
                     "--fuchsia-dir=" + rebase_path("//", root_build_dir),
                     "--mode=print",
                   ],
-                  "json")
+                  "json",
+                  [
+                    "//third_party/icu/default",
+                    "//third_party/icu/latest",
+                  ])
 }
 
 # A target that verifies that the content of config.json is valid at build time.

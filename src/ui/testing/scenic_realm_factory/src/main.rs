@@ -57,7 +57,12 @@ async fn run_realm_factory_server(stream: ui_test_context::ScenicRealmFactoryReq
                     let realm_server = payload.realm_server.expect("missing realm_server");
 
                     // Create the test realm.
-                    let realm = assemble_realm(payload.renderer, payload.display_rotation).await;
+                    let realm = assemble_realm(
+                        payload.renderer,
+                        payload.display_rotation,
+                        payload.display_composition,
+                    )
+                    .await;
 
                     let request_stream = realm_server.into_stream().expect("into stream");
                     task_group.spawn(async move {
@@ -92,6 +97,7 @@ const CONFIG_URL: &str = "#meta/config.cm";
 async fn assemble_realm(
     renderer: Option<ui_test_context::RendererType>,
     display_rotation: Option<u64>,
+    display_composition: Option<bool>,
 ) -> RealmInstance {
     let builder =
         RealmBuilder::with_params(RealmBuilderParams::new().from_relative_url(SCENIC_REALM_URL))
@@ -117,7 +123,6 @@ async fn assemble_realm(
     builder
         .add_route(
             Route::new()
-                .capability(Capability::configuration("fuchsia.scenic.DisplayComposition"))
                 .capability(Capability::configuration(
                     "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
                 ))
@@ -182,6 +187,29 @@ async fn assemble_realm(
             Route::new()
                 .capability(Capability::configuration("fuchsia.scenic.Renderer"))
                 .capability(Capability::configuration("fuchsia.scenic.DisplayRotation"))
+                .from(Ref::self_())
+                .to(Ref::child(SCENIC)),
+        )
+        .await
+        .expect("Failed to route config capabilities.");
+
+    let display_composition: bool = match display_composition {
+        Some(value) => value,
+        None => true,
+    };
+
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.scenic.DisplayComposition".to_string().fidl_into_native(),
+            value: display_composition.into(),
+        }))
+        .await
+        .expect("Failed to set fuchsia.scenic.DisplayComposition.");
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.scenic.DisplayComposition"))
                 .from(Ref::self_())
                 .to(Ref::child(SCENIC)),
         )

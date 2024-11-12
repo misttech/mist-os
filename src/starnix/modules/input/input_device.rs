@@ -18,7 +18,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::Arc;
 
-// Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
+// Add a fuchsia-specific vendor ID. 0xfc1a is currently not allocated
 // to any vendor in the USB spec.
 //
 // May not be zero, see below.

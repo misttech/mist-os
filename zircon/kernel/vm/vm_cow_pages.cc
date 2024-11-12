@@ -193,7 +193,7 @@ ktl::optional<vm_page_t*> MaybeDecompressReference(VmCompression* compression,
   if (auto maybe_page_and_metadata = compression->MoveReference(ref)) {
     InitializeVmPage(maybe_page_and_metadata->page);
     // Ensure the share count is propagated from the compressed page.
-    SetShareCount(maybe_page_and_metadata->page, maybe_page_and_metadata->metadata);
+    maybe_page_and_metadata->page->object.share_count = maybe_page_and_metadata->metadata;
 
     return maybe_page_and_metadata->page;
   }
@@ -457,7 +457,7 @@ zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
   uint32_t page_metadata;
   compression->Decompress(ref, page_data, &page_metadata);
   // Ensure the share count is propagated from the compressed page.
-  SetShareCount(p, page_metadata);
+  p->object.share_count = page_metadata;
 
   return ZX_OK;
 }
@@ -1752,11 +1752,11 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
       } else if (p->IsPage()) {
         vm_page_t* page = p->Page();
         printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR " share %" PRIu32 "(%c)\n", offset,
-               page, page->paddr(), GetShareCount(page), page->object.always_need ? 'A' : '.');
+               page, page->paddr(), page->object.share_count, page->object.always_need ? 'A' : '.');
       } else if (p->IsReference()) {
         const uint64_t cookie = p->Reference().value();
         printf("offset %#" PRIx64 " reference %#" PRIx64 " share %" PRIu32 "\n", offset, cookie,
-               GetShareCount(p));
+               Pmm::Node().GetPageCompression()->GetMetadata(p->Reference()));
       } else if (p->IsIntervalStart()) {
         printf("offset %#" PRIx64 " page interval start\n", offset);
       } else if (p->IsIntervalEnd()) {
@@ -6846,7 +6846,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     // When split bits are in use, the share_count will actually encode the split bits according to
     // |IsSplit| and |SetSplit| above.
     VmPageOrMarker::ReferenceValue temp_ref = compressor->Start(
-        VmCompressor::PageAndMetadata{.page = page, .metadata = GetShareCount(page)});
+        VmCompressor::PageAndMetadata{.page = page, .metadata = page->object.share_count});
     [[maybe_unused]] vm_page_t* compress_page = page_or_marker.SwapPageForReference(temp_ref);
     DEBUG_ASSERT(compress_page == page);
   }
@@ -6894,7 +6894,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
       // When split bits are in use, the share_count will actually encode the split bits according
       // to |IsSplit| and |SetSplit| above.
       DEBUG_ASSERT(page == fail->src_page.page);
-      SetShareCount(page, fail->src_page.metadata);
+      page->object.share_count = fail->src_page.metadata;
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
       // TODO(https://fxbug.dev/42138396): Placing in a queue and then moving it is inefficient, but
       // avoids needing to reason about whether reclamation could be manually attempted on pages

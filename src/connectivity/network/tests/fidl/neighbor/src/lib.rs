@@ -92,8 +92,8 @@ async fn create_realm<'a, N: Netstack>(
             interfaces.get(&ep.id())?.properties.addresses.iter().find_map(
                 |&fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
                      assignment_state,
+                     ..
                  }| {
                     assert_eq!(
                         assignment_state,

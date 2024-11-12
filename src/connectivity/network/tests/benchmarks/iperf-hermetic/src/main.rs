@@ -9,13 +9,13 @@ use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
 };
-use netstack_testing_common::{get_component_moniker, wait_for_component_stopped};
-use std::io::Write as _;
+use netstack_testing_common::wait_for_component_stopped;
 
 const IPERF_URL: &str = "#meta/iperf.cm";
 const NAME_PROVIDER_URL: &str = "#meta/device-name-provider.cm";
 const NAME_PROVIDER_MONIKER: &str = "device-name-provider";
 const PRIMARY_INTERFACE_CONFIGURATION: &str = "fuchsia.network.PrimaryInterface";
+const CUSTOM_ARTIFACTS_PATH: &str = "/custom_artifacts";
 
 fn iperf_component<'a>(
     name: &str,
@@ -46,6 +46,11 @@ fn iperf_component<'a>(
             fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                 variant: Some(fnetemul::StorageVariant::Tmp),
                 path: Some("/tmp".to_string()),
+                ..Default::default()
+            }),
+            fnetemul::Capability::StorageDep(fnetemul::StorageDep {
+                variant: Some(fnetemul::StorageVariant::CustomArtifacts),
+                path: Some(CUSTOM_ARTIFACTS_PATH.to_string()),
                 ..Default::default()
             }),
         ])),
@@ -162,6 +167,7 @@ async fn bench<N: Netstack, I: TestIpExt>(
 
     let client_moniker = |i| format!("iperf-client-{i}");
     let server_moniker = |i| format!("iperf-server-{i}");
+    let message_size = message_size.to_string();
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
@@ -171,30 +177,45 @@ async fn bench<N: Netstack, I: TestIpExt>(
                     (0..flows)
                         .map(|i| {
                             // NB: The port numbers are arbitrarily chosen.
-                            let port = 9001 + u16::from(i);
+                            let port = (9001 + u16::from(i)).to_string();
+                            let server_output_file =
+                                format!("{CUSTOM_ARTIFACTS_PATH}/iperf_server_{i}.json");
+                            let client_output_file =
+                                format!("{CUSTOM_ARTIFACTS_PATH}/iperf_client_{i}.json");
+
+                            let mut server_args =
+                                vec!["-s", I::SERVER_FLAG, "--port", &port, "--json"];
+                            let mut client_args: Vec<_> = [
+                                "-c",
+                                I::SERVER_ADDR,
+                                "--port",
+                                &port,
+                                "--length",
+                                &message_size,
+                                "--json",
+                                "--bitrate",
+                                "0",
+                                "--get-server-output",
+                                if bench { "-t5" } else { "-n1" },
+                            ]
+                            .into_iter()
+                            .chain((protocol == Protocol::Udp).then_some("-u"))
+                            .collect();
+
+                            if bench {
+                                server_args.extend(&["--logfile", &server_output_file]);
+                                client_args.extend(&["--logfile", &client_output_file]);
+                            }
+
                             [
                                 iperf_component(
                                     &server_moniker(i),
-                                    ["-s", I::SERVER_FLAG, "--port", &port.to_string(), "--json"],
+                                    server_args,
                                     /* eager */ true,
                                 ),
                                 iperf_component(
                                     &client_moniker(i),
-                                    [
-                                        "-c",
-                                        I::SERVER_ADDR,
-                                        "--port",
-                                        &port.to_string(),
-                                        "--length",
-                                        &message_size.to_string(),
-                                        "--json",
-                                        "--bitrate",
-                                        "0",
-                                        "--get-server-output",
-                                        if bench { "-t5" } else { "-n1" },
-                                    ]
-                                    .into_iter()
-                                    .chain((protocol == Protocol::Udp).then_some("-u")),
+                                    client_args,
                                     /* eager */ false,
                                 ),
                             ]
@@ -233,66 +254,12 @@ async fn bench<N: Netstack, I: TestIpExt>(
             );
         },
     }
-
-    if bench {
-        async fn get_output(
-            realm: &netemul::TestRealm<'_>,
-            client: bool,
-            moniker: &str,
-            path: String,
-        ) {
-            let moniker = get_component_moniker(&realm, moniker).await.expect("get moniker");
-            let output = diagnostics_reader::ArchiveReader::new()
-                .select_all_for_moniker(&moniker)
-                .snapshot()
-                .await
-                .expect("take snapshot");
-
-            // We want only the last JSON object (starts with a line with
-            // just an opening brace) in the client output as there may be
-            // output from failed attempts to start the client.
-            let start_index = if client {
-                output
-                    .iter()
-                    .rposition(|line| if let Some(line) = line.msg() { line == "{" } else { false })
-                    .expect("client JSON output should have a line with only {")
-            } else {
-                0
-            };
-
-            let mut f = std::io::BufWriter::new(
-                std::fs::File::create(path).expect("create JSON output file"),
-            );
-            output.iter().skip(start_index).for_each(|line| {
-                if let Some(line) = line.msg() {
-                    f.write_all(line.as_bytes()).expect("write output");
-                    f.write_all("\n".as_bytes()).expect("write newline");
-                }
-            });
-            f.flush().expect("flush writes");
-        }
-        for i in 0..flows {
-            get_output(
-                &realm,
-                true, /* client */
-                &client_moniker(i),
-                format!("/custom_artifacts/iperf_client_{i}.json"),
-            )
-            .await;
-            get_output(
-                &realm,
-                false, /* client */
-                &server_moniker(i),
-                format!("/custom_artifacts/iperf_server_{i}.json"),
-            )
-            .await;
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use futures::StreamExt as _;
+    use netstack_testing_common::get_component_moniker;
     use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
     use netstack_testing_macros::netstack_test;
     use test_case::test_case;

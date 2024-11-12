@@ -66,11 +66,23 @@ struct AllocCheckerContainer {
       return true;
     }
 
+    template <class Diagnostics>
+    bool resize(Diagnostics& diagnostics, std::string_view error, size_type size) {
+      fbl::AllocChecker ac;
+      Base::resize(size, &ac);
+      if (!ac.check()) {
+        diagnostics.OutOfMemory(error, size * sizeof(value_type));
+        return false;
+      }
+      return true;
+    }
+
    private:
     // Make the original methods unavailable.
     using Base::insert;
     using Base::push_back;
     using Base::reserve;
+    using Base::resize;
   };
 };
 

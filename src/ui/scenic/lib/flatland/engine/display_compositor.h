@@ -156,14 +156,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct FrameEventData {
     scenic_impl::DisplayEventId wait_id;
-    scenic_impl::DisplayEventId signal_id;
     zx::event wait_event;
-    zx::event signal_event;
-  };
-
-  struct ImageEventData {
-    scenic_impl::DisplayEventId signal_id;
-    zx::event signal_event;
   };
 
   struct DisplayEngineData {
@@ -201,9 +194,6 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Generates a new FrameEventData struct to be used with a render target on a display.
   FrameEventData NewFrameEventData() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Generates a new ImageEventData struct to be used with a client image on a display.
-  ImageEventData NewImageEventData() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
   fuchsia_hardware_display_types::ImageMetadata CreateImageMetadata(
       const allocation::ImageMetadata& metadata) const FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -229,7 +219,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Calls SetRenderData for each item in |render_data_list| and applies direct-to-display color
   // conversion. Return false if this fails for any RenderData.
-  bool SetRenderDatasOnDisplay(const std::vector<RenderData>& render_data_list)
+  bool TryDirectToDisplay(const std::vector<RenderData>& render_data_list)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Sets the provided layers onto the display referenced by the given display_id.
@@ -286,9 +276,6 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator_
       FXL_GUARDED_BY(lock_);
 
-  std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_
-      FXL_GUARDED_BY(lock_);
-
   // Maps a buffer collection ID to a BufferCollectionSyncPtr in the same domain as the token with
   // display constraints set. This is used as a bridge between ImportBufferCollection() and
   // ImportBufferImage() calls, so that we can check if the existing allocation is
@@ -314,9 +301,6 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Software renderer used when render data cannot be directly composited to the display.
   const std::shared_ptr<Renderer> renderer_;
-
-  // Pending images in the current config that hasn't been applied yet.
-  std::vector<allocation::GlobalImageId> pending_images_in_config_;
 
   // Maps a display ID to the the DisplayInfo struct. This is kept separate from the
   // display_DisplayCompositor_data_map_ since this only this data is needed for the

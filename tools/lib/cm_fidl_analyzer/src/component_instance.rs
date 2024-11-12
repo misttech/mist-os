@@ -28,7 +28,6 @@ use routing::environment::RunnerRegistry;
 use routing::error::{ComponentInstanceError, ErrorReporter, RouteRequestErrorInfo};
 use routing::policy::GlobalPolicyChecker;
 use routing::resolving::{ComponentAddress, ComponentResolutionContext};
-use sandbox::Dict;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -175,7 +174,6 @@ impl ComponentInstanceForAnalyzer {
             children_component_output_dictionary_routers,
             &decl,
             input,
-            &Dict::new(), // progam_input_dict_additions
             program_output_dict,
             build_framework_dictionary(&self_),
             build_capability_sourced_capabilities_dictionary(&self_, &decl),

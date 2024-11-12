@@ -13,3 +13,8 @@ Process::~Process() = default;
 fxl::WeakPtr<Process> Process::GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
 }  // namespace zxdb
+
+std::ostream& operator<<(std::ostream& os, const zxdb::Process& process) {
+  os << "process '" << process.GetName() << "' (" << process.GetKoid() << ")";
+  return os;
+}

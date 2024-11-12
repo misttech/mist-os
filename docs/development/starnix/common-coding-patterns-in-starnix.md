@@ -209,7 +209,7 @@ Plus, when translating one error into another, it may be convenient to use
 
   ```cpp {:.devsite-disable-click-to-copy}
   let s = mm.read_c_string_to_vec(user_string, elem_limit).map_err(|e| {
-    if e == errno!(ENAMETOOLONG) {
+    if e.code == ENAMETOOLONG {
       errno!(E2BIG)
     } else {
       e
@@ -221,7 +221,7 @@ Plus, when translating one error into another, it may be convenient to use
 
   ```cpp {:.devsite-disable-click-to-copy}
   let s = match mm.read_c_string_to_vec(user_string, elem_limit) {
-    Err(e) if e == errno!(ENAMETOOLONG) => {
+    Err(e) if e.code == ENAMETOOLONG => {
       errno!(E2BIG)
     },
     Err(e) => {
@@ -298,4 +298,3 @@ To learn more about the execution model for Starnix, please see
 
 [starnix-concepts]: /docs/concepts/starnix/README.md
 [restricted-mode]: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md#running-a-linux-program-in-restricted-mode
-

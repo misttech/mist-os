@@ -7,8 +7,6 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DIAGNOSTICS_H_
 
 #include <stdio.h>
-#include <zircon/assert.h>
-#include <zircon/compiler.h>
 
 #include <string_view>
 #include <tuple>
@@ -18,6 +16,7 @@
 #include "field.h"
 #include "internal/const-string.h"
 #include "internal/diagnostics-printf.h"
+#include "internal/no_unique_address.h"
 
 namespace elfldltl {
 
@@ -221,9 +220,9 @@ struct FixedBool : std::integral_constant<bool, Value> {};
 // An alternative Flags type can be defined like this one to make one or more
 // of the values fixed, or to change the default value of a mutable flag.
 struct DiagnosticsPanicFlags {
-  __NO_UNIQUE_ADDRESS FixedBool<false, 0> multiple_errors;
-  __NO_UNIQUE_ADDRESS FixedBool<true, 1> warnings_are_errors;
-  __NO_UNIQUE_ADDRESS FixedBool<false, 2> extra_checking;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<false, 0> multiple_errors;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<true, 1> warnings_are_errors;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<false, 2> extra_checking;
 };
 
 // elfldltl::Diagnostics provides a canonical implementation of a diagnostics
@@ -315,7 +314,7 @@ class Diagnostics {
  private:
   // This is either a wrapper around an integer, or is an empty object.
   // The tag is unused but makes the two Count types always distinct so
-  // that adjacent empty members with __NO_UNIQUE_ADDRESS can be elided.
+  // that adjacent empty members with [[no_unique_address]] can be elided.
   template <bool Counting, auto Tag>
   struct Count;
 
@@ -345,10 +344,10 @@ class Diagnostics {
   static constexpr bool kCount =
       !std::is_base_of_v<std::false_type, decltype(std::declval<Flags>().multiple_errors)>;
 
-  __NO_UNIQUE_ADDRESS Report report_;
-  __NO_UNIQUE_ADDRESS Flags flags_;
-  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::multiple_errors> errors_;
-  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::warnings_are_errors> warnings_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Report report_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Flags flags_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Count<kCount, &Flags::multiple_errors> errors_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Count<kCount, &Flags::warnings_are_errors> warnings_;
 };
 
 // This creates a callable object to use as the Report function in a
@@ -380,18 +379,6 @@ constexpr auto FprintfDiagnosticsReport(FILE* stream, Prefix&&... prefix) {
   return PrintfDiagnosticsReport(printer, std::forward<Prefix>(prefix)...);
 }
 
-// This is PrintfDiagnosticsReport but using ZX_PANIC for printf.
-template <typename... Prefix>
-constexpr auto PanicDiagnosticsReport(Prefix&&... prefix) {
-  constexpr auto panic_ = [](const char* format, auto&&... args) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
-    ZX_PANIC(format, std::forward<decltype(args)>(args)...);
-#pragma GCC diagnostic pop
-  };
-  return PrintfDiagnosticsReport(panic_, std::forward<Prefix>(prefix)...);
-}
-
 // This returns a Diagnostics object that crashes immediately for any error or
 // warning.  There are no library dependencies of any kind.  This behavior is
 // appropriate only for self-relocation and bootstrapping cases where if there
@@ -403,20 +390,6 @@ constexpr auto TrapDiagnostics() {
     return false;
   };
   return Diagnostics(trap, DiagnosticsPanicFlags());
-}
-
-// This is similar to TrapDiagnostics but it uses the <zircon/assert.h>
-// ZX_PANIC call to write the message and crash, with an optional fixed prefix.
-// So it has some library dependencies but might be able to generate some error
-// output beofre crashing.  Any arguments are stored in the diagnostics object
-// and then treated as if initial arguments to every FormatError et al call so
-// they can form a prefix on every message.  Those arguments are forwarded
-// perfectly, so if passed as an lvalue reference, the reference will be stored
-// rather than its referent copied.
-template <typename... Prefix>
-constexpr auto PanicDiagnostics(Prefix&&... prefix) {
-  return Diagnostics(PanicDiagnosticsReport(std::forward<Prefix>(prefix)...),
-                     DiagnosticsPanicFlags());
 }
 
 // This returns a Diagnostics object that simply stores a single error or

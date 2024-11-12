@@ -44,7 +44,7 @@ size_checker_input = {
       ]
 
       # [START_EXCLUDE]
-      limit = 2046836  # 1.952 MiB
+      limit = 2146836  # 2.047 MiB
       creep_limit = 204800  # 200.0 KiB
 
       # [END_EXCLUDE]
@@ -66,7 +66,7 @@ size_checker_input = {
     {
       component = "Connectivity/Location"
       pkgs = [ "regulatory_region" ]
-      limit = 1835008  # 1.75 MiB
+      limit = 1839008  # 1.754 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -91,7 +91,7 @@ size_checker_input = {
         "network",
         "reachability",
       ]
-      limit = 8965179  # 8.550 MiB
+      limit = 9047099  # 8.628 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -104,7 +104,7 @@ size_checker_input = {
         "wlanphy",
         "wlan",
       ]
-      limit = 4194304  # 4 MiB
+      limit = 4276224  # 4.078 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -169,6 +169,7 @@ size_checker_input = {
       pkgs = [
         "memory_monitor",
         "memory_sampler",
+        "memory_pressure_signaler",
       ]
       limit = 2621440  # 2.5 MiB
       creep_limit = 102400  # 100 KiB
@@ -176,7 +177,7 @@ size_checker_input = {
     {
       component = "SetUI"
       pkgs = [ "setui_service" ]
-      limit = 8912896  # 8.5 MiB
+      limit = 8978432  # 8.563 MiB
       creep_limit = 65536  # 64.0 KiB
     },
     {
@@ -224,7 +225,7 @@ size_checker_input = {
         "fuzzctl",
         "run_test_suite",
       ]
-      limit = 13107200  # 12.5 MiB
+      limit = 13230080  # 12.617 MiB
       creep_limit = 122880  # 120.0 KiB
     },
     {

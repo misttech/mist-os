@@ -5,9 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_STATIC_VECTOR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_STATIC_VECTOR_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <array>
+#include <span>
 
 #include "preallocated-vector.h"
 
@@ -25,7 +24,7 @@ struct StaticVector {
     using typename PreallocatedVector<T, N>::iterator;
     using typename PreallocatedVector<T, N>::const_iterator;
 
-    constexpr Container() : PreallocatedVector<T, N>(cpp20::span<T, N>{storage_.array_}) {}
+    constexpr Container() : PreallocatedVector<T, N>(std::span<T, N>{storage_.array_}) {}
 
     template <class Diagnostics>
     constexpr Container(Diagnostics& diagnostics, std::string_view error,

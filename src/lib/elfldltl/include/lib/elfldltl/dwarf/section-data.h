@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_SECTION_DATA_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_SECTION_DATA_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <utility>
 
 #include "../layout.h"
@@ -65,7 +64,7 @@ class SectionData {
 
   constexpr SectionData(const SectionData&) = default;
 
-  constexpr SectionData(cpp20::span<const std::byte> contents, Format format)
+  constexpr SectionData(std::span<const std::byte> contents, Format format)
       : contents_{contents}, format_{format} {}
 
   constexpr SectionData& operator=(const SectionData&) = default;
@@ -75,7 +74,7 @@ class SectionData {
   constexpr size_t size_bytes() const { return initial_length_size() + contents_.size_bytes(); }
 
   // The contents of this data unit, not including its initial length header.
-  constexpr cpp20::span<const std::byte> contents() const { return contents_; }
+  constexpr std::span<const std::byte> contents() const { return contents_; }
 
   // The format of this data unit.
   constexpr Format format() const { return format_; }
@@ -108,7 +107,7 @@ class SectionData {
   // A 32-bit offset is zero-extended to uint64_t.
   template <class Elf = Elf<>>
   static constexpr std::optional<uint64_t> ReadOffset(  //
-      Format format, cpp20::span<const std::byte> bytes) {
+      Format format, std::span<const std::byte> bytes) {
     switch (format) {
       case Format::kDwarf32:
         return ReadFromBytes<typename Elf::Word>(bytes);
@@ -127,7 +126,7 @@ class SectionData {
   // the header for the particular kind of data starts.
   template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
   static constexpr std::optional<SectionData> Read(  //
-      Diagnostics& diag, cpp20::span<const std::byte> bytes, ErrorArgs&&... error_args);
+      Diagnostics& diag, std::span<const std::byte> bytes, ErrorArgs&&... error_args);
 
   // This combines Read with peeling off the size_bytes() consumed from the
   // byte stream, returning the new tail:
@@ -139,15 +138,15 @@ class SectionData {
   // ```
   // On failure (when `data == std::nullopt`), `bytes` is returned unchanged.
   template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
-  static constexpr std::pair<std::optional<SectionData>, cpp20::span<const std::byte>> Consume(
-      Diagnostics& diag, cpp20::span<const std::byte> bytes, ErrorArgs&&... error_args) {
+  static constexpr std::pair<std::optional<SectionData>, std::span<const std::byte>> Consume(
+      Diagnostics& diag, std::span<const std::byte> bytes, ErrorArgs&&... error_args) {
     auto read = Read<Elf>(diag, bytes, std::forward<ErrorArgs>(error_args)...);
     return {read, read ? bytes.subspan(read->size_bytes()) : bytes};
   }
 
  private:
   template <typename T>
-  static constexpr std::optional<T> ReadFromBytes(cpp20::span<const std::byte> bytes) {
+  static constexpr std::optional<T> ReadFromBytes(std::span<const std::byte> bytes) {
     if (bytes.size_bytes() < sizeof(T)) [[unlikely]] {
       return std::nullopt;
     }
@@ -156,13 +155,13 @@ class SectionData {
     return value;
   }
 
-  cpp20::span<const std::byte> contents_;
+  std::span<const std::byte> contents_;
   Format format_ = Format::kDwarf32;
 };
 
 template <class Elf, class Diagnostics, typename... ErrorArgs>
 constexpr std::optional<SectionData> SectionData::Read(  //
-    Diagnostics& diag, cpp20::span<const std::byte> bytes, ErrorArgs&&... error_args) {
+    Diagnostics& diag, std::span<const std::byte> bytes, ErrorArgs&&... error_args) {
   using Word = typename Elf::Word;
   using Xword = typename Elf::Xword;
 

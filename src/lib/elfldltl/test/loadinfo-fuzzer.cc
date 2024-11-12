@@ -7,6 +7,7 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/testing/fuzzer.h>
+#include <zircon/assert.h>
 
 #include <vector>
 

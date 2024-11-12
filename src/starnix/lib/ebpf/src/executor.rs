@@ -855,9 +855,9 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         width: DataWidth,
     ) -> Result<(), String> {
         let addr = self.reg(src);
-        let loaded_type = self.load_memory(addr, offset as u64, width);
+        let loaded = self.load_memory(addr, offset as u64, width);
         self.next();
-        self.set_reg(dst, loaded_type);
+        self.set_reg(dst, loaded);
         Ok(())
     }
 

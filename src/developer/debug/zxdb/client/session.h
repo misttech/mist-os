@@ -100,6 +100,10 @@ class Session : public SettingStoreObserver {
   void RemoveDownloadObserver(DownloadObserver* observer) {
     download_observers_.RemoveObserver(observer);
   }
+  void AddProcessObserver(ProcessObserver* observer) { process_observers_.AddObserver(observer); }
+  void RemoveProcessObserver(ProcessObserver* observer) {
+    process_observers_.RemoveObserver(observer);
+  }
 
   // Returns information about whether this session is connected to a minidump instead of a live
   // system.

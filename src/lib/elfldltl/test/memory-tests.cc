@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/container.h>
 #include <lib/elfldltl/memory.h>
-#include <lib/stdcompat/span.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/trivial-allocator/basic-leaky-allocator.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/single-heap-allocator.h>
 
+#include <algorithm>
+#include <span>
 #include <string_view>
 
 #include <gtest/gtest.h>
@@ -26,7 +29,7 @@ struct Header {
 
 TEST(ElfldltlDirectMemoryTests, FileApi) {
   char file_image[] = "HeaderOf16Bytes\0Dataaabb";
-  auto image_bytes = cpp20::as_writable_bytes(cpp20::span(file_image));
+  auto image_bytes = std::as_writable_bytes(std::span(file_image));
   elfldltl::DirectMemory file(image_bytes);
 
   auto header = file.ReadFromFile<Header>(0);
@@ -54,7 +57,7 @@ TEST(ElfldltlDirectMemoryTests, FileApi) {
 
 TEST(ElfldltlDirectMemoryTests, MemoryApi) {
   char file_image[] = "HeaderOf16Bytes\0Dataaabb";
-  auto image_bytes = cpp20::as_writable_bytes(cpp20::span(file_image));
+  auto image_bytes = std::as_writable_bytes(std::span(file_image));
   elfldltl::DirectMemory file(image_bytes, kBaseAddress - 1);
   EXPECT_EQ(file.base(), kBaseAddress - 1);
   file.set_base(kBaseAddress);
@@ -101,57 +104,38 @@ TEST(ElfldltlDirectMemoryTests, MemoryApi) {
 
 TEST(ElfldltlMemoryTests, NoArrayFromFile) {
   auto result = elfldltl::NoArrayFromFile<char>()(1);
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
+  static_assert(std::is_convertible_v<decltype(result.value()), std::span<const char>>);
   EXPECT_FALSE(result.has_value());
 }
 
-TEST(ElfldltlMemoryTests, NewArrayFromFile) {
-  auto result = elfldltl::NewArrayFromFile<char>()(kFoobar.size());
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
+TEST(ElfldltlMemoryTests, ContainerArrayFromFile) {
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  auto allocator =
+      elfldltl::ContainerArrayFromFile<elfldltl::StdContainer<std::vector>::Container<char>>(
+          diag, "impossible");
+  auto result = allocator(kFoobar.size());
+  static_assert(std::is_convertible_v<decltype(result.value()), std::span<char>>);
   ASSERT_TRUE(result.has_value());
   auto owner = std::move(result).value();
-  cpp20::span<char> chars = owner;
-  std::copy(kFoobar.begin(), kFoobar.end(), chars.begin());
-  EXPECT_EQ(kFoobar, std::string_view(chars.data(), chars.size()));
-}
-
-TEST(ElfldltlMemoryTests, NewArrayFromFileWithCustomAllocator) {
-  // Use a custom allocator via `new (allocator, ac) T[...]`.
-  std::byte backing_buffer[32];
-  trivial_allocator::SingleHeapAllocator backing_allocator({backing_buffer});
-  trivial_allocator::BasicLeakyAllocator allocator(backing_allocator);
-
-  // We need the std::unique_ptr<char[]> API with get() and release(),
-  // but there's no actual `delete` operation that should be done.
-  struct NoDelete {
-    constexpr void operator()(char* ptr) {}
-  };
-  using Ptr = std::unique_ptr<char, NoDelete>;
-
-  using NewArray = elfldltl::NewArrayFromFile<char, Ptr, decltype(allocator)&>;
-  auto result = NewArray{allocator}(kFoobar.size());
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
-  ASSERT_TRUE(result.has_value());
-  auto owner = std::move(result).value();
-  cpp20::span<char> chars = owner;
-  std::copy(kFoobar.begin(), kFoobar.end(), chars.begin());
+  std::span<char> chars = owner;
+  std::ranges::copy(kFoobar, chars.begin());
   EXPECT_EQ(kFoobar, std::string_view(chars.data(), chars.size()));
 }
 
 TEST(ElfldltlMemoryTests, FixedArrayFromFile) {
   constexpr std::string_view kFoobar = "foobar";
   auto result = elfldltl::FixedArrayFromFile<char, 32>()(kFoobar.size());
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
+  static_assert(std::is_convertible_v<decltype(result.value()), std::span<char>>);
   ASSERT_TRUE(result.has_value());
   auto owner = std::move(result).value();
-  cpp20::span<char> chars = owner;
+  std::span<char> chars = owner;
   std::copy(kFoobar.begin(), kFoobar.end(), chars.begin());
   EXPECT_EQ(kFoobar, std::string_view(chars.data(), chars.size()));
 }
 
 TEST(ElfldltlMemoryTests, FixedArrayFromFileTooSmall) {
   auto result = elfldltl::FixedArrayFromFile<char, 5>()(6);
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
+  static_assert(std::is_convertible_v<decltype(result.value()), std::span<char>>);
   EXPECT_FALSE(result.has_value());
 }
 

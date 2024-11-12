@@ -138,6 +138,8 @@ pub struct BuiltinEnvironmentBuilder {
     inspector: Option<Inspector>,
     crash_records: CrashRecords,
     instance_registry: Arc<InstanceRegistry>,
+    #[cfg(test)]
+    scope_factory: Option<Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>>,
 }
 
 impl Default for BuiltinEnvironmentBuilder {
@@ -153,6 +155,8 @@ impl Default for BuiltinEnvironmentBuilder {
             inspector: None,
             crash_records: CrashRecords::new(),
             instance_registry: InstanceRegistry::new(),
+            #[cfg(test)]
+            scope_factory: None,
         }
     }
 }
@@ -181,6 +185,17 @@ impl BuiltinEnvironmentBuilder {
     #[cfg(test)]
     pub fn set_inspector(mut self, inspector: Inspector) -> Self {
         self.inspector = Some(inspector);
+        self
+    }
+
+    /// Set a custom execution scope on components. This is useful for tests that wish
+    /// to directly control the execution of scoped tasks.
+    #[cfg(test)]
+    pub fn set_scope_factory(
+        mut self,
+        f: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
+    ) -> Self {
+        self.scope_factory = Some(f);
         self
     }
 
@@ -350,6 +365,8 @@ impl BuiltinEnvironmentBuilder {
             runtime_config: Arc::clone(&runtime_config),
             top_instance,
             instance_registry: self.instance_registry,
+            #[cfg(test)]
+            scope_factory: self.scope_factory,
         };
 
         // Wrap BuiltinRunnerFactory in BuiltinRunner now that we have the definite RuntimeConfig.

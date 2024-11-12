@@ -17,8 +17,8 @@ use num_traits::cast::FromPrimitive;
 use thiserror::Error;
 use zx::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
 use zx::{
-    Clock, ClockDetails, ClockTransformation, ClockUpdate, Duration, Handle, HandleBased, Instant,
-    Job, MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
+    BootTimeline, Clock, ClockDetails, ClockTransformation, ClockUpdate, Duration, Handle,
+    HandleBased, Instant, Job, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
 };
 
 // TODO(https://fxbug.dev/42139436): Document these.
@@ -359,20 +359,16 @@ pub type UtcInstant = Instant<UtcTimeline>;
 pub type UtcDuration = Duration<UtcTimeline>;
 
 /// A clock that will return UTC timestamps.
-// TODO(https://fxbug.dev/356911500) switch to boot timeline
-pub type UtcClock = Clock<MonotonicTimeline, UtcTimeline>;
+pub type UtcClock = Clock<BootTimeline, UtcTimeline>;
 
 /// Details of a UTC clock.
-// TODO(https://fxbug.dev/356911500) switch to boot timeline
-pub type UtcClockDetails = ClockDetails<MonotonicTimeline, UtcTimeline>;
+pub type UtcClockDetails = ClockDetails<BootTimeline, UtcTimeline>;
 
 /// A transformation for the UTC clock.
-// TODO(https://fxbug.dev/356911500) switch to boot timeline
-pub type UtcClockTransform = ClockTransformation<MonotonicTimeline, UtcTimeline>;
+pub type UtcClockTransform = ClockTransformation<BootTimeline, UtcTimeline>;
 
 /// An update for the UTC clock.
-// TODO(https://fxbug.dev/356911500) switch to boot timeline
-pub type UtcClockUpdate = ClockUpdate<MonotonicTimeline, UtcTimeline>;
+pub type UtcClockUpdate = ClockUpdate<BootTimeline, UtcTimeline>;
 
 fn utc_clock() -> Unowned<'static, UtcClock> {
     // SAFETY: basic FFI call which returns either a valid handle or ZX_HANDLE_INVALID.

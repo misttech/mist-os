@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_FXL_LOG_SETTINGS_COMMAND_LINE_H_
 #define SRC_LIB_FXL_LOG_SETTINGS_COMMAND_LINE_H_
 
+#include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/log_settings.h>
 
 #include <string>
@@ -25,7 +26,7 @@ struct LogSettings {
   //
   // Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
   // the range between INFO and DEBUG
-  FuchsiaLogSeverity min_log_level = fuchsia_logging::kDefaultLogLevel;
+  fuchsia_logging::RawLogSeverity min_log_level = fuchsia_logging::kDefaultLogLevel;
 #ifndef __Fuchsia__
   // The name of a file to which the log should be written.
   // When non-empty, the previous log output is closed and logging is

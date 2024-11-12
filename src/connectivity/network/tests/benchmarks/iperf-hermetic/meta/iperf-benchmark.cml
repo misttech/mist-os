@@ -11,10 +11,4 @@
     program: {
         binary: "bin/iperf_benchmark",
     },
-    use: [
-        {
-            storage: "custom_artifacts",
-            path: "/custom_artifacts",
-        },
-    ],
 }

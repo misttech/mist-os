@@ -691,7 +691,7 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
   driver_name_ = note->payload.name;
-  logger_->log(fdf::INFO, "Loaded driver '{}'", note->payload.name);
+  logger_->log(fdf::INFO, "Loaded driver '{}'", driver_name_);
   record_ = static_cast<zx_driver_rec_t*>(dlsym(library_, "__zircon_driver_rec__"));
   if (record_ == nullptr) {
     logger_->log(fdf::ERROR, "Failed to load driver '{}', driver record not found", url_str);

@@ -27,7 +27,7 @@ cpp17::string_view StripDots(cpp17::string_view path) {
   return pos == cpp17::string_view::npos ? path : path.substr(pos + 3);
 }
 
-void BeginRecordLegacy(LogBuffer* buffer, FuchsiaLogSeverity severity,
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
                        cpp17::optional<cpp17::string_view> file, unsigned int line,
                        cpp17::optional<cpp17::string_view> msg,
                        cpp17::optional<cpp17::string_view> condition) {
@@ -129,25 +129,26 @@ void EndRecordLegacy(LogBuffer* buffer) {}
 
 }  // namespace
 namespace internal {
-const std::string GetNameForLogSeverity(FuchsiaLogSeverity severity) {
+const std::string GetNameForLogSeverity(fuchsia_logging::RawLogSeverity severity) {
   switch (severity) {
-    case FUCHSIA_LOG_TRACE:
+    case fuchsia_logging::LogSeverity::Trace:
       return "TRACE";
-    case FUCHSIA_LOG_DEBUG:
+    case fuchsia_logging::LogSeverity::Debug:
       return "DEBUG";
-    case FUCHSIA_LOG_INFO:
+    case fuchsia_logging::LogSeverity::Info:
       return "INFO";
-    case FUCHSIA_LOG_WARNING:
+    case fuchsia_logging::LogSeverity::Warn:
       return "WARNING";
-    case FUCHSIA_LOG_ERROR:
+    case fuchsia_logging::LogSeverity::Error:
       return "ERROR";
-    case FUCHSIA_LOG_FATAL:
+    case fuchsia_logging::LogSeverity::Fatal:
       return "FATAL";
   }
 
-  if (severity > FUCHSIA_LOG_DEBUG && severity < FUCHSIA_LOG_INFO) {
+  if (severity > fuchsia_logging::LogSeverity::Debug &&
+      severity < fuchsia_logging::LogSeverity::Info) {
     std::ostringstream stream;
-    stream << "VLOG(" << (FUCHSIA_LOG_INFO - severity) << ")";
+    stream << "VLOG(" << (fuchsia_logging::LogSeverity::Info - severity) << ")";
     return stream.str();
   }
 
@@ -156,21 +157,32 @@ const std::string GetNameForLogSeverity(FuchsiaLogSeverity severity) {
 }  // namespace internal
 namespace {
 void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
-  g_log_settings.min_log_level = std::min(FUCHSIA_LOG_FATAL, settings.min_log_level);
+  g_log_settings.min_log_level =
+      std::min(static_cast<uint8_t>(fuchsia_logging::LogSeverity::Fatal), settings.min_log_level);
 
   const char* raw_severity_from_env = std::getenv("FUCHSIA_HOST_LOG_MIN_SEVERITY");
   if (raw_severity_from_env) {
     std::string severity_from_env(raw_severity_from_env);
     if (severity_from_env == "FATAL") {
-      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_FATAL, g_log_settings.min_log_level);
+      g_log_settings.min_log_level = std::min(
+          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Fatal),
+          g_log_settings.min_log_level);
     } else if (severity_from_env == "ERROR") {
-      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_ERROR, g_log_settings.min_log_level);
+      g_log_settings.min_log_level = std::min(
+          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Error),
+          g_log_settings.min_log_level);
     } else if (severity_from_env == "INFO") {
-      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_INFO, g_log_settings.min_log_level);
+      g_log_settings.min_log_level =
+          std::min(static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Info),
+                   g_log_settings.min_log_level);
     } else if (severity_from_env == "DEBUG") {
-      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_DEBUG, g_log_settings.min_log_level);
+      g_log_settings.min_log_level = std::min(
+          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Debug),
+          g_log_settings.min_log_level);
     } else if (severity_from_env == "TRACE") {
-      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_TRACE, g_log_settings.min_log_level);
+      g_log_settings.min_log_level = std::min(
+          static_cast<fuchsia_logging::RawLogSeverity>(fuchsia_logging::LogSeverity::Trace),
+          g_log_settings.min_log_level);
     }
   }
 
@@ -198,11 +210,13 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
 
-FuchsiaLogSeverity GetMinLogSeverity() { return syslog_runtime::g_log_settings.min_log_level; }
+fuchsia_logging::RawLogSeverity GetMinLogSeverity() {
+  return syslog_runtime::g_log_settings.min_log_level;
+}
 
-void BeginRecord(LogBuffer* buffer, FuchsiaLogSeverity severity, internal::NullSafeStringView file,
-                 unsigned int line, internal::NullSafeStringView msg,
-                 internal::NullSafeStringView condition) {
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
+                 internal::NullSafeStringView file, unsigned int line,
+                 internal::NullSafeStringView msg, internal::NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
@@ -239,8 +253,8 @@ bool LogBuffer::Flush() {
   return true;
 }
 
-void WriteLog(FuchsiaLogSeverity severity, const char* file, unsigned int line, const char* tag,
-              const char* condition, const std::string& msg) {
+void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned int line,
+              const char* tag, const char* condition, const std::string& msg) {
   if (tag)
     std::cerr << "[" << tag << "] ";
 
@@ -267,12 +281,15 @@ namespace fuchsia_logging {
 
 // Sets the default log severity. If not explicitly set,
 // this defaults to INFO, or to the value specified by Archivist.
-LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(FuchsiaLogSeverity min_log_level) {
+LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(
+    fuchsia_logging::RawLogSeverity min_log_level) {
   settings_.min_log_level = min_log_level;
   return *this;
 }
 
-FuchsiaLogSeverity GetMinLogSeverity() { return syslog_runtime::g_log_settings.min_log_level; }
+fuchsia_logging::RawLogSeverity GetMinLogSeverity() {
+  return syslog_runtime::g_log_settings.min_log_level;
+}
 
 // Sets the log file.
 LogSettingsBuilder& LogSettingsBuilder::WithLogFile(const std::string_view& log_file) {

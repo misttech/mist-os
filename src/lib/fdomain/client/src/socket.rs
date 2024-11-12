@@ -15,7 +15,7 @@ use std::sync::Arc;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Socket(pub(crate) Handle);
 
-handle_type!(Socket peered);
+handle_type!(Socket SOCKET peered);
 
 /// Disposition of a socket.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -127,7 +127,7 @@ impl SocketWriter {
 pub struct SocketReadStream {
     socket: Arc<Socket>,
     buf: Vec<u8>,
-    channel: UnboundedReceiver<Result<Vec<u8>, proto::Error>>,
+    channel: UnboundedReceiver<Result<Vec<u8>, Error>>,
 }
 
 impl SocketReadStream {

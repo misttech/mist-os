@@ -364,13 +364,7 @@ impl EbpfProgram<()> {
             // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
             // packet is supposed to be access only through the `PacketAccessor` which validates
             // the offset in runtime.
-            Type::PtrToMemory {
-                id: packet_memory_id.clone(),
-                offset: 0,
-                buffer_size: 0,
-                fields: Default::default(),
-                mappings: Default::default(),
-            },
+            Type::PtrToMemory { id: packet_memory_id.clone(), offset: 0, buffer_size: 0 },
             // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
             // value pointed by the first argument.
             Type::ScalarValueParameter,
@@ -384,7 +378,7 @@ impl EbpfProgram<()> {
 mod test {
     use super::*;
     use crate::conformance::test::parse_asm;
-    use crate::{FieldMapping, FieldType, NullVerifierLogger};
+    use crate::{FieldDescriptor, FieldMapping, FieldType, NullVerifierLogger, StructDescriptor};
     use linux_uapi::*;
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -593,35 +587,119 @@ mod test {
     #[repr(C)]
     #[derive(Debug, Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
     struct ProgramArgument {
-        /// Pointer to an array of u64
+        // A field that should not be writable by the program.
+        pub read_only_field: u32,
+        pub _padding1: u32,
+        /// Pointer to an array.
         pub data: u64,
         /// End of the array.
         pub data_end: u64,
+        // A field that can be updated by the program.
+        pub mutable_field: u32,
+        pub _padding2: u32,
+    }
+
+    // A version of ProgramArgument with 32-bit remapped pointers.
+    struct ProgramArgument32 {
+        pub read_only_field: u32,
+        pub data: u32,
+        pub data_end: u32,
+        pub mutable_field: u32,
+    }
+
+    impl Default for ProgramArgument {
+        fn default() -> Self {
+            Self {
+                read_only_field: 1,
+                _padding1: 0,
+                data: 0,
+                data_end: 0,
+                mutable_field: 2,
+                _padding2: 0,
+            }
+        }
     }
 
     impl ProgramArgument {
         fn get_type() -> Type {
-            Self::get_type_with_mappings(Default::default())
-        }
-
-        fn get_type_with_mappings(mappings: Vec<FieldMapping>) -> Type {
-            let struct_size = std::mem::size_of::<ProgramArgument>() as u64;
             let array_id = new_bpf_type_identifier();
-            Type::PtrToMemory {
-                id: new_bpf_type_identifier(),
-                offset: 0,
-                buffer_size: struct_size,
+
+            let descriptor = Arc::new(StructDescriptor {
                 fields: vec![
-                    FieldType {
-                        offset: 0,
-                        field_type: Box::new(Type::PtrToArray { id: array_id.clone(), offset: 0 }),
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument, read_only_field),
+                        field_type: FieldType::Scalar { size: 4 },
                     },
-                    FieldType {
-                        offset: 8,
-                        field_type: Box::new(Type::PtrToEndArray { id: array_id }),
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument, data),
+                        field_type: FieldType::PtrToArray {
+                            is_32_bit: false,
+                            id: array_id.clone(),
+                        },
+                    },
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument, data_end),
+                        field_type: FieldType::PtrToEndArray { is_32_bit: false, id: array_id },
+                    },
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument, mutable_field),
+                        field_type: FieldType::MutableScalar { size: 4 },
                     },
                 ],
-                mappings,
+                mappings: Default::default(),
+            });
+
+            Type::PtrToStruct { id: new_bpf_type_identifier(), offset: 0, descriptor }
+        }
+
+        // Returns type def for a program that takes `ProgramArgument32`, but remaps access to `ProgramArgument`.
+        fn get_type_32bit_remapped() -> Type {
+            let array_id = new_bpf_type_identifier();
+
+            let descriptor = Arc::new(StructDescriptor {
+                fields: vec![
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument32, read_only_field),
+                        field_type: FieldType::Scalar { size: 4 },
+                    },
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument32, data),
+                        field_type: FieldType::PtrToArray { is_32_bit: true, id: array_id.clone() },
+                    },
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument32, data_end),
+                        field_type: FieldType::PtrToEndArray { is_32_bit: true, id: array_id },
+                    },
+                    FieldDescriptor {
+                        offset: std::mem::offset_of!(ProgramArgument32, mutable_field),
+                        field_type: FieldType::MutableScalar { size: 4 },
+                    },
+                ],
+                mappings: vec![
+                    FieldMapping {
+                        source_offset: std::mem::offset_of!(ProgramArgument32, data),
+                        target_offset: std::mem::offset_of!(ProgramArgument, data),
+                    },
+                    FieldMapping {
+                        source_offset: std::mem::offset_of!(ProgramArgument32, data_end),
+                        target_offset: std::mem::offset_of!(ProgramArgument, data_end),
+                    },
+                    FieldMapping {
+                        source_offset: std::mem::offset_of!(ProgramArgument32, mutable_field),
+                        target_offset: std::mem::offset_of!(ProgramArgument, mutable_field),
+                    },
+                ],
+            });
+
+            Type::PtrToStruct { id: new_bpf_type_identifier(), offset: 0, descriptor }
+        }
+
+        fn from_data(data: &[u64]) -> Self {
+            let ptr_range = data.as_ptr_range();
+            Self {
+                data: ptr_range.start as u64,
+                data_end: ptr_range.end as u64,
+                ..Default::default()
             }
         }
     }
@@ -630,8 +708,8 @@ mod test {
     fn test_data_end() {
         let program = r#"
         mov %r0, 0
-        ldxdw %r2, [%r1+8]
-        ldxdw %r1, [%r1]
+        ldxdw %r2, [%r1+16]
+        ldxdw %r1, [%r1+8]
         # ensure data contains at least 8 bytes
         mov %r3, %r1
         add %r3, 0x8
@@ -646,19 +724,17 @@ mod test {
         builder.set_args(&[ProgramArgument::get_type()]);
         let program = builder.load(code, &mut NullVerifierLogger).expect("load");
 
-        let v: u64 = 42;
-        let v_ptr = (&v as *const u64) as u64;
-        let mut data =
-            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v);
+        let v = [42];
+        let mut data = ProgramArgument::from_data(&v[..]);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
     }
 
     #[test]
     fn test_past_data_end() {
         let program = r#"
         mov %r0, 0
-        ldxdw %r2, [%r1+8]
-        ldxdw %r1, [%r1]
+        ldxdw %r2, [%r1+16]
+        ldxdw %r1, [%r1+6]
         # ensure data contains at least 4 bytes
         mov %r3, %r1
         add %r3, 0x4
@@ -677,10 +753,49 @@ mod test {
     #[test]
     fn test_mapping() {
         let program = r#"
+          # Return `ProgramArgument32.mutable_filed`
+          ldxw %r0, [%r1+12]
+          exit
+        "#;
+        let code = parse_asm(program);
+        let argument = ProgramArgument::get_type_32bit_remapped();
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[argument]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let mut data = ProgramArgument::default();
+        assert_eq!(
+            program.run(&mut (), &EmptyPacketAccessor::default(), &mut data),
+            data.mutable_field as u64
+        );
+    }
+
+    #[test]
+    fn test_mapping_partial_load() {
+        // Verify that we can access middle of a remapped scalar field.
+        let program = r#"
+          # Returns two upper bytes of `ProgramArgument32.mutable_filed`
+          ldxh %r0, [%r1+14]
+          exit
+        "#;
+        let code = parse_asm(program);
+        let argument = ProgramArgument::get_type_32bit_remapped();
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[argument]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let mut data = ProgramArgument::default();
+        data.mutable_field = 0x12345678;
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 0x1234 as u64);
+    }
+
+    #[test]
+    fn test_mapping_ptr() {
+        let program = r#"
         mov %r0, 0
-        # Load data and data_end as 32 bits pointers
-        ldxw %r2, [%r1+4]
-        ldxw %r1, [%r1]
+        # Load data and data_end as 32 bits pointers in ProgramArgument32
+        ldxw %r2, [%r1+8]
+        ldxw %r1, [%r1+4]
         # ensure data contains at least 8 bytes
         mov %r3, %r1
         add %r3, 0x8
@@ -691,20 +806,44 @@ mod test {
         "#;
         let code = parse_asm(program);
 
-        let mut mappings = vec![];
-        mappings.push(FieldMapping::new_size_mapping(0, 0));
-        mappings.push(FieldMapping::new_size_mapping(4, 8));
-        let argument = ProgramArgument::get_type_with_mappings(mappings);
+        let argument = ProgramArgument::get_type_32bit_remapped();
 
         let mut builder = EbpfProgramBuilder::<()>::default();
         builder.set_args(&[argument]);
         let program = builder.load(code, &mut NullVerifierLogger).expect("load");
 
-        let v: u64 = 42;
-        let v_ptr = (&v as *const u64) as u64;
-        let mut data =
-            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v);
+        let v = [42];
+        let mut data = ProgramArgument::from_data(&v[..]);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
+    }
+
+    #[test]
+    fn test_mapping_with_offset() {
+        let program = r#"
+        mov %r0, 0
+        add %r1, 0x8
+        # Load data and data_end as 32 bits pointers in ProgramArgument32
+        ldxw %r2, [%r1]
+        ldxw %r1, [%r1-4]
+        # ensure data contains at least 8 bytes
+        mov %r3, %r1
+        add %r3, 0x8
+        jgt %r3, %r2, +1
+        # read 8 bytes from data
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let argument = ProgramArgument::get_type_32bit_remapped();
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[argument]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let v = [42];
+        let mut data = ProgramArgument::from_data(&v[..]);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v[0]);
     }
 
     #[test]
@@ -721,8 +860,8 @@ mod test {
           sub %r2, %r10
           add %r0, %r2
 
-          ldxdw %r2, [%r1+8]
-          ldxdw %r1, [%r1]
+          ldxdw %r2, [%r1+16]
+          ldxdw %r1, [%r1+8]
           # Substract ptr to array and ptr to array end
           sub %r2, %r1
           add %r0, %r2
@@ -741,10 +880,8 @@ mod test {
         builder.set_args(&[ProgramArgument::get_type()]);
         let program = builder.load(code, &mut NullVerifierLogger).expect("load");
 
-        let v: u64 = 42;
-        let v_ptr = (&v as *const u64) as u64;
-        let mut data =
-            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
+        let v = [42];
+        let mut data = ProgramArgument::from_data(&v[..]);
         assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 17);
     }
 
@@ -764,25 +901,106 @@ mod test {
         builder.set_packet_memory_id(packet_memory_id.clone());
         let second_memory_id = new_bpf_type_identifier();
         builder.set_args(&[
-            Type::PtrToMemory {
-                id: packet_memory_id,
-                offset: 0,
-                buffer_size: 16,
-                fields: Default::default(),
-                mappings: Default::default(),
-            },
-            Type::PtrToMemory {
-                id: second_memory_id,
-                offset: 0,
-                buffer_size: 16,
-                fields: Default::default(),
-                mappings: Default::default(),
-            },
+            Type::PtrToMemory { id: packet_memory_id, offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: second_memory_id, offset: 0, buffer_size: 16 },
         ]);
 
         assert_eq!(
             builder.load(code, &mut NullVerifierLogger).expect_err("validation should fail"),
             EbpfError::ProgramLoadError("R6 is not a packet at pc 2".to_string())
         );
+    }
+
+    #[test]
+    fn test_invalid_field_size() {
+        // Load with a field size too large fails validation.
+        let program = r#"
+          ldxdw %r0, [%r1]
+          exit
+        "#;
+        let code = parse_asm(program);
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
+
+    #[test]
+    fn test_unknown_field() {
+        // Load outside of the know fields fails validation.
+        let program = r#"
+          ldxw %r0, [%r1 + 4]
+          exit
+        "#;
+        let code = parse_asm(program);
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
+
+    #[test]
+    fn test_partial_ptr_field() {
+        // Partial loads of ptr fields are not allowed.
+        let program = r#"
+          ldxw %r0, [%r1 + 8]
+          exit
+        "#;
+        let code = parse_asm(program);
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
+
+    #[test]
+    fn test_readonly_field() {
+        // Store to a read only field fails validation.
+        let program = r#"
+          stw [%r1], 0x42
+          exit
+        "#;
+        let code = parse_asm(program);
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
+
+    #[test]
+    fn test_store_mutable_field() {
+        // Store to a mutable field is allowed.
+        let program = r#"
+          stw [%r1 + 24], 0x42
+          mov %r0, 1
+          exit
+        "#;
+        let code = parse_asm(program);
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let mut data = ProgramArgument::default();
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 1);
+        assert_eq!(data.mutable_field, 0x42);
+    }
+
+    #[test]
+    fn test_fake_array_bounds_check() {
+        // Verify that negative offsets in memory ptrs are handled properly and cannot be used to
+        // bypass array bounds checks.
+        let program = r#"
+        mov %r0, 0
+        ldxdw %r2, [%r1+16]
+        ldxdw %r1, [%r1+8]
+        # Subtract 8 from `data` and pretend checking array bounds.
+        mov %r3, %r1
+        sub %r3, 0x8
+        jgt %r3, %r2, +1
+        # Read 8 bytes from `data`. This should be rejected by the verifier.
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
     }
 }

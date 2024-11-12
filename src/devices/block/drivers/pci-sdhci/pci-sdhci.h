@@ -29,6 +29,7 @@ class PciSdhci : public DeviceType, public ddk::SdhciProtocol<PciSdhci, ddk::bas
   uint32_t SdhciGetBaseClock();
   uint64_t SdhciGetQuirks(uint64_t* out_dma_boundary_alignment);
   void SdhciHwReset();
+  zx_status_t SdhciVendorSetBusClock(uint32_t frequency_hz);
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();

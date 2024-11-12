@@ -49,7 +49,6 @@ rustc_library("lib") {
   ]
 
   test_deps = [
-    "//sdk/rust/zx-types",
     "//src/connectivity/lib/net-declare",
     "//src/lib/const-unwrap",
     "//src/lib/fuchsia-async",

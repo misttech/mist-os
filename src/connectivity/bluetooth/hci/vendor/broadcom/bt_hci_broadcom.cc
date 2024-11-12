@@ -134,14 +134,7 @@ void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
 }
 
 void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
-  zx::result<fidl::ClientEnd<fhbt::Hci>> client_end = incoming()->Connect<fhbt::HciService::Hci>();
-  if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to fhbt::Hci protocol failed: %s", client_end.status_string());
-    completer.ReplyError(client_end.status_value());
-    return;
-  }
-
-  completer.ReplySuccess(std::move(*client_end));
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void BtHciBroadcom::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {

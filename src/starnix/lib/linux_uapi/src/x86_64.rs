@@ -20408,10 +20408,10 @@ pub struct StdAtomicU64 {
 #[derive(Debug, Default)]
 pub struct vvar_data {
     pub seq_num: std::sync::atomic::AtomicU64,
-    pub mono_to_utc_reference_offset: std::sync::atomic::AtomicI64,
-    pub mono_to_utc_synthetic_offset: std::sync::atomic::AtomicI64,
-    pub mono_to_utc_reference_ticks: std::sync::atomic::AtomicU32,
-    pub mono_to_utc_synthetic_ticks: std::sync::atomic::AtomicU32,
+    pub boot_to_utc_reference_offset: std::sync::atomic::AtomicI64,
+    pub boot_to_utc_synthetic_offset: std::sync::atomic::AtomicI64,
+    pub boot_to_utc_reference_ticks: std::sync::atomic::AtomicU32,
+    pub boot_to_utc_synthetic_ticks: std::sync::atomic::AtomicU32,
 }
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;

@@ -34,7 +34,7 @@ Specifically:
 ## Overview
 
 TTRF spins up a hermetic instance of Timekeeper, optionally connected
-to a fake [monotonic clock][mclk], a fake [UTC clock][utc] handle, a fake [Real
+to a fake [boot clock][mclk], a fake [UTC clock][utc] handle, a fake [Real
 Time Clock (RTC)][rtc] service, and a real Timekeeper machinery. This setup
 is housed in a hermetic realm, which is constructed by a Test Realm Factory
 component.  The realm factory component for the Timekeeper test realm is
@@ -99,7 +99,7 @@ keeping a reference for this test.
 ```
 let (push_source_puppet_client_end, _ignore_opts, _ignore_cobalt) = ttr_proxy
     .create_realm(
-        fttr::RealmOptions { use_real_monotonic_clock: Some(true), ..Default::default() },
+        fttr::RealmOptions { use_real_reference_clock: Some(true), ..Default::default() },
         utc_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicated"),
         rp_server_end,
     )
@@ -108,18 +108,18 @@ let (push_source_puppet_client_end, _ignore_opts, _ignore_cobalt) = ttr_proxy
     .expect("Error value returned from the call");
 ```
 
-Sampling the monotonic clock directly is OK since we configured the timekeeper
-test realm to use the real monotonic clock. Convert to a proxy so we can send
+Sampling the boot clock directly is OK since we configured the timekeeper
+test realm to use the real boot clock. Convert to a proxy so we can send
 RPCs.
 
 Now we tell Timekeeper to set a UTC time sample. We do this by establishing a
-correspondence between a reading of the monotonic clock, and the reading of the
+correspondence between a reading of the boot clock, and the reading of the
 UTC clock. We then also provide a standard deviation of the estimation error.
 The "push source puppet" is an endpoint that allows us to inject "fake"
 readings of the time source.
 
 ```
-let sample_monotonic = zx::MonotonicInstant::get();
+let sample_reference = zx::BootInstant::get();
 let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");
 ```
 
@@ -131,7 +131,7 @@ const STD_DEV: zx::Duration = zx::Duration::from_millis(50);
 push_source_puppet
     .set_sample(&TimeSample {
         utc: Some(VALID_TIME.into_nanos()),
-        monotonic: Some(sample_monotonic.into_nanos()),
+        reference: Some(sample_reference.into_nanos()),
         standard_deviation: Some(STD_DEV.into_nanos()),
         ..Default::default()
     })

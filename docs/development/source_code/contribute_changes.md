@@ -64,6 +64,18 @@ To create a change in Gerrit, do the following:
 
 1. Create or edit files in the new branch.
 
+1. Format modified or newly added code.
+
+   ```posix-terminal
+   fx format-code
+   ```
+
+   Note: On some Ubuntu 24.x systems, you may see an error like
+   `initCloneNs():382 mount('/', '/', NULL, MS_REC|MS_PRIVATE, NULL): Permission denied`
+   when executing `fx format-code`. These errors are caused by the system's
+   AppArmor configuration. For a workaround, see
+   [permission errors on Ubuntu 24.x systems][permission-errors-on-Ubuntu-24.x-systems]{:.external}.
+
 1. Add the updated files:
 
    ```posix-terminal
@@ -86,7 +98,7 @@ To create a change in Gerrit, do the following:
    [Gerrit documentation][gerrit-doc-upload-change]{:.external}.
 
    For more information on special options that control commit behavior, see
-   [Commit message options][commit-message-options].
+   [Commit message options][commit-message-options]{:.external}.
 
 ## 3. Request a code review {#request-a-code-review}
 
@@ -118,7 +130,7 @@ In order for your change to be submitted, you need a **Code Review Label +2**.
 A Code Review Label +2 score can only be applied by a directory owner.
 
 If you need to update your change during the review process, see
-[Create and upload a patch](#create-and-upload-a-patch) (or
+[Update and upload a patch](#update-and-upload-a-patch) (or
 [Resolve merge conflicts](#resolve-merge-conflicts)) in Appendices.
 
 ### Resolve comments {#resolving-comments}
@@ -143,11 +155,18 @@ to submit code for them.
 
 ## Appendices
 
-### Create and upload a patch {#create-and-upload-a-patch}
+### Update and upload a patch {#update-and-upload-a-patch}
 
 After creating a change, to upload a patch to your change, do the following:
 
 1. Create or edit files in the same branch.
+
+1. Format the files that you have updated:
+
+   ```posix-terminal
+   fx format-code
+   ```
+
 1. Add the updated files:
 
    ```posix-terminal
@@ -181,6 +200,12 @@ When Gerrit warns you of merge conflicts in your change, do the following:
 
    ```posix-terminal
    git add <files_with_resolved_conflicts>
+   ```
+
+1. Format the files:
+
+   ```posix-terminal
+   fx format-code
    ```
 
 1. Finish the rebase:
@@ -236,3 +261,4 @@ information on the structure of the Fuchsia repository.
 [config-labels]: https://gerrit-review.googlesource.com/Documentation/config-labels.html
 [committer]: /docs/contribute/community/contributor-roles.md#committer
 [owners]: /docs/development/source_code/owners.md
+[permission-errors-on-Ubuntu-24.x-systems]: https://github.com/google/nsjail/issues/236

@@ -76,7 +76,9 @@ pub type DeliveryMap = HashMap<DictKey, DeliveryMapEntry>;
 /// the stream, or drop the receiver, to prevent unbounded buffering.
 ///
 /// On success, returns a future that services the namespace.
-pub fn add_to_processargs(
+// TODO: This is only used by tests. Is there a reason to keep it?
+#[allow(unused)]
+async fn add_to_processargs(
     scope: ExecutionScope,
     dict: Dict,
     processargs: &mut ProcessArgs,
@@ -255,7 +257,7 @@ mod tests {
         let dict = Dict::new();
         let delivery_map = DeliveryMap::new();
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 0);
@@ -282,7 +284,7 @@ mod tests {
             )
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -327,7 +329,7 @@ mod tests {
             })
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -363,7 +365,7 @@ mod tests {
             })
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -408,7 +410,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).await.err().unwrap(),
             DeliveryError::NotADict(name)
             if name.as_str() == "handles"
         );
@@ -428,7 +430,7 @@ mod tests {
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
-            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).await.err().unwrap(),
             DeliveryError::UnusedCapabilities(keys)
             if keys == vec![DictKey::from_str("stdin").unwrap()]
         );
@@ -452,7 +454,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).await.err().unwrap(),
             DeliveryError::UnsupportedHandleType(handle_type)
             if handle_type == HandleType::DirectoryRequest
         );
@@ -469,7 +471,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).await.err().unwrap(),
             DeliveryError::NotInDict(name)
             if name.as_str() == "stdin"
         );
@@ -501,7 +503,7 @@ mod tests {
             )
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.handles.len(), 0);
         assert_eq!(processargs.namespace_entries.len(), 1);
@@ -559,7 +561,7 @@ mod tests {
             ),
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore()).await?;
 
         assert_eq!(processargs.handles.len(), 0);
         assert_eq!(processargs.namespace_entries.len(), 1);
@@ -618,7 +620,14 @@ mod tests {
             ),
         };
         let scope = ExecutionScope::new();
-        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+        exec.run_singlethreaded(&mut pin!(add_to_processargs(
+            scope.clone(),
+            dict,
+            &mut processargs,
+            &delivery_map,
+            ignore(),
+        )))
+        .unwrap();
 
         assert_eq!(processargs.handles.len(), 0);
         assert_eq!(processargs.namespace_entries.len(), 1);
@@ -681,7 +690,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).await.err().unwrap(),
             DeliveryError::NamespaceError(BuildNamespaceError::Conversion {
                 path, ..
             })

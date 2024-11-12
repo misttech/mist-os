@@ -111,12 +111,6 @@ __BEGIN_CDECLS
 // BIND_POWER_SENSOR_DOMAIN was 0x0A90
 // LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
 
-typedef struct zx_device_prop {
-  uint16_t id;
-  uint16_t reserved;
-  uint32_t value;
-} zx_device_prop_t;
-
 #define ZIRCON_NOTE_NAME "Zircon"
 #define ZIRCON_NOTE_DRIVER 0x31565244  // DRV1
 

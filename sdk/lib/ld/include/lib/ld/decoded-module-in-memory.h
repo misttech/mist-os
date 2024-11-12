@@ -49,8 +49,8 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   // or all of these things may be useless to some callers, but the startup
   // dynamic linker uses each in some cases.
   struct DecodeResult {
-    cpp20::span<const Dyn> dynamic;  // PT_DYNAMIC contents in memory.
-    size_type entry = 0;             // e_entry entry point, needs load bias.
+    std::span<const Dyn> dynamic;  // PT_DYNAMIC contents in memory.
+    size_type entry = 0;           // e_entry entry point, needs load bias.
     std::optional<size_type> stack_size;
   };
 
@@ -90,7 +90,7 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
     if (headers) [[likely]] {
       auto& [ehdr_owner, phdrs_owner] = *headers;
       const Ehdr& ehdr = ehdr_owner;
-      const cpp20::span<const Phdr> phdrs = phdrs_owner;
+      const std::span<const Phdr> phdrs = phdrs_owner;
 
       // Decode phdrs just to fill load_info().  There will need to be another
       // pass over the phdrs after the image is mapped in, because metadata
@@ -130,7 +130,7 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   template <class Diagnostics, class Memory, class... DynamicObservers>
   [[nodiscard]] constexpr std::optional<DecodeResult> DecodeFromMemory(  //
       Diagnostics& diag, Memory&& memory, size_t page_size, const Ehdr& ehdr,
-      cpp20::span<const Phdr> phdrs, size_type& max_tls_modid,
+      std::span<const Phdr> phdrs, size_type& max_tls_modid,
       DynamicObservers&&... dynamic_observers) {
     auto result = DecodeModulePhdrs(  //
         diag, phdrs, PhdrMemoryBuildIdObserver(memory, this->module()));

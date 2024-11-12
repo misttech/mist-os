@@ -32,8 +32,8 @@ constexpr size_t kShlibOffset =
 constexpr size_t kExpectedSize = Traits::kTlsNegative ? kExpectedAlign + kTlsDepAlignedTotalSize
                                                       : kShlibOffset + kTlsDepTotalSize;
 
-constexpr ptrdiff_t kTpOffsetForDepData = cpp20::bit_cast<ptrdiff_t>(kShlibOffset);
-constexpr ptrdiff_t kTpOffsetForDepBss = cpp20::bit_cast<ptrdiff_t>(kShlibOffset + kTlsDepAlign);
+constexpr ptrdiff_t kTpOffsetForDepData = std::bit_cast<ptrdiff_t>(kShlibOffset);
+constexpr ptrdiff_t kTpOffsetForDepBss = std::bit_cast<ptrdiff_t>(kShlibOffset + kTlsDepAlign);
 
 extern "C" int64_t TestStart() {
   const auto modules = ld::AbiLoadedModules(ld::abi::_ld_abi);
@@ -113,7 +113,7 @@ extern "C" int64_t TestStart() {
   }
 
   int tls_block[2] = {123, 456};
-  ld::TlsModuleInit(exec_tls, cpp20::as_writable_bytes(cpp20::span(tls_block)));
+  ld::TlsModuleInit(exec_tls, std::as_writable_bytes(std::span(tls_block)));
   if (tls_block[0] != 23) {
     return 19;
   }

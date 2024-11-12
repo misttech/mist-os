@@ -9,13 +9,14 @@ use crate::mm::{
     create_anonymous_mapping_memory, DesiredAddress, MappingName, MappingOptions,
     MemoryAccessorExt, ProtectionFlags,
 };
+use crate::task::syslog::{self, KmsgLevel};
 use crate::task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
-use starnix_logging::{log_info, track_stub};
+use starnix_logging::{log, log_info, track_stub, Level};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -375,7 +376,23 @@ impl FileOps for DevKmsg {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let bytes = data.read_all()?;
-        log_info!(tag = "kmsg", "{}", String::from_utf8_lossy(&bytes).trim_end_matches('\n'));
+        let extract_result = syslog::extract_level(&bytes);
+        let (level, msg_bytes) = match extract_result {
+            None => (Level::INFO, bytes.as_slice()),
+            Some((level, bytes_after_level)) => match level {
+                // An error but keep the <level> str.
+                KmsgLevel::Emergency | KmsgLevel::Alert | KmsgLevel::Critical => {
+                    (Level::ERROR, bytes.as_slice())
+                }
+                KmsgLevel::Error => (Level::ERROR, bytes_after_level),
+                KmsgLevel::Warning => (Level::WARN, bytes_after_level),
+                // Log as info but show the <level>.
+                KmsgLevel::Notice => (Level::INFO, bytes.as_slice()),
+                KmsgLevel::Info => (Level::INFO, bytes_after_level),
+                KmsgLevel::Debug => (Level::DEBUG, bytes_after_level),
+            },
+        };
+        log!(level, tag = "kmsg", "{}", String::from_utf8_lossy(msg_bytes).trim_end_matches('\n'));
         Ok(bytes.len())
     }
 }

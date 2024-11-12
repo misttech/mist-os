@@ -5,18 +5,17 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
-#include <zircon/compiler.h>
-
 #include <algorithm>
+#include <bit>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
 #include "constants.h"
 #include "diagnostics.h"
+#include "internal/no_unique_address.h"
 #include "internal/phdr-error.h"
 
 namespace elfldltl {
@@ -146,7 +145,7 @@ struct PhdrObserver {};
 // false then this stops processing early and returns false.  Otherwise, each
 // observer's Finish method is called, stopping early if one returns false.
 template <class Diagnostics, class Phdr, size_t N, class... Observers>
-constexpr bool DecodePhdrs(Diagnostics&& diagnostics, cpp20::span<const Phdr, N> phdrs,
+constexpr bool DecodePhdrs(Diagnostics&& diagnostics, std::span<const Phdr, N> phdrs,
                            Observers&&... observers) {
   for (const Phdr& phdr : phdrs) {
     if ((!DecodePhdr(diagnostics, phdr, observers) || ...)) {
@@ -177,7 +176,7 @@ constexpr bool DecodePhdr(Diagnostics&& diagnostics, const Phdr& phdr,
     // An `align` of 0 signifies no alignment constraints, which in practice
     // means an alignment of 1.
     auto align = phdr.align() > 0 ? phdr.align() : 1;
-    if (!cpp20::has_single_bit(align)) {
+    if (!std::has_single_bit(align)) {
       if (ok = diagnostics.FormatError(Error::kBadAlignment); !ok) {
         return false;
       }
@@ -325,7 +324,7 @@ class PhdrStackObserver : public PhdrSingletonObserver<Elf, ElfPhdrType::kStack>
 
   std::optional<Phdr> phdr_;
   std::optional<size_type>& size_;
-  __NO_UNIQUE_ADDRESS std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
 };
 
 // A generic metadata, singleton observer that validates constraints around
@@ -450,10 +449,10 @@ class PhdrLoadObserver
         vaddr_size_(vaddr_size),
         page_size_(page_size),
         callback_(std::move(callback)) {
-    ZX_ASSERT(cpp20::has_single_bit(page_size));
+    assert(std::has_single_bit(page_size));
     vaddr_start_ = 0;
     vaddr_size_ = 0;
-    ZX_DEBUG_ASSERT(NoHeadersSeen());
+    assert(NoHeadersSeen());
   }
 
   template <typename C = Callback, typename = std::enable_if_t<std::is_default_constructible_v<C>>>
@@ -592,10 +591,11 @@ class PhdrLoadObserver
 
   // The highest `p_align`-aligned address and offset seen thus far.
   size_type high_memory_watermark_;
-  __NO_UNIQUE_ADDRESS std::conditional_t<kTrackFileOffsets, size_type, Empty> high_file_watermark_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS std::conditional_t<kTrackFileOffsets, size_type, Empty>
+      high_file_watermark_;
 
   // Additional tail of observer function.
-  __NO_UNIQUE_ADDRESS Callback callback_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Callback callback_;
 };
 
 // This acts as a deduction guide with partial explicit specialization.
@@ -612,7 +612,7 @@ constexpr auto MakePhdrLoadObserver(typename Elf::size_type page_size,
 // segments, excluding the RELRO region.  Returns false as soon as the first
 // callback returns false, or else returns true.
 template <class Phdr, typename T>
-constexpr bool OnPhdrWritableSegments(cpp20::span<const Phdr> phdrs, T&& callback) {
+constexpr bool OnPhdrWritableSegments(std::span<const Phdr> phdrs, T&& callback) {
   using size_type = decltype(phdrs.front().memsz());
   static_assert(std::is_invocable_r_v<bool, T, size_type, size_type>);
 

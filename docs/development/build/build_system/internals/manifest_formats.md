@@ -14,9 +14,8 @@ are located under `//build/dist/` in the Fuchsia source tree.
 ## FINI (Fuchsia INI) manifest file format {#fini-manifest}
 
 The FINI manifest format is used by several tools invoked during the build: the
-[`ffx package build`][ffx-tool] command (or the legacy [`pm`][pm-tool] tool) that
-generates Fuchsia package archives or the [`zbi`][zbi-tool] tool which generates
-ZBI images.
+[`ffx package build`][ffx-tool] command that generates Fuchsia package archives
+or the [`zbi`][zbi-tool] tool which generates ZBI images.
 
 The syntax is very simple: each line of text looks like `<destination>=<source>`,
 where `<destination>` is a destination file path, relative to the top of the
@@ -347,5 +346,4 @@ during the GN generation pass.
 [fuchsia-package-archive]: /docs/concepts/packages/package.md#structure-of-a-package
 [glossary.zircon boot image]: /docs//glossary/README.md#zircon-boot-image
 [ffx-tool]: https://fuchsia.dev/reference/tools/sdk/ffx
-[pm-tool]: https://fuchsia.dev/reference/tools/sdk/pm.md
 [zbi-tool]: https://fuchsia.dev/reference/tools/sdk/zbi.md

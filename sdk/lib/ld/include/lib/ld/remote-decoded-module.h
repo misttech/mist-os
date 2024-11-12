@@ -178,7 +178,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // than vaddr, such as via the PhdrFileNoteObserver.
     auto& [ehdr_owner, phdrs_owner] = *headers;
     const Ehdr& ehdr = ehdr_owner;
-    const cpp20::span<const Phdr> phdrs = phdrs_owner;
+    const std::span<const Phdr> phdrs = phdrs_owner;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
     auto result = DecodeModulePhdrs(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),

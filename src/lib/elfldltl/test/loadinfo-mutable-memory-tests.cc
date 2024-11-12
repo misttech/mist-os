@@ -35,7 +35,7 @@ class MockMemory {
  public:
   MOCK_METHOD(bool, Store, (size_t size, uintptr_t ptr, uintmax_t value));
   MOCK_METHOD(bool, StoreAdd, (size_t size, uintptr_t ptr, uintmax_t value));
-  MOCK_METHOD(std::optional<cpp20::span<const std::byte>>, ReadArray,
+  MOCK_METHOD(std::optional<std::span<const std::byte>>, ReadArray,
               (size_t size, uintptr_t ptr, std::optional<size_t> count));
 
   class Memory;
@@ -55,9 +55,9 @@ void ExpectStoreAdd(StrictMockMemory& mock, uintptr_t ptr, uintmax_t value) {
 
 template <typename T>
 void ExpectReadArray(StrictMockMemory& mock, uintptr_t ptr, std::optional<size_t> count,
-                     std::optional<cpp20::span<const T>> result) {
+                     std::optional<std::span<const T>> result) {
   EXPECT_CALL(mock, ReadArray(sizeof(T), ptr, count))
-      .WillOnce(Return(result ? std::make_optional(cpp20::as_bytes(*result)) : std::nullopt));
+      .WillOnce(Return(result ? std::make_optional(std::as_bytes(*result)) : std::nullopt));
 }
 
 class MockMemory::Memory {
@@ -75,10 +75,10 @@ class MockMemory::Memory {
   }
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr,
-                                                std::optional<size_t> count = std::nullopt) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr,
+                                              std::optional<size_t> count = std::nullopt) {
     if (auto bytes = mock_.ReadArray(sizeof(T), ptr, count)) {
-      return cpp20::span{
+      return std::span{
           reinterpret_cast<const T*>(bytes->data()),
           bytes->size() / sizeof(T),
       };
@@ -294,7 +294,7 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, ReadArray) {
   StrictMockMemory mock_memory;
 
   static constexpr size_type kData[] = {0x1234, 0x5678};
-  constexpr cpp20::span<const size_type> kDataSpan{kData};
+  constexpr std::span<const size_type> kDataSpan{kData};
 
   ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, mock_memory);
   ExpectReadArray<size_type>(mock_memory, kDataStart, 1, kDataSpan.first(1));
@@ -303,10 +303,10 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, ReadArray) {
   ExpectReadArray<size_type>(mock_memory, kDataMiddle, std::nullopt, std::nullopt);
   EXPECT_THAT(memory.template ReadArray<size_type>(kDataStart, 1),
               Optional(AllOf(SizeIs(1),
-                             Property(&cpp20::span<const size_type>::data, Eq(kDataSpan.data())))));
+                             Property(&std::span<const size_type>::data, Eq(kDataSpan.data())))));
   EXPECT_THAT(memory.template ReadArray<size_type>(kDataStart),
               Optional(AllOf(SizeIs(2),
-                             Property(&cpp20::span<const size_type>::data, Eq(kDataSpan.data())))));
+                             Property(&std::span<const size_type>::data, Eq(kDataSpan.data())))));
   EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle, 1), std::nullopt);
   EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle), std::nullopt);
 }

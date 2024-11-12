@@ -66,6 +66,8 @@ class CpuRendererIntegrationTest : public ScenicCtfTest {
 
   uint64_t DisplayRotation() const override { return 0; }
 
+  bool DisplayComposition() const override { return false; }
+
  protected:
   fuchsia::sysmem2::BufferCollectionInfo SetConstraintsAndAllocateBuffer(
       fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, fuchsia::images2::PixelFormat format) {

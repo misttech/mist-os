@@ -1466,7 +1466,8 @@ TEST(StreamTestCase, AppendSuppliesZeroes) {
 }
 
 // Tests that passing a contiguous or physical VMO into zx_stream_create will return
-// ZX_ERR_WRONG_TYPE.
+// ZX_ERR_WRONG_TYPE. Although a stream object can't be created on physical or contiguous VMOs, get
+// and set stream size can still be used if needed for bookkeeping.
 TEST(StreamTestCase, NoStreamFromContiguousOrPhysicalVmo) {
   // Resources for contiguous VMO.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
@@ -1495,25 +1496,60 @@ TEST(StreamTestCase, NoStreamFromContiguousOrPhysicalVmo) {
   ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   EXPECT_OK(zx::bti::create(iommu, 0, 0xdead1eaf, &bti));
 
+  size_t vmo_size = zx_system_get_page_size();
+
   // Create a contiguous VMO & check that a stream cannot be created.
-  zx::vmo c_vmo;
-  ASSERT_OK(zx::vmo::create_contiguous(bti, zx_system_get_page_size(), 0, &c_vmo));
+  zx::vmo contig_vmo;
+  ASSERT_OK(zx::vmo::create_contiguous(bti, vmo_size, 0, &contig_vmo));
 
   zx::stream stream;
-  EXPECT_EQ(zx::stream::create(ZX_STREAM_MODE_READ, c_vmo, 0, &stream), ZX_ERR_WRONG_TYPE);
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, zx::stream::create(ZX_STREAM_MODE_READ, contig_vmo, 0, &stream));
+
+  uint64_t set_stream_size = 42;
+  uint64_t stream_size = 0;
+  uint64_t content_size = 0;
+
+  // Stream size can still be used on contiguous VMOs for bookkeeping.
+  EXPECT_OK(contig_vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(vmo_size, stream_size);
+  EXPECT_OK(contig_vmo.set_stream_size(set_stream_size));
+  EXPECT_OK(contig_vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(42, stream_size);
+
+  // Lecacy support for prop_content_size.
+  EXPECT_OK(contig_vmo.set_prop_content_size(vmo_size));
+  EXPECT_OK(contig_vmo.get_prop_content_size(&content_size));
+  EXPECT_EQ(vmo_size, content_size);
+  EXPECT_OK(contig_vmo.set_prop_content_size(set_stream_size));
+  EXPECT_OK(contig_vmo.get_prop_content_size(&content_size));
+  EXPECT_EQ(set_stream_size, content_size);
 
   // Create a physical VMO & check that a stream cannot be created.
-  vmo_test::PhysVmo p_vmo;
-  if (auto res = vmo_test::GetTestPhysVmo(); !res.is_ok()) {
+  vmo_test::PhysVmo phys_vmo;
+  if (auto res = vmo_test::GetTestPhysVmo(vmo_size); !res.is_ok()) {
     if (res.error_value() == ZX_ERR_NOT_SUPPORTED) {
       printf("Root resource not available, skipping\n");
     }
     return;
   } else {
-    p_vmo = std::move(res.value());
+    phys_vmo = std::move(res.value());
   }
 
-  EXPECT_EQ(zx::stream::create(ZX_STREAM_MODE_READ, p_vmo.vmo, 0, &stream), ZX_ERR_WRONG_TYPE);
+  // Can call get_stream_size on a physical vmo, but set_stream_size is not supported as the zeroing
+  // requirements can't be fulfilled.
+  EXPECT_OK(phys_vmo.vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(vmo_size, stream_size);
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, phys_vmo.vmo.set_stream_size(set_stream_size));
+  EXPECT_OK(phys_vmo.vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(vmo_size, stream_size);
+
+  // Legacy support for prop_content_size.
+  EXPECT_OK(phys_vmo.vmo.set_prop_content_size(vmo_size));
+  EXPECT_OK(phys_vmo.vmo.get_prop_content_size(&content_size));
+  EXPECT_EQ(vmo_size, content_size);
+  EXPECT_OK(phys_vmo.vmo.set_prop_content_size(set_stream_size));
+  EXPECT_OK(phys_vmo.vmo.get_prop_content_size(&content_size));
+  EXPECT_EQ(set_stream_size, content_size);
 }
 
 }  // namespace

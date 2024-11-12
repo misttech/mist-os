@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::connector::{DirectConnector, Overnet};
+use crate::connector::{DirectConnector, NetworkConnector};
 use async_trait::async_trait;
 use errors::FfxError;
+use fdomain_client::fidl::{
+    DiscoverableProtocolMarker as FDiscoverableProtocolMarker, FDomainResourceDialect,
+    Proxy as FProxy,
+};
 use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
@@ -12,6 +16,7 @@ use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_fidl::VersionInfo;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
+use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use futures::future::LocalBoxFuture;
@@ -148,7 +153,8 @@ pub async fn connection_behavior(
     env: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
     if ffx.global.strict {
-        let connector = Overnet::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
+        let connector =
+            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
         Ok(crate::from_env::FhoConnectionBehavior::DirectConnector(Rc::new(connector)))
     } else {
         if let Some(daemon_injector) = injector {
@@ -460,15 +466,16 @@ impl<T: TryFromEnv> TryFromEnv for Connector<T> {
 
 pub struct DirectTargetConnector<T: TryFromEnv> {
     pub inner: Connector<T>,
-    connector: Rc<Overnet<SshConnector>>,
+    connector: Rc<NetworkConnector<SshConnector>>,
 }
 
 #[async_trait(?Send)]
 impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         // Configure the environment to use a direct connector
-        let connector: Rc<Overnet<SshConnector>> =
-            Rc::new(Overnet::<ffx_target::ssh_connector::SshConnector>::new(&env.context).await?);
+        let connector: Rc<NetworkConnector<SshConnector>> = Rc::new(
+            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(&env.context).await?,
+        );
 
         let mut direct_env = env.clone();
         direct_env.behavior = FhoConnectionBehavior::DirectConnector(connector.clone());
@@ -641,14 +648,14 @@ impl TryFromEnv for ffx_config::SdkRoot {
 }
 
 /// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
-pub struct WithMoniker<P> {
+pub struct WithMoniker<P, D> {
     moniker: String,
     timeout: Duration,
-    _p: PhantomData<fn() -> P>,
+    _p: PhantomData<(fn() -> P, D)>,
 }
 
 #[async_trait(?Send)]
-impl<P> TryFromEnvWith for WithMoniker<P>
+impl<P> TryFromEnvWith for WithMoniker<P, DefaultFuchsiaResourceDialect>
 where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
@@ -657,6 +664,25 @@ where
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         let rcs_instance = connect_to_rcs(&env).await?;
         open_moniker(&rcs_instance, OpenDirType::ExposedDir, &self.moniker, self.timeout).await
+    }
+}
+
+#[async_trait(?Send)]
+impl<P> TryFromEnvWith for WithMoniker<P, FDomainResourceDialect>
+where
+    P: FProxy + 'static,
+    P::Protocol: FDiscoverableProtocolMarker,
+{
+    type Output = P;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
+        let rcs_instance = connect_to_rcs_fdomain(&env).await?;
+        open_moniker_fdomain(
+            &rcs_instance,
+            rcs_fdomain::OpenDirType::ExposedDir,
+            &self.moniker,
+            self.timeout,
+        )
+        .await
     }
 }
 
@@ -675,13 +701,35 @@ where
 ///     foo_proxy: FooProxy,
 /// }
 /// ```
-pub fn moniker<P: Proxy>(moniker: impl AsRef<str>) -> WithToolbox<P> {
+pub fn moniker<P: Proxy>(
+    moniker: impl AsRef<str>,
+) -> WithToolbox<P, DefaultFuchsiaResourceDialect> {
     toolbox_or(moniker)
 }
 
 /// Like [`moniker`], but lets you also specify an override for the default
 /// timeout.
-pub fn moniker_timeout<P: Proxy>(moniker: impl AsRef<str>, timeout_secs: u64) -> WithMoniker<P> {
+pub fn moniker_timeout<P: Proxy>(
+    moniker: impl AsRef<str>,
+    timeout_secs: u64,
+) -> WithMoniker<P, DefaultFuchsiaResourceDialect> {
+    WithMoniker {
+        moniker: moniker.as_ref().to_owned(),
+        timeout: Duration::from_secs(timeout_secs),
+        _p: Default::default(),
+    }
+}
+
+/// Same as [`moniker`] but for FDomain
+pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
+    toolbox_or_f(moniker)
+}
+
+/// Same as [`moniker_timeout`] but for FDomain
+pub fn moniker_timeout_f<P: FProxy>(
+    moniker: impl AsRef<str>,
+    timeout_secs: u64,
+) -> WithMoniker<P, FDomainResourceDialect> {
     WithMoniker {
         moniker: moniker.as_ref().to_owned(),
         timeout: Duration::from_secs(timeout_secs),
@@ -800,6 +848,28 @@ impl TryFromEnv for ffx_fidl::TargetProxy {
 }
 
 #[async_trait(?Send)]
+impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        match &env.behavior {
+            FhoConnectionBehavior::DirectConnector(dc) => {
+                dc.rcs_proxy_fdomain().await.map_err(Into::into)
+            }
+            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory().await {
+                Ok(_p) => todo!("FDomain with the daemon is unsupported!"),
+                Err(e) => {
+                    if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
+                        let message = format!("Failed connecting to remote control proxy: {ffx_e}");
+                        Err(e).user_message(message)
+                    } else {
+                        Err(e).user_message("Failed to create remote control proxy")
+                    }
+                }
+            },
+        }
+    }
+}
+
+#[async_trait(?Send)]
 impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         match &env.behavior {
@@ -858,6 +928,7 @@ impl<T> TryFromEnv for PhantomData<T> {
 
 #[cfg(test)]
 mod tests {
+    use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
     use ffx_command::Error;
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
     use futures::future::LocalBoxFuture;
@@ -891,6 +962,7 @@ mod tests {
         impl DirectConnector for TestConnector {
            fn connect(&self) -> LocalBoxFuture<'_, Result<()>>;
            fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
+           fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>>;
            fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
            fn device_address(&self) -> LocalBoxFuture<'_, Option<std::net::SocketAddr>>;
            fn target_spec(&self) -> Option<String>;

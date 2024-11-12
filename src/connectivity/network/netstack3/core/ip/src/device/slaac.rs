@@ -29,8 +29,11 @@ use packet_formats::utils::NonZeroDuration;
 use rand::distributions::Uniform;
 use rand::Rng;
 
+use crate::device::Ipv6AddrSlaacConfig;
 use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
-use crate::internal::device::state::{Lifetime, SlaacConfig, TemporarySlaacConfig};
+use crate::internal::device::state::{
+    Lifetime, PreferredLifetime, SlaacConfig, TemporarySlaacConfig,
+};
 use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
@@ -109,9 +112,7 @@ pub struct SlaacAddressEntry<Instant> {
     /// The address and the subnet.
     pub addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     /// The address' SLAAC configuration.
-    pub config: SlaacConfig<Instant>,
-    /// True if the address is deprecated.
-    pub deprecated: bool,
+    pub config: Ipv6AddrSlaacConfig<Instant>,
 }
 
 /// A mutable view into state associated with a SLAAC address's mutable state.
@@ -119,9 +120,7 @@ pub struct SlaacAddressEntryMut<'a, Instant> {
     /// The address and the subnet.
     pub addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     /// Mutable access to the address' SLAAC configuration.
-    pub config: &'a mut SlaacConfig<Instant>,
-    /// True if the address is deprecated.
-    pub deprecated: &'a mut bool,
+    pub config: &'a mut Ipv6AddrSlaacConfig<Instant>,
 }
 
 /// Abstracts iteration over a device's SLAAC addresses.
@@ -142,7 +141,7 @@ pub trait SlaacAddresses<BT: SlaacBindingsTypes> {
         &mut self,
         bindings_ctx: &mut BT,
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        config: SlaacConfig<BT::Instant>,
+        config: Ipv6AddrSlaacConfig<BT::Instant>,
         and_then: F,
     ) -> Result<O, ExistsError>;
 
@@ -586,14 +585,17 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     subnet: Subnet<Ipv6Addr>,
     device_id: &D,
     valid_lifetime: Option<NonZeroNdpLifetime>,
-    preferred_lifetime: Option<NonZeroNdpLifetime>,
+    addr_preferred_lifetime: Option<NonZeroNdpLifetime>,
     config: &SlaacConfiguration,
     now: <BC as InstantBindingsTypes>::Instant,
     retrans_timer: Duration,
     dad_transmits: Option<NonZeroU16>,
     bindings_ctx: &mut BC,
 ) -> ControlFlow<(), SlaacType> {
-    let SlaacAddressEntryMut { addr_sub, config: slaac_config, deprecated } = address_entry;
+    let SlaacAddressEntryMut {
+        addr_sub,
+        config: Ipv6AddrSlaacConfig { inner: slaac_config, preferred_lifetime },
+    } = address_entry;
     let SlaacState { timers } = state;
     if addr_sub.subnet() != subnet {
         return ControlFlow::Break(());
@@ -626,7 +628,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
         SlaacConfig::Static { valid_until: entry_valid_until } => (
             ValidLifetimeBound::FromPrefix(valid_lifetime),
             *entry_valid_until,
-            preferred_lifetime.map(|p| (p, None)),
+            addr_preferred_lifetime.map(|p| (p, None)),
         ),
         // Select valid_for and preferred_for according to RFC 8981
         // Section 3.4.
@@ -643,8 +645,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     // Since it's possible to change NDP configuration for a
                     // device during runtime, we can end up here, with a
                     // temporary address on an interface even though temporary
-                    // addressing is disabled. Don't update the valid lifetime
-                    // in this case.
+                    // addressing is disabled. Don't update the valid or
+                    // preferred lifetimes in this case.
                     TemporarySlaacAddressConfiguration::Disabled => {
                         (ValidLifetimeBound::FromMaxBound(Duration::ZERO), None, *entry_valid_until)
                     }
@@ -660,14 +662,15 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                         //   the received lifetime or (CREATION_TIME +
                         //   TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR). A similar
                         //   approach can be used with the valid lifetime.
-                        let preferred_for = preferred_lifetime.and_then(|preferred_lifetime| {
-                            temp_preferred_lifetime
-                                .get()
-                                .checked_sub(now.saturating_duration_since(*creation_time))
-                                .and_then(|p| p.checked_sub(*desync_factor))
-                                .and_then(NonZeroDuration::new)
-                                .map(|d| preferred_lifetime.min_finite_duration(d))
-                        });
+                        let preferred_for =
+                            addr_preferred_lifetime.and_then(|preferred_lifetime| {
+                                temp_preferred_lifetime
+                                    .get()
+                                    .checked_sub(now.saturating_duration_since(*creation_time))
+                                    .and_then(|p| p.checked_sub(*desync_factor))
+                                    .and_then(NonZeroDuration::new)
+                                    .map(|d| preferred_lifetime.min_finite_duration(d))
+                            });
                         // Per RFC 8981 Section 3.4.1, `desync_factor` is only
                         // used for preferred lifetime:
                         //   [...] with the overall constraint that no temporary
@@ -765,8 +768,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     // Update the preferred lifetime for this address.
     match preferred_for_and_regen_at {
         None => {
-            if !*deprecated {
-                *deprecated = true;
+            if !preferred_lifetime.is_deprecated() {
+                *preferred_lifetime = PreferredLifetime::Deprecated;
                 let _: Option<(BC::Instant, ())> =
                     timers.cancel(bindings_ctx, &InnerSlaacTimerId::DeprecateSlaacAddress { addr });
                 let _: Option<(BC::Instant, ())> = timers.cancel(
@@ -776,28 +779,19 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
             }
         }
         Some((preferred_for, regen_at)) => {
-            if *deprecated {
-                *deprecated = false;
-            }
-
             let timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr };
-            let _previously_scheduled_instant: Option<(BC::Instant, ())> = match preferred_for {
-                NonZeroNdpLifetime::Finite(preferred_for) => {
-                    // Use `schedule_timer_instant` instead of `schedule_timer` to set
-                    // the timeout relative to the previously recorded `now` value. This
-                    // helps prevent skew in cases where this task gets preempted and
-                    // isn't scheduled for some period of time between recording `now`
-                    // and here.
-                    timers.schedule_instant(
-                        bindings_ctx,
-                        timer_id,
-                        (),
-                        now.checked_add(preferred_for.get()).unwrap(),
-                    )
+            let preferred_instant = Lifetime::from_ndp(now, preferred_for);
+            match preferred_instant {
+                Lifetime::Finite(instant) => {
+                    let _previously_scheduled_instant: Option<(BC::Instant, ())> =
+                        timers.schedule_instant(bindings_ctx, timer_id, (), instant);
                 }
-                NonZeroNdpLifetime::Infinite => timers.cancel(bindings_ctx, &timer_id),
+                Lifetime::Infinite => {
+                    let _previously_scheduled_instant: Option<(BC::Instant, ())> =
+                        timers.cancel(bindings_ctx, &timer_id);
+                }
             };
-
+            *preferred_lifetime = PreferredLifetime::Preferred(preferred_instant);
             let timer_id = InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet: addr_sub };
             let _prev_regen_at: Option<(BC::Instant, ())> = match regen_at {
                 Some(regen_at) => timers.schedule_instant(bindings_ctx, timer_id, (), regen_at),
@@ -859,9 +853,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     };
 
     match valid_for_to_update {
-        Some(valid_for) => match valid_for {
-            NonZeroNdpLifetime::Finite(valid_for) => {
-                let valid_until = now.checked_add(valid_for.get()).unwrap();
+        Some(valid_for) => match Lifetime::from_ndp(now, valid_for) {
+            Lifetime::Finite(valid_until) => {
                 trace!(
                     "receive_ndp_packet: updating valid lifetime to {:?} for SLAAC address {:?} on device {:?}",
                     valid_until,
@@ -879,7 +872,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     valid_until,
                 );
             }
-            NonZeroNdpLifetime::Infinite => {
+            Lifetime::Infinite => {
                 // Set the valid lifetime for this address.
                 update_slaac_addr_valid_until(slaac_config, Lifetime::Infinite);
 
@@ -912,15 +905,13 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
                 return;
             };
             match timer_id {
-                InnerSlaacTimerId::DeprecateSlaacAddress { addr } => {
-                    slaac_addrs_config.addrs.for_each_addr_mut(
-                        |SlaacAddressEntryMut { addr_sub, config: _, deprecated }| {
-                            if addr_sub.addr() == addr {
-                                *deprecated = true;
-                            }
-                        },
-                    )
-                }
+                InnerSlaacTimerId::DeprecateSlaacAddress { addr } => slaac_addrs_config
+                    .addrs
+                    .for_each_addr_mut(|SlaacAddressEntryMut { addr_sub, config }| {
+                        if addr_sub.addr() == addr {
+                            config.preferred_lifetime = PreferredLifetime::Deprecated;
+                        }
+                    }),
                 InnerSlaacTimerId::InvalidateSlaacAddress { addr } => {
                     let (addr, config) =
                         match slaac_addrs_config.addrs.remove_addr(bindings_ctx, &addr) {
@@ -1243,7 +1234,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
                 // In order to tend towards only one non-deprecated temporary address on
                 // a subnet, we ignore all but the last regen timer for the
                 // non-deprecated addresses in a subnet.
-                if !entry.deprecated {
+                if !entry.config.preferred_lifetime.is_deprecated() {
                     if let Some((entry, regen_at)) = timers
                         .get(&InnerSlaacTimerId::RegenerateTemporaryAddress {
                             addr_subnet: entry.addr_sub,
@@ -1271,10 +1262,14 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
             found_entry.unwrap_or_else(|| panic!("couldn't find {:?} to regenerate", addr_subnet))
         };
 
-        assert!(!entry.deprecated, "can't regenerate deprecated address {:?}", addr_subnet);
+        assert!(
+            !entry.config.preferred_lifetime.is_deprecated(),
+            "can't regenerate deprecated address {:?}",
+            addr_subnet
+        );
 
         let TemporarySlaacConfig { creation_time, desync_factor, valid_until, dad_counter: _ } =
-            match entry.config {
+            match entry.config.inner {
                 SlaacConfig::Temporary(temporary_config) => temporary_config,
                 SlaacConfig::Static { valid_until: _ } => unreachable!(
                     "can't regenerate a temporary address for {:?}, which is static",
@@ -1495,12 +1490,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 return;
             }
 
-            let valid_until = match prefix_valid_for {
-                NonZeroNdpLifetime::Finite(d) => {
-                    Lifetime::Finite(now.checked_add(d.get()).unwrap())
-                }
-                NonZeroNdpLifetime::Infinite => Lifetime::Infinite,
-            };
+            let valid_until = Lifetime::from_ndp(now, prefix_valid_for);
             (
                 valid_until,
                 prefix_preferred_for.map(|p| PreferredForAndRegenAt(p, None)),
@@ -1572,7 +1562,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                         }
                     }));
 
-                    let valid_until = now.checked_add(valid_for.get()).unwrap();
+                    let valid_until = now.saturating_add(valid_for.get());
 
                     let desync_factor = if let Some(d) = desync_factor(
                         &mut bindings_ctx.rng(),
@@ -1616,7 +1606,9 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                             match preferred_for.get().checked_sub(regen_advance.get()) {
                                 Some(before_regen) => PreferredForAndRegenAt(
                                     NonZeroNdpLifetime::Finite(preferred_for),
-                                    Some(now.checked_add(before_regen).unwrap()),
+                                    // Checked add, if we overflow it's as good
+                                    // as not ever having to regenerate.
+                                    now.checked_add(before_regen),
                                 ),
                                 None => {
                                     trace!(
@@ -1668,13 +1660,25 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
             }
         };
 
+        // Calculate the durations to instants relative to the previously
+        // recorded `now` value. This helps prevent skew in cases where this
+        // task gets preempted and isn't scheduled for some period of time
+        // between recording `now` and here.
+        let (preferred_lifetime, regen_at) = match preferred_and_regen {
+            Some(PreferredForAndRegenAt(preferred_for, regen_at)) => {
+                (PreferredLifetime::preferred_for(now, preferred_for), regen_at)
+            }
+            None => (PreferredLifetime::Deprecated, None),
+        };
+        let config = Ipv6AddrSlaacConfig { inner: slaac_config, preferred_lifetime };
+
         // TODO(https://fxbug.dev/42172850): Should bindings be the one to actually
         // assign the address to maintain a "single source of truth"?
         let res = slaac_addrs.add_addr_sub_and_then(
             bindings_ctx,
             address,
-            slaac_config,
-            |SlaacAddressEntryMut { addr_sub, config: _, deprecated }, ctx| {
+            config,
+            |SlaacAddressEntryMut { addr_sub, config: _ }, ctx| {
                 // Set the valid lifetime for this address.
                 //
                 // Must not have reached this point if the address was already assigned
@@ -1697,52 +1701,31 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 let deprecate_timer_id =
                     InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
 
-                // Set the preferred lifetime for this address.
-                //
-                // Must not have reached this point if the address was already assigned
-                // to a device.
-                match preferred_and_regen {
-                    // Use `schedule_timer_instant` instead of `schedule_timer` to set the timeout
-                    // relative to the previously recorded `now` value. This helps prevent skew in
-                    // cases where this task gets preempted and isn't scheduled for some period of
-                    // time between recording `now` and here.
-                    Some(PreferredForAndRegenAt(preferred_for, regen_at)) => {
-                        match preferred_for {
-                            NonZeroNdpLifetime::Finite(preferred_for) => {
-                                assert_eq!(
-                                    timers.schedule_instant(
-                                        ctx,
-                                        deprecate_timer_id,
-                                        (),
-                                        now.checked_add(preferred_for.get()).unwrap(),
-                                    ),
-                                    None
-                                );
-                            }
-                            NonZeroNdpLifetime::Infinite => {}
-                        }
-
-                        match regen_at {
-                            Some(regen_at) => assert_eq!(
-                                timers.schedule_instant(
-                                    ctx,
-                                    InnerSlaacTimerId::RegenerateTemporaryAddress {
-                                        addr_subnet: addr_sub
-                                    },
-                                    (),
-                                    regen_at,
-                                ),
-                                None
-                            ),
-                            None => (),
-                        }
+                match preferred_lifetime {
+                    PreferredLifetime::Preferred(Lifetime::Finite(instant)) => {
+                        assert_eq!(
+                            timers.schedule_instant(ctx, deprecate_timer_id, (), instant,),
+                            None
+                        );
                     }
-                    None => {
-                        *deprecated = true;
+                    PreferredLifetime::Preferred(Lifetime::Infinite) => {}
+                    PreferredLifetime::Deprecated => {
                         assert_eq!(timers.cancel(ctx, &deprecate_timer_id), None);
                     }
-                };
+                }
 
+                match regen_at {
+                    Some(regen_at) => assert_eq!(
+                        timers.schedule_instant(
+                            ctx,
+                            InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet: addr_sub },
+                            (),
+                            regen_at,
+                        ),
+                        None
+                    ),
+                    None => (),
+                }
                 addr_sub
             },
         );
@@ -1851,8 +1834,8 @@ mod tests {
             mut cb: F,
         ) {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
-            slaac_addrs.iter_mut().for_each(|SlaacAddressEntry { addr_sub, config, deprecated }| {
-                cb(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
+            slaac_addrs.iter_mut().for_each(|SlaacAddressEntry { addr_sub, config }| {
+                cb(SlaacAddressEntryMut { addr_sub: *addr_sub, config })
             })
         }
 
@@ -1870,7 +1853,7 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
             add_addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-            config: SlaacConfig<FakeInstant>,
+            config: Ipv6AddrSlaacConfig<FakeInstant>,
             and_then: F,
         ) -> Result<O, ExistsError> {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr, counters: _ } = self;
@@ -1883,19 +1866,11 @@ mod tests {
                 return Err(ExistsError);
             }
 
-            slaac_addrs.push(SlaacAddressEntry {
-                addr_sub: add_addr_sub,
-                config,
-                deprecated: false,
-            });
+            slaac_addrs.push(SlaacAddressEntry { addr_sub: add_addr_sub, config });
 
-            let SlaacAddressEntry { addr_sub, config, deprecated } =
-                slaac_addrs.iter_mut().last().unwrap();
+            let SlaacAddressEntry { addr_sub, config } = slaac_addrs.iter_mut().last().unwrap();
 
-            Ok(and_then(
-                SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated },
-                bindings_ctx,
-            ))
+            Ok(and_then(SlaacAddressEntryMut { addr_sub: *addr_sub, config }, bindings_ctx))
         }
 
         fn remove_addr(
@@ -1912,9 +1887,9 @@ mod tests {
                 .find_map(|(i, a)| (&a.addr_sub.addr() == addr).then(|| i))
                 .ok_or(NotFoundError)
                 .map(|i| {
-                    let SlaacAddressEntry { addr_sub, config, deprecated: _ } =
+                    let SlaacAddressEntry { addr_sub, config: Ipv6AddrSlaacConfig { inner, .. } } =
                         slaac_addrs.remove(i);
-                    (addr_sub, config)
+                    (addr_sub, inner)
                 })
         }
     }
@@ -1989,6 +1964,20 @@ mod tests {
         })
     }
 
+    impl<Instant> SlaacAddressEntry<Instant> {
+        fn to_deprecated(self) -> Self {
+            let Self { addr_sub, config: Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ } } =
+                self;
+            Self {
+                addr_sub,
+                config: Ipv6AddrSlaacConfig {
+                    inner,
+                    preferred_lifetime: PreferredLifetime::Deprecated,
+                },
+            }
+        }
+    }
+
     #[test_case(ip_v6!("1:2:3:4::"), false; "subnet-router anycast")]
     #[test_case(ip_v6!("::1"), true; "allowed 1")]
     #[test_case(ip_v6!("1:2:3:4::1"), true; "allowed 2")]
@@ -2057,10 +2046,14 @@ mod tests {
         let address_created_deprecated = preferred_lifetime_secs == 0;
         let now = bindings_ctx.now();
         let valid_until = now + Duration::from_secs(valid_lifetime_secs.into());
+        let preferred_lifetime = match preferred_lifetime_secs {
+            0 => PreferredLifetime::Deprecated,
+            secs => PreferredLifetime::preferred_until(now + Duration::from_secs(secs.into())),
+        };
+        let inner = SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) };
         let entry = SlaacAddressEntry {
             addr_sub,
-            config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
-            deprecated: address_created_deprecated,
+            config: Ipv6AddrSlaacConfig { inner, preferred_lifetime },
         };
         assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
         let deprecate_timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
@@ -2074,7 +2067,13 @@ mod tests {
 
             // Trigger the deprecation timer.
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
-            let entry = SlaacAddressEntry { deprecated: true, ..entry };
+            let entry = SlaacAddressEntry {
+                addr_sub,
+                config: Ipv6AddrSlaacConfig {
+                    inner,
+                    preferred_lifetime: PreferredLifetime::Deprecated,
+                },
+            };
             assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         }
         core_ctx.state.slaac_state.timers.assert_timers([(invalidate_timer_id, (), valid_until)]);
@@ -2144,8 +2143,10 @@ mod tests {
         let valid_until = now + Duration::from_secs(LIFETIME_SECS.into());
         let entry = SlaacAddressEntry {
             addr_sub,
-            config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
-            deprecated: false,
+            config: Ipv6AddrSlaacConfig {
+                inner: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
+                preferred_lifetime: PreferredLifetime::preferred_until(valid_until),
+            },
         };
         assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
 
@@ -2159,11 +2160,13 @@ mod tests {
 
         // Remove the address and let SLAAC know the address was removed
         let config = {
-            let SlaacAddressEntry { addr_sub: got_addr_sub, config, deprecated } =
-                core_ctx.state.slaac_addrs.slaac_addrs.remove(0);
+            let SlaacAddressEntry {
+                addr_sub: got_addr_sub,
+                config: Ipv6AddrSlaacConfig { inner, preferred_lifetime },
+            } = core_ctx.state.slaac_addrs.slaac_addrs.remove(0);
             assert_eq!(addr_sub, got_addr_sub);
-            assert!(!deprecated);
-            config
+            assert_eq!(preferred_lifetime, PreferredLifetime::preferred_until(valid_until));
+            inner
         };
         SlaacHandler::on_address_removed(
             &mut core_ctx,
@@ -2315,7 +2318,6 @@ mod tests {
             ndp_pl,
             ndp_vl,
         );
-        let address_created_deprecated = ndp_pl.is_none();
         let now = bindings_ctx.now();
         let mut expected_timers = Vec::new();
         let valid_until = match ndp_vl.expect("this test expects to create an address") {
@@ -2334,8 +2336,10 @@ mod tests {
         }
         let entry = SlaacAddressEntry {
             addr_sub,
-            config: SlaacConfig::Static { valid_until },
-            deprecated: address_created_deprecated,
+            config: Ipv6AddrSlaacConfig {
+                inner: SlaacConfig::Static { valid_until },
+                preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
+            },
         };
         assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
@@ -2368,8 +2372,10 @@ mod tests {
             }
         }
         let entry = SlaacAddressEntry {
-            config: SlaacConfig::Static { valid_until },
-            deprecated: ndp_pl.is_none(),
+            config: Ipv6AddrSlaacConfig {
+                inner: SlaacConfig::Static { valid_until },
+                preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
+            },
             ..entry
         };
         assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
@@ -2664,27 +2670,30 @@ mod tests {
             let desync_factor =
                 desync_factor(rng, NonZeroDuration::new(pl_config).unwrap(), regen_advance)
                     .unwrap();
+            let preferred_until = {
+                let d = creation_time + Duration::from_secs(expected_pl_addr.into());
+                if pl_config.as_secs() > pl_ra.into() {
+                    d + config_greater_than_ra_desync_factor_offset
+                } else {
+                    d - desync_factor
+                }
+            };
 
             AddrProps {
                 desync_factor,
                 valid_until,
-                preferred_until: {
-                    let d = creation_time + Duration::from_secs(expected_pl_addr.into());
-                    if pl_config.as_secs() > pl_ra.into() {
-                        d + config_greater_than_ra_desync_factor_offset
-                    } else {
-                        d - desync_factor
-                    }
-                },
+                preferred_until,
                 entry: SlaacAddressEntry {
                     addr_sub,
-                    config: SlaacConfig::Temporary(TemporarySlaacConfig {
-                        valid_until,
-                        desync_factor,
-                        creation_time,
-                        dad_counter: 0,
-                    }),
-                    deprecated: false,
+                    config: Ipv6AddrSlaacConfig {
+                        inner: SlaacConfig::Temporary(TemporarySlaacConfig {
+                            valid_until,
+                            desync_factor,
+                            creation_time,
+                            dad_counter: 0,
+                        }),
+                        preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
+                    },
                 },
                 deprecate_timer_id: InnerSlaacTimerId::DeprecateSlaacAddress {
                     addr: addr_sub.addr(),
@@ -2750,7 +2759,7 @@ mod tests {
 
         // Deprecate first address.
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()),);
-        let first_entry = SlaacAddressEntry { deprecated: true, ..first_entry };
+        let first_entry = first_entry.to_deprecated();
         assert_eq!(
             core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [first_entry, second_entry]
@@ -2796,7 +2805,7 @@ mod tests {
             invalidate_timer_id: third_invalidate_timer_id,
             regenerate_timer_id: third_regenerate_timer_id,
         } = addr_props(&mut dup_rng, third_created_at, first_desync_factor + second_desync_factor);
-        let second_entry = SlaacAddressEntry { deprecated: true, ..second_entry };
+        let second_entry = second_entry.to_deprecated();
         assert_eq!(
             core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [second_entry, third_entry]
@@ -2821,13 +2830,15 @@ mod tests {
             FakeSlaacAddrs {
                 slaac_addrs: vec![SlaacAddressEntry {
                     addr_sub: testutil::calculate_slaac_addr_sub(SUBNET, IID),
-                    deprecated: false,
-                    config: SlaacConfig::Temporary(TemporarySlaacConfig {
-                        valid_until: want_valid_until,
-                        desync_factor: Duration::default(),
-                        creation_time: FakeInstant::default(),
-                        dad_counter: 0,
-                    }),
+                    config: Ipv6AddrSlaacConfig {
+                        inner: SlaacConfig::Temporary(TemporarySlaacConfig {
+                            valid_until: want_valid_until,
+                            desync_factor: Duration::default(),
+                            creation_time: FakeInstant::default(),
+                            dad_counter: 0,
+                        }),
+                        preferred_lifetime: PreferredLifetime::preferred_forever(),
+                    },
                 }],
                 ..Default::default()
             },
@@ -2845,14 +2856,18 @@ mod tests {
         );
         let addrs = core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>();
         assert_eq!(addrs.len(), 1);
-        assert_matches!(addrs[0], SlaacAddressEntry {
-            config: SlaacConfig::Temporary(TemporarySlaacConfig {
+        let SlaacAddressEntry { config: Ipv6AddrSlaacConfig { inner, preferred_lifetime }, .. } =
+            addrs[0];
+        assert_matches!(inner,SlaacConfig::Temporary(TemporarySlaacConfig {
                 valid_until,
                 ..
-            }),
-            ..
-        } => {
+            }) => {
             assert_eq!(valid_until, want_valid_until);
         });
+        // Even though we don't remove the addresses immediately, they may
+        // become deprecated. So the address is not completely removed as a
+        // side-effect of disabling temporary addresses, but we'll steer it away
+        // from being used more.
+        assert_eq!(preferred_lifetime, PreferredLifetime::Deprecated);
     }
 }

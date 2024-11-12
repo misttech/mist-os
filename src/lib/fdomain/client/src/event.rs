@@ -8,4 +8,4 @@ use crate::Handle;
 /// An event handle in a remote FDomain.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Event(pub(crate) Handle);
-handle_type!(Event);
+handle_type!(Event EVENT);

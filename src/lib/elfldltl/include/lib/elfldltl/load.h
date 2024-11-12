@@ -61,7 +61,7 @@ constexpr auto LoadEhdrFromFile(Diagnostics& diagnostics, File& file,
 //   if (headers) {
 //     auto [ehdr_owner, phdrs_owner] = *headers;
 //     const Ehdr& ehdr = ehdr_owner;
-//     const cpp20::span<const Phdr> phdrs = phdrs_owner;
+//     const std::span<const Phdr> phdrs = phdrs_owner;
 //     ...
 //   }
 // ```
@@ -85,15 +85,20 @@ constexpr auto LoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 // This does the same work as LoadHeadersFromFile, but handles different
 // ELFCLASS (and optionally, ELFDATA) formats in the ELF file.  It returns
 // false if the file is invalid, or else returns the result of invoking the
-// callback as `bool(const Ehdr&, cpp20::span<const Phdr>)` for the particular
+// callback as `bool(const Ehdr&, std::span<const Phdr>)` for the particular
 // Elf64<...> or Elf32<...> instantiation chosen.
+//
+// The MetaAllocator is a lambda <typename T>(size_t) that is called with the
+// specific elfldltl::Elf<...>Phdr type as an explicit template parameter and
+// should otherwise act like the Allocator API object for ReadArrayFromFile<T>.
 //
 // If the optional expected_data argument is provided, it can be std::nullopt
 // to permit callbacks with either data format (byte order) as well as either
 // class.  The final optional argument gives the machine architecture to match,
 // and likewise can be std::nullopt to accept any machine.
-template <template <typename> class PhdrAllocator, class Diagnostics, class File, typename Callback>
-constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Callback&& callback,
+template <class Diagnostics, class File, class MetaAllocator, typename Callback>
+constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
+                                       MetaAllocator&& meta_allocator, Callback&& callback,
                                        std::optional<ElfData> expected_data = ElfData::kNative,
                                        std::optional<ElfMachine> machine = ElfMachine::kNative) {
   using namespace std::literals::string_view_literals;
@@ -109,12 +114,14 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Cal
     if (!ehdr.Loadable(diagnostics, machine)) [[unlikely]] {
       return false;
     }
-    PhdrAllocator<Phdr> phdr_allocator;
+    auto phdr_allocator = [&meta_allocator](size_t size) {
+      return meta_allocator.template operator()<Phdr>(size);
+    };
     auto read_phdrs = ReadPhdrsFromFile(diagnostics, file, phdr_allocator, ehdr);
     if (!read_phdrs) [[unlikely]] {
       return false;
     }
-    cpp20::span<const Phdr> phdrs = *read_phdrs;
+    std::span<const Phdr> phdrs = *read_phdrs;
     return std::invoke(std::forward<Callback>(callback), ehdr, phdrs);
   };
 
@@ -503,7 +510,7 @@ class LoadInfo {
   // markup output stream.
   template <class Writer>
   Writer& SymbolizerContext(Writer& writer, unsigned int id, std::string_view name,
-                            cpp20::span<const std::byte> build_id, size_type load_address,
+                            std::span<const std::byte> build_id, size_type load_address,
                             std::string_view prefix = {}) const {
     writer.Prefix(prefix).ElfModule(id, name, build_id).Newline();
     VisitSegments([&](const auto& segment) {

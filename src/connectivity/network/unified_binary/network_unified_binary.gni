@@ -22,7 +22,7 @@ import("//build/rust/rustc_library.gni")
 #   binary target.
 # - add_configs: applies `configs += add_configs` on the generated
 #   binary and library targets.
-# - bin_build_job_vars: vars to set on the bin for build job configuration.
+# - build_job_vars: vars to set on the generated binary and library targets.
 template("network_unified_binary") {
   _bin_remove_configs = []
   if (defined(invoker.bin_remove_configs)) {
@@ -44,15 +44,15 @@ template("network_unified_binary") {
                            "*",
                            [
                              "bin_remove_configs",
-                             "bin_build_job_vars",
+                             "build_job_vars",
                            ])
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
     configs -= _bin_remove_configs
     configs += _bin_add_configs
     configs += _add_configs
 
-    if (defined(invoker.bin_build_job_vars)) {
-      forward_variables_from(invoker.bin_build_job_vars, "*")
+    if (defined(invoker.build_job_vars)) {
+      forward_variables_from(invoker.build_job_vars, "*")
     }
   }
 
@@ -99,6 +99,10 @@ template("network_unified_binary") {
     # LTO variants.
     if (!is_lto_variant) {
       configs += [ "//build/config/lto:lto-rust-linker-plugin" ]
+    }
+
+    if (defined(invoker.build_job_vars)) {
+      forward_variables_from(invoker.build_job_vars, "*")
     }
   }
 

@@ -8,11 +8,8 @@
 #include <lib/elfldltl/tls-layout.h>
 
 #include <cassert>
-#include <functional>
-
-#if __cpp_impl_three_way_comparison >= 201907L
 #include <compare>
-#endif
+#include <functional>
 
 #include <fbl/alloc_checker.h>
 
@@ -340,29 +337,9 @@ class LoadModuleRef {
   // hashed containers, but only for purposes of lookup, never for enumeration
   // where ordering should be useful.
 
-#if __cpp_impl_three_way_comparison >= 201907L
-
   constexpr std::strong_ordering operator<=>(const LoadModuleRef& other) const {
     return Ordering<std::compare_three_way>(other);
   }
-
-#else  // No operator<=>.
-
-  constexpr bool operator<(const LoadModuleRef& other) const { return Ordering<std::less>(other); }
-
-  constexpr bool operator<=(const LoadModuleRef& other) const {
-    return Ordering<std::less_equal>(other);
-  }
-
-  constexpr bool operator>(const LoadModuleRef& other) const {
-    return Ordering<std::greater>(other);
-  }
-
-  constexpr bool operator>=(const LoadModuleRef& other) const {
-    return Ordering<std::greater_equal>(other);
-  }
-
-#endif  // operator<=>.
 
  private:
   template <class Compare>

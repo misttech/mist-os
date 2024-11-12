@@ -34,7 +34,7 @@ use ::routing::component_instance::{
 };
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
-use ::routing::{DictExt, WeakInstanceTokenExt};
+use ::routing::{DictExt, RouteRequest, WeakInstanceTokenExt};
 use async_trait::async_trait;
 use async_utils::async_once::Once;
 use clonable_error::ClonableError;
@@ -61,7 +61,7 @@ use sandbox::{
     Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Routable, Router,
     RouterResponse, WeakInstanceToken,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 use tracing::warn;
@@ -299,6 +299,9 @@ pub struct ResolvedInstanceState {
     /// Weak reference to the component that owns this state.
     weak_component: WeakComponentInstance,
 
+    /// The component's execution scope, shared with [ComponentInstance::execution_scope].
+    execution_scope: ExecutionScope,
+
     /// Caches an instance token.
     instance_token_state: InstanceTokenState,
 
@@ -345,10 +348,6 @@ pub struct ResolvedInstanceState {
 
     /// The sandbox holds all dictionaries involved in capability routing.
     pub sandbox: ComponentSandbox,
-
-    /// Dictionary of extra capabilities passed to the component when it is started.
-    // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
-    pub program_input_dict_additions: Dict,
 
     /// State held by the framework on behalf of the component's program, including
     /// its outgoing directory server endpoint. Present if and only if the component
@@ -415,6 +414,7 @@ impl ResolvedInstanceState {
 
         let mut state = Self {
             weak_component,
+            execution_scope: component.execution_scope.clone(),
             instance_token_state,
             resolved_component,
             children: HashMap::new(),
@@ -427,7 +427,6 @@ impl ResolvedInstanceState {
             address,
             anonymized_services: HashMap::new(),
             sandbox: Default::default(),
-            program_input_dict_additions: Dict::new(),
             program_escrow,
         };
         state.add_static_children(component).await?;
@@ -475,13 +474,18 @@ impl ResolvedInstanceState {
             child_outgoing_dictionary_routers,
             &decl,
             component_input,
-            &state.program_input_dict_additions,
             program_output_dict,
             build_framework_dictionary(component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
             RoutingFailureErrorReporter::new(component.as_weak()),
         );
+        Self::extend_program_input_namespace_with_legacy(
+            &component,
+            &state.resolved_component.decl,
+            &component_sandbox.program_input.namespace(),
+        );
+
         state.sandbox = component_sandbox;
         state.populate_child_inputs(&state.sandbox.child_inputs).await;
         Ok(state)
@@ -504,7 +508,7 @@ impl ResolvedInstanceState {
         let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
         let outgoing_dir_entry = component
             .get_outgoing()
-            .try_into_directory_entry()
+            .try_into_directory_entry(component.execution_scope.clone())
             .expect("conversion to directory entry should succeed");
         #[derive(Derivative)]
         #[derivative(Debug)]
@@ -562,7 +566,7 @@ impl ResolvedInstanceState {
         let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
         let outgoing_dir_entry = component
             .get_outgoing()
-            .try_into_directory_entry()
+            .try_into_directory_entry(component.execution_scope.clone())
             .expect("conversion to directory entry should succeed");
         let dir_entry =
             DirEntry::new(Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type)));
@@ -671,6 +675,59 @@ impl ResolvedInstanceState {
             .clone())
     }
 
+    fn extend_program_input_namespace_with_legacy(
+        component: &Arc<ComponentInstance>,
+        decl: &cm_rust::ComponentDecl,
+        out_dict: &Dict,
+    ) {
+        let uses = Self::deduplicate_event_stream(decl.uses.iter());
+        for use_ in uses {
+            let path: cm_types::Path = match use_ {
+                cm_rust::UseDecl::Protocol(d) => d.target_path.clone(),
+                cm_rust::UseDecl::Service(d) => d.target_path.clone(),
+                cm_rust::UseDecl::Directory(d) => d.target_path.clone(),
+                cm_rust::UseDecl::Storage(d) => d.target_path.clone(),
+                cm_rust::UseDecl::EventStream(d) => d.target_path.clone(),
+                cm_rust::UseDecl::Runner(d) => format!("/{}", d.source_name).parse().unwrap(),
+                cm_rust::UseDecl::Config(d) => format!("/{}", d.target_name).parse().unwrap(),
+            };
+            if !sandbox_construction::is_supported_use(&use_) {
+                // Legacy capability.
+                let request = RouteRequest::from(use_.clone());
+                let Some(capability) = request.into_capability(component) else {
+                    continue;
+                };
+                match out_dict.insert_capability(&path, capability) {
+                    Ok(()) => {}
+                    Err(e) => warn!("failed to insert {path} in program input dict: {e:?}"),
+                };
+            }
+        }
+    }
+
+    /// This function transforms a sequence of [`UseDecl`] such that the duplicate event stream
+    /// uses by paths are removed.
+    ///
+    /// Different from all other use declarations, multiple event stream capabilities may be used
+    /// at the same path, the semantics being a single FIDL protocol capability is made available
+    /// at that path, subscribing to all the specified events:
+    /// see [`crate::model::events::registry::EventRegistry`].
+    fn deduplicate_event_stream<'a>(
+        iter: std::slice::Iter<'a, UseDecl>,
+    ) -> impl Iterator<Item = &'a UseDecl> {
+        let mut paths = HashSet::new();
+        iter.filter_map(move |use_decl| match use_decl {
+            UseDecl::EventStream(ref event_stream) => {
+                if !paths.insert(event_stream.target_path.clone()) {
+                    None
+                } else {
+                    Some(use_decl)
+                }
+            }
+            _ => Some(use_decl),
+        })
+    }
+
     /// Returns a [`Dict`] with contents similar to `component_output_dict`, but adds capabilities
     /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
     /// to generate the `exposed_dir`.
@@ -702,7 +759,9 @@ impl ResolvedInstanceState {
                     Some(r) => r,
                     None => continue,
                 };
-            let capability = request.into_capability(component);
+            let Some(capability) = request.into_capability(component) else {
+                continue;
+            };
             match target_dict.insert_capability(target_name, capability) {
                 Ok(()) => (),
                 Err(e) => warn!("failed to insert {} in target dict: {e:?}", target_name),
@@ -715,7 +774,7 @@ impl ResolvedInstanceState {
             let exposed_dict = self.get_exposed_dict().await.clone();
             DirEntry::new(
                 exposed_dict
-                    .try_into_directory_entry()
+                    .try_into_directory_entry(self.execution_scope.clone())
                     .expect("converting exposed dict to open should always succeed"),
             )
         };

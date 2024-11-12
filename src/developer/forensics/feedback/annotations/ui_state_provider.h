@@ -54,7 +54,7 @@ class UIStateProvider : public fuchsia::ui::activity::Listener,
   std::unique_ptr<backoff::Backoff> backoff_;
 
   std::optional<ErrorOrString> current_state_;
-  std::variant<std::monostate, Error, zx::time> last_transition_time_;
+  std::variant<std::monostate, Error, zx::time_monotonic> last_transition_time_;
 
   ::fit::function<void(Annotations)> on_update_;
 

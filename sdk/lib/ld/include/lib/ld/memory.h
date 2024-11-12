@@ -26,7 +26,7 @@ class ModuleMemory : public elfldltl::DirectMemory {
 
  private:
   template <class Module>
-  static cpp20::span<std::byte> Image(const Module& module) {
+  static std::span<std::byte> Image(const Module& module) {
     uintptr_t start = module.vaddr_start;
     size_t size = module.vaddr_end - module.vaddr_start;
     return {reinterpret_cast<std::byte*>(start), size};

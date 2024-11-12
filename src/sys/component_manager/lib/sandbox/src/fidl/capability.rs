@@ -8,6 +8,7 @@ use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
 
 impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
@@ -109,21 +110,24 @@ impl TryFrom<fsandbox::Capability> for Capability {
 }
 
 impl RemotableCapability for Capability {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
-            Self::Connector(s) => s.try_into_directory_entry(),
-            Self::DirConnector(s) => s.try_into_directory_entry(),
-            Self::DirEntry(s) => s.try_into_directory_entry(),
-            Self::ConnectorRouter(s) => s.try_into_directory_entry(),
-            Self::DictionaryRouter(s) => s.try_into_directory_entry(),
-            Self::DirEntryRouter(s) => s.try_into_directory_entry(),
-            Self::DataRouter(s) => s.try_into_directory_entry(),
-            Self::Dictionary(s) => s.try_into_directory_entry(),
-            Self::Data(s) => s.try_into_directory_entry(),
-            Self::Unit(s) => s.try_into_directory_entry(),
-            Self::Directory(s) => s.try_into_directory_entry(),
-            Self::Handle(s) => s.try_into_directory_entry(),
-            Self::Instance(s) => s.try_into_directory_entry(),
+            Self::Connector(s) => s.try_into_directory_entry(scope),
+            Self::DirConnector(s) => s.try_into_directory_entry(scope),
+            Self::DirEntry(s) => s.try_into_directory_entry(scope),
+            Self::ConnectorRouter(s) => s.try_into_directory_entry(scope),
+            Self::DictionaryRouter(s) => s.try_into_directory_entry(scope),
+            Self::DirEntryRouter(s) => s.try_into_directory_entry(scope),
+            Self::DataRouter(s) => s.try_into_directory_entry(scope),
+            Self::Dictionary(s) => s.try_into_directory_entry(scope),
+            Self::Data(s) => s.try_into_directory_entry(scope),
+            Self::Unit(s) => s.try_into_directory_entry(scope),
+            Self::Directory(s) => s.try_into_directory_entry(scope),
+            Self::Handle(s) => s.try_into_directory_entry(scope),
+            Self::Instance(s) => s.try_into_directory_entry(scope),
         }
     }
 }

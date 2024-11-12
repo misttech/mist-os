@@ -187,10 +187,13 @@ impl<'n> EncodeBuffer<'n> {
                 self.encode_handle(*object_type, *rights, HandleType::Bare, *nullable, value)
             }
             FrameworkError => self.encode_raw(&[0, 0, 0, 0]),
-            Request { identifier, rights, nullable } => self.encode_handle(
+            Endpoint { role, protocol, rights, nullable } => self.encode_handle(
                 fidl::ObjectType::CHANNEL,
                 *rights,
-                HandleType::ServerEnd(identifier),
+                match role {
+                    library::EndpointRole::Client => HandleType::ClientEnd(protocol),
+                    library::EndpointRole::Server => HandleType::ServerEnd(protocol),
+                },
                 *nullable,
                 value,
             ),
@@ -430,13 +433,10 @@ impl<'n> EncodeBuffer<'n> {
             (Table(t), false) => self.encode_table(t, value),
             (Struct(s), nullable) => self.encode_struct(s, nullable, value),
             (Union(u), nullable) => self.encode_union(u, nullable, value),
-            (Protocol(_), nullable) => self.encode_handle(
-                fidl::ObjectType::CHANNEL,
-                fidl::Rights::CHANNEL_DEFAULT,
-                HandleType::ClientEnd(&name),
-                nullable,
-                value,
-            ),
+            (Protocol(_), _) => Err(Error::LibraryError(format!(
+                "Protocol names cannot be used as identifiers: {}",
+                name
+            ))),
             _ => Err(Error::LibraryError(format!("Type {} shouldn't be nullable", name))),
         }
     }

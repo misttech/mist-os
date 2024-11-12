@@ -466,6 +466,11 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(start_result.error_value()));
     return;
   }
+  if (request.setup_event().is_valid()) {
+    request.setup_event().signal(0, ZX_EVENT_SIGNALED);
+  } else {
+    FDF_LOG(WARNING, "Invalid setup_event for timer id: %zu", request.id());
+  }
   timers_[timer_index].power_enabled_wait_completer = completer.ToAsync();
 }
 

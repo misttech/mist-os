@@ -56,7 +56,6 @@ enum class VmCowPagesOptions : uint32_t {
   // Internal-only flags:
   kHidden = (1u << 1),
   kSlice = (1u << 2),
-  kUnpinOnDelete = (1u << 3),
 
   kInternalOnlyMask = kHidden | kSlice,
 };

@@ -6,12 +6,12 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_NOTE_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
-#include <zircon/assert.h>
 
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -27,7 +27,7 @@ namespace elfldltl {
 // This represents one decoded ELF note.  It's created ephemerally to yield
 // views on the name and desc (payload), along with the type value.
 struct ElfNote {
-  using Bytes = cpp20::span<const std::byte>;
+  using Bytes = std::span<const std::byte>;
 
   constexpr ElfNote() = default;
 
@@ -115,19 +115,19 @@ class ElfNoteSegment {
     constexpr bool operator!=(const iterator& other) const { return !(*this == other); }
 
     ElfNote operator*() const {
-      ZX_DEBUG_ASSERT(Check(notes_));
+      assert(Check(notes_));
       return {Header(notes_), notes_};
     }
 
     iterator& operator++() {  // prefix
-      ZX_DEBUG_ASSERT(Check(notes_));
+      assert(Check(notes_));
       notes_ = notes_.subspan(Header(notes_).size_bytes());
       if (!Check(notes_)) {
         // Ignore any odd bytes at the end of the segment and move to end()
         // state if there isn't space for another note.
         notes_ = notes_.subspan(notes_.size());
       }
-      ZX_DEBUG_ASSERT(notes_.empty() || Check(notes_));
+      assert(notes_.empty() || Check(notes_));
       return *this;
     }
 
@@ -144,7 +144,7 @@ class ElfNoteSegment {
     // end() state), or else contains at least one whole valid note.
 
     explicit constexpr iterator(Bytes notes) : notes_(notes) {
-      ZX_DEBUG_ASSERT(notes_.empty() || Check(notes_));
+      assert(notes_.empty() || Check(notes_));
     }
 
     Bytes notes_;

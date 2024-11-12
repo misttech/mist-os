@@ -163,9 +163,6 @@ std::optional<ParentElement> PowerElementVisitor::GetParentElementFromLevelRef(
     if (power_element.name() == "execution-state-element") {
       return ParentElement::WithSag(SagElement::kExecutionState);
     }
-    if (power_element.name() == "wake-handling-element") {
-      return ParentElement::WithSag(SagElement::kWakeHandling);
-    }
     if (power_element.name() == "application-activity-element") {
       return ParentElement::WithSag(SagElement::kApplicationActivity);
     }

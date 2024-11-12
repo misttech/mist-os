@@ -87,7 +87,7 @@ bool ConfigureMany(perftest::RepeatState* state) {
       FX_CHECK(client->StartTracing({}).is_ok());
       state->NextStep();
 
-      FX_CHECK(client->StopTracing({{{.write_results = {false}}}}).is_ok());
+      FX_CHECK(client->StopTracing({{.write_results = {false}}}).is_ok());
       state->NextStep();
     }
     // Session should be terminated by now.

@@ -55,7 +55,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
 
   controller_client->StartTracing({});
   loop.Run(zx::deadline_after(zx::sec(1)));
-  controller_client->StopTracing({{{.write_results = true}}});
+  controller_client->StopTracing({{.write_results = true}});
 
   size_t num_perfetto_bytes = 0;
   trace::TraceReader::RecordConsumer handle_perfetto_blob =

@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Directory, RemotableCapability};
+use crate::{ConversionError, Directory, RemotableCapability};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
 
 impl Directory {
@@ -17,7 +18,14 @@ impl Directory {
     }
 }
 
-impl RemotableCapability for Directory {}
+impl RemotableCapability for Directory {
+    fn try_into_directory_entry(
+        self,
+        _scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        Ok(self.into_remote())
+    }
+}
 
 // These tests only run on target because the vfs library is not generally available on host.
 #[cfg(test)]
@@ -78,8 +86,9 @@ mod tests {
 
         let dir_entry = DirEntry::new(Arc::new(MockDir(open_tx)));
 
+        let scope = ExecutionScope::new();
         let fs = pseudo_directory! {
-            "foo" => dir_entry.try_into_directory_entry().unwrap(),
+            "foo" => dir_entry.try_into_directory_entry(scope).unwrap(),
         };
 
         // Create a Directory capability, and a clone.

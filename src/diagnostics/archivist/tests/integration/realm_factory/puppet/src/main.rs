@@ -305,6 +305,7 @@ async fn handle_puppet_request(
 
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(fpuppet::LogPuppetLogRequest)]
+#[fidl_table_strict]
 pub struct LogRequest {
     pub message: String,
     pub severity: fdiagnostics::Severity,

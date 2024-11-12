@@ -233,6 +233,84 @@ the `fx test` command with `zxdb`.
   [zxdb]
   ```
 
+  Or, when in an asynchronous context, you can use `async-backtrace`, for example:
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] async-backtrace
+  Task(id = 0)
+  └─ fuchsia_async::test_support::«impl»::run_singlethreaded::λ • test_support.rs:122
+     └─ fuchsia_async::test_support::«impl»::run_singlethreaded::λ • test_support.rs:27
+        └─ archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point • archivist.rs:546
+           └─ futures_util::stream::stream::next::Next
+  Task(id = 1)
+  └─ diagnostics_log::fuchsia::filter::«impl»::listen_to_interest_changes • fuchsia/filter.rs:77
+     └─ fidl::client::QueryResponseFut
+  Task(id = 2)
+  └─ archivist_lib_lib_test::logs::repository::«impl»::new • logs/repository.rs:433
+     └─ futures_util::stream::stream::next::Next
+  Task(id = 3)
+  └─ archivist_lib_lib_test::logs::repository::«impl»::process_removal_of_components • logs/repository.rs:232
+     └─ futures_util::stream::stream::next::Next
+  Task(id = 4)
+  └─ archivist_lib_lib_test::logs::servers::log_settings::«impl»::new • log_settings.rs:33
+     └─ futures_util::stream::stream::for_each_concurrent::ForEachConcurrent
+  Task(id = 5)
+  └─ archivist_lib_lib_test::inspect::servers::inspect_sink::«impl»::new • inspect_sink.rs:42
+     └─ futures_util::stream::stream::for_each_concurrent::ForEachConcurrent
+  Task(id = 6)
+  └─ archivist_lib_lib_test::logs::servers::log_settings::«impl»::new • log_settings.rs:33
+     └─ futures_util::stream::stream::for_each_concurrent::ForEachConcurrent
+  Task(id = 7)
+  └─ archivist_lib_lib_test::logs::servers::log_settings::«impl»::new • log_settings.rs:33
+     └─ futures_util::stream::stream::for_each_concurrent::ForEachConcurrent
+  Task(id = 8)
+  └─ archivist_lib_lib_test::logs::servers::log_settings::«impl»::new • log_settings.rs:33
+     └─ futures_util::stream::stream::for_each_concurrent::ForEachConcurrent
+  Task(id = 9)
+  └─ archivist_lib_lib_test::archivist::tests::run_archivist::λ • archivist.rs:518
+     └─ archivist_lib_lib_test::archivist::«impl»::run • archivist.rs:342
+        └─ futures_util::future::join::Join3
+  Task(id = 10)
+  └─ archivist_lib_lib_test::logs::testing::start_listener • logs/testing.rs:592
+     └─ fuchsia_syslog_listener::run_log_listener_with_proxy • syslog-listener/src/lib.rs:78
+        └─ fuchsia_syslog_listener::log_listener • syslog-listener/src/lib.rs:34
+           └─ futures_util::stream::try_stream::try_next::TryNext
+  Task(id = 11)
+  └─ inspect_runtime::service::spawn_tree_server_with_stream • runtime/rust/src/service.rs:80
+     └─ inspect_runtime::service::handle_request_stream • runtime/rust/src/service.rs:28
+        └─ futures_util::stream::try_stream::try_next::TryNext
+  Task(id = 12)
+  └─ archivist_lib_lib_test::archivist::«impl»::run::λ • archivist.rs:293
+     └─ archivist_lib_lib_test::events::router::«impl»::start • router.rs:96
+        └─ futures_util::stream::stream::next::Next
+  Task(id = 14)
+  └─ archivist_lib_lib_test::logs::servers::log::«impl»::spawn • log.rs:46
+     └─ archivist_lib_lib_test::logs::servers::log::«impl»::handle_requests • log.rs:78
+        └─ futures_util::stream::stream::next::Next
+  Task(id = 15)
+  └─ archivist_lib_lib_test::logs::listener::«impl»::spawn • logs/listener.rs:83
+     └─ archivist_lib_lib_test::logs::listener::«impl»::run • logs/listener.rs:106
+        └─ archivist_lib_lib_test::logs::listener::«impl»::send_new_logs • logs/listener.rs:123
+           └─ archivist_lib_lib_test::logs::listener::«impl»::send_log • logs/listener.rs:181
+              └─ fidl::client::QueryResponseFut
+  Task(id = 16)
+  └─ archivist_lib_lib_test::logs::container::«impl»::actually_handle_log_sink • logs/container.rs:256
+     └─ futures_util::stream::stream::next::Next
+  Task(id = 17)
+  └─ archivist_lib_lib_test::logs::container::«impl»::drain_messages • logs/container.rs:373
+     └─ futures_util::stream::stream::next::Next
+  Task(id = 18)
+  └─ archivist_lib_lib_test::logs::container::«impl»::actually_handle_log_sink • logs/container.rs:256
+     └─ futures_util::stream::stream::next::Next
+  Task(id = 19)
+  └─ archivist_lib_lib_test::logs::container::«impl»::drain_messages • logs/container.rs:373
+     └─ futures_util::stream::stream::next::Next
+  Scope(0x1771eceb2a0)
+  └─ Task(id = 13)
+     └─ vfs::execution_scope::«impl»::spawn • execution_scope.rs:120
+        └─ core::future::poll_fn::PollFn
+  ```
+
   All commands that you run are in the context of frame #17, as indicated by `▶`.
   You can list the source code again with a little bit of additional context:
 

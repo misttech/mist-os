@@ -128,7 +128,7 @@ impl Identifier for HostIdentifier {
             .map(|(_, v): (u64, _)| v)
             .flat_map(|properties_and_state| {
                 properties_and_state.properties.addresses.into_iter().filter_map(
-                    |fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }| {
+                    |fnet_interfaces_ext::Address { addr, assignment_state, .. }| {
                         match assignment_state {
                             fnet_interfaces::AddressAssignmentState::Assigned => Some(addr),
                             fnet_interfaces::AddressAssignmentState::Tentative

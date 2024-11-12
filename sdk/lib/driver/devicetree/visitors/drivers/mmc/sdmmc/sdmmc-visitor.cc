@@ -49,6 +49,7 @@ zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
   }
 
   fuchsia_hardware_sdmmc::SdmmcMetadata sdmmc_metadata = {};
+  sdmmc_metadata.instance_identifier() = node.name();
 
   if (parser_output->find(kMaxFrequency) != parser_output->end()) {
     sdmmc_metadata.max_frequency() = parser_output->at(kMaxFrequency)[0].AsUint32();

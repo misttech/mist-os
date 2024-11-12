@@ -365,6 +365,55 @@ impl Into<Vec<u8>> for ResultBuffer {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum KmsgLevel {
+    Emergency = 0,
+    Alert = 1,
+    Critical = 2,
+    Error = 3,
+    Warning = 4,
+    Notice = 5,
+    Info = 6,
+    Debug = 7,
+}
+
+impl KmsgLevel {
+    fn from_raw(value: u8) -> Option<KmsgLevel> {
+        if value < 8 {
+            // SAFETY: validated the range in previous line.
+            Some(unsafe { std::mem::transmute(value) })
+        } else {
+            None
+        }
+    }
+}
+
+/// Given a string starting with <[0-9]*>, returns the level interpreted from the lower 3 bits.
+/// The next 8 is the facility, which we ignore atm.
+/// If the string doesn't start with a valid level, we return None.
+/// The slice returned is the rest of the message after the closing '>'.
+///
+/// Reference: https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
+pub(crate) fn extract_level(msg: &[u8]) -> Option<(KmsgLevel, &[u8])> {
+    let mut bytes_iter = msg.iter();
+    let Some(c) = bytes_iter.next() else {
+        return None;
+    };
+    if *c != b'<' {
+        return None;
+    }
+    let Some(end) = bytes_iter.enumerate().find(|(_, c)| **c == b'>').map(|(i, _)| i + 1) else {
+        return None;
+    };
+    std::str::from_utf8(&msg[1..end])
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(|level| (level & 0x07) as u8)
+        .and_then(KmsgLevel::from_raw)
+        .map(|level| (level, &msg[end + 1..]))
+}
+
 fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
     let mut formatted_tags = match data.tags() {
         None => vec![],
@@ -386,14 +435,17 @@ fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
     };
 
     let mut result = Vec::<u8>::new();
-    let level = match data.severity() {
-        Severity::Trace | Severity::Debug => 7,
-        Severity::Info => 6,
-        Severity::Warn => 4,
-        Severity::Error => 3,
-        Severity::Fatal => 2,
+    let (level, msg_after_level) = match data.msg().and_then(|msg| extract_level(msg.as_bytes())) {
+        Some((level, remaining_msg)) => (level as u8, Some(remaining_msg)),
+        None => match data.severity() {
+            Severity::Trace | Severity::Debug => (KmsgLevel::Debug as u8, None),
+            Severity::Info => (KmsgLevel::Info as u8, None),
+            Severity::Warn => (KmsgLevel::Warning as u8, None),
+            Severity::Error => (KmsgLevel::Error as u8, None),
+            Severity::Fatal => (KmsgLevel::Critical as u8, None),
+        },
     };
-    let time = zx::MonotonicDuration::from_nanos(data.metadata.timestamp.into_nanos());
+    let time = zx::BootDuration::from_nanos(data.metadata.timestamp.into_nanos());
     let component_name = data.component_name();
     let time_secs = time.into_seconds();
     let time_fract = time.into_micros() % 1_000_000;
@@ -406,7 +458,9 @@ fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
 
     result.append(&mut formatted_tags);
 
-    if let Some(msg) = data.msg() {
+    if let Some(msg) = msg_after_level {
+        write!(&mut result, "{}", String::from_utf8_lossy(msg))?;
+    } else if let Some(msg) = data.msg() {
         write!(&mut result, "{msg}")?;
     }
 
@@ -436,5 +490,37 @@ mod tests {
         for i in 0..50u8 {
             assert_eq!(result[i as usize], i);
         }
+    }
+
+    #[test]
+    fn test_extract_level() {
+        for level in 0..8 {
+            let msg = format!("<{level}> some message");
+            let result = extract_level(msg.as_bytes()).map(|(x, i)| (x as u8, i));
+            assert_eq!(Some((level, " some message".as_bytes())), result);
+        }
+    }
+
+    #[test]
+    fn parse_message_accepts_levels_greater_than_7() {
+        assert_eq!(
+            Some((KmsgLevel::Warning, " message".as_bytes())),
+            extract_level("<100> message".as_bytes())
+        );
+    }
+
+    #[test]
+    fn parse_message_defaults_when_non_numbers() {
+        assert_eq!(None, extract_level("<a> some message".as_bytes()));
+    }
+
+    #[test]
+    fn parse_message_defaults_when_invalid_level_syntax() {
+        assert_eq!(None, extract_level("<1 some message".as_bytes()));
+    }
+
+    #[test]
+    fn parse_message_defaults_when_no_level() {
+        assert_eq!(None, extract_level("some message".as_bytes()));
     }
 }

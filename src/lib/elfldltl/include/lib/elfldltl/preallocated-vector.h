@@ -5,10 +5,10 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PREALLOCATED_VECTOR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PREALLOCATED_VECTOR_H_
 
-#include <lib/stdcompat/span.h>
-
+#include <cassert>
 #include <new>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -26,8 +26,8 @@ namespace elfldltl {
 //
 // This can be default-constructed (with zero capacity) and then move-assigned
 // from another object constructed with storage.  It's usually constructed via
-// the deduction guide with any cpp20::span argument.
-template <typename T, size_t N = cpp20::dynamic_extent>
+// the deduction guide with any std::span argument.
+template <typename T, size_t N = std::dynamic_extent>
 class PreallocatedVector {
  public:
   using value_type = T;
@@ -35,10 +35,10 @@ class PreallocatedVector {
   using const_pointer = const T*;
   using reference = T&;
   using const_reference = const T&;
-  using iterator = typename cpp20::span<T>::iterator;
-  using const_iterator = typename cpp20::span<const T, N>::iterator;
-  using reverse_iterator = typename cpp20::span<T, N>::reverse_iterator;
-  using const_reverse_iterator = typename cpp20::span<const T, N>::reverse_iterator;
+  using iterator = typename std::span<T>::iterator;
+  using const_iterator = typename std::span<const T, N>::iterator;
+  using reverse_iterator = typename std::span<T, N>::reverse_iterator;
+  using const_reverse_iterator = typename std::span<const T, N>::reverse_iterator;
 
   constexpr PreallocatedVector() = default;
 
@@ -47,16 +47,16 @@ class PreallocatedVector {
   template <size_t OtherN>
   constexpr explicit PreallocatedVector(PreallocatedVector<T, OtherN>&& other) noexcept
       : PreallocatedVector(other.storage_) {
-    static_assert(N == cpp20::dynamic_extent || OtherN == N);
+    static_assert(N == std::dynamic_extent || OtherN == N);
   }
 
-  constexpr explicit PreallocatedVector(cpp20::span<T, N> storage) : storage_(storage) {}
+  constexpr explicit PreallocatedVector(std::span<T, N> storage) : storage_(storage) {}
 
   constexpr PreallocatedVector& operator=(PreallocatedVector&&) noexcept = default;
 
   template <size_t OtherN>
   constexpr PreallocatedVector& operator=(PreallocatedVector<T, OtherN>&& other) noexcept {
-    static_assert(N == cpp20::dynamic_extent || OtherN == N);
+    static_assert(N == std::dynamic_extent || OtherN == N);
     *this = PreallocatedVector(other.storage_);
     return *this;
   }
@@ -69,8 +69,8 @@ class PreallocatedVector {
 
   constexpr size_t capacity() const { return storage_.size(); }
 
-  constexpr cpp20::span<T> as_span() { return storage_.subspan(0, size_); }
-  constexpr cpp20::span<const T> as_span() const { return storage_.subspan(0, size_); }
+  constexpr std::span<T> as_span() { return storage_.subspan(0, size_); }
+  constexpr std::span<const T> as_span() const { return storage_.subspan(0, size_); }
 
   constexpr pointer data() { return as_span().data(); }
   constexpr const_pointer data() const { return as_span().data(); }
@@ -164,7 +164,7 @@ class PreallocatedVector {
     // Default-construct the new elements.
     size_t old_size = size_;
     size_ = new_size;
-    for (auto& elt : cpp20::span(data(), capacity()).subspan(old_size)) {
+    for (auto& elt : std::span(data(), capacity()).subspan(old_size)) {
       new (&elt) T();
     }
     return true;
@@ -245,7 +245,7 @@ class PreallocatedVector {
  private:
   template <class Diagnostics, typename... Args>
   constexpr void ResourceLimit(Diagnostics& diag, Args... args) {
-    if constexpr (N != cpp20::dynamic_extent) {
+    if constexpr (N != std::dynamic_extent) {
       diag.template ResourceLimit<N>(args...);
     } else {
       diag.ResourceLimit(capacity(), args...);
@@ -270,12 +270,12 @@ class PreallocatedVector {
   }
 
   size_t size_ = 0;
-  cpp20::span<T, N> storage_;
+  std::span<T, N> storage_;
 };
 
 // Deduction guide.
 template <typename T, size_t N>
-PreallocatedVector(cpp20::span<T, N>) -> PreallocatedVector<T, N>;
+PreallocatedVector(std::span<T, N>) -> PreallocatedVector<T, N>;
 
 }  // namespace elfldltl
 

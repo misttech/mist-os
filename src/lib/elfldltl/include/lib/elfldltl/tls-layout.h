@@ -5,9 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TLS_LAYOUT_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TLS_LAYOUT_H_
 
-#include <lib/stdcompat/bit.h>
-
 #include <algorithm>
+#include <bit>
 #include <cassert>
 
 #include "constants.h"
@@ -46,7 +45,7 @@ class TlsLayout {
     using Traits = TlsTraits<Elf, Machine>;
 
     segment_alignment = std::max<size_type>(segment_alignment, 1);
-    assert(cpp20::has_single_bit(segment_alignment));
+    assert(std::has_single_bit(segment_alignment));
 
     // The first module gets assigned at a fixed offset.  This isn't just made
     // the initializer value for size_bytes_ for two reasons: to keep this type

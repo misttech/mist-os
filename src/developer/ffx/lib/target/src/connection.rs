@@ -7,6 +7,11 @@ use crate::target_connector::TargetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
+use fdomain_client::fidl::DiscoverableProtocolMarker;
+use fdomain_fuchsia_developer_remotecontrol::{
+    RemoteControlMarker as FDRemoteControlMarker, RemoteControlProxy as FDRemoteControlProxy,
+};
+use fdomain_fuchsia_io as fio;
 use ffx_ssh::parse::HostAddr;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
@@ -23,7 +28,8 @@ struct RcsInfo {
 /// Represents a direct (no daemon) connection to a Fuchsia target.
 #[derive(Debug)]
 pub struct Connection {
-    overnet: OvernetClient,
+    overnet: Option<OvernetClient>,
+    fdomain: Option<Arc<fdomain_client::Client>>,
     fidl_pipe: FidlPipe,
     rcs_info: Mutex<Option<RcsInfo>>,
 }
@@ -37,6 +43,8 @@ pub enum ConnectionError {
     // TODO(b/339266778): change knock errors to non-fidl types.
     #[error("knock error: {0:?}")]
     KnockError(#[source] anyhow::Error),
+    #[error("Overnet isn't supported for this target")]
+    OvernetUnsupported,
 }
 
 impl Connection {
@@ -55,10 +63,11 @@ impl Connection {
     #[tracing::instrument(level = "debug")]
     pub async fn new(connector: impl TargetConnector + 'static) -> Result<Self, ConnectionError> {
         let connector_debug_string = format!("{connector:?}");
-        let (fidl_pipe, node) = FidlPipe::start_internal(connector).await.map_err(|e| {
+        let (fidl_pipe, node, client) = FidlPipe::start_internal(connector).await.map_err(|e| {
             ConnectionError::ConnectionStartError(connector_debug_string, e.to_string())
         })?;
-        Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_info: Default::default() })
+        let overnet = node.map(|node| OvernetClient { node });
+        Ok(Self { overnet, fdomain: client, fidl_pipe, rcs_info: Default::default() })
     }
 
     /// Attempts to retrieve an instance of the remote control proxy. When invoked for the first
@@ -66,8 +75,9 @@ impl Connection {
     /// the caller's responsibility to time out.
     pub async fn rcs_proxy(&self) -> Result<RemoteControlProxy, ConnectionError> {
         let mut rcs_info = self.rcs_info.lock().await;
+        let overnet = self.overnet.as_ref().ok_or(ConnectionError::OvernetUnsupported)?;
         if rcs_info.is_none() {
-            let (proxy, node_id) = self.overnet.connect_remote_control().await.map_err(|e| {
+            let (proxy, node_id) = overnet.connect_remote_control().await.map_err(|e| {
                 ConnectionError::KnockError(
                     self.wrap_connection_errors(e).context("getting RCS proxy"),
                 )
@@ -78,7 +88,7 @@ impl Connection {
             fidl::endpoints::create_proxy::<RemoteControlMarker>()
                 .map_err(|e| ConnectionError::InternalError(e.into()))?;
         let node_id = rcs_info.as_ref().unwrap().node_id;
-        self.overnet
+        overnet
             .node
             .connect_to_service(
                 node_id,
@@ -92,6 +102,31 @@ impl Connection {
                 )
             })?;
         Ok(remote_proxy)
+    }
+
+    /// Attempts to retrieve an instance of the remote control proxy. When invoked for the first
+    /// time, this function will run indefinitely until it finds a remote control proxy, so it is
+    /// the caller's responsibility to time out.
+    pub async fn rcs_proxy_fdomain(&self) -> Result<FDRemoteControlProxy, ConnectionError> {
+        let Some(fdomain) = &self.fdomain else {
+            todo!("overnet passthrough unsupported");
+        };
+
+        let (proxy, server_end) = fdomain
+            .create_proxy::<FDRemoteControlMarker>()
+            .await
+            .map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let ns = fdomain.namespace().await.map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let ns = fio::DirectoryProxy::new(ns);
+        ns.open3(
+            FDRemoteControlMarker::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end.into_channel(),
+        )
+        .map_err(|e| ConnectionError::InternalError(e.into()))?;
+
+        Ok(proxy)
     }
 
     /// Takes a given connection error and, if there have been underlying connection errors, adds

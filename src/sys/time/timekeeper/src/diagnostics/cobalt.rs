@@ -117,7 +117,7 @@ impl CobaltDiagnostics {
     }
 
     /// Records an update to the Kalman filter state, including an event and a covariance report.
-    fn record_kalman_filter_update(&self, track: Track, sqrt_covariance: zx::MonotonicDuration) {
+    fn record_kalman_filter_update(&self, track: Track, sqrt_covariance: zx::BootDuration) {
         let mut locked_sender = self.sender.lock();
         let cobalt_track = Into::<CobaltTrack>::into(track);
         locked_sender.send(
@@ -204,9 +204,9 @@ impl CobaltDiagnostics {
         );
         if track == Track::Monitor {
             if let Some(monitor_clock) = self.monitor_clock.as_ref() {
-                let monotonic_ref = zx::MonotonicInstant::get();
-                let primary = time_at_monotonic(&self.primary_clock, monotonic_ref);
-                let monitor = time_at_monotonic(monitor_clock, monotonic_ref);
+                let reference = zx::BootInstant::get();
+                let primary = time_at_monotonic(&self.primary_clock, reference);
+                let monitor = time_at_monotonic(monitor_clock, reference);
                 let direction =
                     if monitor >= primary { Direction::Positive } else { Direction::Negative };
                 locked_sender.send(
@@ -332,7 +332,7 @@ mod test {
     // in timing, this interval may sometimes be too small and cause flaky
     // tests. The flake rate for 10ms was 0.15 flakes/day, this should be
     // somewhat better.
-    const MONITOR_OFFSET_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(40);
+    const MONITOR_OFFSET_ERROR: zx::BootDuration = zx::BootDuration::from_millis(40);
 
     fn create_clock(time: UtcInstant) -> Arc<UtcClock> {
         let clk = UtcClock::create(zx::ClockOpts::empty(), None).unwrap();
@@ -423,7 +423,7 @@ mod test {
 
         diagnostics.record(Event::SampleRejected {
             role: Role::Primary,
-            error: SampleValidationError::MonotonicTooOld,
+            error: SampleValidationError::ReferenceInstantTooOld,
         });
         assert_eq!(
             mpsc_receiver.next().await,
@@ -479,9 +479,9 @@ mod test {
 
         diagnostics.record(Event::KalmanFilterUpdated {
             track: Track::Primary,
-            monotonic: zx::MonotonicInstant::from_nanos(333_000_000_000),
+            reference: zx::BootInstant::from_nanos(333_000_000_000),
             utc: UtcInstant::from_nanos(4455445544_000_000_000),
-            sqrt_covariance: zx::MonotonicDuration::from_micros(55555),
+            sqrt_covariance: zx::BootDuration::from_micros(55555),
         });
         assert_eq!(
             mpsc_receiver.next().await,
@@ -506,7 +506,7 @@ mod test {
 
         diagnostics.record(Event::FrequencyUpdated {
             track: Track::Primary,
-            monotonic: zx::MonotonicInstant::from_nanos(888_000_000_000),
+            reference: zx::BootInstant::from_nanos(888_000_000_000),
             rate_adjust_ppm: -4,
             window_count: 7,
         });

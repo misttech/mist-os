@@ -5,7 +5,7 @@
 #ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
 #define LIB_DL_TEST_DL_IMPL_TESTS_H_
 
-#include <lib/stdcompat/functional.h>
+#include <lib/fit/defer.h>
 
 #include "../runtime-dynamic-linker.h"
 #include "dl-load-tests-base.h"
@@ -38,7 +38,7 @@ class DlImplTests : public Base {
     // satisfied and then clear the expectation set.
     auto verify_expectations = fit::defer([&]() { Base::VerifyAndClearNeeded(); });
     auto result = dynamic_linker_.Open<typename Base::Loader>(
-        file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
+        file, mode, std::bind_front(&Base::RetrieveFile, this));
     if (result.is_ok()) {
       Base::TrackModule(result.value(), std::string{file});
     }

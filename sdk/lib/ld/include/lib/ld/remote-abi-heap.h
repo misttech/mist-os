@@ -8,13 +8,13 @@
 #include <lib/elfldltl/abi-span.h>
 #include <lib/elfldltl/mapped-vmo-file.h>
 #include <lib/elfldltl/segment-with-vmo.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls.h>
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -207,7 +207,7 @@ class RemoteAbiHeap {
   template <typename T>
   using AbiPtr = elfldltl::AbiPtr<T, Elf, AbiTraits>;
   template <typename T>
-  using AbiSpan = elfldltl::AbiSpan<T, cpp20::dynamic_extent, Elf, AbiTraits>;
+  using AbiSpan = elfldltl::AbiSpan<T, std::dynamic_extent, Elf, AbiTraits>;
 
   RemoteAbiHeap(RemoteAbiHeap&&) = default;
   RemoteAbiHeap& operator=(RemoteAbiHeap&&) = default;
@@ -256,9 +256,9 @@ class RemoteAbiHeap {
     }
 
     // Fill in the string table.  Each string has a NUL terminator.
-    cpp20::span<char> local_strtab = heap.Local(strtab);
+    std::span<char> local_strtab = heap.Local(strtab);
     for (const auto& [str, offset] : layout.strings_) {
-      cpp20::span<char> dest = local_strtab.subspan(offset, str.size() + 1);
+      std::span<char> dest = local_strtab.subspan(offset, str.size() + 1);
       memcpy(dest.data(), str.c_str(), dest.size());
     }
     // If there are no strings, the table is just one NUL.  Thus the mapping of
@@ -301,9 +301,9 @@ class RemoteAbiHeap {
   // The string table is already written, so each RemoteAbiString yields a
   // constant span of the image where that NUL-terminated string already lies
   // in the table.
-  cpp20::span<const char> Local(RemoteAbiString str) const {
-    cpp20::span strtab_image = image().subspan(strtab_);
-    cpp20::span<const char> strtab{
+  std::span<const char> Local(RemoteAbiString str) const {
+    std::span strtab_image = image().subspan(strtab_);
+    std::span<const char> strtab{
         reinterpret_cast<const char*>(strtab_image.data()),
         strtab_image.size(),
     };
@@ -317,10 +317,10 @@ class RemoteAbiHeap {
   // The local span<T> contents in the RemoteAbiHeap can now be filled in.
   // The return span remains valid until Commit() is called (see below).
   template <typename T>
-  cpp20::span<T> Local(RemoteAbiSpan<T> span) {
+  std::span<T> Local(RemoteAbiSpan<T> span) {
     size_t bytes_count = span.count_ * sizeof(T);
-    cpp20::span bytes = image().subspan(span.offset_, bytes_count);
-    return cpp20::span{reinterpret_cast<T*>(bytes.data()), span.count_};
+    std::span bytes = image().subspan(span.offset_, bytes_count);
+    return std::span{reinterpret_cast<T*>(bytes.data()), span.count_};
   }
 
   // Given the remote virtual address where the segment will be mapped,
@@ -381,7 +381,7 @@ class RemoteAbiHeap {
   };
   using Mapped = elfldltl::MappedVmoFile;
 
-  cpp20::span<std::byte> image() {
+  std::span<std::byte> image() {
     if (auto* mapped = std::get_if<Mapped>(&data_)) {
       return mapped->image();
     }

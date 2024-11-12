@@ -245,7 +245,7 @@ async fn configure_interface(
         .context("wait for link-local address generation")?;
 
         let interface_addr = match addresses.as_mut_slice() {
-            [fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }] => {
+            [fnet_interfaces_ext::Address { addr, assignment_state, .. }] => {
                 assert_eq!(*assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 Ok(addr)
             }

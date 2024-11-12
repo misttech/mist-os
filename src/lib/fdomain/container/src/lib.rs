@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_fdomain_ext::{
-    proto_signals_to_fidl_take, AsFDomainObjectType, AsFDomainRights, AsFDomainSignals,
-};
+use fidl::{AsHandleRef, HandleBased};
 use futures::prelude::*;
 use replace_with::replace_with;
 use std::collections::hash_map::Entry;
@@ -14,7 +12,6 @@ use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
-use zx::{AsHandleRef, HandleBased};
 use {fidl_fuchsia_fdomain as proto, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 mod handles;
@@ -110,12 +107,12 @@ pub enum FDomainEvent {
 }
 
 /// An [`FDomainEvent`] that needs a bit more processing before it can be sent.
-/// I.e. it still contains `zx::Handle` objects that need to be replaced with
+/// I.e. it still contains `fidl::Handle` objects that need to be replaced with
 /// FDomain IDs.
 enum UnprocessedFDomainEvent {
     Ready(FDomainEvent),
-    ChannelData(NonZeroU32, zx::MessageBufEtc),
-    ChannelStreamingData(proto::Hid, zx::MessageBufEtc),
+    ChannelData(NonZeroU32, fidl::MessageBufEtc),
+    ChannelStreamingData(proto::Hid, fidl::MessageBufEtc),
 }
 
 impl From<FDomainEvent> for UnprocessedFDomainEvent {
@@ -194,7 +191,7 @@ impl ShuttingDownHandle {
                             ReadOp::Channel(tid) => {
                                 let err = state
                                     .handle
-                                    .expected_type(zx::ObjectType::CHANNEL)
+                                    .expected_type(fidl::ObjectType::CHANNEL)
                                     .err()
                                     .unwrap_or(proto::Error::ClosedDuringRead(
                                         proto::ClosedDuringRead,
@@ -205,7 +202,7 @@ impl ShuttingDownHandle {
                             ReadOp::Socket(tid, _max_bytes) => {
                                 let err = state
                                     .handle
-                                    .expected_type(zx::ObjectType::SOCKET)
+                                    .expected_type(fidl::ObjectType::SOCKET)
                                     .err()
                                     .unwrap_or(proto::Error::ClosedDuringRead(
                                         proto::ClosedDuringRead,
@@ -267,11 +264,11 @@ impl ShuttingDownHandle {
 }
 
 /// A vector of [`ShuttingDownHandle`] paired with rights for the new handles, which
-/// can transition into being a vector of [`zx::HandleDisposition`] when all the
+/// can transition into being a vector of [`fidl::HandleDisposition`] when all the
 /// handles are ready.
 enum HandlesToWrite {
-    SomeInUse(Vec<(ShuttingDownHandle, zx::Rights)>),
-    AllReady(Vec<zx::HandleDisposition<'static>>),
+    SomeInUse(Vec<(ShuttingDownHandle, fidl::Rights)>),
+    AllReady(Vec<fidl::HandleDisposition<'static>>),
 }
 
 impl HandlesToWrite {
@@ -279,7 +276,7 @@ impl HandlesToWrite {
         &mut self,
         event_queue: &mut VecDeque<UnprocessedFDomainEvent>,
         ctx: &mut Context<'_>,
-    ) -> Poll<&mut Vec<zx::HandleDisposition<'static>>> {
+    ) -> Poll<&mut Vec<fidl::HandleDisposition<'static>>> {
         match self {
             HandlesToWrite::AllReady(s) => Poll::Ready(s),
             HandlesToWrite::SomeInUse(handles) => {
@@ -298,11 +295,11 @@ impl HandlesToWrite {
                         .map(|(handle, rights)| {
                             let ShuttingDownHandle::Ready(handle) = handle else { unreachable!() };
 
-                            zx::HandleDisposition::new(
-                                zx::HandleOp::Move(handle.into()),
-                                zx::ObjectType::NONE,
+                            fidl::HandleDisposition::new(
+                                fidl::HandleOp::Move(handle.into()),
+                                fidl::ObjectType::NONE,
                                 rights,
-                                zx::Status::OK,
+                                fidl::Status::OK,
                             )
                         })
                         .collect(),
@@ -318,16 +315,22 @@ impl HandlesToWrite {
 struct AnyHandleRef(Arc<AnyHandle>);
 
 impl AsHandleRef for AnyHandleRef {
-    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
+    fn as_handle_ref(&self) -> fidl::HandleRef<'_> {
         self.0.as_handle_ref()
     }
 }
+
+#[cfg(target_os = "fuchsia")]
+type OnSignals = fasync::OnSignals<'static, AnyHandleRef>;
+
+#[cfg(not(target_os = "fuchsia"))]
+type OnSignals = fasync::OnSignalsRef<'static>;
 
 /// Represents a `WaitForSignals` transaction from a client. When the contained
 /// `OnSignals` polls to completion we can reply to the transaction.
 struct SignalWaiter {
     tid: NonZeroU32,
-    waiter: fasync::OnSignals<'static, AnyHandleRef>,
+    waiter: OnSignals,
 }
 
 /// Information about a single handle within the [`FDomain`].
@@ -362,7 +365,7 @@ struct HandleState {
     signal_waiters: Vec<SignalWaiter>,
     /// Contains a waiter on this handle for IO reading and writing. Populated
     /// whenever we need to block on IO to service a request.
-    io_waiter: Option<fasync::OnSignals<'static, AnyHandleRef>>,
+    io_waiter: Option<OnSignals>,
 }
 
 impl HandleState {
@@ -386,17 +389,12 @@ impl HandleState {
             let Poll::Ready(result) = x.waiter.poll_unpin(ctx) else {
                 return true;
             };
-            let ty = x.waiter.as_ref().0.proto_type();
 
             event_queue.push_back(
                 FDomainEvent::WaitForSignals(
                     x.tid,
                     result
-                        .map(|x| proto::FDomainWaitForSignalsResponse {
-                            signals: x
-                                .as_fdomain_signals(ty)
-                                .expect("Waited for signals we didn't know how to encode!"),
-                        })
+                        .map(|x| proto::FDomainWaitForSignalsResponse { signals: x.bits() })
                         .map_err(|e| proto::Error::TargetError(e.into_raw())),
                 )
                 .into(),
@@ -442,11 +440,11 @@ impl HandleState {
                 if self.async_read_in_progress || !self.read_queue.is_empty() {
                     read_signals
                 } else {
-                    zx::Signals::NONE
-                } | if !self.write_queue.is_empty() { write_signals } else { zx::Signals::NONE };
+                    fidl::Signals::NONE
+                } | if !self.write_queue.is_empty() { write_signals } else { fidl::Signals::NONE };
 
             if !subscribed_signals.is_empty() {
-                self.io_waiter = Some(fasync::OnSignals::new(
+                self.io_waiter = Some(OnSignals::new(
                     AnyHandleRef(Arc::clone(&self.handle)),
                     subscribed_signals,
                 ));
@@ -793,7 +791,7 @@ impl ClosingHandle {
 /// period ends.
 enum CloseAction {
     Close { tid: NonZeroU32, count: AtomicU32, result: Result<()> },
-    Replace { tid: NonZeroU32, new_hid: proto::NewHid, rights: zx::Rights },
+    Replace { tid: NonZeroU32, new_hid: proto::NewHid, rights: fidl::Rights },
 }
 
 impl CloseAction {
@@ -822,7 +820,7 @@ impl CloseAction {
 /// Most of the methods simply handle FIDL requests from the FDomain protocol.
 #[pin_project::pin_project]
 pub struct FDomain {
-    namespace: Box<dyn Fn() -> Result<ClientEnd<fio::DirectoryMarker>, zx::Status> + Send>,
+    namespace: Box<dyn Fn() -> Result<ClientEnd<fio::DirectoryMarker>, fidl::Status> + Send>,
     handles: HashMap<proto::Hid, HandleState>,
     closing_handles: Vec<ClosingHandle>,
     event_queue: VecDeque<UnprocessedFDomainEvent>,
@@ -833,12 +831,12 @@ impl FDomain {
     /// Create a new FDomain. The new FDomain is empty and ready to be connected
     /// to by a client.
     pub fn new_empty() -> Self {
-        Self::new(|| Err(zx::Status::NOT_FOUND))
+        Self::new(|| Err(fidl::Status::NOT_FOUND))
     }
 
     /// Create a new FDomain populated with the given namespace entries.
     pub fn new(
-        namespace: impl Fn() -> Result<ClientEnd<fio::DirectoryMarker>, zx::Status> + Send + 'static,
+        namespace: impl Fn() -> Result<ClientEnd<fio::DirectoryMarker>, fidl::Status> + Send + 'static,
     ) -> Self {
         FDomain {
             namespace: Box::new(namespace),
@@ -855,35 +853,34 @@ impl FDomain {
         self.waker.take().map(Waker::wake);
     }
 
-    /// Given a [`zx::MessageBufEtc`], load all of the handles from it into this
+    /// Given a [`fidl::MessageBufEtc`], load all of the handles from it into this
     /// FDomain and return a [`ReadChannelPayload`](proto::ReadChannelPayload)
     /// with the same data and the IDs for the handles.
-    fn process_message(&mut self, message: zx::MessageBufEtc) -> proto::ChannelMessage {
+    fn process_message(&mut self, message: fidl::MessageBufEtc) -> proto::ChannelMessage {
         let (data, handles) = message.split();
         let handles = handles
             .into_iter()
             .map(|info| {
-                let type_ =
-                    info.object_type.as_fdomain_object_type().unwrap_or(proto::ObjType::None);
+                let type_ = info.object_type;
 
                 let handle = match info.object_type {
                     fidl::ObjectType::CHANNEL => {
-                        AnyHandle::Channel(zx::Channel::from_handle(info.handle))
+                        AnyHandle::Channel(fidl::Channel::from_handle(info.handle))
                     }
                     fidl::ObjectType::SOCKET => {
-                        AnyHandle::Socket(zx::Socket::from_handle(info.handle))
+                        AnyHandle::Socket(fidl::Socket::from_handle(info.handle))
                     }
                     fidl::ObjectType::EVENTPAIR => {
-                        AnyHandle::EventPair(zx::EventPair::from_handle(info.handle))
+                        AnyHandle::EventPair(fidl::EventPair::from_handle(info.handle))
                     }
                     fidl::ObjectType::EVENT => {
-                        AnyHandle::Event(zx::Event::from_handle(info.handle))
+                        AnyHandle::Event(fidl::Event::from_handle(info.handle))
                     }
                     _ => AnyHandle::Unknown(handles::Unknown(info.handle, info.object_type)),
                 };
 
                 proto::HandleInfo {
-                    rights: info.rights.as_fdomain_rights_truncate(),
+                    rights: info.rights,
                     handle: self.alloc_fdomain_handle(handle),
                     type_,
                 }
@@ -973,14 +970,14 @@ impl FDomain {
     }
 
     pub fn create_channel(&mut self, request: proto::ChannelCreateChannelRequest) -> Result<()> {
-        let (a, b) = zx::Channel::create();
+        let (a, b) = fidl::Channel::create();
         self.alloc_client_handles(request.handles, [AnyHandle::Channel(a), AnyHandle::Channel(b)])
     }
 
     pub fn create_socket(&mut self, request: proto::SocketCreateSocketRequest) -> Result<()> {
         let (a, b) = match request.options {
-            proto::SocketType::Stream => zx::Socket::create_stream(),
-            proto::SocketType::Datagram => zx::Socket::create_datagram(),
+            proto::SocketType::Stream => fidl::Socket::create_stream(),
+            proto::SocketType::Datagram => fidl::Socket::create_datagram(),
             type_ => {
                 return Err(proto::Error::SocketTypeUnknown(proto::SocketTypeUnknown { type_ }))
             }
@@ -993,7 +990,7 @@ impl FDomain {
         &mut self,
         request: proto::EventPairCreateEventPairRequest,
     ) -> Result<()> {
-        let (a, b) = zx::EventPair::create();
+        let (a, b) = fidl::EventPair::create();
         self.alloc_client_handles(
             request.handles,
             [AnyHandle::EventPair(a), AnyHandle::EventPair(b)],
@@ -1001,7 +998,7 @@ impl FDomain {
     }
 
     pub fn create_event(&mut self, request: proto::EventCreateEventRequest) -> Result<()> {
-        let a = zx::Event::create();
+        let a = fidl::Event::create();
         self.alloc_client_handles([request.handle], [AnyHandle::Event(a)])
     }
 
@@ -1096,7 +1093,7 @@ impl FDomain {
                                 // reference to the handle, and we get lifetime
                                 // hell.
                                 self.using_handle(h, |h| {
-                                    h.handle.duplicate(zx::Rights::SAME_RIGHTS)
+                                    h.handle.duplicate(fidl::Rights::SAME_RIGHTS)
                                 })
                                 .map(ShuttingDownHandle::Ready)
                             } else {
@@ -1105,7 +1102,7 @@ impl FDomain {
                         }
                     };
 
-                    res.and_then(|x| Ok((x, convert_rights(d.rights)?)))
+                    res.and_then(|x| Ok((x, d.rights)))
                 })
                 .collect(),
         };
@@ -1161,10 +1158,10 @@ impl FDomain {
         request: proto::FDomainWaitForSignalsRequest,
     ) {
         let result = self.using_handle(request.handle, |h| {
-            let signals = convert_signals(request.signals)?;
+            let signals = fidl::Signals::from_bits_retain(request.signals);
             h.signal_waiters.push(SignalWaiter {
                 tid,
-                waiter: fasync::OnSignals::new(AnyHandleRef(Arc::clone(&h.handle)), signals),
+                waiter: OnSignals::new(AnyHandleRef(Arc::clone(&h.handle)), signals),
             });
             Ok(())
         });
@@ -1204,7 +1201,7 @@ impl FDomain {
     }
 
     pub fn duplicate(&mut self, request: proto::FDomainDuplicateRequest) -> Result<()> {
-        let rights = convert_rights(request.rights)?;
+        let rights = request.rights;
         let handle = self.using_handle(request.handle, |h| h.handle.duplicate(rights));
         handle.and_then(|h| self.alloc_client_handles([request.new_handle], [h]))
     }
@@ -1214,7 +1211,7 @@ impl FDomain {
         tid: NonZeroU32,
         request: proto::FDomainReplaceRequest,
     ) -> Result<()> {
-        let rights = convert_rights(request.rights)?;
+        let rights = request.rights;
         let new_hid = request.new_handle;
         match self.take_handle(request.handle) {
             Ok(state) => self.closing_handles.push(ClosingHandle {
@@ -1230,8 +1227,8 @@ impl FDomain {
     }
 
     pub fn signal(&mut self, request: proto::FDomainSignalRequest) -> Result<()> {
-        let set = convert_signals(request.set)?;
-        let clear = convert_signals(request.clear)?;
+        let set = fidl::Signals::from_bits_retain(request.set);
+        let clear = fidl::Signals::from_bits_retain(request.clear);
 
         self.using_handle(request.handle, |h| {
             h.handle.signal_handle(clear, set).map_err(|e| proto::Error::TargetError(e.into_raw()))
@@ -1239,8 +1236,8 @@ impl FDomain {
     }
 
     pub fn signal_peer(&mut self, request: proto::FDomainSignalPeerRequest) -> Result<()> {
-        let set = convert_signals(request.set)?;
-        let clear = convert_signals(request.clear)?;
+        let set = fidl::Signals::from_bits_retain(request.set);
+        let clear = fidl::Signals::from_bits_retain(request.clear);
 
         self.using_handle(request.handle, |h| h.handle.signal_peer(clear, set))
     }
@@ -1251,7 +1248,7 @@ impl FDomain {
         request: proto::ChannelReadChannelStreamingStartRequest,
     ) {
         if let Err(err) = self.using_handle(request.handle, |h| {
-            h.handle.expected_type(zx::ObjectType::CHANNEL)?;
+            h.handle.expected_type(fidl::ObjectType::CHANNEL)?;
             h.read_queue.push_back(ReadOp::StreamingChannel(tid, true));
             Ok(())
         }) {
@@ -1266,7 +1263,7 @@ impl FDomain {
         request: proto::ChannelReadChannelStreamingStopRequest,
     ) {
         if let Err(err) = self.using_handle(request.handle, |h| {
-            h.handle.expected_type(zx::ObjectType::CHANNEL)?;
+            h.handle.expected_type(fidl::ObjectType::CHANNEL)?;
             h.read_queue.push_back(ReadOp::StreamingChannel(tid, false));
             Ok(())
         }) {
@@ -1280,7 +1277,7 @@ impl FDomain {
         request: proto::SocketReadSocketStreamingStartRequest,
     ) {
         if let Err(err) = self.using_handle(request.handle, |h| {
-            h.handle.expected_type(zx::ObjectType::SOCKET)?;
+            h.handle.expected_type(fidl::ObjectType::SOCKET)?;
             h.read_queue.push_back(ReadOp::StreamingSocket(tid, true));
             Ok(())
         }) {
@@ -1294,7 +1291,7 @@ impl FDomain {
         request: proto::SocketReadSocketStreamingStopRequest,
     ) {
         if let Err(err) = self.using_handle(request.handle, |h| {
-            h.handle.expected_type(zx::ObjectType::SOCKET)?;
+            h.handle.expected_type(fidl::ObjectType::SOCKET)?;
             h.read_queue.push_back(ReadOp::StreamingSocket(tid, false));
             Ok(())
         }) {
@@ -1346,58 +1343,4 @@ impl futures::Stream for FDomain {
             Poll::Pending
         }
     }
-}
-
-fn convert_signals(mut sigs: proto::Signals) -> Result<fidl::Signals> {
-    let ret = proto_signals_to_fidl_take(&mut sigs);
-
-    if sigs.general.is_empty() && sigs.typed.is_none() {
-        Ok(ret)
-    } else {
-        Err(proto::Error::SignalsUnknown(proto::SignalsUnknown { signals: sigs }))
-    }
-}
-
-fn convert_rights(mut rights: proto::Rights) -> Result<fidl::Rights> {
-    let mut ret = fidl::Rights::empty();
-
-    for (proto, local) in [
-        (proto::Rights::DUPLICATE, fidl::Rights::DUPLICATE),
-        (proto::Rights::TRANSFER, fidl::Rights::TRANSFER),
-        (proto::Rights::READ, fidl::Rights::READ),
-        (proto::Rights::WRITE, fidl::Rights::WRITE),
-        (proto::Rights::EXECUTE, fidl::Rights::EXECUTE),
-        (proto::Rights::MAP, fidl::Rights::MAP),
-        (proto::Rights::GET_PROPERTY, fidl::Rights::GET_PROPERTY),
-        (proto::Rights::SET_PROPERTY, fidl::Rights::SET_PROPERTY),
-        (proto::Rights::ENUMERATE, fidl::Rights::ENUMERATE),
-        (proto::Rights::DESTROY, fidl::Rights::DESTROY),
-        (proto::Rights::SET_POLICY, fidl::Rights::SET_POLICY),
-        (proto::Rights::GET_POLICY, fidl::Rights::GET_POLICY),
-        (proto::Rights::SIGNAL, fidl::Rights::SIGNAL),
-        (proto::Rights::SIGNAL_PEER, fidl::Rights::SIGNAL_PEER),
-        (proto::Rights::WAIT, fidl::Rights::WAIT),
-        (proto::Rights::INSPECT, fidl::Rights::INSPECT),
-        (proto::Rights::MANAGE_JOB, fidl::Rights::MANAGE_JOB),
-        (proto::Rights::MANAGE_PROCESS, fidl::Rights::MANAGE_PROCESS),
-        (proto::Rights::MANAGE_THREAD, fidl::Rights::MANAGE_THREAD),
-        (proto::Rights::APPLY_PROFILE, fidl::Rights::APPLY_PROFILE),
-        (proto::Rights::MANAGE_SOCKET, fidl::Rights::MANAGE_SOCKET),
-        (proto::Rights::OP_CHILDREN, fidl::Rights::OP_CHILDREN),
-        (proto::Rights::RESIZE, fidl::Rights::RESIZE),
-        (proto::Rights::ATTACH_VMO, fidl::Rights::ATTACH_VMO),
-        (proto::Rights::MANAGE_VMO, fidl::Rights::MANAGE_VMO),
-        (proto::Rights::SAME_RIGHTS, fidl::Rights::SAME_RIGHTS),
-    ] {
-        if rights.contains(proto) {
-            rights.remove(proto);
-            ret |= local;
-        }
-    }
-
-    if !rights.is_empty() {
-        return Err(proto::Error::RightsUnknown(proto::RightsUnknown { rights }));
-    }
-
-    Ok(ret)
 }

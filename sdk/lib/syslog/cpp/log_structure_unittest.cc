@@ -99,12 +99,12 @@ TEST(StructuredLogging, ThreadInitialization) {
 
 TEST(StructuredLogging, BackendDirect) {
   {
-    syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_WARNING);
+    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_WARNING);
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
   auto buffer =
       builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
@@ -119,12 +119,12 @@ TEST(StructuredLogging, Overflow) {
   memset(very_large_string.data(), 5, very_large_string.size());
   very_large_string[very_large_string.size() - 1] = 0;
   {
-    syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_WARNING);
+    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_WARNING);
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LogSeverity::Warn);
   auto buffer =
       builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));

@@ -143,8 +143,13 @@ impl<'a> std::fmt::Display for LookupResultOrType<'a> {
             LookupResultOrType::Type(lib::Type::Identifier { name, nullable }) => {
                 write!(f, "{}{}", name, nullable_mark(nullable))
             }
-            LookupResultOrType::Type(lib::Type::Request { identifier, rights: _, nullable }) => {
-                write!(f, "{}{}", identifier, nullable_mark(nullable))
+            LookupResultOrType::Type(lib::Type::Endpoint {
+                protocol,
+                role: _,
+                rights: _,
+                nullable,
+            }) => {
+                write!(f, "{}{}", protocol, nullable_mark(nullable))
             }
             LookupResultOrType::Type(lib::Type::Bool) => write!(f, "bool"),
             LookupResultOrType::Type(lib::Type::U8) => write!(f, "u8"),
@@ -705,22 +710,27 @@ impl PlaygroundValue {
                 v,
             ) => v.to_fidl_value_by_type_or_lookup(ns, LookupResultOrType::Type(ty.clone())),
             (
-                LookupResultOrType::Type(lib::Type::Request { identifier, .. }),
-                PlaygroundValue::InUseHandle(h),
-            ) => h
-                .take_server(Some(&identifier))
-                .map(|x| FidlValue::ServerEnd(x, identifier.to_owned()))
-                .map_err(|_| ValueError::ServerConversionFailed(identifier.clone()).into()),
-            (
-                LookupResultOrType::LookupResult(lib::LookupResult::Protocol(lib::Protocol {
-                    name,
+                LookupResultOrType::Type(lib::Type::Endpoint {
+                    role: lib::EndpointRole::Server,
+                    protocol,
                     ..
-                })),
+                }),
                 PlaygroundValue::InUseHandle(h),
             ) => h
-                .take_client(Some(&name))
-                .map(|x| FidlValue::ClientEnd(x, name.to_owned()))
-                .map_err(|_| ValueError::ClientConversionFailed(name.clone()).into()),
+                .take_server(Some(&protocol))
+                .map(|x| FidlValue::ServerEnd(x, protocol.to_owned()))
+                .map_err(|_| ValueError::ServerConversionFailed(protocol.clone()).into()),
+            (
+                LookupResultOrType::Type(lib::Type::Endpoint {
+                    role: lib::EndpointRole::Client,
+                    protocol,
+                    ..
+                }),
+                PlaygroundValue::InUseHandle(h),
+            ) => h
+                .take_client(Some(&protocol))
+                .map(|x| FidlValue::ClientEnd(x, protocol.to_owned()))
+                .map_err(|_| ValueError::ClientConversionFailed(protocol.clone()).into()),
             (
                 LookupResultOrType::Type(lib::Type::Handle {
                     object_type: fidl::ObjectType::SOCKET,
@@ -1318,8 +1328,10 @@ mod test {
 
         let Ok(FidlValue::ClientEnd(_channel, protocol)) = client_dup.to_fidl_value(
             &ns,
-            &lib::Type::Identifier {
-                name: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
+            &lib::Type::Endpoint {
+                role: lib::EndpointRole::Client,
+                protocol: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
+                rights: fidl::Rights::SAME_RIGHTS,
                 nullable: false,
             },
         ) else {
@@ -1329,8 +1341,9 @@ mod test {
 
         let Ok(FidlValue::ServerEnd(_channel, protocol)) = server_dup.to_fidl_value(
             &ns,
-            &lib::Type::Request {
-                identifier: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
+            &lib::Type::Endpoint {
+                role: lib::EndpointRole::Server,
+                protocol: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
                 rights: fidl::Rights::SAME_RIGHTS,
                 nullable: false,
             },

@@ -484,6 +484,12 @@ class SchedulerState {
   // the expected runtime estimate to improve accuracy.
   SchedDuration banked_runtime_ns_{0};
 
+  // Tracks the accumulated energy consumption of the thread, as estimated by
+  // the processor energy model. This counter can accumulate ~580 watt years
+  // (e.g. 1W continuously for ~580 years, 10W continuously for ~58 years, ...)
+  // before overflowing.
+  uint64_t estimated_energy_consumption_nj{0};
+
   // The time the thread last ran. The exact point in time this value represents
   // depends on the thread state:
   //   * THREAD_RUNNING: The time of the last reschedule that selected the thread.

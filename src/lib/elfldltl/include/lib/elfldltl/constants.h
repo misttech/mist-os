@@ -5,8 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_CONSTANTS_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_CONSTANTS_H_
 
-#include <lib/stdcompat/bit.h>
-
+#include <bit>
 #include <cstdint>
 
 namespace elfldltl {
@@ -36,9 +35,9 @@ enum class ElfData : uint8_t {
   k2Msb = 2,
   kNative =
       []() {
-        if constexpr (cpp20::endian::native == cpp20::endian::little) {
+        if constexpr (std::endian::native == std::endian::little) {
           return k2Lsb;
-        } else if constexpr (cpp20::endian::native == cpp20::endian::big) {
+        } else if constexpr (std::endian::native == std::endian::big) {
           return k2Msb;
         }
       }()
@@ -214,6 +213,7 @@ enum class ElfSymVisibility : uint8_t {
 enum class ElfMachine : uint16_t {
   kNone = 0,
   k386 = 3,
+  kArm = 40,  // aka AArch32
   kX86_64 = 62,
   kAarch64 = 183,
   kRiscv = 243,
@@ -222,6 +222,8 @@ enum class ElfMachine : uint16_t {
       []() {
 #ifdef __aarch64__
         return kAarch64;
+#elif defined(__arm__)
+        return kArm;
 #elif defined(__i386__)
         return k386;
 #elif defined(__x86_64__)

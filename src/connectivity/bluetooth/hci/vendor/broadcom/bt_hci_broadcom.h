@@ -125,7 +125,6 @@ class BtHciBroadcom final
   fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
   fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
 
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_server_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
   driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 };

@@ -37,7 +37,7 @@ class FakePciroot : public ddk::PcirootProtocol<FakePciroot> {
             .name = "fakroot",
             .start_bus_num = bus_start,
             .end_bus_num = bus_end,
-            .ecam_vmo = ecam_.vmo()->get(),
+            .cam = {.vmo = ecam_.vmo()->get(), .is_extended = true},
         } {
     ZX_ASSERT(fake_root_resource_create(resource_.reset_and_get_address()) == ZX_OK);
     ZX_ASSERT(fake_bti_create(bti_.reset_and_get_address()) == ZX_OK);

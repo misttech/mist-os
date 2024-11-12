@@ -18,6 +18,7 @@
 #include <zircon/types.h>
 
 #include <array>
+#include <limits>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
@@ -110,6 +111,21 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   // Discard the lifecycle aspect of the returned pointer, we'll be tracking it on the bus
   // side of things.
   return zx::ok(new_base);
+}
+
+constexpr uint64_t kU32Max = std::numeric_limits<uint32_t>::max();
+zx::result<> PciRootHost::AddMmioRange(zx_paddr_t base, size_t size) {
+  // Any range that starts in the lower 4GB space needs to stay within [0, 0xFFFF'FFFF].
+  if (base <= kU32Max) {
+    uint32_t result32 = 0;
+    if (size > kU32Max || (add_overflow(base, size, &result32) && result32)) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    return zx::make_result(mmio32_alloc_.AddRegion({.base = base, .size = size}));
+  }
+
+  // We can rely on the RegionAllocator's checks for 64bit.
+  return zx::make_result(mmio64_alloc_.AddRegion({.base = base, .size = size}));
 }
 
 void PciRootHost::ProcessQueue() {

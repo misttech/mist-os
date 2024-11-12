@@ -18,10 +18,9 @@ power_management::EnergyModel MakeFakeEnergyModel(size_t power_levels) {
   for (size_t i = 0; i < power_levels; ++i) {
     levels[i].control_interface = static_cast<uint64_t>(ControlInterfaceIdForLevel(i));
     levels[i].control_argument = ControlInterfaceArgForLevel(i);
-    levels[i].options = (i == kDomainIndependantPowerLevel)
-                            ? ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT
-                            : 0;
-    levels[i].processing_rate = i * 10;
+    levels[i].options =
+        i <= kMaxIdlePowerLevel ? ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT : 0;
+    levels[i].processing_rate = i <= kMaxIdlePowerLevel ? 0 : i * 10;
     levels[i].power_coefficient_nw = i + 1;
     for (size_t j = 0; j < power_levels; ++j) {
       transitions[j + i * power_levels].from = static_cast<uint8_t>(i);

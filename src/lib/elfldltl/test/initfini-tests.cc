@@ -24,13 +24,13 @@ template <class Elf>
 constexpr typename Elf::Addr kImageData[] = {1, 2, 3, 4};
 
 template <class Elf>
-constexpr cpp20::span kImage(kImageData<Elf>);
+constexpr std::span kImage(kImageData<Elf>);
 
 template <class Elf>
-const auto kImageBytes = cpp20::as_bytes(kImage<Elf>);
+const auto kImageBytes = std::as_bytes(kImage<Elf>);
 
 template <typename Dyn, size_t N>
-constexpr cpp20::span<const Dyn> DynSpan(const std::array<Dyn, N>& dyn) {
+constexpr std::span<const Dyn> DynSpan(const std::array<Dyn, N>& dyn) {
   return {dyn};
 }
 
@@ -231,7 +231,7 @@ TYPED_TEST(ElfldltlInitFiniTests, VisitInitTests) {
 
   constexpr typename Elf::Addr array[] = {2, 3, 4, 5};
   elfldltl::InitFiniInfo<Elf> info;
-  info.set_array(cpp20::span(array));
+  info.set_array(std::span(array));
   info.set_legacy(1);
 
   ASSERT_EQ(5u, info.size());
@@ -259,7 +259,7 @@ TYPED_TEST(ElfldltlInitFiniTests, VisitFiniTests) {
 
   constexpr typename Elf::Addr array[] = {2, 3, 4, 5};
   elfldltl::InitFiniInfo<Elf> info;
-  info.set_array(cpp20::span(array));
+  info.set_array(std::span(array));
   info.set_legacy(1);
 
   ASSERT_EQ(5u, info.size());

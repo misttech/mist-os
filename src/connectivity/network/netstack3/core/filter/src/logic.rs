@@ -54,6 +54,16 @@ pub struct ProofOfEgressCheck {
     _private_field_to_prevent_construction_outside_of_module: (),
 }
 
+impl ProofOfEgressCheck {
+    /// Clones this proof of egress check.
+    ///
+    /// May only be used in case of fragmentation after going through the egress
+    /// hook.
+    pub fn clone_for_fragmentation(&self) -> Self {
+        Self { _private_field_to_prevent_construction_outside_of_module: () }
+    }
+}
+
 pub(crate) struct Interfaces<'a, D> {
     pub ingress: Option<&'a D>,
     pub egress: Option<&'a D>,

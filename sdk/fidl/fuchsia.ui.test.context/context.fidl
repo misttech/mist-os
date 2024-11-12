@@ -39,5 +39,6 @@ open protocol ScenicRealmFactory {
         1: realm_server server_end:fuchsia.testing.harness.RealmProxy;
         2: renderer RendererType;
         3: display_rotation uint64;
+        4: display_composition bool;
     }) -> () error fuchsia.testing.harness.OperationError;
 };

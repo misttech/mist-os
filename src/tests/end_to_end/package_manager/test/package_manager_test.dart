@@ -30,9 +30,11 @@ void printErrorHelp() {
 
 // validRepoName replaces invalid characters in the input sequence to ensure
 // the returned string complies to
-// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
+// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+// The replacement starts with a letter to avoid starting with a - since it makes
+// it look like an option to the command.
 String validRepoName(String originalName) {
-  return originalName.replaceAll(RegExp(r'(?![a-z0-9-]).'), '-');
+  return originalName.replaceAll(RegExp(r'(?![a-z0-9-]).'), 'x-');
 }
 
 Future<String> formattedHostAddress(sl4f.Sl4f sl4fDriver, Logger log) async {
@@ -268,11 +270,9 @@ void main() {
           equals(
               'resolving fuchsia-pkg://package-manager-test/package-manager-sample\n'));
 
-      // The repo path usually contains disallowed characters like '/' and
-      // uppercase characters. pkgctl will return an error in this case.
-      // Ensure we have a repoNameFixed that is known to comply with
-      // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
-      var repoNameFixed = validRepoName(repoServer.getRepoPath());
+      // Set the repo name to something unique for this test. Following the rules in
+      // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+      var repoNameFixed = validRepoName("test-pkg-resolve-base");
 
       await repoServer.setupServe(
           '$testPackageName-0.far', manifestPath, repoNameFixed);
@@ -316,11 +316,9 @@ void main() {
       expect(resolveVProcessResult.stdout.toString(),
           isNot(contains('package contents:\n')));
 
-      // The repo path usually contains disallowed characters like '/' and
-      // uppercase characters. pkgctl will return an error in this case.
-      // Ensure we have a repoNameFixed that is known to comply with
-      // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
-      var repoNameFixed = validRepoName(repoServer.getRepoPath());
+      // Set the repo name to something unique for this test. Following the rules in
+      // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+      var repoNameFixed = validRepoName("pkgctl-resolve-verbose-base");
 
       await repoServer.setupServe(
           '$testPackageName-0.far', manifestPath, repoNameFixed);
@@ -366,7 +364,7 @@ void main() {
           .exitCode;
       expect(resolveExitCode, isNonZero);
 
-      var repoNameFixed = validRepoName(repoServer.getRepoPath());
+      var repoNameFixed = validRepoName("test-repo-flow-e2e");
 
       await repoServer.setupServe(
           '$testPackageName-0.far', manifestPath, repoNameFixed);

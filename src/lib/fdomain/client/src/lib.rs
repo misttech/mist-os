@@ -37,7 +37,7 @@ pub use channel::{
 pub use event::Event;
 pub use event_pair::Eventpair as EventPair;
 pub use handle::{AsHandleRef, Handle, HandleBased, HandleRef, OnFDomainSignals, Peered};
-pub use proto::{Error as FDomainError, ObjType, WriteChannelError, WriteSocketError};
+pub use proto::{Error as FDomainError, WriteChannelError, WriteSocketError};
 pub use socket::{Socket, SocketDisposition, SocketReadStream, SocketWriter};
 
 // Unsupported handle types.
@@ -118,8 +118,7 @@ pub enum Error {
     ProtocolStreamEventIncompatible,
     Transport(Arc<std::io::Error>),
     ConnectionMismatch,
-    NamespaceAlreadyTaken,
-    ConnectionLost,
+    ClientLost,
 }
 
 impl std::fmt::Display for Error {
@@ -161,8 +160,7 @@ impl std::fmt::Display for Error {
             Self::ConnectionMismatch => {
                 write!(f, "Tried to use an FDomain handle from a different connection")
             }
-            Self::NamespaceAlreadyTaken => write!(f, "Called `take_namespace` more than once"),
-            Self::ConnectionLost => write!(f, "Remote connection for handle was closed"),
+            Self::ClientLost => write!(f, "The client associated with this handle was destroyed"),
         }
     }
 }
@@ -180,8 +178,7 @@ impl std::fmt::Debug for Error {
             Self::ProtocolSignalsIncompatible => write!(f, "ProtocolSignalsIncompatible "),
             Self::ProtocolStreamEventIncompatible => write!(f, "ProtocolStreamEventIncompatible"),
             Self::ConnectionMismatch => write!(f, "ConnectionMismatch"),
-            Self::NamespaceAlreadyTaken => write!(f, "NamespaceAlreadyTaken"),
-            Self::ConnectionLost => write!(f, "ConnectionLost"),
+            Self::ClientLost => write!(f, "ClientLost"),
         }
     }
 }
@@ -336,11 +333,10 @@ impl Transport {
 struct ClientInner {
     transport: Transport,
     transactions: HashMap<NonZeroU32, responder::Responder>,
-    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, proto::Error>>>,
+    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, Error>>>,
     channel_read_subscriptions:
-        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, proto::Error>>>,
+        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
     next_tx_id: u32,
-    namespace_taken: bool,
     waiting_to_close: Vec<proto::Hid>,
 }
 
@@ -381,6 +377,14 @@ impl ClientInner {
 
         loop {
             if let Poll::Ready(e) = self.transport.poll_send_messages(ctx) {
+                for sender in self.socket_read_subscriptions.values_mut() {
+                    let _ = sender.unbounded_send(Err(e.clone().into()));
+                }
+                for sender in self.channel_read_subscriptions.values_mut() {
+                    let _ = sender.unbounded_send(Err(e.clone().into()));
+                }
+                self.socket_read_subscriptions.clear();
+                self.channel_read_subscriptions.clear();
                 return Err(e);
             }
             let Poll::Ready(Some(result)) = self.transport.poll_next(ctx) else { return Ok(()) };
@@ -427,7 +431,7 @@ impl ClientInner {
                         proto::SocketMessage::Stopped(proto::AioStopped { error }) => {
                             let o = o.remove();
                             if let Some(error) = error {
-                                let _ = o.unbounded_send(Err(*error));
+                                let _ = o.unbounded_send(Err(Error::FDomain(*error)));
                             }
                             Ok(())
                         }
@@ -459,7 +463,7 @@ impl ClientInner {
                         proto::ChannelSent::Stopped(proto::AioStopped { error }) => {
                             let o = o.remove();
                             if let Some(error) = error {
-                                let _ = o.unbounded_send(Err(*error));
+                                let _ = o.unbounded_send(Err(Error::FDomain(*error)));
                             }
                             Ok(())
                         }
@@ -522,7 +526,6 @@ impl Client {
             socket_read_subscriptions: HashMap::new(),
             channel_read_subscriptions: HashMap::new(),
             next_tx_id: 1,
-            namespace_taken: false,
             waiting_to_close: Vec::new(),
         })));
 
@@ -541,18 +544,14 @@ impl Client {
 
     /// Get the namespace for the connected FDomain. Calling this more than once is an error.
     pub async fn namespace(self: &Arc<Self>) -> Result<Channel, Error> {
-        if std::mem::replace(&mut self.0.lock().unwrap().namespace_taken, true) {
-            Err(Error::NamespaceAlreadyTaken)
-        } else {
-            let new_handle = self.new_hid();
-            self.transaction(
-                ordinals::NAMESPACE,
-                proto::FDomainNamespaceRequest { new_handle },
-                Responder::Namespace,
-            )
-            .await?;
-            Ok(Channel(Handle { id: new_handle.id, client: Arc::downgrade(self) }))
-        }
+        let new_handle = self.new_hid();
+        self.transaction(
+            ordinals::NAMESPACE,
+            proto::FDomainNamespaceRequest { new_handle },
+            Responder::Namespace,
+        )
+        .await?;
+        Ok(Channel(Handle { id: new_handle.id, client: Arc::downgrade(self) }))
     }
 
     /// Create a new channel in the connected FDomain.
@@ -685,7 +684,7 @@ impl Client {
     pub(crate) fn start_socket_streaming(
         &self,
         id: proto::Hid,
-        output: UnboundedSender<Result<Vec<u8>, proto::Error>>,
+        output: UnboundedSender<Result<Vec<u8>, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
         inner.socket_read_subscriptions.insert(id, output);
@@ -716,7 +715,7 @@ impl Client {
     pub(crate) fn start_channel_streaming(
         &self,
         id: proto::Hid,
-        output: UnboundedSender<Result<proto::ChannelMessage, proto::Error>>,
+        output: UnboundedSender<Result<proto::ChannelMessage, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
         inner.channel_read_subscriptions.insert(id, output);

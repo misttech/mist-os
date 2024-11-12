@@ -88,28 +88,28 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
   // severities "in the wild" including both those from the
   // legacy syslog severities and the new.
   std::vector<uint8_t> severities_in_use = {
-      FUCHSIA_LOG_TRACE,      // 0x10
-      FUCHSIA_LOG_DEBUG,      // Legacy "verbosity" (v=1)
-      FUCHSIA_LOG_INFO - 10,  // Legacy "verbosity" (v=10)
-      FUCHSIA_LOG_INFO - 5,   // Legacy "verbosity" (v=5)
-      FUCHSIA_LOG_INFO - 4,   // Legacy "verbosity" (v=4)
-      FUCHSIA_LOG_INFO - 3,   // Legacy "verbosity" (v=3)
-      FUCHSIA_LOG_INFO,       // 0x30
-      FUCHSIA_LOG_WARNING,    // Legacy severity (WARNING)
-      FUCHSIA_LOG_ERROR,      // 0x50
+      fuchsia_logging::LogSeverity::Trace,      // 0x10
+      fuchsia_logging::LogSeverity::Debug,      // Legacy "verbosity" (v=1)
+      fuchsia_logging::LogSeverity::Info - 10,  // Legacy "verbosity" (v=10)
+      fuchsia_logging::LogSeverity::Info - 5,   // Legacy "verbosity" (v=5)
+      fuchsia_logging::LogSeverity::Info - 4,   // Legacy "verbosity" (v=4)
+      fuchsia_logging::LogSeverity::Info - 3,   // Legacy "verbosity" (v=3)
+      fuchsia_logging::LogSeverity::Info,       // 0x30
+      fuchsia_logging::LogSeverity::Warn,       // Legacy severity (WARNING)
+      fuchsia_logging::LogSeverity::Error,      // 0x50
   };
 
   // Expected post-transform severities
   std::vector<uint8_t> expected_severities = {
-      FUCHSIA_LOG_TRACE,      // 0x10
-      FUCHSIA_LOG_DEBUG,      // Legacy "verbosity" (v=1)
-      FUCHSIA_LOG_INFO - 10,  // Legacy "verbosity" (v=10)
-      FUCHSIA_LOG_INFO - 5,   // Legacy "verbosity" (v=5)
-      FUCHSIA_LOG_INFO - 4,   // Legacy "verbosity" (v=4)
-      FUCHSIA_LOG_INFO - 3,   // Legacy "verbosity" (v=3)
-      FUCHSIA_LOG_INFO,       // 0x30
-      FUCHSIA_LOG_WARNING,    // Legacy severity (WARNING)
-      FUCHSIA_LOG_ERROR,      // 0x50
+      fuchsia_logging::LogSeverity::Trace,      // 0x10
+      fuchsia_logging::LogSeverity::Debug,      // Legacy "verbosity" (v=1)
+      fuchsia_logging::LogSeverity::Info - 10,  // Legacy "verbosity" (v=10)
+      fuchsia_logging::LogSeverity::Info - 5,   // Legacy "verbosity" (v=5)
+      fuchsia_logging::LogSeverity::Info - 4,   // Legacy "verbosity" (v=4)
+      fuchsia_logging::LogSeverity::Info - 3,   // Legacy "verbosity" (v=3)
+      fuchsia_logging::LogSeverity::Info,       // 0x30
+      fuchsia_logging::LogSeverity::Warn,       // Legacy severity (WARNING)
+      fuchsia_logging::LogSeverity::Error,      // 0x50
   };
   fuchsia_logging::LogSettingsBuilder builder;
   builder.WithMinLogSeverity(0).WithTags({tag}).BuildAndInitialize();

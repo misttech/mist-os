@@ -17,8 +17,8 @@
 namespace fio = fuchsia_io;
 
 __EXPORT
-zx_status_t fdio_service_connect(const char* path, zx_handle_t h) {
-  zx::handle handle{h};
+zx_status_t fdio_service_connect(const char* path, zx_handle_t request) {
+  zx::handle handle{request};
   fdio_ns_t* ns;
   if (zx_status_t status = fdio_ns_get_installed(&ns); status != ZX_OK) {
     return status;
@@ -27,8 +27,8 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t h) {
 }
 
 __EXPORT
-zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t h) {
-  return fdio_open_at(dir, path, 0, h);
+zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t request) {
+  return fdio_open_at(dir, path, 0, request);
 }
 
 __EXPORT
@@ -208,6 +208,6 @@ zx_status_t fdio_open3_fd(const char* path, uint64_t flags, int* out_fd) {
 }
 
 __EXPORT
-zx_status_t fdio_open3_fd_at(int dirfd, const char* path, uint64_t flags, int* out_fd) {
-  return fdio_open_fd_at_internal(dirfd, path, fio::Flags{flags}, false, out_fd);
+zx_status_t fdio_open3_fd_at(int dir_fd, const char* path, uint64_t flags, int* out_fd) {
+  return fdio_open_fd_at_internal(dir_fd, path, fio::Flags{flags}, false, out_fd);
 }

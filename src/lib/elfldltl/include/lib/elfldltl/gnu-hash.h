@@ -5,12 +5,11 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_GNU_HASH_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_GNU_HASH_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
-
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -27,7 +26,7 @@ inline constexpr uint32_t GnuHashString(std::string_view name) {
   uint_fast32_t hash = 5381;
   for (char c : name) {
     hash *= 33;
-    hash += cpp20::bit_cast<unsigned char>(c);
+    hash += std::bit_cast<unsigned char>(c);
   }
   return static_cast<uint32_t>(hash);
 }
@@ -103,9 +102,9 @@ class GnuHash {
 
   class BucketIterator;
 
-  constexpr explicit GnuHash(cpp20::span<const Addr> table) : GnuHash(table, *GetSizes(table)) {}
+  constexpr explicit GnuHash(std::span<const Addr> table) : GnuHash(table, *GetSizes(table)) {}
 
-  static constexpr bool Valid(cpp20::span<const Addr> table) { return GetSizes(table).has_value(); }
+  static constexpr bool Valid(std::span<const Addr> table) { return GetSizes(table).has_value(); }
 
   constexpr uint32_t symtab_size() const {
     // First run through the buckets to find the largest symbol table index.
@@ -259,14 +258,14 @@ class GnuHash {
     return 32 * (kLittle ? (idx & 1) : (~idx & 1));
   }
 
-  constexpr GnuHash(cpp20::span<const Addr> table, const Sizes& sizes)
+  constexpr GnuHash(std::span<const Addr> table, const Sizes& sizes)
       : tables_(table.subspan(kAddrPerSizes)),
         bucket_count_(sizes.nbucket),
         chain_index_bias_(sizes.bias),
         filter_index_mask_(sizes.nfilter - 1),
         filter_hash_shift_(sizes.shift) {}
 
-  static constexpr std::optional<Sizes> GetSizes(cpp20::span<const Addr> table) {
+  static constexpr std::optional<Sizes> GetSizes(std::span<const Addr> table) {
     if (table.size() >= kAddrPerSizes) [[likely]] {
       Sizes sizes;
       if constexpr (sizeof(Addr) == sizeof(Word)) {
@@ -296,11 +295,11 @@ class GnuHash {
       const uint32_t bucket_slots = (sizes.nbucket + 1 + kBucketsPerAddr - 1) / kBucketsPerAddr;
       const uint32_t max_buckets = bucket_slots * kBucketsPerAddr;
 
-      if (sizes.nbucket > 0 &&                     // Cannot be empty.
-          sizes.nbucket <= max_buckets &&          // Check for overflow.
-          sizes.shift < 32 &&                      // Must be plausible.
-          cpp20::has_single_bit(sizes.nfilter) &&  // Must be power of two.
-          total_addrs >= sizes.nfilter &&          // Space for the filters.
+      if (sizes.nbucket > 0 &&                   // Cannot be empty.
+          sizes.nbucket <= max_buckets &&        // Check for overflow.
+          sizes.shift < 32 &&                    // Must be plausible.
+          std::has_single_bit(sizes.nfilter) &&  // Must be power of two.
+          total_addrs >= sizes.nfilter &&        // Space for the filters.
           // There must be space for the buckets and the chain table.  We can't
           // really tell how much space is needed for the chain table without
           // examining all the buckets, so those indices can't be presumed
@@ -323,7 +322,7 @@ class GnuHash {
     return ((filter_index_mask_ + 1) * kBucketsPerAddr) + BucketChainStart(symndx);
   }
 
-  AbiSpan<const Addr, cpp20::dynamic_extent, Elf, AbiTraits> tables_;
+  AbiSpan<const Addr, std::dynamic_extent, Elf, AbiTraits> tables_;
   Word bucket_count_ = 0;
   Word chain_index_bias_ = 0;
   Word filter_index_mask_ = 0;

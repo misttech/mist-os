@@ -22,7 +22,7 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, zx_types as zx,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
 };
 
 /// Like [`fnet_interfaces::PortClass`], with the inner `device` flattened.
@@ -145,10 +145,10 @@ impl TryFrom<fhardware_network::PortClass> for PortClass {
     }
 }
 
-// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// Properties of a network interface.
 #[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Properties)]
+#[fidl_table_strict(device_class)]
 pub struct Properties {
     /// An opaque identifier for the interface. Its value will not be reused
     /// even if the device is removed and subsequently re-added. Immutable.
@@ -167,11 +167,10 @@ pub struct Properties {
     pub port_class: PortClass,
 }
 
-// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// An address and its properties.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Address)]
-#[fidl_table_validator(AddressValidator)]
+#[fidl_table_strict]
 pub struct Address {
     /// The address and prefix length.
     pub addr: fidl_fuchsia_net::Subnet,
@@ -179,25 +178,122 @@ pub struct Address {
     ///
     /// Its value must be greater than 0. A value of zx.time.INFINITE indicates
     /// that the address will always be valid.
-    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicInstant once there is support for custom
-    // conversion functions.
-    pub valid_until: zx::zx_time_t,
+    pub valid_until: PositiveMonotonicInstant,
+    /// Preferred lifetime information.
+    pub preferred_lifetime_info: PreferredLifetimeInfo,
     /// The address's assignment state.
     pub assignment_state: fnet_interfaces::AddressAssignmentState,
 }
 
-/// Helper struct implementing Address validation.
-pub struct AddressValidator;
+/// Information about the preferred lifetime of an IP address or delegated
+/// prefix.
+///
+/// Type-safe version of [`fnet_interfaces::PreferredLifetimeInfo`].
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone, Hash)]
+#[allow(missing_docs)]
+pub enum PreferredLifetimeInfo {
+    PreferredUntil(PositiveMonotonicInstant),
+    Deprecated,
+}
 
-impl Validate<Address> for AddressValidator {
-    type Error = String;
-    fn validate(
-        Address { addr: _, valid_until, assignment_state: _ }: &Address,
-    ) -> Result<(), Self::Error> {
-        if *valid_until <= 0 {
-            return Err(format!("non-positive value for valid_until={}", *valid_until));
+impl PreferredLifetimeInfo {
+    /// Returns a lifetime information for an address that is always preferred.
+    pub const fn preferred_forever() -> Self {
+        Self::PreferredUntil(PositiveMonotonicInstant::INFINITE_FUTURE)
+    }
+
+    /// Converts to the equivalent FIDL type.
+    pub const fn to_fidl(self) -> fnet_interfaces::PreferredLifetimeInfo {
+        match self {
+            PreferredLifetimeInfo::Deprecated => {
+                fnet_interfaces::PreferredLifetimeInfo::Deprecated(fnet_interfaces::Empty)
+            }
+            PreferredLifetimeInfo::PreferredUntil(v) => {
+                fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(v.into_nanos())
+            }
         }
-        Ok(())
+    }
+}
+
+impl TryFrom<fnet_interfaces::PreferredLifetimeInfo> for PreferredLifetimeInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: fnet_interfaces::PreferredLifetimeInfo) -> Result<Self, Self::Error> {
+        match value {
+            fnet_interfaces::PreferredLifetimeInfo::Deprecated(fnet_interfaces::Empty) => {
+                Ok(Self::Deprecated)
+            }
+            fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(v) => {
+                Ok(Self::PreferredUntil(v.try_into()?))
+            }
+        }
+    }
+}
+
+impl From<PreferredLifetimeInfo> for fnet_interfaces::PreferredLifetimeInfo {
+    fn from(value: PreferredLifetimeInfo) -> Self {
+        value.to_fidl()
+    }
+}
+
+/// A positive monotonic instant.
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone, Hash)]
+pub struct PositiveMonotonicInstant(i64);
+
+impl PositiveMonotonicInstant {
+    /// An instant in the infinite future.
+    pub const INFINITE_FUTURE: Self = Self(zx_types::ZX_TIME_INFINITE);
+
+    /// Returns the nanoseconds value for the instant.
+    pub const fn into_nanos(self) -> i64 {
+        let Self(v) = self;
+        v
+    }
+
+    /// Returns the the positive nanoseconds value from the monotonic timestamp
+    /// in nanoseconds, if it's positive.
+    pub const fn from_nanos(v: i64) -> Option<Self> {
+        if v > 0 {
+            Some(Self(v))
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if `self` is equal to `INFINITE_FUTURE`.
+    pub fn is_infinite(&self) -> bool {
+        self == &Self::INFINITE_FUTURE
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<PositiveMonotonicInstant> for zx::MonotonicInstant {
+    fn from(PositiveMonotonicInstant(v): PositiveMonotonicInstant) -> Self {
+        zx::MonotonicInstant::from_nanos(v)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl TryFrom<zx::MonotonicInstant> for PositiveMonotonicInstant {
+    type Error = anyhow::Error;
+
+    fn try_from(value: zx::MonotonicInstant) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_nanos())
+    }
+}
+
+impl From<PositiveMonotonicInstant> for zx_types::zx_time_t {
+    fn from(value: PositiveMonotonicInstant) -> Self {
+        value.into_nanos()
+    }
+}
+
+impl TryFrom<zx_types::zx_time_t> for PositiveMonotonicInstant {
+    type Error = anyhow::Error;
+
+    fn try_from(value: zx_types::zx_time_t) -> Result<Self, Self::Error> {
+        Self::from_nanos(value)
+            .ok_or_else(|| anyhow::anyhow!("non-positive value for positive monotonic instant"))
     }
 }
 
@@ -787,7 +883,7 @@ mod tests {
             online: Some(false),
             has_default_ipv4_route: Some(false),
             has_default_ipv6_route: Some(false),
-            addresses: Some(vec![fidl_address(ADDR, zx::ZX_TIME_INFINITE)]),
+            addresses: Some(vec![fidl_address(ADDR, zx_types::ZX_TIME_INFINITE)]),
             ..Default::default()
         }
     }
@@ -807,7 +903,7 @@ mod tests {
             online: Some(true),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
-            addresses: Some(vec![fidl_address(ADDR2, zx::ZX_TIME_INFINITE)]),
+            addresses: Some(vec![fidl_address(ADDR2, zx_types::ZX_TIME_INFINITE)]),
             ..Default::default()
         }
     }
@@ -820,7 +916,7 @@ mod tests {
             online: Some(true),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
-            addresses: Some(vec![fidl_address(ADDR2, zx::ZX_TIME_INFINITE)]),
+            addresses: Some(vec![fidl_address(ADDR2, zx_types::ZX_TIME_INFINITE)]),
             ..Default::default()
         }
     }
@@ -834,12 +930,16 @@ mod tests {
         }
     }
 
-    fn fidl_address(addr: fnet::Subnet, valid_until: zx::zx_time_t) -> fnet_interfaces::Address {
+    fn fidl_address(
+        addr: fnet::Subnet,
+        valid_until: zx_types::zx_time_t,
+    ) -> fnet_interfaces::Address {
         fnet_interfaces::Address {
             addr: Some(addr),
-            valid_until: Some(valid_until),
+            valid_until: Some(valid_until.try_into().unwrap()),
             assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-            ..Default::default()
+            preferred_lifetime_info: Some(PreferredLifetimeInfo::preferred_forever().into()),
+            __source_breaking: Default::default(),
         }
     }
 
@@ -932,7 +1032,7 @@ mod tests {
             online: Some(false),
             has_default_ipv4_route: Some(false),
             has_default_ipv6_route: Some(false),
-            addresses: Some(vec![fidl_address(ADDR, zx::ZX_TIME_INFINITE)]),
+            addresses: Some(vec![fidl_address(ADDR, zx_types::ZX_TIME_INFINITE)]),
             ..Default::default()
         };
         assert_matches::assert_matches!(
@@ -1087,24 +1187,9 @@ mod tests {
     }
 
     #[test]
-    fn test_address_validator() {
-        let valid = fidl_address(ADDR, 42);
-        let fidl_fuchsia_net_interfaces::Address { addr, valid_until, assignment_state, .. } =
-            valid.clone();
-        assert_eq!(
-            Address::try_from(valid).expect("failed to create address from valid fidl table"),
-            Address {
-                addr: addr.expect("addr field missing from valid address"),
-                valid_until: valid_until.expect("valid_until field missing from valid address"),
-                assignment_state: assignment_state
-                    .expect("assignment_state missing from valid address"),
-            }
-        );
-        let invalid = fidl_address(ADDR, 0);
-        assert_matches!(
-            Address::try_from(invalid),
-            Err(AddressValidationError::Logical(e @ String { .. }))
-                if e == "non-positive value for valid_until=0"
-        );
+    fn positive_instant() {
+        assert_eq!(PositiveMonotonicInstant::from_nanos(-1), None);
+        assert_eq!(PositiveMonotonicInstant::from_nanos(0), None);
+        assert_eq!(PositiveMonotonicInstant::from_nanos(1), Some(PositiveMonotonicInstant(1)));
     }
 }

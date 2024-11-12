@@ -146,6 +146,10 @@ open protocol Device {
     /// Start the timer `id` to expire after `ticks` and waits until the timer expires with
     /// support for preventing suspension via the Power Framework.
     ///
+    /// The driver will signal the `setup_event` event once the timer has been setup using the
+    /// ZX_EVENT_SIGNALED signal. This allows a client to know that it is safe to allow the
+    /// system to suspend. The client is responsible for clearing this event.
+    ///
     /// The driver will not respond to this call (hang) until the timer has triggered.
     /// Calling `Stop` on the timer will abort this call and return `CANCELED`. Note that this
     /// may race with the expiration of the timer.
@@ -164,10 +168,11 @@ open protocol Device {
     /// If the driver does not have a `keep_alive` token to provide to the client, then this
     /// call will return `BAD_STATE`.
     /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
-    flexible StartAndWait(struct {
+    flexible StartAndWait(resource struct {
         id uint64;
         resolution Resolution;
         ticks uint64;
+        setup_event zx.Handle:EVENT;
     }) -> (resource struct {
         keep_alive fuchsia.power.system.LeaseToken;
     }) error DriverError;

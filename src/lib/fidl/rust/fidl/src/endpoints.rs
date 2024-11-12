@@ -10,6 +10,7 @@ use crate::{
     ServeInner,
 };
 use futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt};
+use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tracing::error;
@@ -99,6 +100,65 @@ pub trait Proxy: Sized + Send + Sync {
     /// `PEER_CLOSED` signal.
     fn on_closed(&self) -> OnSignalsRef<'_> {
         self.as_channel().on_closed()
+    }
+}
+
+/// This gives native Zircon proxies a client method like FDomain proxies have.
+/// This makes it easier in some cases to build the same code for both FDomain
+/// and regular FIDL.
+pub trait ProxyHasClient {
+    /// Get a "client" for this proxy. This is just an object which has methods
+    /// for a few common handle creation operations.
+    fn client(&self) -> Result<ZirconClient, Infallible> {
+        Ok(ZirconClient)
+    }
+}
+
+impl<T: Proxy> ProxyHasClient for T {}
+
+/// The fake "client" produced by `ProxyHasClient`. Analogous to an FDomain client.
+pub struct ZirconClient;
+
+impl ZirconClient {
+    /// Equivalent to [`EventPair::create`]
+    pub async fn create_event_pair(
+        &self,
+    ) -> Result<(crate::EventPair, crate::EventPair), Infallible> {
+        Ok(crate::EventPair::create())
+    }
+
+    /// Equivalent to [`Event::create`]
+    pub async fn create_event(&self) -> Result<crate::Event, Infallible> {
+        Ok(crate::Event::create())
+    }
+
+    /// Equivalent to [`Socket::create_stream`]
+    pub async fn create_stream_socket(&self) -> Result<(crate::Socket, crate::Socket), Infallible> {
+        Ok(crate::Socket::create_stream())
+    }
+
+    /// Equivalent to [`Socket::create_datagram`]
+    pub async fn create_datagram_socket(
+        &self,
+    ) -> Result<(crate::Socket, crate::Socket), Infallible> {
+        Ok(crate::Socket::create_datagram())
+    }
+
+    /// Equivalent to [`Channel::create`]
+    pub async fn create_channel(&self) -> Result<(Channel, Channel), Infallible> {
+        Ok(Channel::create())
+    }
+
+    /// Equivalent to the module level [`create_endpoints`]
+    pub async fn create_endpoints<T: ProtocolMarker>(
+        &self,
+    ) -> Result<(ClientEnd<T>, ServerEnd<T>), Infallible> {
+        Ok(create_endpoints::<T>())
+    }
+
+    /// Equivalent to the module level [`create_proxy`]
+    pub async fn create_proxy<T: ProtocolMarker>(&self) -> Result<(T::Proxy, ServerEnd<T>), Error> {
+        create_proxy::<T>()
     }
 }
 

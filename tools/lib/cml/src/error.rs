@@ -84,16 +84,16 @@ impl Error {
         Self::Internal(err.into())
     }
 
-    pub fn json5(err: json5format::Error, file: &Path) -> Self {
+    pub fn json5(err: json5format::Error, file: Option<&Path>) -> Self {
         match err {
             json5format::Error::Configuration(errstr) => Error::Internal(errstr),
             json5format::Error::Parse(location, errstr) => match location {
                 Some(location) => Error::parse(
                     errstr,
                     Some(Location { line: location.line, column: location.col }),
-                    Some(file),
+                    file,
                 ),
-                None => Error::parse(errstr, None, Some(file)),
+                None => Error::parse(errstr, None, file),
             },
             json5format::Error::Internal(location, errstr) => match location {
                 Some(location) => Error::Internal(format!("{}: {}", location, errstr)),

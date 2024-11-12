@@ -9,9 +9,9 @@
 
 // This is in its own source file so it can be unit tested.
 int64_t calculate_utc_time_nsec() {
-  int64_t monotonic_time = calculate_monotonic_time_nsec();
+  int64_t reference_time = calculate_monotonic_time_nsec();
 
-  // Mono to utc transform is read from vvar_data. The data is protected by a seqlock, and so
+  // Boot time to utc transform is read from vvar_data. The data is protected by a seqlock, and so
   // a seqlock reader is implemented
   // Check that the state of the seqlock shows that the transform is not being updated
   uint64_t seq_num1 = vvar.seq_num.load(std::memory_order_acquire);
@@ -19,14 +19,14 @@ int64_t calculate_utc_time_nsec() {
     // Cannot read, because a write is in progress
     return kUtcInvalid;
   }
-  int64_t mono_to_utc_reference_offset =
-      vvar.mono_to_utc_reference_offset.load(std::memory_order_acquire);
-  int64_t mono_to_utc_synthetic_offset =
-      vvar.mono_to_utc_synthetic_offset.load(std::memory_order_acquire);
-  uint32_t mono_to_utc_reference_ticks =
-      vvar.mono_to_utc_reference_ticks.load(std::memory_order_acquire);
-  uint32_t mono_to_utc_synthetic_ticks =
-      vvar.mono_to_utc_synthetic_ticks.load(std::memory_order_acquire);
+  int64_t boot_to_utc_reference_offset =
+      vvar.boot_to_utc_reference_offset.load(std::memory_order_acquire);
+  int64_t boot_to_utc_synthetic_offset =
+      vvar.boot_to_utc_synthetic_offset.load(std::memory_order_acquire);
+  uint32_t boot_to_utc_reference_ticks =
+      vvar.boot_to_utc_reference_ticks.load(std::memory_order_acquire);
+  uint32_t boot_to_utc_synthetic_ticks =
+      vvar.boot_to_utc_synthetic_ticks.load(std::memory_order_acquire);
   // Check that the state of the seqlock has not changed while reading the transform
   uint64_t seq_num2 = vvar.seq_num.load(std::memory_order_acquire);
   if (seq_num1 != seq_num2) {
@@ -34,7 +34,7 @@ int64_t calculate_utc_time_nsec() {
     return kUtcInvalid;
   }
 
-  affine::Ratio mono_to_utc_ratio(mono_to_utc_synthetic_ticks, mono_to_utc_reference_ticks);
-  return mono_to_utc_ratio.Scale(monotonic_time - mono_to_utc_reference_offset) +
-         mono_to_utc_synthetic_offset;
+  affine::Ratio boot_to_utc_ratio(boot_to_utc_synthetic_ticks, boot_to_utc_reference_ticks);
+  return boot_to_utc_ratio.Scale(reference_time - boot_to_utc_reference_offset) +
+         boot_to_utc_synthetic_offset;
 }

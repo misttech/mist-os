@@ -181,4 +181,21 @@ bool SymbolServer::LoadGCloudAuth() {
   return true;
 }
 
+std::string ServerStateToString(const SymbolServer::State& state) {
+  switch (state) {
+    case SymbolServer::State::kInitializing:
+      return "initializing";
+    case SymbolServer::State::kAuth:
+      return "authenticating";
+    case SymbolServer::State::kBusy:
+      return "busy";
+    case SymbolServer::State::kReady:
+      return "ready";
+    case SymbolServer::State::kUnreachable:
+      return "unreachable";
+    default:
+      return "unknown";
+  }
+}
+
 }  // namespace zxdb

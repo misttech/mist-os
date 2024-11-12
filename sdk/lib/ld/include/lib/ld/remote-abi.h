@@ -391,7 +391,7 @@ class RemoteAbi {
     assert(!modules.empty());
     assert(modules.size() == abi_modules_.size());
 
-    cpp20::span abi_modules = heap_->Local(abi_modules_);
+    std::span abi_modules = heap_->Local(abi_modules_);
     assert(modules.size() == abi_modules.size());
 
     std::vector<ModuleVaddrMap> vaddr_maps;

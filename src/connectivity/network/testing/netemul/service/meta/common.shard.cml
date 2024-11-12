@@ -24,10 +24,21 @@
             durability: "transient",
         },
     ],
+    capabilities: [
+        {
+            directory: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.netemul.network.NetworkContext",
             from: "#network-context",
+        },
+        {
+            storage: "custom_artifacts",
+            path: "/custom_artifacts",
         },
     ],
     offer: [
@@ -64,6 +75,11 @@
                 "tmp",
             ],
             from: "parent",
+            to: "#netemul",
+        },
+        {
+            directory: "custom_artifacts",
+            from: "self",
             to: "#netemul",
         },
         {

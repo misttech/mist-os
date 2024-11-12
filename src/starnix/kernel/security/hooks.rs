@@ -28,19 +28,19 @@ use std::sync::Arc;
 /// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
 /// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
 /// and its result returned.
-fn if_selinux_else_with_arg<F, R, D, A>(arg: A, task: &Task, hook: F, default: D) -> R
+fn if_selinux_else_with_context<F, R, D, C>(context: C, task: &Task, hook: F, default: D) -> R
 where
-    F: FnOnce(A, &Arc<SecurityServer>) -> R,
-    D: Fn(A) -> R,
+    F: FnOnce(C, &Arc<SecurityServer>) -> R,
+    D: Fn(C) -> R,
 {
     if let Some(state) = task.kernel().security_state.state.as_ref() {
         if state.server.has_policy() {
-            hook(arg, &state.server)
+            hook(context, &state.server)
         } else {
-            default(arg)
+            default(context)
         }
     } else {
-        default(arg)
+        default(context)
     }
 }
 
@@ -52,18 +52,27 @@ where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    if_selinux_else_with_arg((), task, |_, security_server| hook(security_server), |_| default())
+    if_selinux_else_with_context(
+        (),
+        task,
+        |_, security_server| hook(security_server),
+        |_| default(),
+    )
 }
 
 /// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
 /// arranges to return a default `Ok(...)` result value if SELinux is not enabled, or not yet
 /// configured with a policy.
-fn if_selinux_else_default_ok_with_arg<R, F, A>(arg: A, task: &Task, hook: F) -> Result<R, Errno>
+fn if_selinux_else_default_ok_with_context<R, F, C>(
+    context: C,
+    task: &Task,
+    hook: F,
+) -> Result<R, Errno>
 where
-    F: FnOnce(A, &Arc<SecurityServer>) -> Result<R, Errno>,
+    F: FnOnce(C, &Arc<SecurityServer>) -> Result<R, Errno>,
     R: Default,
 {
-    if_selinux_else_with_arg(arg, task, hook, |_| Ok(R::default()))
+    if_selinux_else_with_context(context, task, hook, |_| Ok(R::default()))
 }
 
 /// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
@@ -123,7 +132,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.file_system_resolve_security");
-    if_selinux_else_default_ok_with_arg(locked, current_task, |locked, security_server| {
+    if_selinux_else_default_ok_with_context(locked, current_task, |locked, security_server| {
         selinux_hooks::file_system_resolve_security(
             locked,
             security_server,
@@ -553,7 +562,7 @@ pub fn sb_mount(
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::sb_mount(
+        selinux_hooks::superblock::sb_mount(
             &security_server.as_permission_check(),
             current_task,
             dev_name,
@@ -575,7 +584,12 @@ pub fn sb_umount(
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_umount");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::sb_umount(&security_server.as_permission_check(), current_task, node, flags)
+        selinux_hooks::superblock::sb_umount(
+            &security_server.as_permission_check(),
+            current_task,
+            node,
+            flags,
+        )
     })
 }
 
@@ -662,7 +676,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.fs_node_getsecurity");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
@@ -714,7 +728,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.fs_node_setsecurity");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
@@ -802,7 +816,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.selinuxfs_policy_loaded");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
@@ -850,10 +864,8 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::security::selinux_hooks::testing;
     use crate::security::selinux_hooks::testing::{
-        create_test_file, create_unlabeled_test_file,
-        spawn_kernel_with_selinux_hooks_test_policy_and_run,
+        self, spawn_kernel_with_selinux_hooks_test_policy_and_run,
     };
     use crate::testing::{create_task, spawn_kernel_and_run, spawn_kernel_with_selinux_and_run};
     use linux_uapi::XATTR_NAME_SELINUX;
@@ -1173,16 +1185,16 @@ mod tests {
     #[fuchsia::test]
     async fn fs_node_task_to_fs_node_noop_selinux_disabled() {
         spawn_kernel_and_run(|locked, current_task| {
-            let node = &create_unlabeled_test_file(locked, current_task).entry.node;
+            let node = &testing::create_test_file(locked, current_task).entry.node;
             task_to_fs_node(current_task, &current_task.temp_task(), &node);
             assert_eq!(None, selinux_hooks::get_cached_sid(node));
         });
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_noop_selinux_disabled() {
+    async fn fs_node_setsecurity_selinux_disabled_only_sets_xattr() {
         spawn_kernel_and_run(|locked, current_task| {
-            let node = &create_unlabeled_test_file(locked, current_task).entry.node;
+            let node = &testing::create_test_file(locked, current_task).entry.node;
 
             fs_node_setsecurity(
                 locked,
@@ -1199,10 +1211,9 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_noop_selinux_without_policy() {
+    async fn fs_node_setsecurity_selinux_without_policy_only_sets_xattr() {
         spawn_kernel_with_selinux_and_run(|locked, current_task, _security_server| {
-            let node = &create_unlabeled_test_file(locked, current_task).entry.node;
-
+            let node = &testing::create_test_file(locked, current_task).entry.node;
             fs_node_setsecurity(
                 locked,
                 current_task,
@@ -1218,14 +1229,17 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_selinux_permissive() {
+    async fn fs_node_setsecurity_selinux_permissive_sets_xattr_and_label() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, security_server| {
                 security_server.set_enforcing(false);
                 let expected_sid = security_server
                     .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
                     .expect("no SID for VALID_SECURITY_CONTEXT");
-                let node = &create_unlabeled_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, &current_task).entry.node;
+
+                // Safeguard against a false positive by ensuring `expected_sid` is not already the file's label.
+                assert_ne!(Some(expected_sid), selinux_hooks::get_cached_sid(node));
 
                 fs_node_setsecurity(
                     locked,
@@ -1245,13 +1259,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_not_selinux_is_noop() {
+    async fn fs_node_setsecurity_not_selinux_only_sets_xattr() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, security_server| {
                 let valid_security_context_sid = security_server
                     .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
                     .expect("no SID for VALID_SECURITY_CONTEXT");
-                let node = &create_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, current_task).entry.node;
                 // The label assigned to the test file on creation must differ from
                 // VALID_SECURITY_CONTEXT, otherwise this test may return a false
                 // positive.
@@ -1275,19 +1289,36 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_clear_invalid_security_context() {
+    async fn fs_node_setsecurity_selinux_enforcing_invalid_context_fails() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, _security_server| {
-                let node = &create_test_file(locked, current_task).entry.node;
-                fs_node_setsecurity(
+                let node = &testing::create_test_file(locked, current_task).entry.node;
+
+                let before_sid = selinux_hooks::get_cached_sid(node);
+                assert_ne!(Some(SecurityId::initial(InitialSid::Unlabeled)), before_sid);
+
+                assert!(fs_node_setsecurity(
                     locked,
-                    current_task,
+                    &current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
-                    VALID_SECURITY_CONTEXT.into(),
+                    "!".into(), // Note: Not a valid security context.
                     XattrOp::Set,
                 )
-                .expect("set_xattr(security.selinux) failed");
+                .is_err());
+
+                assert_eq!(before_sid, selinux_hooks::get_cached_sid(node));
+            },
+        )
+    }
+
+    #[fuchsia::test]
+    async fn fs_node_setsecurity_selinux_permissive_invalid_context_sets_xattr_and_label() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                security_server.set_enforcing(false);
+                let node = &testing::create_test_file(locked, current_task).entry.node;
+
                 assert_ne!(
                     Some(SecurityId::initial(InitialSid::Unlabeled)),
                     selinux_hooks::get_cached_sid(node)
@@ -1312,31 +1343,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_set_sid_selinux_enforcing() {
-        spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, _security_server| {
-                let node = &create_unlabeled_test_file(locked, current_task).entry.node;
-
-                fs_node_setsecurity(
-                    locked,
-                    current_task,
-                    &node,
-                    XATTR_NAME_SELINUX.to_bytes().into(),
-                    VALID_SECURITY_CONTEXT.into(),
-                    XattrOp::Set,
-                )
-                .expect("set_xattr(security.selinux) failed");
-
-                assert!(selinux_hooks::get_cached_sid(node).is_some());
-            },
-        )
-    }
-
-    #[fuchsia::test]
     async fn fs_node_setsecurity_different_sid_for_different_context() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, _security_server| {
-                let node = &create_unlabeled_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 fs_node_setsecurity(
                     locked,
@@ -1374,7 +1384,7 @@ mod tests {
     async fn fs_node_getsecurity_returns_cached_context() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, security_server| {
-                let node = &create_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 // Set a mismatched value in `node`'s "security.seliux" attribute.
                 const TEST_VALUE: &str = "Something Random";
@@ -1414,10 +1424,12 @@ mod tests {
     #[fuchsia::test]
     async fn fs_node_getsecurity_delegates_to_get_xattr() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, _security_server| {
-                let node = &create_test_file(locked, current_task).entry.node;
+            |locked, current_task, security_server| {
+                let node = &testing::create_test_file(locked, current_task).entry.node;
 
-                // Set an invalid value in `node`'s "security.seliux" attribute.
+                // Set an invalid value in `node`'s "security.selinux" attribute.
+                // This requires SELinux to be in permissive mode, otherwise the "relabelto" permission check will fail.
+                security_server.set_enforcing(false);
                 const TEST_VALUE: &str = "Something Random";
                 fs_node_setsecurity(
                     locked,
@@ -1428,6 +1440,7 @@ mod tests {
                     XattrOp::Set,
                 )
                 .expect("set_xattr(security.selinux) failed");
+                security_server.set_enforcing(true);
 
                 // Reading the security attribute should pass-through to read the value from the file system.
                 let result = fs_node_getsecurity(

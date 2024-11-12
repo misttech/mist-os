@@ -119,7 +119,7 @@ class AmlSdmmc : public fdf::DriverBase,
   zx_status_t ResumePower() __TA_REQUIRES(lock_);
 
   // Visible for tests
-  zx_status_t Init(const fdf::PDev::DeviceInfo& device_info) __TA_EXCLUDES(lock_);
+  zx_status_t Init(const std::string& instance_identifier) __TA_EXCLUDES(lock_);
 
  protected:
   virtual zx_status_t WaitForInterruptImpl();
@@ -208,7 +208,7 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty distance_to_failing_point;
     inspect::BoolProperty power_suspended;
 
-    void Init(const fdf::PDev::DeviceInfo& device_info, inspect::Node& parent,
+    void Init(const std::string& instance_identifier, inspect::Node& parent,
               bool is_power_suspended);
   };
 

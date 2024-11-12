@@ -21,8 +21,8 @@ TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
                            size_t buffer_size_megabytes,
                            fuchsia::tracing::BufferingMode buffering_mode,
                            TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
-                           zx::duration stop_timeout, fit::closure abort_handler,
-                           AlertCallback alert_callback)
+                           zx::duration stop_timeout, controller::FxtVersion fxt_version,
+                           fit::closure abort_handler, AlertCallback alert_callback)
     : executor_(executor),
       buffer_forwarder_(std::make_shared<BufferForwarder>(std::move(destination))),
       enabled_categories_(std::move(enabled_categories)),
@@ -31,6 +31,7 @@ TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
       provider_specs_(std::move(provider_specs)),
       start_timeout_(start_timeout),
       stop_timeout_(stop_timeout),
+      fxt_version_(std::move(fxt_version)),
       abort_handler_(std::move(abort_handler)),
       alert_callback_(std::move(alert_callback)),
       weak_ptr_factory_(this) {}
@@ -317,9 +318,9 @@ void TraceSession::NotifyStopped() {
     }
 
     controller::Session_StopTracing_Result stop_result;
-    controller::TerminateResult result;
+    controller::StopResult result;
     result.set_provider_stats(std::move(trace_stats_));
-    stop_result.set_response(controller::Session_StopTracing_Response(std::move(result)));
+    stop_result.set_response(std::move(result));
     auto callback = std::move(stop_callback_);
     FX_DCHECK(callback);
     callback(std::move(stop_result));
@@ -457,7 +458,7 @@ void TraceSession::Abort() {
     TransitionToState(State::kStopped);
     session_stop_timeout_.Cancel();
     controller::Session_StopTracing_Result stop_result;
-    stop_result.set_err(controller::StopErrorCode::ABORTED);
+    stop_result.set_err(controller::StopError::ABORTED);
     auto callback = std::move(stop_callback_);
     FX_DCHECK(callback);
     callback(std::move(stop_result));

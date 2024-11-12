@@ -27,25 +27,33 @@ const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
 pub struct Sample {
     /// The UTC time.
     pub utc: UtcInstant,
-    /// The monotonic time at which the UTC was most valid.
-    pub monotonic: zx::MonotonicInstant,
+    /// The reference time at which the UTC was most valid.
+    pub reference: zx::BootInstant,
     /// The standard deviation of the UTC error.
-    pub std_dev: zx::MonotonicDuration,
+    pub std_dev: zx::BootDuration,
 }
 
 impl TryFrom<TimeSample> for Sample {
     type Error = anyhow::Error;
 
     fn try_from(sample: TimeSample) -> Result<Self, Self::Error> {
-        let TimeSample { utc, monotonic, standard_deviation, .. } = sample;
-        match (utc, monotonic, standard_deviation) {
-            (None, _, _) => Err(anyhow!("sample missing utc")),
-            (_, None, _) => Err(anyhow!("sample missing monotonic")),
-            (_, _, None) => Err(anyhow!("sample missing standard deviation")),
-            (Some(utc), Some(monotonic), Some(std_dev)) => Ok(Sample {
+        let TimeSample { utc, monotonic, standard_deviation, reference, .. } = sample;
+        match (utc, reference, standard_deviation, monotonic) {
+            (None, _, _, _) => Err(anyhow!("sample missing utc")),
+            (Some(utc), None, Some(std_dev), Some(monotonic)) => Ok(Sample {
                 utc: UtcInstant::from_nanos(utc),
-                monotonic: zx::MonotonicInstant::from_nanos(monotonic),
-                std_dev: zx::MonotonicDuration::from_nanos(std_dev),
+                // Treat `monotonic` as a boot instant, for compatibility.
+                // This should work since any platform versions that still
+                // use `monotonic` will not know the difference.
+                reference: zx::BootInstant::from_nanos(monotonic),
+                std_dev: zx::BootDuration::from_nanos(std_dev),
+            }),
+            (_, None, _, None) => Err(anyhow!("sample missing reference: {:?}", sample)),
+            (_, _, None, _) => Err(anyhow!("sample missing standard deviation")),
+            (Some(utc), Some(reference), Some(std_dev), _) => Ok(Sample {
+                utc: UtcInstant::from_nanos(utc),
+                reference,
+                std_dev: zx::BootDuration::from_nanos(std_dev),
             }),
         }
     }
@@ -54,12 +62,8 @@ impl TryFrom<TimeSample> for Sample {
 #[cfg(test)]
 impl Sample {
     /// Constructs a new `Sample`.
-    pub fn new(
-        utc: UtcInstant,
-        monotonic: zx::MonotonicInstant,
-        std_dev: zx::MonotonicDuration,
-    ) -> Sample {
-        Sample { utc, monotonic, std_dev }
+    pub fn new(utc: UtcInstant, reference: zx::BootInstant, std_dev: zx::BootDuration) -> Sample {
+        Sample { utc, reference, std_dev }
     }
 }
 
@@ -496,21 +500,21 @@ mod test {
 
     const STATUS_1: Status = Status::Initializing;
     const SAMPLE_1_UTC_NANOS: i64 = 1234567;
-    const SAMPLE_1_MONO_NANOS: i64 = 222;
+    const SAMPLE_1_REF_NANOS: i64 = 222;
     const SAMPLE_1_STD_DEV_NANOS: i64 = 8888;
 
     lazy_static! {
         static ref STATUS_EVENT_1: Event = Event::StatusChange { status: STATUS_1 };
         static ref SAMPLE_1: Sample = Sample {
             utc: UtcInstant::from_nanos(SAMPLE_1_UTC_NANOS),
-            monotonic: zx::MonotonicInstant::from_nanos(SAMPLE_1_MONO_NANOS),
-            std_dev: zx::MonotonicDuration::from_nanos(SAMPLE_1_STD_DEV_NANOS),
+            reference: zx::BootInstant::from_nanos(SAMPLE_1_REF_NANOS),
+            std_dev: zx::BootDuration::from_nanos(SAMPLE_1_STD_DEV_NANOS),
         };
         static ref SAMPLE_EVENT_1: Event = Event::from(*SAMPLE_1);
         static ref SAMPLE_2: Sample = Sample {
             utc: UtcInstant::from_nanos(12345678),
-            monotonic: zx::MonotonicInstant::from_nanos(333),
-            std_dev: zx::MonotonicDuration::from_nanos(9999),
+            reference: zx::BootInstant::from_nanos(333),
+            std_dev: zx::BootDuration::from_nanos(9999),
         };
         static ref SAMPLE_EVENT_2: Event = Event::from(*SAMPLE_2);
     }
@@ -553,7 +557,7 @@ mod test {
         let fake = FakePushTimeSource::events(vec![]);
         let mut events = fake.watch().await.unwrap();
         // Getting an event from the last collection should never complete, leading to a stall.
-        events.next().await;
+        let _event = events.next().await;
     }
 
     #[fuchsia::test]
@@ -587,7 +591,7 @@ mod test {
                     ftexternal::PushSourceRequest::WatchSample { responder, .. } => {
                         let sample = ftexternal::TimeSample {
                             utc: Some(SAMPLE_1_UTC_NANOS),
-                            monotonic: Some(SAMPLE_1_MONO_NANOS),
+                            reference: Some(zx::BootInstant::from_nanos(SAMPLE_1_REF_NANOS)),
                             standard_deviation: Some(SAMPLE_1_STD_DEV_NANOS),
                             ..Default::default()
                         };

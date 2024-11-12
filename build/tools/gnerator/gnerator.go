@@ -22,6 +22,7 @@ var knownRules = map[string]bool{
 	"go_test":            true,
 	"install_host_tools": true,
 	"sdk_host_tool":      true,
+	"package":            true,
 }
 
 // attrsToOmitByRules stores a mapping from known rules to attributes to omit when
@@ -180,6 +181,11 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	fn := expr.Fn.(*syntax.Ident)
 	if !knownRules[fn.Name] {
 		return nil, fmt.Errorf("%s is not a known Bazel rule to convert to GN", fn.Name)
+	}
+
+	// TODO(jayzhuang): Handle package level settings, e.g. visibility.
+	if fn.Name == "package" {
+		return nil, nil
 	}
 
 	attrsToOmit := attrsToOmitByRules[fn.Name]

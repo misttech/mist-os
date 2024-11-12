@@ -25,11 +25,10 @@ use time_metrics_registry::{
     HTTPSDATE_POLL_LATENCY_MIGRATED_METRIC_ID, PROJECT_ID,
 };
 
-const RTT_BUCKET_SIZE: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(
-    HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64,
-);
-const RTT_BUCKET_FLOOR: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_FLOOR);
+const RTT_BUCKET_SIZE: zx::BootDuration =
+    zx::BootDuration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64);
+const RTT_BUCKET_FLOOR: zx::BootDuration =
+    zx::BootDuration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_FLOOR);
 
 struct CobaltConnectedService;
 impl ConnectedProtocol for CobaltConnectedService {
@@ -90,17 +89,17 @@ impl CobaltDiagnostics {
     }
 
     /// Calculate the bucket number in the latency metric for a given duration.
-    fn round_trip_time_bucket(duration: &zx::MonotonicDuration) -> u32 {
+    fn round_trip_time_bucket(duration: &zx::BootDuration) -> u32 {
         Self::cobalt_bucket(*duration, RTT_BUCKETS, RTT_BUCKET_SIZE, RTT_BUCKET_FLOOR)
     }
 
     /// Calculate the bucket index for a time duration. Indices follow the rules for Cobalt
     /// histograms - bucket 0 is underflow, and num_buckets + 1 is overflow.
     fn cobalt_bucket(
-        duration: zx::MonotonicDuration,
+        duration: zx::BootDuration,
         num_buckets: u32,
-        bucket_size: zx::MonotonicDuration,
-        underflow_floor: zx::MonotonicDuration,
+        bucket_size: zx::BootDuration,
+        underflow_floor: zx::BootDuration,
     ) -> u32 {
         let overflow_threshold = underflow_floor + (bucket_size * num_buckets);
         if duration < underflow_floor {
@@ -166,22 +165,21 @@ mod test {
     use std::collections::HashSet;
 
     const TEST_INITIAL_PHASE: Phase = Phase::Initial;
-    const TEST_BOUND_SIZE: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(101);
-    const TEST_STANDARD_DEVIATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(20);
-    const ONE_MICROS: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(1);
-    const TEST_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(123_456_789);
+    const TEST_BOUND_SIZE: zx::BootDuration = zx::BootDuration::from_millis(101);
+    const TEST_STANDARD_DEVIATION: zx::BootDuration = zx::BootDuration::from_millis(20);
+    const ONE_MICROS: zx::BootDuration = zx::BootDuration::from_micros(1);
+    const TEST_TIME: zx::BootInstant = zx::BootInstant::from_nanos(123_456_789);
     const TEST_RTT_BUCKET: u32 = 2;
     const TEST_RTT_2_BUCKET: u32 = 4;
-    const OVERFLOW_RTT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
-    const RTT_BUCKET_SIZE: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(
-        HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64,
-    );
+    const OVERFLOW_RTT: zx::BootDuration = zx::BootDuration::from_seconds(10);
+    const RTT_BUCKET_SIZE: zx::BootDuration =
+        zx::BootDuration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64);
 
     lazy_static! {
         static ref TEST_INITIAL_PHASE_COBALT: CobaltPhase = TEST_INITIAL_PHASE.into();
-        static ref TEST_RTT: zx::MonotonicDuration =
+        static ref TEST_RTT: zx::BootDuration =
             RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * TEST_RTT_BUCKET - ONE_MICROS;
-        static ref TEST_RTT_2: zx::MonotonicDuration =
+        static ref TEST_RTT_2: zx::BootDuration =
             RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * TEST_RTT_2_BUCKET - ONE_MICROS;
     }
 
@@ -202,9 +200,8 @@ mod test {
         let bucket_1_rtt = RTT_BUCKET_FLOOR + ONE_MICROS;
         let bucket_5_rtt_1 = bucket_1_rtt + RTT_BUCKET_SIZE * 4;
         let overflow_rtt = RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * (RTT_BUCKETS + 2);
-        let overflow_rtt_2 = RTT_BUCKET_FLOOR
-            + RTT_BUCKET_SIZE * RTT_BUCKETS
-            + zx::MonotonicDuration::from_minutes(2);
+        let overflow_rtt_2 =
+            RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * RTT_BUCKETS + zx::BootDuration::from_minutes(2);
         let overflow_adjacent_rtt = RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * RTT_BUCKETS - ONE_MICROS;
         let underflow_rtt = RTT_BUCKET_FLOOR - ONE_MICROS;
 
@@ -221,7 +218,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            monotonic: TEST_TIME,
+            reference: TEST_TIME,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT)],
@@ -251,7 +248,7 @@ mod test {
         let (cobalt, mut event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            monotonic: TEST_TIME,
+            reference: TEST_TIME,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT)],
@@ -262,7 +259,7 @@ mod test {
         cobalt.record(Event::Phase(Phase::Converge));
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            monotonic: TEST_TIME,
+            reference: TEST_TIME,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll::with_round_trip_time(*TEST_RTT_2)],
@@ -276,7 +273,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            monotonic: TEST_TIME,
+            reference: TEST_TIME,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![
@@ -313,7 +310,7 @@ mod test {
         let (cobalt, event_recv) = diagnostics_for_test();
         cobalt.record(Event::Success(&HttpsSample {
             utc: TEST_TIME,
-            monotonic: TEST_TIME,
+            reference: TEST_TIME,
             standard_deviation: TEST_STANDARD_DEVIATION,
             final_bound_size: TEST_BOUND_SIZE,
             polls: vec![Poll { round_trip_time: OVERFLOW_RTT }],

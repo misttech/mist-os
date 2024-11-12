@@ -365,6 +365,7 @@ struct BufferLayout {
 /// Network device base info with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(netdev::DeviceBaseInfo)]
+#[fidl_table_strict]
 pub struct DeviceBaseInfo {
     /// Maximum number of items in rx FIFO (per session).
     pub rx_depth: u16,
@@ -383,6 +384,8 @@ pub struct DeviceBaseInfo {
     pub min_tx_buffer_head: u16,
     /// The amount of bytes the device requests be free as `tail` space in a tx buffer.
     pub min_tx_buffer_tail: u16,
+    /// Maximum descriptor chain length accepted by the device.
+    pub max_buffer_parts: u8,
     /// Available rx acceleration flags for this device.
     #[fidl_field_type(default)]
     pub rx_accel: Vec<netdev::RxAcceleration>,
@@ -394,6 +397,7 @@ pub struct DeviceBaseInfo {
 /// Network device information with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(netdev::DeviceInfo)]
+#[fidl_table_strict]
 pub struct DeviceInfo {
     /// Minimum descriptor length, in 64-bit words.
     pub min_descriptor_length: u8,
@@ -456,6 +460,7 @@ impl DeviceInfo {
                     min_tx_buffer_length,
                     min_tx_buffer_head,
                     min_tx_buffer_tail,
+                    max_buffer_parts: _,
                     rx_accel: _,
                     tx_accel: _,
                 },
@@ -840,6 +845,7 @@ mod tests {
         min_tx_buffer_head: 0,
         min_tx_buffer_length: 0,
         min_tx_buffer_tail: 0,
+        max_buffer_parts: fidl_fuchsia_hardware_network::MAX_DESCRIPTOR_CHAIN,
         rx_accel: Vec::new(),
         tx_accel: Vec::new(),
     };

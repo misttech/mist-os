@@ -5,7 +5,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use fidl_fuchsia_hardware_sockettunnel::{DeviceMarker, DeviceOpenSocketRequest};
+use fidl_fuchsia_hardware_sockettunnel::{DeviceMarker, DeviceRegisterSocketRequest};
 use starnix_core::device::DeviceOps;
 use starnix_core::fs::fuchsia::new_remote_file_ops;
 use starnix_core::fs::sysfs::DeviceDirectory;
@@ -13,7 +13,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsStr, FsString};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::{errno, error};
+use starnix_uapi::errno;
 
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -45,23 +45,19 @@ impl DeviceOps for SocketTunnelDevice {
         // Create the socket pair for local/remote sides
         let (tx, rx) = zx::Socket::create_stream();
 
-        let open_socket_params = DeviceOpenSocketRequest {
+        let register_socket_params = DeviceRegisterSocketRequest {
             server_socket: rx.into(),
             socket_label: Some(self.socket_label.deref().clone().to_string()),
             ..Default::default()
         };
         // Execute command, check if the FIDL connection succeeded, and extract the Status
-        let open_socket_result = device_proxy
-            .open_socket(open_socket_params, zx::MonotonicInstant::INFINITE)
+        device_proxy
+            .register_socket(register_socket_params, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?
-            .status
-            .ok_or(errno!(ENOENT))?;
+            .ok_or_else(|| errno!(ENOENT))?;
 
-        // Return the remote_file_ops if status is OK
-        match zx::Status::from_raw(open_socket_result) {
-            zx::Status::OK => new_remote_file_ops(tx.into()),
-            _ => error!(ENOENT),
-        }
+        // This will only be reached if the status was OK
+        new_remote_file_ops(tx.into())
     }
 }
 

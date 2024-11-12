@@ -61,10 +61,13 @@ class ScratchPad {
     LoadInfo load_info;
     elfldltl::RemoteVmarLoader loader{root_vmar()};
     auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-        diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
+        diag, file,
+        elfldltl::ContainerArrayFromFile<
+            elfldltl::StdContainer<std::vector>::Container<elfldltl::Elf<>::Phdr>>(diag,
+                                                                                   "impossible"));
     ZX_ASSERT(headers);
     auto& [ehdr, phdrs_result] = *headers;
-    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result.get();
+    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
     ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())));
     load_info.VisitSegments([this](const auto& segment) {
       if (segment.executable()) {

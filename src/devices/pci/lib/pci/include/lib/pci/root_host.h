@@ -40,7 +40,7 @@ struct McfgAllocation {
 // be implemented on a given platform and paired with Pciroot<T> implementations.
 class PciRootHost {
  public:
-  enum AllocationType {
+  enum AllocationType : uint8_t {
     kIo,
     kMmio32,
     kMmio64,
@@ -109,6 +109,8 @@ class PciRootHost {
     return ZX_ERR_NOT_FOUND;
   }
 
+  zx::result<> AddMmioRange(zx_paddr_t base, size_t size);
+
   void DumpAllocatorWindows() __TA_EXCLUDES(lock_) {
     fbl::AutoLock lock(&lock_);
     DumpAllocatorWindowsLocked();
@@ -117,15 +119,22 @@ class PciRootHost {
  private:
   void DumpAllocatorWindowsLocked() __TA_REQUIRES(lock_) {
     auto cb = [](const ralloc_region_t* r) -> bool {
-      printf("    [%#lx, %#lx) [%#zx]", r->base, r->base + r->size, r->size);
+      printf("  [%#lx, %#lx) [%#zx]\n", r->base, r->base + r->size, r->size);
       return true;
     };
-    printf("Mmio32 available:");
-    Mmio32().WalkAvailableRegions(cb);
-    printf("Mmio64 available:");
-    Mmio64().WalkAvailableRegions(cb);
-    printf("Io available:");
-    Io().WalkAvailableRegions(cb);
+    if (mmio32_alloc_.AvailableRegionCount()) {
+      printf("Mmio32 available:\n");
+      mmio32_alloc_.WalkAvailableRegions(cb);
+    }
+    if (mmio64_alloc_.AvailableRegionCount()) {
+      printf("Mmio64 available:\n");
+      mmio64_alloc_.WalkAvailableRegions(cb);
+    }
+    if (io_alloc_.AvailableRegionCount()) {
+      printf("Io available:\n");
+      Io().WalkAvailableRegions(cb);
+    }
+    printf("\n");
   }
   void ProcessQueue() __TA_REQUIRES(lock_);
   zx::result<zx_paddr_t> Allocate(AllocationType type, uint32_t kind, zx_paddr_t base, size_t size,

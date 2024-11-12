@@ -49,14 +49,12 @@ fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
 
 }  // namespace internal
 
-AmlUart::AmlUart(
-    fdf::PDev pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
-    fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
-    std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher, bool power_control_enabled,
-    std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end,
-    std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end,
-    std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_end,
-    std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_end)
+AmlUart::AmlUart(fdf::PDev pdev,
+                 const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
+                 fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
+                 std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher,
+                 bool power_control_enabled,
+                 std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag)
     : pdev_(std::move(pdev)),
       serial_port_info_(serial_port_info),
       mmio_(std::move(mmio)),
@@ -70,68 +68,10 @@ AmlUart::AmlUart(
     timer_waiter_.set_trigger(ZX_TIMER_SIGNALED);
   }
 
-  if (lessor_client_end != std::nullopt) {
-    lessor_client_.Bind(std::move(*lessor_client_end));
-  } else {
-    zxlogf(INFO, "No lessor client end gets passed into AmlUart during initialization.");
+  if (sag != std::nullopt) {
+    sag_.Bind(std::move(*sag));
+    this->sag_available_ = true;
   }
-
-  if (required_level_client_end != std::nullopt) {
-    required_level_client_.Bind(std::move(*required_level_client_end),
-                                fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  } else {
-    zxlogf(INFO, "No required level client end gets passed into AmlUart during initialization.");
-  }
-
-  if (current_level_client_end != std::nullopt) {
-    current_level_client_.Bind(std::move(*current_level_client_end));
-  } else {
-    zxlogf(INFO, "No current level client end gets passed into AmlUart during initialization.");
-  }
-
-  if (element_control_client_end != std::nullopt) {
-    element_control_client_end_ = std::move(element_control_client_end);
-    WatchRequiredLevel();
-  } else {
-    zxlogf(INFO, "No element control client end gets passed into AmlUart during initialization.");
-  }
-}
-
-// Keep watching the required level, since the driver doesn't toggle the hardware power state
-// according to power element levels, report the current level to power broker immediately with the
-// required level value received from power broker.
-void AmlUart::WatchRequiredLevel() {
-  if (!required_level_client_.is_valid()) {
-    zxlogf(ERROR, "RequiredLevel not valid, can't monitor it");
-    element_control_client_end_.reset();
-    return;
-  }
-  required_level_client_->Watch().Then(
-      [this](fidl::Result<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        if (result.is_error()) {
-          if (result.error_value().is_framework_error() &&
-              result.error_value().framework_error().status() != ZX_ERR_CANCELED) {
-            zxlogf(ERROR, "Power level required call failed: %s. Stop monitoring required level",
-                   result.error_value().FormatDescription().c_str());
-          }
-          element_control_client_end_.reset();
-          return;
-        }
-        zxlogf(DEBUG, "RequiredLevel : %u", static_cast<uint8_t>(result->required_level()));
-        if (!current_level_client_.is_valid()) {
-          zxlogf(ERROR, "CurrentLevel not valid. Stop monitoring required level");
-          element_control_client_end_.reset();
-          return;
-        }
-        auto update_result = current_level_client_->Update(result->required_level());
-        if (update_result.is_error()) {
-          zxlogf(ERROR, "CurrentLevel call failed: %s. Stop monitoring required level",
-                 update_result.error_value().FormatDescription().c_str());
-          element_control_client_end_.reset();
-          return;
-        }
-        WatchRequiredLevel();
-      });
 }
 
 constexpr auto kMinBaudRate = 2;
@@ -269,10 +209,6 @@ void AmlUart::EnableLocked(bool enable) {
         .set_inv_rts(!ctrl.two_wire())
         .WriteTo(&mmio_);
   }
-}
-
-fidl::ClientEnd<fuchsia_power_broker::ElementControl>& AmlUart::element_control_for_testing() {
-  return *element_control_client_end_;
 }
 
 void AmlUart::HandleTXRaceForTest() {
@@ -479,51 +415,27 @@ void AmlUart::handle_unknown_method(
   zxlogf(WARNING, "handle_unknown_method in fuchsia_hardware_serialimpl::Device server.");
 }
 
-zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AmlUart::AcquireLease() {
-  auto lease_result = lessor_client_->Lease(kPowerLevelHandling);
-  if (lease_result.is_error()) {
-    zxlogf(ERROR, "Failed to aquire lease: %s",
-           lease_result.error_value().FormatDescription().c_str());
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-  if (!lease_result->lease_control().is_valid()) {
-    zxlogf(ERROR, "Lease returned invalid lease control client end.");
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-  // Wait until the lease is actually granted.
-  fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control_client(
-      std::move(lease_result->lease_control()));
-  fuchsia_power_broker::LeaseStatus current_lease_status =
-      fuchsia_power_broker::LeaseStatus::kUnknown;
-  do {
-    auto watch_result = lease_control_client->WatchStatus(current_lease_status);
-    if (watch_result.is_error()) {
-      zxlogf(ERROR, "WatchStatus returned error: %s",
-             watch_result.error_value().FormatDescription().c_str());
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-    current_lease_status = watch_result->status();
-  } while (current_lease_status != fuchsia_power_broker::LeaseStatus::kSatisfied);
-  return zx::ok(lease_control_client.TakeClientEnd());
-}
-
 void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                         const zx_packet_interrupt_t* interrupt) {
   if (status != ZX_OK) {
     return;
   }
-  // If the element control client end is not available, it means that power management is not
-  // enabled for this driver, the driver will not take a wake lease and set timer in this case.
-  if (element_control_client_end_) {
+  // If sag is not available, it means that power management is not enabled for this driver,
+  // the driver will not take a wake lease and set timer in this case.
+  if (this->sag_available_) {
     fbl::AutoLock lock(&timer_lock_);
 
-    if (!lease_control_client_end_.is_valid()) {
-      // Take the wake lease and keep the lease control client.
-      auto lease_control_result = AcquireLease();
-      if (lease_control_result.is_error()) {
+    if (sag_.is_valid() && !token_) {
+      // Take a wake lease.
+      fidl::Request<::fuchsia_power_system::ActivityGovernor::TakeWakeLease> request;
+      request.name("uart");
+      auto activity_governor_result = sag_->TakeWakeLease(request);
+      if (activity_governor_result.is_error()) {
+        zxlogf(ERROR, "Failed to take wake lease: %s",
+               activity_governor_result.error_value().FormatDescription().c_str());
         return;
       }
-      lease_control_client_end_ = std::move(*lease_control_result);
+      token_ = std::move(activity_governor_result.value().token());
     }
 
     timeout_ = zx::deadline_after(zx::msec(kPowerLeaseTimeoutMs));
@@ -567,6 +479,8 @@ void AmlUart::HandleLeaseTimer(async_dispatcher_t* dispatcher, async::WaitBase* 
     return;
   }
 
-  lease_control_client_end_.reset();
+  // Release the wake lease.
+  token_.reset();
 }
+
 }  // namespace serial

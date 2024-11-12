@@ -52,8 +52,8 @@ pub trait TargetConnector: Debug {
 pub struct FDomainConnection {
     // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
     // implementation, this needs to be a buffered reader.
-    pub(crate) output: Box<dyn AsyncBufRead + Unpin>,
-    pub(crate) input: Box<dyn AsyncWrite + Unpin>,
+    pub(crate) output: Box<dyn AsyncBufRead + Unpin + Send>,
+    pub(crate) input: Box<dyn AsyncWrite + Unpin + Send>,
     pub(crate) errors: Receiver<anyhow::Error>,
     pub(crate) main_task: Option<Task<()>>,
 }

@@ -12,9 +12,10 @@
 #include <lib/elfldltl/static-vector.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/typed-test.h>
-#include <lib/stdcompat/source_location.h>
-#include <lib/stdcompat/span.h>
 #include <lib/symbolizer-markup/writer.h>
+
+#include <source_location>
+#include <span>
 
 namespace {
 
@@ -267,8 +268,7 @@ TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
       DataPhdr<Elf>{}(offset),     ZeroFillPhdr<Elf>{}(offset),
   };
 
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
   const auto& segments = load_info.segments();
   EXPECT_EQ(segments.size(), 2u);
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[0]));
@@ -299,8 +299,7 @@ TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
       DataPhdr<Elf>{}(offset),
   };
 
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
   ASSERT_EQ(load_info.segments().size(), 2u);
 
   int currentIndex = 0;
@@ -331,8 +330,7 @@ TYPED_TEST(ElfldltlLoadTests, RemoveLastSegment) {
       ConstantPhdr<Elf>{}(offset),
       DataPhdr<Elf>{}(offset),
   };
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
   ASSERT_EQ(load_info.segments().size(), 2u);
 
   EXPECT_EQ(load_info.vaddr_size(), 2 * kPageSize);
@@ -417,7 +415,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
     EXPECT_TRUE(load_info.ApplyRelro(expected, phdrs[1], kPageSize, false));
   }
 
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>(phdrs),
                                     load_info.GetPhdrObserver(kPageSize)));
 
   {
@@ -445,7 +443,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroBadStart) {
   ASSERT_EQ(load_info.RelroBounds(phdrs[1], kPageSize).start, kPageSize);
   ASSERT_EQ(load_info.RelroBounds(phdrs[1], kPageSize).end, kPageSize * 2);
 
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>(phdrs),
                                     load_info.GetPhdrObserver(kPageSize)));
 
   ExpectedSingleError expected("PT_GNU_RELRO not at segment start");
@@ -466,7 +464,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
   };
   phdrs[0].flags = elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite;
 
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>(phdrs),
                                     load_info.GetPhdrObserver(kPageSize)));
 
   ASSERT_EQ(load_info.segments().size(), 1u);
@@ -558,7 +556,7 @@ using RelroTestLoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::ve
 
 template <typename Elf, template <class> class SegmentWrapper = elfldltl::NoSegmentWrapper>
 void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy, bool merge_ro,
-               cpp20::source_location loc = cpp20::source_location::current()) {
+               std::source_location loc = std::source_location::current()) {
   using Phdr = typename Elf::Phdr;
 
   std::vector<Phdr> input_phdrs;
@@ -569,7 +567,7 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
 
   RelroTestLoadInfo<Elf, SegmentWrapper> load_info;
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag,
-                                    cpp20::span<const Phdr>(input_phdrs.data(), input_phdrs.size()),
+                                    std::span<const Phdr>(input_phdrs.data(), input_phdrs.size()),
                                     load_info.GetPhdrObserver(kPageSize)));
   ASSERT_TRUE(load_info.ApplyRelro(diag, creator.get_relro_phdr(), kPageSize, merge_ro))
       << "line " << loc.line();
@@ -583,7 +581,7 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
 
 template <typename Elf, template <class> class SegmentWrapper = elfldltl::NoSegmentWrapper>
 void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy,
-               cpp20::source_location loc = cpp20::source_location::current()) {
+               std::source_location loc = std::source_location::current()) {
   RelroTest<Elf, SegmentWrapper>(input, expected, strategy, true, loc);
   RelroTest<Elf, SegmentWrapper>(input, expected, strategy, false, loc);
 }
@@ -710,7 +708,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMerge) {
     elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
     using ConstantSegment = typename decltype(load_info)::ConstantSegment;
 
-    EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+    EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>(phdrs),
                                       load_info.GetPhdrObserver(kPageSize)));
     auto& segments = load_info.segments();
     ASSERT_EQ(segments.size(), 2u);
@@ -752,7 +750,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantReplaceSegmentWrapper) {
   auto diag = elfldltl::OneStringDiagnostics(error);
 
   RelroTestLoadInfo<Elf, CantReplaceSegmentWrapper> load_info;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>(phdrs),
                                     load_info.GetPhdrObserver(kPageSize)));
 
   for (bool merge_ro : {true, false}) {
@@ -799,7 +797,7 @@ foo: {{{mmap:0x12342000:0x1000:load:17:rw:0x2000}}}
   std::string markup;
   symbolizer_markup::Writer writer([&markup](std::string_view str) { markup += str; });
   EXPECT_EQ(&writer,
-            &(info.SymbolizerContext(writer, 17, "foo", cpp20::span(kBuildId), 0x12340000, "foo")));
+            &(info.SymbolizerContext(writer, 17, "foo", std::span(kBuildId), 0x12340000, "foo")));
 
   EXPECT_EQ(kExpectedContext, markup);
 }

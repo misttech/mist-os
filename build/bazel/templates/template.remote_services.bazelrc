@@ -28,9 +28,6 @@ build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
 build:remote_cache_only --config=_remote_common
 build:remote_cache_only --remote_cache=grpcs://remotebuildexecution.googleapis.com
 
-# For b/353675498, workaround potential issues with remote linking in ASan
-build:link_local --strategy=CppLink=sandboxed,local
-
 # Build event protocol (BEP) streaming
 build:_bes_common --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
 build:_bes_common --google_default_credentials=true

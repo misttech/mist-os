@@ -26,10 +26,11 @@ zx::vmo Bootfs::Open(std::string_view root, std::string_view filename, std::stri
     Fail(result.error_value());
   }
   if (it == bootfs.end()) {
-    fail(log_, "failed to find '%.*s%s%.*s'",         //
-         static_cast<int>(root.size()), root.data(),  //
-         root.empty() ? "" : "/",                     //
-         static_cast<int>(filename.size()), filename.data());
+    printl(log_, "failed to find '%.*s%s%.*s'",         //
+           static_cast<int>(root.size()), root.data(),  //
+           root.empty() ? "" : "/",                     //
+           static_cast<int>(filename.size()), filename.data());
+    return {};
   }
 
   // Clone a private, read-only snapshot of the file's subset of the bootfs VMO.

@@ -57,6 +57,10 @@ struct cpu_stats {
   // inter-processor interrupts
   ulong reschedule_ipis;
   ulong generic_ipis;
+
+  // energy consumption
+  ulong active_energy_consumption_nj;
+  ulong idle_energy_consumption_nj;
 };
 
 // include after the cpu_stats definition above, since it is part of the percpu structure

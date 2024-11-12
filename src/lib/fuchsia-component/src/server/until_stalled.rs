@@ -73,7 +73,7 @@ enum State {
     Stalled { channel: Option<fasync::OnSignals<'static, zx::Channel>> },
 }
 
-impl<ServiceObjTy: ServiceObjTrait + Send> Stream for StallableServiceFs<ServiceObjTy> {
+impl<ServiceObjTy: ServiceObjTrait> Stream for StallableServiceFs<ServiceObjTy> {
     type Item = Item<ServiceObjTy::Output>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

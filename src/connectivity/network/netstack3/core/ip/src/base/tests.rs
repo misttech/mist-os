@@ -11,7 +11,7 @@ use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use netstack3_base::testutil::{MultipleDevicesId, TestIpExt};
 use netstack3_base::{CtxPair, SubnetMatcher};
-use packet::InnerPacketBuilder as _;
+use packet::{InnerPacketBuilder as _, Serializer};
 use packet_formats::ip::IpProto;
 
 use crate::internal::routing::rules::RuleMatcher;

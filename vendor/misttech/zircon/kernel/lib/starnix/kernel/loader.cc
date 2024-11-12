@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/loader.h"
 
 #include <lib/crypto/global_prng.h>
+#include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
@@ -65,6 +66,8 @@ using starnix::StackResult;
 using starnix::StarnixLoader;
 
 constexpr size_t kMaxSegments = 4;
+constexpr size_t kMaxPhdrs = 16;
+
 constexpr size_t kRandomSeedBytes = 16;
 
 size_t get_initial_stack_size(const ktl::string_view& path, const fbl::Vector<BString>& argv,
@@ -231,7 +234,7 @@ fit::result<Errno, LoadedElf> load_elf(
   auto diag = GetDiagnostics();
   elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
   auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-      diag, vmo_file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
+      diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
@@ -299,7 +302,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
   auto diag = GetDiagnostics();
   elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
   auto elf_headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-      diag, vmo_file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
+      diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(elf_headers);
   auto& [ehdr, phdrs_result] = *elf_headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;

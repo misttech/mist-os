@@ -5,13 +5,13 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMAR_LOADER_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMAR_LOADER_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls/object.h>
 
+#include <span>
 #include <type_traits>
 
 #include "diagnostics.h"
@@ -331,9 +331,10 @@ class VmarLoader {
 
       // First map data from the file, if any.
       if (map_size > 0) {
-        zx_status_t status = MapWritable<PartialPage == PartialPagePolicy::kZeroInVmo>(
-            vmar_offset, map_vmo->borrow(), map_cow, base_name, map_offset, map_size,
-            num_data_segments);
+        zx_status_t status =
+            MapWritable < PartialPage ==
+            PartialPagePolicy::kZeroInVmo > (vmar_offset, map_vmo->borrow(), map_cow, base_name,
+                                             map_offset, map_size, num_data_segments);
         if (status != ZX_OK) [[unlikely]] {
           diag.SystemError("cannot map writable segment", FileAddress{segment.vaddr()},
                            " from file", FileOffset{map_offset}, ": ", ZirconError{status});

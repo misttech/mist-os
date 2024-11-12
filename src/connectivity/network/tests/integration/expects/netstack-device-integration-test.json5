@@ -9,11 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                "ping_succeeds_with_expected_payload_ns3::fragmented",
-            ],
-        },
     ],
 }

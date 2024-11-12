@@ -11,6 +11,11 @@ type PciBdf = struct {
     function_id uint8;
 };
 
+type ConfigurationAccessMechanism = resource struct {
+    vmo zx.Handle:VMO;
+    is_extended bool;
+};
+
 const DEVICES_PER_BUS uint8 = 32;
 const FUNCTIONS_PER_DEVICE uint8 = 8;
 const PINS_PER_FUNCTION uint8 = 4;
@@ -53,7 +58,7 @@ type PciPlatformInfo = resource struct {
     start_bus_num uint8;
     end_bus_num uint8;
     segment_group uint16;
-    ecam_vmo zx.Handle:VMO;
+    cam ConfigurationAccessMechanism;
     legacy_irqs vector<PciLegacyIrq>:MAX;
     irq_routing vector<PciIrqRoutingEntry>:MAX;
     /// A vector of PciBdfs that are known to ACPI.

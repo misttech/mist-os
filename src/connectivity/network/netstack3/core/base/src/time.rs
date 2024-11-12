@@ -40,12 +40,16 @@ pub trait Instant:
     /// underlying data structure), `None` otherwise.
     fn checked_add(&self, duration: Duration) -> Option<Self>;
 
+    /// Returns the instant at `self + duration` saturating to the maximum
+    /// representable instant value.
+    fn saturating_add(&self, duration: Duration) -> Self;
+
     /// Unwraps the result from `checked_add`.
     ///
     /// # Panics
     ///
     /// This function will panic if the addition makes the clock wrap around.
-    fn add(&self, duration: Duration) -> Self {
+    fn panicking_add(&self, duration: Duration) -> Self {
         self.checked_add(duration).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
         })

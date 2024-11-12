@@ -19,10 +19,9 @@ int main(int argc, const char* const* argv) {
     fprintf(stderr, "Couldn't create channel, %d\n", status);
     return -1;
   }
-  status = fdio_open("/pkg",
-                     static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                           fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                     server_end.release());
+  status = fdio_open3(
+      "/pkg", static_cast<uint64_t>(fuchsia::io::PERM_READABLE | fuchsia::io::PERM_EXECUTABLE),
+      server_end.release());
   if (status != ZX_OK) {
     fprintf(stderr, "Failed to open /pkg");
     return -1;

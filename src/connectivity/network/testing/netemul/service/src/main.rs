@@ -41,6 +41,8 @@ const NETEMUL_SERVICES_COMPONENT_NAME: &str = "netemul-services";
 const DEVFS: &str = "dev";
 const DEVFS_PATH: &str = "/dev";
 const DEVFS_CAPABILITY: &str = "dev-topological";
+const CUSTOM_ARTIFACTS_PATH: &str = "/custom_artifacts";
+const CUSTOM_ARTIFACTS_CAPABILITY: &str = "custom_artifacts";
 
 #[derive(Error, Debug)]
 enum CreateRealmError {
@@ -140,6 +142,7 @@ impl std::fmt::Display for StorageVariant {
             Self(fnetemul::StorageVariant::Data) => "data",
             Self(fnetemul::StorageVariant::Cache) => "cache",
             Self(fnetemul::StorageVariant::Tmp) => "tmp",
+            Self(fnetemul::StorageVariant::CustomArtifacts) => "custom_artifacts",
         };
         write!(f, "{}", v)
     }
@@ -167,6 +170,7 @@ async fn create_realm_instance(
     prefix: &str,
     devfs: Arc<SimpleImmutableDir>,
     devfs_proxy: fio::DirectoryProxy,
+    custom_artifacts_proxy: fio::DirectoryProxy,
 ) -> Result<(RealmInstance, ExposedProtocols), CreateRealmError> {
     // Keep track of the protocols that exist in the realm along with the children that offer
     // that protocol.
@@ -180,22 +184,25 @@ async fn create_realm_instance(
     // those components can be extracted and modified.
     let mut modified_program_args = HashMap::new();
 
-    let name =
+    let realm_name =
         name.map(|name| format!("{}-{}", prefix, name)).unwrap_or_else(|| prefix.to_string());
     let builder = RealmBuilder::with_params(
         RealmBuilderParams::new()
             .in_collection(REALM_COLLECTION_NAME.to_string())
-            .realm_name(name.clone()),
+            .realm_name(realm_name.clone()),
     )
     .await?;
+    let custom_artifacts_clone = Clone::clone(&custom_artifacts_proxy);
     let netemul_services = builder
         .add_local_child(
             NETEMUL_SERVICES_COMPONENT_NAME,
             move |handles: LocalComponentHandles| {
                 let devfs_proxy = Clone::clone(&devfs_proxy);
+                let custom_artifacts_proxy = Clone::clone(&custom_artifacts_clone);
                 Box::pin(async {
                     let mut fs = ServiceFs::new();
                     fs.add_remote(DEVFS, devfs_proxy)
+                        .add_remote(CUSTOM_ARTIFACTS_CAPABILITY, custom_artifacts_proxy)
                         .serve_connection(handles.outgoing_dir)?
                         .collect::<()>()
                         .await;
@@ -442,20 +449,60 @@ async fn create_realm_instance(
                             }) => {
                                 let variant = variant
                                     .ok_or(CreateRealmError::StorageCapabilityVariantNotProvided)?;
-                                let variant = StorageVariant(variant);
+
                                 let mount_path =
                                     path.ok_or(CreateRealmError::StorageCapabilityPathNotProvided)?;
-                                let () = builder
-                                    .add_route(
+
+                                let route = match variant {
+                                    fnetemul::StorageVariant::Data
+                                    | fnetemul::StorageVariant::Cache
+                                    | fnetemul::StorageVariant::Tmp => {
+                                        let capability = Capability::storage(
+                                            StorageVariant(variant).to_string(),
+                                        )
+                                        .path(mount_path.to_string());
                                         Route::new()
-                                            .capability(
-                                                Capability::storage(variant.to_string())
-                                                    .path(mount_path.to_string()),
-                                            )
+                                            .capability(capability)
                                             .from(Ref::parent())
-                                            .to(&child_ref),
-                                    )
-                                    .await?;
+                                            .to(&child_ref)
+                                    }
+                                    // We proxy `custom_artifacts` storage as a directory to the
+                                    // managed realm so that dynamically created components can
+                                    // write artifacts there without them being deleted when the
+                                    // realm is torn down, which is what happens by default for per-
+                                    // component storage.
+                                    //
+                                    // TODO(https://fxbug.dev/378163044): when it is supported,
+                                    // enable persistent storage for the netemul component
+                                    // collection to prevent custom artifacts being destroyed, and
+                                    // directly route the `custom_artifacts` storage capability into
+                                    // the managed realm without a proxy.
+                                    fnetemul::StorageVariant::CustomArtifacts => {
+                                        // Create an isolated directory for this component so it
+                                        // doesn't overwrite custom artifacts from other components.
+                                        let dir_name = format!("{realm_name}-{name}");
+                                        let _dir = fuchsia_fs::directory::create_directory(
+                                            &custom_artifacts_proxy,
+                                            &dir_name,
+                                            fio::PERM_READABLE | fio::PERM_WRITABLE,
+                                        )
+                                        .await
+                                        .expect("open isolated custom artifacts directory");
+
+                                        let capability =
+                                            Capability::directory(CUSTOM_ARTIFACTS_CAPABILITY)
+                                                .rights(fio::RW_STAR_DIR)
+                                                .subdir(&dir_name)
+                                                .path(CUSTOM_ARTIFACTS_PATH)
+                                                .as_(CUSTOM_ARTIFACTS_CAPABILITY);
+                                        Route::new()
+                                            .capability(capability)
+                                            .from(&netemul_services)
+                                            .to(&child_ref)
+                                    }
+                                };
+
+                                builder.add_route(route).await?;
                                 UniqueCapability::Storage { mount_path: mount_path.into() }
                             }
                             fnetemul::Capability::TracingProvider(fnetemul::Empty) => {
@@ -546,7 +593,7 @@ async fn create_realm_instance(
         )
         .await?;
 
-    info!("creating new ManagedRealm with name '{}'", name);
+    info!("creating new ManagedRealm with name '{realm_name}'");
     builder.build().await.map(|realm| (realm, capability_from_children)).map_err(Into::into)
 }
 
@@ -935,15 +982,23 @@ async fn handle_sandbox(
 ) -> Result {
     let (tx, rx) = mpsc::channel(1);
     let realm_index = AtomicU64::new(0);
+
     let network_context =
         fuchsia_component::client::connect_to_protocol::<fnetemul_network::NetworkContextMarker>()
             .context("connect to network context")?;
+    let custom_artifacts = fuchsia_fs::directory::open_in_namespace(
+        CUSTOM_ARTIFACTS_PATH,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
+    )
+    .context("open custom artifacts directory")?;
+
     let mut sandbox_fut =
         pin!(stream.err_into::<anyhow::Error>().try_for_each_concurrent(None, |request| {
             let mut tx = tx.clone();
             let sandbox_name = &sandbox_name;
             let realm_index = &realm_index;
             let network_context = &network_context;
+            let custom_artifacts = Clone::clone(&custom_artifacts);
             async move {
                 match request {
                     SandboxRequest::CreateRealm {
@@ -954,8 +1009,16 @@ async fn handle_sandbox(
                         let index = realm_index.fetch_add(1, Ordering::SeqCst);
                         let prefix = format!("{}{}", sandbox_name, index);
                         let devfs = vfs::directory::immutable::simple::simple();
-                        let proxy = vfs::directory::spawn_directory(devfs.clone());
-                        match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
+                        let devfs_proxy = vfs::directory::spawn_directory(devfs.clone());
+                        match create_realm_instance(
+                            options,
+                            &prefix,
+                            devfs.clone(),
+                            devfs_proxy,
+                            custom_artifacts,
+                        )
+                        .await
+                        {
                             Ok((realm, capability_from_children)) => tx
                                 .send(ManagedRealm {
                                     server_end,

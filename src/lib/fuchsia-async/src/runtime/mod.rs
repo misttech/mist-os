@@ -40,13 +40,13 @@ pub use self::fuchsia::{
 ///
 /// See the [`Scope`] documentation for details.
 pub mod scope {
-    pub use super::implementation::scope::{Scope, ScopeRef};
+    pub use super::implementation::scope::{Scope, ScopeHandle};
 
     #[cfg(target_os = "fuchsia")]
     pub use super::implementation::scope::Join;
 }
 
-pub use scope::{Scope, ScopeRef};
+pub use scope::{Scope, ScopeHandle};
 
 use futures::prelude::*;
 use pin_project_lite::pin_project;
@@ -317,15 +317,15 @@ mod timer_tests {
         }
     }
 
-    #[cfg(target = "fuchsia")]
+    #[cfg(target_os = "fuchsia")]
     #[test]
     fn can_use_zx_duration() {
         let mut exec = LocalExecutor::new();
-        let start = Instant::now();
+        let start = MonotonicInstant::now();
         let timer = Timer::new(MonotonicDuration::from_millis(100));
         exec.run_singlethreaded(timer);
-        let end = Instant::now();
-        assert!(end - start > std::time::Duration::from_millis(100));
+        let end = MonotonicInstant::now();
+        assert!(end - start > MonotonicDuration::from_millis(100));
     }
 
     #[test]

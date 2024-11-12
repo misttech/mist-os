@@ -9,7 +9,6 @@
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
 
-#include <memory>
 #include <optional>
 #include <string>
 
@@ -20,8 +19,10 @@
 
 namespace forensics::feedback {
 
-// Collects the previous boot log and also deletes previous boot log after
-// |delete_previous_boot_log_at| of device uptime.
+// Collects the previous boot log and proactively deletes the previous boot log after
+// |delete_previous_boot_log_at| of device runtime. When the previous boot log is collected, the
+// previous boot log will also be lazily deleted if more than |delete_previous_boot_log_at| of
+// device uptime has passed.
 class PreviousBootLog : public FileBackedProvider {
  public:
   PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
@@ -36,6 +37,7 @@ class PreviousBootLog : public FileBackedProvider {
   timekeeper::Clock* clock_;
   bool is_file_deleted_;
   std::string path_;
+  std::optional<zx::time_boot> delete_previous_boot_log_at_;
   fxl::WeakPtrFactory<PreviousBootLog> weak_factory_{this};
 };
 

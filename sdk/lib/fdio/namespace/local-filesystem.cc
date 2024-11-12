@@ -13,7 +13,6 @@
 #include <lib/zxio/types.h>
 #include <zircon/processargs.h>
 
-#include <new>
 #include <utility>
 
 #include <fbl/auto_lock.h>
@@ -32,19 +31,15 @@ namespace fio = fuchsia_io;
 namespace {
 
 std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
-  auto next_slash = path.find('/');
-  if (next_slash == std::string_view::npos) {
-    return {path, true};
-  }
-  return {std::string_view(path.data(), next_slash), false};
+  const size_t next_slash = path.find('/');
+  return {path.substr(0, next_slash), next_slash == std::string_view::npos};
 }
 
 zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
     fbl::RefPtr<fdio_internal::LocalVnode> parent, fbl::String name,
     fidl::ClientEnd<fio::Directory> remote) {
   zxio_storage_t remote_storage;
-  if (zx_status_t status =
-          zxio::CreateDirectory(const_cast<zxio_storage_t*>(&remote_storage), std::move(remote));
+  if (zx_status_t status = zxio::CreateDirectory(&remote_storage, std::move(remote));
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -353,7 +348,9 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
   };
 
   if (path.empty()) {
-    auto handle_root_terminal_node = std::bind(handle_terminal_node, true /* is_last_segment */);
+    auto handle_root_terminal_node = [&]() {
+      return handle_terminal_node(true /* is_last_segment */);
+    };
     zx_status_t status = std::visit(
         fdio::overloaded{
             [&](LocalVnode::Local&) -> zx_status_t { return handle_root_terminal_node(); },
@@ -414,7 +411,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
     vn = std::move(next_vn.value());
 
-    auto handle_nonroot_terminal_node = std::bind(handle_terminal_node, is_last_segment);
+    auto handle_nonroot_terminal_node = [&]() { return handle_terminal_node(is_last_segment); };
 
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // an unbind attempt, or a need to continue parsing the path to find the bind location.

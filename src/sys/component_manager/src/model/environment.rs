@@ -247,6 +247,7 @@ mod tests {
                     ),
                     top_instance,
                     instance_registry: InstanceRegistry::new(),
+                    scope_factory: None,
                 },
                 root_input_builder.build(),
             )
@@ -329,6 +330,7 @@ mod tests {
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
+                scope_factory: None,
             },
             root_input_builder.build(),
         )
@@ -433,6 +435,7 @@ mod tests {
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
+                scope_factory: None,
             },
             root_input_builder.build(),
         )
@@ -568,6 +571,7 @@ mod tests {
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
+                scope_factory: None,
             },
             root_input_builder.build(),
         )
@@ -680,6 +684,7 @@ mod tests {
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
+                scope_factory: None,
             },
             root_input_builder.build(),
         )
@@ -761,6 +766,7 @@ mod tests {
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
+                scope_factory: None,
             },
             ComponentInput::default(),
         )

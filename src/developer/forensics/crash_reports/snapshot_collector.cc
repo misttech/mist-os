@@ -85,7 +85,7 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const std
                   GetMissingSnapshotAnnotations(kNoUuidSnapshotUuid)));
   }
 
-  const zx::time current_time{clock_->MonotonicNow()};
+  const zx::time_monotonic current_time{clock_->MonotonicNow()};
 
   std::string uuid;
 
@@ -140,7 +140,7 @@ void SnapshotCollector::Shutdown() {
   snapshot_requests_.clear();
 }
 
-std::string SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time,
+std::string SnapshotCollector::MakeNewSnapshotRequest(const zx::time_monotonic start_time,
                                                       const zx::duration timeout) {
   const auto uuid = uuid::Generate();
   snapshot_requests_.emplace_back(std::unique_ptr<SnapshotRequest>(new SnapshotRequest{

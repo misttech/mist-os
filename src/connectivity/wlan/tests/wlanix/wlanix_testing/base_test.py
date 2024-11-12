@@ -9,7 +9,7 @@ import asyncio
 from typing import Any
 
 import fidl.fuchsia_wlan_wlanix as fidl_wlanix
-from antlion import context, controllers
+from antlion import controllers
 from antlion.controllers import fuchsia_device
 from antlion.controllers.access_point import AccessPoint
 from antlion.controllers.ap_lib import hostapd_constants
@@ -232,8 +232,7 @@ class ConnectionBaseTestClass(IfaceBaseTestClass):
             self.packet_log_pid = {}
 
         # Maintain the invariant that every test starts with no access points.
-        current_path = context.get_current_context().get_full_output_path()
-        self.access_point().download_ap_logs(current_path)
+        self.access_point().download_ap_logs(self.log_path)
         self.access_point().stop_all_aps()
         super().teardown_test()
 

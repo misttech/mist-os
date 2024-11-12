@@ -17,10 +17,10 @@ using UIStateProviderBase = SINGLE_BINDING_STUB_FIDL_SERVER(fuchsia::ui::activit
 class UIStateProvider : public UIStateProviderBase {
  public:
   UIStateProvider(async_dispatcher_t* dispatcher, fuchsia::ui::activity::State state,
-                  zx::time time);
+                  zx::time_monotonic time);
 
   void WatchState(::fidl::InterfaceHandle<::fuchsia::ui::activity::Listener> listener) override;
-  void SetState(fuchsia::ui::activity::State state, zx::time time);
+  void SetState(fuchsia::ui::activity::State state, zx::time_monotonic time);
   void UnbindListener();
 
  private:
@@ -28,7 +28,7 @@ class UIStateProvider : public UIStateProviderBase {
 
   async_dispatcher_t* dispatcher_;
   fuchsia::ui::activity::State state_;
-  zx::time time_;
+  zx::time_monotonic time_;
   fuchsia::ui::activity::ListenerPtr listener_;
 };
 

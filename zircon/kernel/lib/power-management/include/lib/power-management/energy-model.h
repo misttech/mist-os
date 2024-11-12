@@ -283,6 +283,32 @@ class EnergyModel {
     return levels().subspan(0, idle_power_levels_);
   }
 
+  // Returns the idle power level with the maximum power consumption.
+  constexpr std::optional<uint8_t> max_idle_power_level() const {
+    if (idle_power_levels_ > 0) {
+      return idle_power_levels_ - 1;
+    }
+    return std::nullopt;
+  }
+
+  // Returns the power coefficient of the idle power level with the maximum power consumption. This
+  // idle power level typically corresponds to clock gating, such that the power consumption is
+  // almost entirely leakage power loss.
+  constexpr std::optional<uint64_t> max_idle_power_coefficient_nw() const {
+    if (idle_power_levels_ > 0) {
+      return power_levels_[idle_power_levels_ - 1].power_coefficient_nw();
+    }
+    return std::nullopt;
+  }
+
+  // Returns the control interface of the idle power level with the maximum power consumption.
+  constexpr std::optional<ControlInterface> max_idle_power_level_interface() const {
+    if (idle_power_levels_ > 0) {
+      return power_levels_[idle_power_levels_ - 1].control();
+    }
+    return std::nullopt;
+  }
+
   // Following the same rules as `levels()` but returns only the set of power levels whose type is
   // `PowerLevel::Type::kActive`. This set may be empty.
   constexpr cpp20::span<const PowerLevel> active_levels() const {
@@ -335,8 +361,10 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   // Model describing the behavior of the power domain.
   constexpr const EnergyModel& model() const { return energy_model_; }
 
-  // Normalized utilization accumulated from all the entities that this `PowerDomain`
-  // is associated with (e.g. all the cpus in the power domain).
+  // The total normalized utilization of the set of processors associated with this power domain.
+  //
+  // Uses relaxed semantics, since the value does not need to synchronize with other memory accesses
+  // and innaccuracy is acceptable.
   uint64_t total_normalized_utilization() const {
     return total_normalized_utilization_.load(std::memory_order_relaxed);
   }
@@ -344,12 +372,21 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   const fbl::RefPtr<PowerLevelController>& controller() const { return controller_; }
 
   // Returns whether the kernel scheduler should send power level update requests to the controller.
-  // This does not prevent the kernel from exercising the control interface in tests, however, only
-  // whether the scheduler will interact with the control interface to handle utilization changes.
+  // This is used by tests to prevent the scheduler from sending power level change requests through
+  // the fake control interface that could confuse the test. It does not prevent the kernel from
+  // exercising the control interface, however, only whether the scheduler will interact with the
+  // control interface to handle utilization changes.
+  //
+  // Uses relaxed semantics, since this variable will generally be synchronized by the lock
+  // protecting each PowerState as it is associated with this PowerDomain. However, an atomic is
+  // used to prevent formal data races if the value is read outside of external synchronization,
+  // which can't be statically checked internally.
   bool scheduler_control_enabled() const {
     return scheduler_control_enabled_.load(std::memory_order_relaxed);
   }
 
+  // Sets whether the kernel scheduler should send power level update requests through the control
+  // interface. When set to false, the scheduler must not send requests to avoid confusing tests.
   void SetSchedulerControlEnabled(bool enabled) {
     scheduler_control_enabled_.store(enabled, std::memory_order_relaxed);
   }

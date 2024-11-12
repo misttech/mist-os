@@ -2,69 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(target_os = "fuchsia")]
+use fidl::HandleBased;
+use fidl::{AsHandleRef, Peered};
 use fidl_fuchsia_fdomain as proto;
-use zx::{AsHandleRef, HandleBased, Peered};
 
 /// Amount of buffer space we allocate for reading from handles in order to
 /// serve read requests.
 const READ_BUFFER_SIZE: usize = 4096;
 
-fn convert_object_type(ty: zx::ObjectType) -> proto::ObjType {
-    match ty {
-        zx::ObjectType::NONE => proto::ObjType::None,
-        zx::ObjectType::PROCESS => proto::ObjType::Process,
-        zx::ObjectType::THREAD => proto::ObjType::Thread,
-        zx::ObjectType::VMO => proto::ObjType::Vmo,
-        zx::ObjectType::CHANNEL => proto::ObjType::Channel,
-        zx::ObjectType::EVENT => proto::ObjType::Event,
-        zx::ObjectType::PORT => proto::ObjType::Port,
-        zx::ObjectType::INTERRUPT => proto::ObjType::Interrupt,
-        zx::ObjectType::PCI_DEVICE => proto::ObjType::PciDevice,
-        zx::ObjectType::DEBUGLOG => proto::ObjType::Debuglog,
-        zx::ObjectType::SOCKET => proto::ObjType::Socket,
-        zx::ObjectType::RESOURCE => proto::ObjType::Resource,
-        zx::ObjectType::EVENTPAIR => proto::ObjType::Eventpair,
-        zx::ObjectType::JOB => proto::ObjType::Job,
-        zx::ObjectType::VMAR => proto::ObjType::Vmar,
-        zx::ObjectType::FIFO => proto::ObjType::Fifo,
-        zx::ObjectType::GUEST => proto::ObjType::Guest,
-        zx::ObjectType::VCPU => proto::ObjType::Vcpu,
-        zx::ObjectType::TIMER => proto::ObjType::Timer,
-        zx::ObjectType::IOMMU => proto::ObjType::Iommu,
-        zx::ObjectType::BTI => proto::ObjType::Bti,
-        zx::ObjectType::PROFILE => proto::ObjType::Profile,
-        zx::ObjectType::PMT => proto::ObjType::Pmt,
-        zx::ObjectType::SUSPEND_TOKEN => proto::ObjType::SuspendToken,
-        zx::ObjectType::PAGER => proto::ObjType::Pager,
-        zx::ObjectType::EXCEPTION => proto::ObjType::Exception,
-        zx::ObjectType::CLOCK => proto::ObjType::Clock,
-        zx::ObjectType::STREAM => proto::ObjType::Stream,
-        zx::ObjectType::MSI => proto::ObjType::Msi,
-        zx::ObjectType::IOB => proto::ObjType::Iob,
-        _ => unreachable!("Unknown object type!"),
-    }
-}
-
-/// This is implemented on the `zx::*` objects for every type of handle FDomain
+/// This is implemented on the `fidl::*` objects for every type of handle FDomain
 /// supports. It essentially makes the handle object a responder to a stream of
 /// [`HandleOperation`]s.
-pub trait HandleType: Sync + Sized + Into<zx::Handle> + zx::AsHandleRef + 'static {
+pub trait HandleType: Sync + Sized + Into<fidl::Handle> + fidl::AsHandleRef + 'static {
     /// This should be the handle type corresponding to the implementing handle.
     /// We use this to generalize some of the error reporting in this trait.
-    fn zx_type(&self) -> zx::ObjectType;
-
-    fn proto_type(&self) -> proto::ObjType {
-        convert_object_type(self.zx_type())
-    }
+    fn object_type(&self) -> fidl::ObjectType;
 
     /// Returns `Ok` if this handle is the given type, `Err` otherwise.
-    fn expected_type(&self, expected_type: zx::ObjectType) -> Result<(), proto::Error> {
-        if expected_type == self.zx_type() {
+    fn expected_type(&self, expected_type: fidl::ObjectType) -> Result<(), proto::Error> {
+        if expected_type == self.object_type() {
             Ok(())
         } else {
             Err(proto::Error::WrongHandleType(proto::WrongHandleType {
-                expected: convert_object_type(expected_type),
-                got: self.proto_type(),
+                expected: expected_type,
+                got: self.object_type(),
             }))
         }
     }
@@ -75,41 +37,51 @@ pub trait HandleType: Sync + Sized + Into<zx::Handle> + zx::AsHandleRef + 'stati
         _disposition: proto::SocketDisposition,
         _disposition_peer: proto::SocketDisposition,
     ) -> Result<(), proto::Error> {
-        self.expected_type(zx::ObjectType::SOCKET)
+        self.expected_type(fidl::ObjectType::SOCKET)
     }
 
     /// Implements [`HandleOperation::ReadSocket`].
     fn read_socket(&self, _max_bytes: u64) -> Result<Option<Vec<u8>>, proto::Error> {
-        Err(self.expected_type(zx::ObjectType::SOCKET).unwrap_err())
+        Err(self.expected_type(fidl::ObjectType::SOCKET).unwrap_err())
     }
 
     /// Implements [`HandleOperation::ReadChannel`].
-    fn read_channel(&self) -> Result<Option<zx::MessageBufEtc>, proto::Error> {
-        Err(self.expected_type(zx::ObjectType::CHANNEL).unwrap_err())
+    fn read_channel(&self) -> Result<Option<fidl::MessageBufEtc>, proto::Error> {
+        Err(self.expected_type(fidl::ObjectType::CHANNEL).unwrap_err())
     }
 
     /// Implements [`HandleOperation::WriteSocket`].
     fn write_socket(&self, _data: &[u8]) -> Result<usize, proto::Error> {
-        Err(self.expected_type(zx::ObjectType::SOCKET).unwrap_err())
+        Err(self.expected_type(fidl::ObjectType::SOCKET).unwrap_err())
     }
 
     /// Implements [`HandleOperation::WriteChannel`].
     fn write_channel(
         &self,
         _data: &[u8],
-        _handles: &mut Vec<zx::HandleDisposition<'static>>,
+        _handles: &mut Vec<fidl::HandleDisposition<'static>>,
     ) -> Option<Result<(), proto::WriteChannelError>> {
         Some(Err(proto::WriteChannelError::Error(
-            self.expected_type(zx::ObjectType::CHANNEL).unwrap_err(),
+            self.expected_type(fidl::ObjectType::CHANNEL).unwrap_err(),
         )))
     }
 }
 
-impl HandleType for zx::Socket {
-    fn zx_type(&self) -> zx::ObjectType {
-        zx::ObjectType::SOCKET
+impl HandleType for fidl::Socket {
+    fn object_type(&self) -> fidl::ObjectType {
+        fidl::ObjectType::SOCKET
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
+    fn socket_disposition(
+        &self,
+        _disposition: proto::SocketDisposition,
+        _disposition_peer: proto::SocketDisposition,
+    ) -> Result<(), proto::Error> {
+        Err(proto::Error::TargetError(fidl::Status::NOT_SUPPORTED.into_raw()))
+    }
+
+    #[cfg(target_os = "fuchsia")]
     fn socket_disposition(
         &self,
         disposition: proto::SocketDisposition,
@@ -147,7 +119,7 @@ impl HandleType for zx::Socket {
         };
         match self.read(buf) {
             Ok(size) => Ok(Some(buf[..size].to_vec())),
-            Err(zx::Status::SHOULD_WAIT) => Ok(None),
+            Err(fidl::Status::SHOULD_WAIT) => Ok(None),
             Err(other) => Err(proto::Error::TargetError(other.into_raw())),
         }
     }
@@ -163,7 +135,7 @@ impl HandleType for zx::Socket {
                         break Ok(wrote);
                     }
                 }
-                Err(zx::Status::SHOULD_WAIT) => break Ok(wrote),
+                Err(fidl::Status::SHOULD_WAIT) => break Ok(wrote),
 
                 Err(other) => break Err(proto::Error::TargetError(other.into_raw())),
             }
@@ -171,15 +143,15 @@ impl HandleType for zx::Socket {
     }
 }
 
-impl HandleType for zx::Channel {
-    fn zx_type(&self) -> zx::ObjectType {
-        zx::ObjectType::CHANNEL
+impl HandleType for fidl::Channel {
+    fn object_type(&self) -> fidl::ObjectType {
+        fidl::ObjectType::CHANNEL
     }
 
-    fn read_channel(&self) -> Result<Option<zx::MessageBufEtc>, proto::Error> {
-        let mut buf = zx::MessageBufEtc::new();
+    fn read_channel(&self) -> Result<Option<fidl::MessageBufEtc>, proto::Error> {
+        let mut buf = fidl::MessageBufEtc::new();
         match self.read_etc(&mut buf) {
-            Err(zx::Status::SHOULD_WAIT) => Ok(None),
+            Err(fidl::Status::SHOULD_WAIT) => Ok(None),
             other => other.map(|_| Some(buf)).map_err(|e| proto::Error::TargetError(e.into_raw())),
         }
     }
@@ -187,13 +159,13 @@ impl HandleType for zx::Channel {
     fn write_channel(
         &self,
         data: &[u8],
-        handles: &mut Vec<zx::HandleDisposition<'static>>,
+        handles: &mut Vec<fidl::HandleDisposition<'static>>,
     ) -> Option<Result<(), proto::WriteChannelError>> {
         match self.write_etc(data, handles) {
             Ok(()) => Some(Ok(())),
-            Err(zx::Status::SHOULD_WAIT) => None,
+            Err(fidl::Status::SHOULD_WAIT) => None,
             Err(other) => {
-                if handles.iter().any(|x| x.result != zx::Status::OK) {
+                if handles.iter().any(|x| x.result != fidl::Status::OK) {
                     Some(Err(proto::WriteChannelError::OpErrors(
                         handles
                             .into_iter()
@@ -214,43 +186,43 @@ impl HandleType for zx::Channel {
     }
 }
 
-impl HandleType for zx::EventPair {
-    fn zx_type(&self) -> zx::ObjectType {
-        zx::ObjectType::EVENTPAIR
+impl HandleType for fidl::EventPair {
+    fn object_type(&self) -> fidl::ObjectType {
+        fidl::ObjectType::EVENTPAIR
     }
 }
 
-impl HandleType for zx::Event {
-    fn zx_type(&self) -> zx::ObjectType {
-        zx::ObjectType::EVENT
+impl HandleType for fidl::Event {
+    fn object_type(&self) -> fidl::ObjectType {
+        fidl::ObjectType::EVENT
     }
 }
 
-pub struct Unknown(pub zx::Handle, pub zx::ObjectType);
+pub struct Unknown(pub fidl::Handle, pub fidl::ObjectType);
 
-impl Into<zx::Handle> for Unknown {
-    fn into(self) -> zx::Handle {
+impl Into<fidl::Handle> for Unknown {
+    fn into(self) -> fidl::Handle {
         self.0
     }
 }
 
-impl zx::AsHandleRef for Unknown {
-    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
+impl fidl::AsHandleRef for Unknown {
+    fn as_handle_ref(&self) -> fidl::HandleRef<'_> {
         self.0.as_handle_ref()
     }
 }
 
 impl HandleType for Unknown {
-    fn zx_type(&self) -> zx::ObjectType {
+    fn object_type(&self) -> fidl::ObjectType {
         self.1
     }
 }
 
 pub enum AnyHandle {
-    Socket(zx::Socket),
-    EventPair(zx::EventPair),
-    Event(zx::Event),
-    Channel(zx::Channel),
+    Socket(fidl::Socket),
+    EventPair(fidl::EventPair),
+    Event(fidl::Event),
+    Channel(fidl::Channel),
     Unknown(Unknown),
 }
 
@@ -278,23 +250,30 @@ impl AnyHandle {
     }
 
     /// zx_handle_duplicate but preserving our metadata.
-    pub fn duplicate(&self, rights: zx::Rights) -> Result<AnyHandle, proto::Error> {
+    pub fn duplicate(&self, rights: fidl::Rights) -> Result<AnyHandle, proto::Error> {
         let handle = self
             .as_handle_ref()
             .duplicate(rights)
             .map_err(|e| proto::Error::TargetError(e.into_raw()))?;
 
         Ok(match self {
-            AnyHandle::Socket(_) => AnyHandle::Socket(zx::Socket::from(handle)),
-            AnyHandle::EventPair(_) => AnyHandle::EventPair(zx::EventPair::from(handle)),
-            AnyHandle::Event(_) => AnyHandle::Event(zx::Event::from(handle)),
-            AnyHandle::Channel(_) => AnyHandle::Channel(zx::Channel::from(handle)),
+            AnyHandle::Socket(_) => AnyHandle::Socket(fidl::Socket::from(handle)),
+            AnyHandle::EventPair(_) => AnyHandle::EventPair(fidl::EventPair::from(handle)),
+            AnyHandle::Event(_) => AnyHandle::Event(fidl::Event::from(handle)),
+            AnyHandle::Channel(_) => AnyHandle::Channel(fidl::Channel::from(handle)),
             AnyHandle::Unknown(Unknown(_, ty)) => AnyHandle::Unknown(Unknown(handle, *ty)),
         })
     }
 
     /// zx_handle_replace but preserving our metadata.
-    pub fn replace(self, rights: zx::Rights) -> Result<AnyHandle, proto::Error> {
+    #[cfg(not(target_os = "fuchsia"))]
+    pub fn replace(self, _rights: fidl::Rights) -> Result<AnyHandle, proto::Error> {
+        Err(proto::Error::TargetError(fidl::Status::NOT_SUPPORTED.into_raw()))
+    }
+
+    /// zx_handle_replace but preserving our metadata.
+    #[cfg(target_os = "fuchsia")]
+    pub fn replace(self, rights: fidl::Rights) -> Result<AnyHandle, proto::Error> {
         Ok(match self {
             AnyHandle::Socket(h) => AnyHandle::Socket(
                 h.replace_handle(rights).map_err(|e| proto::Error::TargetError(e.into_raw()))?,
@@ -315,7 +294,11 @@ impl AnyHandle {
         })
     }
 
-    pub fn signal_peer(&self, clear: zx::Signals, set: zx::Signals) -> Result<(), proto::Error> {
+    pub fn signal_peer(
+        &self,
+        clear: fidl::Signals,
+        set: fidl::Signals,
+    ) -> Result<(), proto::Error> {
         // TODO: Rust is being helpful and only letting us signal peers for
         // things we know have them, but we'd really like to just make the
         // syscall and get it to report whatever error it will. Especially for
@@ -324,34 +307,34 @@ impl AnyHandle {
         match self {
             AnyHandle::Socket(h) => h.signal_peer(clear, set),
             AnyHandle::EventPair(h) => h.signal_peer(clear, set),
-            AnyHandle::Event(_) => Err(zx::Status::INVALID_ARGS),
+            AnyHandle::Event(_) => Err(fidl::Status::INVALID_ARGS),
             AnyHandle::Channel(h) => h.signal_peer(clear, set),
-            AnyHandle::Unknown(_) => Err(zx::Status::INVALID_ARGS),
+            AnyHandle::Unknown(_) => Err(fidl::Status::INVALID_ARGS),
         }
         .map_err(|e| proto::Error::TargetError(e.into_raw()))
     }
 }
 
-impl From<zx::Channel> for AnyHandle {
-    fn from(other: zx::Channel) -> AnyHandle {
+impl From<fidl::Channel> for AnyHandle {
+    fn from(other: fidl::Channel) -> AnyHandle {
         AnyHandle::Channel(other)
     }
 }
 
-impl From<zx::Socket> for AnyHandle {
-    fn from(other: zx::Socket) -> AnyHandle {
+impl From<fidl::Socket> for AnyHandle {
+    fn from(other: fidl::Socket) -> AnyHandle {
         AnyHandle::Socket(other)
     }
 }
 
-impl From<zx::EventPair> for AnyHandle {
-    fn from(other: zx::EventPair) -> AnyHandle {
+impl From<fidl::EventPair> for AnyHandle {
+    fn from(other: fidl::EventPair) -> AnyHandle {
         AnyHandle::EventPair(other)
     }
 }
 
-impl From<zx::Event> for AnyHandle {
-    fn from(other: zx::Event) -> AnyHandle {
+impl From<fidl::Event> for AnyHandle {
+    fn from(other: fidl::Event) -> AnyHandle {
         AnyHandle::Event(other)
     }
 }
@@ -369,8 +352,8 @@ macro_rules! impl_method {
 }
 
 impl HandleType for AnyHandle {
-    fn zx_type(&self) -> zx::ObjectType {
-        impl_method!(self => h.zx_type())
+    fn object_type(&self) -> fidl::ObjectType {
+        impl_method!(self => h.object_type())
     }
 
     fn socket_disposition(
@@ -385,7 +368,7 @@ impl HandleType for AnyHandle {
         impl_method!(self => h.read_socket(max_bytes))
     }
 
-    fn read_channel(&self) -> Result<Option<zx::MessageBufEtc>, proto::Error> {
+    fn read_channel(&self) -> Result<Option<fidl::MessageBufEtc>, proto::Error> {
         impl_method!(self => h.read_channel())
     }
 
@@ -396,20 +379,20 @@ impl HandleType for AnyHandle {
     fn write_channel(
         &self,
         data: &[u8],
-        handles: &mut Vec<zx::HandleDisposition<'static>>,
+        handles: &mut Vec<fidl::HandleDisposition<'static>>,
     ) -> Option<Result<(), proto::WriteChannelError>> {
         impl_method!(self => h.write_channel(data, handles))
     }
 }
 
-impl zx::AsHandleRef for AnyHandle {
-    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
+impl fidl::AsHandleRef for AnyHandle {
+    fn as_handle_ref(&self) -> fidl::HandleRef<'_> {
         impl_method!(self => h.as_handle_ref())
     }
 }
 
-impl Into<zx::Handle> for AnyHandle {
-    fn into(self) -> zx::Handle {
+impl Into<fidl::Handle> for AnyHandle {
+    fn into(self) -> fidl::Handle {
         impl_method!(self => h.into())
     }
 }

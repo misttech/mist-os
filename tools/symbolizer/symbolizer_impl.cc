@@ -50,6 +50,7 @@ void SetupCommandLineOptions(const CommandLineOptions& options, zxdb::MapSetting
 
   const char* symbol_index_from_env = getenv("SYMBOL_INDEX_INCLUDE");
   if (symbol_index_from_env) {
+    FX_LOGS(DEBUG) << "Setting symbol index contents from environment variable.";
     settings.SetList(Settings::System::kSymbolIndexInclude, {symbol_index_from_env});
   }
 
@@ -129,6 +130,7 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
   // Hook observers.
   session_.system().AddObserver(this);
   session_.AddDownloadObserver(this);
+  session_.AddProcessObserver(this);
 
   // Disable indexing on ModuleSymbols to accelerate the loading time.
   session_.system().GetSymbols()->set_create_index(false);
@@ -329,6 +331,7 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
 }
 
 void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutputFn output) {
+  FX_LOGS(TRACE) << "Symbolizing backtrace for address 0x" << std::hex << address;
   InitProcess();
   analytics_builder_.IncreaseNumberOfFrames();
 
@@ -354,6 +357,7 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
   }
 
   if (!module) {
+    FX_LOGS(TRACE) << "Could not find matching module.";
     analytics_builder_.IncreaseNumberOfFramesInvalid();
     analytics_builder_.TotalTimerStop();
     return;
@@ -379,11 +383,15 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
   previous_modules_.clear();
 
   bool symbolized = false;
+  FX_LOGS(TRACE) << "Have " << stack.size() << " frames for address 0x" << std::hex << address;
   for (size_t i = 0; i < stack.size(); i++) {
     // Function name.
     const zxdb::Location location = stack[i]->GetLocation();
     if (location.symbol().is_valid()) {
       symbolized = true;
+    } else {
+      FX_LOGS(WARNING) << "Invalid symbol for stack frame " << i << " of address 0x" << std::hex
+                       << address;
     }
 
     output(stack.size() - i - 1, location, *module);
@@ -392,7 +400,10 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
   // One physical frame could be symbolized to multiple inlined frames. We're only counting the
   // number of physical frames symbolized.
   if (symbolized) {
+    FX_LOGS(TRACE) << "Successfully symbolized address 0x" << std::hex << address;
     analytics_builder_.IncreaseNumberOfFramesSymbolized();
+  } else {
+    FX_LOGS(WARNING) << "No stack frames symbolized for address 0x" << std::hex << address;
   }
   analytics_builder_.TotalTimerStop();
 }
@@ -548,6 +559,7 @@ void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name) {
 }
 
 void SymbolizerImpl::OnDownloadsStarted() {
+  FX_LOGS(DEBUG) << "Starting downloads";
   if (remote_symbol_lookup_enabled_) {
     analytics_builder_.DownloadTimerStart();
   }
@@ -555,6 +567,7 @@ void SymbolizerImpl::OnDownloadsStarted() {
 }
 
 void SymbolizerImpl::OnDownloadsStopped(size_t num_succeeded, size_t num_failed) {
+  FX_LOGS(DEBUG) << "Downloads stopped";
   // Even if no symbol server is configured, this function could still be invoked but all
   // downloadings will be failed.
   if (remote_symbol_lookup_enabled_) {
@@ -567,13 +580,16 @@ void SymbolizerImpl::OnDownloadsStopped(size_t num_succeeded, size_t num_failed)
 }
 
 void SymbolizerImpl::DidCreateSymbolServer(zxdb::SymbolServer* server) {
+  FX_LOGS(DEBUG) << "Created symbol server " << server->name();
   if (server->state() == zxdb::SymbolServer::State::kInitializing ||
       server->state() == zxdb::SymbolServer::State::kBusy) {
     waiting_auth_ = true;
   }
 }
 
-void SymbolizerImpl::OnSymbolServerStatusChanged(zxdb::SymbolServer* unused_server) {
+void SymbolizerImpl::OnSymbolServerStatusChanged(zxdb::SymbolServer* server) {
+  FX_LOGS(DEBUG) << "Symbol server " << server->name() << " status changed to "
+                 << zxdb::ServerStateToString(server->state()) << ".";
   if (!waiting_auth_) {
     return;
   }
@@ -587,6 +603,40 @@ void SymbolizerImpl::OnSymbolServerStatusChanged(zxdb::SymbolServer* unused_serv
 
   waiting_auth_ = false;
   loop_.QuitNow();
+}
+
+void SymbolizerImpl::DidCreateProcess(zxdb::Process* process, uint64_t timestamp) {
+  FX_LOGS(DEBUG) << "Created " << *process << "\n";
+}
+
+void SymbolizerImpl::WillDestroyProcess(zxdb::Process* process, DestroyReason reason, int exit_code,
+                                        uint64_t timestamp) {
+  FX_LOGS(DEBUG) << "Destroying " << *process << " with exit code " << exit_code << ": "
+                 << DestroyReasonToString(reason) << "\n";
+}
+
+void SymbolizerImpl::WillLoadModuleSymbols(zxdb::Process* process, int num_modules) {
+  FX_LOGS(DEBUG) << "About to load " << num_modules << " module symbols for " << *process << "\n";
+}
+
+void SymbolizerImpl::DidLoadModuleSymbols(zxdb::Process* process,
+                                          zxdb::LoadedModuleSymbols* module) {
+  FX_LOGS(DEBUG) << "Loaded module symbols for " << *process << ", build id " << module->build_id()
+                 << "\n";
+}
+
+void SymbolizerImpl::DidLoadAllModuleSymbols(zxdb::Process* process) {
+  FX_LOGS(DEBUG) << "Loaded all module symbols for " << *process << "\n";
+}
+
+void SymbolizerImpl::WillUnloadModuleSymbols(zxdb::Process* process,
+                                             zxdb::LoadedModuleSymbols* module) {
+  FX_LOGS(DEBUG) << "Unloading module symbols for " << *process << ", build id "
+                 << module->build_id() << "\n";
+}
+
+void SymbolizerImpl::OnSymbolLoadFailure(zxdb::Process* process, const zxdb::Err& err) {
+  FX_LOGS(WARNING) << "Symbols failed to load for " << *process << ": " << err.msg() << "\n";
 }
 
 void SymbolizerImpl::InitProcess() {

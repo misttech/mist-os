@@ -67,7 +67,7 @@ where
         let (push_source_puppet, _opts, cobalt_metric_client) = test_realm_proxy
             .create_realm(
                 fttr::RealmOptions {
-                    use_real_monotonic_clock: Some(true),
+                    use_real_reference_clock: Some(true),
                     rtc: initial_rtc_time.map(|t| fttr::RtcOptions::InitialRtcTime(t.into_nanos())),
                     ..Default::default()
                 },
@@ -98,12 +98,14 @@ where
 async fn test_no_rtc_start_clock_from_time_source_alternate_signal() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
-        let sample_monotonic = zx::MonotonicInstant::get();
+        let sample_boot = zx::BootInstant::get();
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
-                monotonic: Some(sample_monotonic.into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(sample_boot.into_nanos()),
+                reference: Some(sample_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -126,12 +128,14 @@ async fn test_no_rtc_start_clock_from_time_source() {
     timekeeper_test(clock, None, |clock, push_source_controller, _, cobalt| async move {
         let before_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
 
-        let sample_monotonic = zx::MonotonicInstant::get();
+        let sample_boot = zx::BootInstant::get();
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
-                monotonic: Some(sample_monotonic.into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(sample_boot.into_nanos()),
+                reference: Some(sample_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -153,13 +157,13 @@ async fn test_no_rtc_start_clock_from_time_source() {
         // UTC time reported by the clock should be at least the time in the sample and no
         // more than the UTC time in the sample + time elapsed since the sample was created.
         let reported_utc = clock.read().unwrap();
-        let monotonic_after_update = zx::MonotonicInstant::get();
+        let boot_time_after_update = zx::BootInstant::get();
         assert_geq!(reported_utc, *VALID_TIME);
         assert_leq!(
             reported_utc,
             *VALID_TIME
                 + zx::SyntheticDuration::from_nanos(
-                    (monotonic_after_update - sample_monotonic).into_nanos()
+                    (boot_time_after_update - sample_boot).into_nanos()
                 )
         );
 
@@ -231,14 +235,16 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
                 ]
             );
 
-            let sample_monotonic = zx::MonotonicInstant::get();
+            let sample_boot = zx::BootInstant::get();
             tracing::info!(
                 "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
             );
             push_source_controller
                 .set_sample(TimeSample {
                     utc: Some(VALID_TIME.into_nanos()),
-                    monotonic: Some(sample_monotonic.into_nanos()),
+                    // Compatibility for CTF tests.
+                    monotonic: Some(sample_boot.into_nanos()),
+                    reference: Some(sample_boot),
                     standard_deviation: Some(STD_DEV.into_nanos()),
                     ..Default::default()
                 })
@@ -257,25 +263,25 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             // source, and no more than the UTC time reported by the time source + time elapsed
             // since the time was read.
             let reported_utc = clock.read().unwrap();
-            let monotonic_after = zx::MonotonicInstant::get();
+            let boot_time_after = zx::BootInstant::get();
             assert_geq!(reported_utc, *VALID_TIME);
             assert_leq!(
                 reported_utc,
                 *VALID_TIME
                     + zx::SyntheticDuration::from_nanos(
-                        (monotonic_after - sample_monotonic).into_nanos()
+                        (boot_time_after - sample_boot).into_nanos()
                     )
             );
             // RTC should also be set.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
-            let monotonic_after_rtc_set = zx::MonotonicInstant::get();
+            let boot_time_after_rtc_set = zx::BootInstant::get();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
                 rtc_reported_utc,
                 *VALID_TIME
                     + zx::SyntheticDuration::from_nanos(
-                        (monotonic_after_rtc_set - sample_monotonic).into_nanos()
+                        (boot_time_after_rtc_set - sample_boot).into_nanos()
                     )
             );
             assert_eq!(
@@ -308,7 +314,7 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
 #[fuchsia::test]
 async fn test_start_clock_from_rtc() {
     let clock = new_nonshareable_clock();
-    let monotonic_before = zx::MonotonicInstant::get();
+    let boot_before = zx::BootInstant::get();
     timekeeper_test(
         clock,
         Some(*VALID_RTC_TIME),
@@ -323,13 +329,13 @@ async fn test_start_clock_from_rtc() {
             // UTC time reported by the clock should be at least the time reported by the RTC, and no
             // more than the UTC time reported by the RTC + time elapsed since Timekeeper was launched.
             let reported_utc = clock.read().unwrap();
-            let monotonic_after = zx::MonotonicInstant::get();
+            let monotonic_after = zx::BootInstant::get();
             assert_geq!(reported_utc, *VALID_RTC_TIME);
             assert_leq!(
                 reported_utc,
                 *VALID_RTC_TIME
                     + zx::SyntheticDuration::from_nanos(
-                        (monotonic_after - monotonic_before).into_nanos()
+                        (monotonic_after - boot_before).into_nanos()
                     )
             );
 
@@ -351,14 +357,16 @@ async fn test_start_clock_from_rtc() {
 
             // Clock should be updated again when the push source reports another time.
             let clock_last_set_ticks = clock.get_details().unwrap().last_value_update_ticks;
-            let sample_monotonic = zx::MonotonicInstant::get();
+            let sample_boot = zx::BootInstant::get();
             tracing::info!(
                 "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
             );
             push_source_controller
                 .set_sample(TimeSample {
                     utc: Some(VALID_TIME.into_nanos()),
-                    monotonic: Some(sample_monotonic.into_nanos()),
+                    // Compatibility for CTF tests.
+                    monotonic: Some(sample_boot.into_nanos()),
+                    reference: Some(sample_boot),
                     standard_deviation: Some(STD_DEV.into_nanos()),
                     ..Default::default()
                 })
@@ -374,25 +382,25 @@ async fn test_start_clock_from_rtc() {
                 "[https://fxbug.dev/42080434]: after push_source_controller.set_sample stage 2"
             );
             let clock_utc = clock.read().unwrap();
-            let monotonic_after_read = zx::MonotonicInstant::get();
+            let monotonic_after_read = zx::BootInstant::get();
             assert_geq!(clock_utc, *VALID_TIME);
             assert_leq!(
                 clock_utc,
                 *VALID_TIME
                     + zx::SyntheticDuration::from_nanos(
-                        (monotonic_after_read - sample_monotonic).into_nanos()
+                        (monotonic_after_read - sample_boot).into_nanos()
                     )
             );
             // RTC should be set too.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
-            let monotonic_after_rtc_set = zx::MonotonicInstant::get();
+            let monotonic_after_rtc_set = zx::BootInstant::get();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
                 rtc_reported_utc,
                 *VALID_TIME
                     + zx::SyntheticDuration::from_nanos(
-                        (monotonic_after_rtc_set - sample_monotonic).into_nanos()
+                        (monotonic_after_rtc_set - sample_boot).into_nanos()
                     )
             );
 
@@ -472,10 +480,13 @@ async fn test_reject_before_backstop() {
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
 
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
+        let reference = zx::BootInstant::get();
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(BEFORE_BACKSTOP_TIME.into_nanos()),
-                monotonic: Some(zx::MonotonicInstant::get().into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(reference.into_nanos()),
+                reference: Some(reference),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -506,20 +517,22 @@ async fn test_slew_clock() {
     // Constants for controlling the duration of the slew we want to induce. These constants
     // are intended to tune the test to avoid flakes and do not necessarily need to match up with
     // those in timekeeper.
-    const SLEW_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(90);
+    const SLEW_DURATION: zx::BootDuration = zx::BootDuration::from_minutes(90);
     const NOMINAL_SLEW_PPM: i64 = 20;
     let error_for_slew = SLEW_DURATION * NOMINAL_SLEW_PPM / 1_000_000;
 
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let sample_1_monotonic = zx::MonotonicInstant::get() - BETWEEN_SAMPLES;
+        let sample_1_boot = zx::BootInstant::get() - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
-                monotonic: Some(sample_1_monotonic.into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(sample_1_boot.into_nanos()),
+                reference: Some(sample_1_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -541,7 +554,7 @@ async fn test_slew_clock() {
         let last_generation_counter = clock.get_details().unwrap().generation_counter;
 
         // Push a second sample that indicates UTC running slightly behind monotonic.
-        let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
+        let sample_2_boot = sample_1_boot + BETWEEN_SAMPLES;
         let sample_2_utc = sample_1_utc
             + zx::SyntheticDuration::from_nanos(
                 (BETWEEN_SAMPLES - error_for_slew * 2).into_nanos(),
@@ -550,7 +563,9 @@ async fn test_slew_clock() {
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
-                monotonic: Some(sample_2_monotonic.into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(sample_2_boot.into_nanos()),
+                reference: Some(sample_2_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -570,18 +585,19 @@ async fn test_slew_clock() {
 
 #[fuchsia::test]
 async fn test_step_clock() {
-    const STEP_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
+    const STEP_ERROR: zx::BootDuration = zx::BootDuration::from_hours(1);
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let monotonic_before = zx::MonotonicInstant::get();
-        let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
+        let monotonic_before = zx::BootInstant::get();
+        let sample_1_boot = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
-                monotonic: Some(sample_1_monotonic.into_nanos()),
+                monotonic: Some(sample_1_boot.into_nanos()),
+                reference: Some(sample_1_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -598,7 +614,7 @@ async fn test_step_clock() {
         .await
         .unwrap();
         let utc_now = clock.read().unwrap();
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
         assert_geq!(
             utc_now,
             sample_1_utc + zx::SyntheticDuration::from_nanos(BETWEEN_SAMPLES.into_nanos())
@@ -613,14 +629,14 @@ async fn test_step_clock() {
 
         let clock_last_set_ticks = clock.get_details().unwrap().last_value_update_ticks;
 
-        let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
+        let sample_2_boot = sample_1_boot + BETWEEN_SAMPLES;
         let sample_2_utc = sample_1_utc
             + zx::SyntheticDuration::from_nanos((BETWEEN_SAMPLES + STEP_ERROR).into_nanos());
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
-                monotonic: Some(sample_2_monotonic.into_nanos()),
+                reference: Some(sample_2_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -630,7 +646,7 @@ async fn test_step_clock() {
             )
             .await;
         let utc_now_2 = clock.read().unwrap();
-        let monotonic_after_2 = zx::MonotonicInstant::get();
+        let monotonic_after_2 = zx::BootInstant::get();
 
         // After the second sample, the clock should have jumped to an offset approximately halfway
         // between the offsets defined in the two samples. 500 ms is added to the upper bound as
@@ -664,14 +680,14 @@ async fn test_restart_crashed_time_source() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let monotonic_before = zx::MonotonicInstant::get();
+        let monotonic_before = zx::BootInstant::get();
         let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
-                monotonic: Some(sample_1_monotonic.into_nanos()),
+                reference: Some(sample_1_monotonic),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -685,12 +701,14 @@ async fn test_restart_crashed_time_source() {
         // After a time source crashes, timekeeper should restart it and accept samples from it.
         let _result = push_source_controller.simulate_crash();
         let sample_2_utc = *VALID_TIME_2;
-        let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
+        let sample_2_boot = sample_1_monotonic + BETWEEN_SAMPLES;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
-                monotonic: Some(sample_2_monotonic.into_nanos()),
+                // Compatibility for CTF tests.
+                monotonic: Some(sample_2_boot.into_nanos()),
+                reference: Some(sample_2_boot),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -699,7 +717,7 @@ async fn test_restart_crashed_time_source() {
             .await;
         // Time from clock should incorporate the second sample.
         let result_utc = clock.read().unwrap();
-        let monotonic_after = zx::MonotonicInstant::get();
+        let monotonic_after = zx::BootInstant::get();
         let minimum_expected = avg(
             sample_1_utc + zx::SyntheticDuration::from_nanos(BETWEEN_SAMPLES.into_nanos()),
             sample_2_utc,

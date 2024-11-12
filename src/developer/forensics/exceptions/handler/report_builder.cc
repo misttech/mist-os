@@ -50,7 +50,7 @@ CrashReportBuilder& CrashReportBuilder::SetProcess(const zx::process& process) {
     }
 
     const zx::duration crashed_process_uptime =
-        zx::clock::get_monotonic() - zx::time(process_info.start_time);
+        zx::clock::get_monotonic() - zx::time_monotonic(process_info.start_time);
     if (crashed_process_uptime.get() >= 0) {
       process_uptime_ = crashed_process_uptime;
     } else {

@@ -7,7 +7,6 @@ use futures::StreamExt;
 // Wrapper type for WlanFullmacImpl_Request types without the responder.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FullmacRequest {
-    Stop,
     Query,
     QueryMacSublayerSupport,
     QuerySecuritySupport,
@@ -69,7 +68,6 @@ impl RecordedRequestStream {
             .unwrap()
             .expect("Could not get next request in fullmac request stream");
         match &request {
-            WlanFullmacImpl_Request::Stop { .. } => self.history.push(FullmacRequest::Stop),
             WlanFullmacImpl_Request::Query { .. } => self.history.push(FullmacRequest::Query),
             WlanFullmacImpl_Request::QueryMacSublayerSupport { .. } => {
                 self.history.push(FullmacRequest::QueryMacSublayerSupport)

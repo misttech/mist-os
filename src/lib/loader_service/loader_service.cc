@@ -4,7 +4,7 @@
 
 #include "src/lib/loader_service/loader_service.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
 #include <lib/syslog/cpp/macros.h>
@@ -138,13 +138,11 @@ std::shared_ptr<LoaderService> LoaderService::Create(async_dispatcher_t* dispatc
 }
 
 zx::result<zx::vmo> LoaderService::LoadObjectImpl(std::string path) {
-  const fio::wire::OpenFlags kFlags = fio::wire::OpenFlags::kNotDirectory |
-                                      fio::wire::OpenFlags::kRightReadable |
-                                      fio::wire::OpenFlags::kRightExecutable;
+  const fio::Flags kFlags = fio::Flags::kProtocolFile | fio::kPermReadable | fio::kPermExecutable;
 
   fbl::unique_fd fd;
-  zx_status_t status = fdio_open_fd_at(dir_.get(), path.data(), static_cast<uint32_t>(kFlags),
-                                       fd.reset_and_get_address());
+  zx_status_t status = fdio_open3_fd_at(dir_.get(), path.data(), static_cast<uint64_t>(kFlags),
+                                        fd.reset_and_get_address());
   if (status != ZX_OK) {
     return zx::error(status);
   }

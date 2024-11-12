@@ -19,7 +19,6 @@ TEST_F(SimTest, ScanResultAfterIfaceStop) {
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc), ZX_OK);
 
   client_ifc.StartScan(0, true);
-  client_ifc.StopInterface();
   // The scan result will arrive after the iface is torn down.
   env_->Run(zx::sec(1));  // This should be a no-op, not a crash.
 

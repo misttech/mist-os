@@ -15,6 +15,7 @@ use futures::FutureExt as _;
 /// See [`fidl_fuchsia_net_dhcpv6::NewClientParams`].
 #[derive(ValidFidlTable, Debug, Clone, PartialEq)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::NewClientParams)]
+#[fidl_table_strict]
 pub struct NewClientParams {
     /// The ID of the interface the client will run on.
     ///
@@ -69,6 +70,7 @@ pub struct NewClientParams {
 /// See [`fidl_fuchsia_net_dhcpv6::ClientConfig`].
 #[derive(ValidFidlTable, Debug, Clone, PartialEq)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::ClientConfig)]
+#[fidl_table_strict]
 pub struct ClientConfig {
     #[fidl_field_type(default)]
     /// Configuration for requesting configuration information.
@@ -107,6 +109,7 @@ pub struct ClientConfig {
 /// See [`fidl_fuchsia_net_dhcpv6::InformationConfig`].
 #[derive(ValidFidlTable, Debug, Clone, PartialEq, Default)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::InformationConfig)]
+#[fidl_table_strict]
 pub struct InformationConfig {
     #[fidl_field_type(default)]
     /// See [`fidl_fuchsia_net_dhcpv6::InformationConfig::dns_servers`].
@@ -157,6 +160,7 @@ impl Validate<AddressConfig> for AddressConfigValidator {
 #[derive(ValidFidlTable, Debug, Clone, PartialEq, Default)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::AddressConfig)]
 #[fidl_table_validator(AddressConfigValidator)]
+#[fidl_table_strict]
 pub struct AddressConfig {
     #[fidl_field_type(default)]
     /// Number of addresses.

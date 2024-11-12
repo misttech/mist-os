@@ -30,7 +30,6 @@ WANT_NAMES = [
     "clidoc/fssh.md",
     "clidoc/funnel.md",
     "clidoc/minfs.md",
-    "clidoc/pm.md",
     "clidoc/symbolizer.md",
     "clidoc/zbi.md",
     "clidoc/zxdb.md",

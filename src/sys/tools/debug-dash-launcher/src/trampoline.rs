@@ -192,10 +192,10 @@ async fn create_trampolines(pkg_dirs: &Vec<PkgDir>) -> Result<Trampolines, Launc
             }
             None => {
                 // Read the package binaries.
-                let bin_dir = fuchsia_fs::directory::open_directory_deprecated(
+                let bin_dir = fuchsia_fs::directory::open_directory(
                     &pkg_dir.dir,
                     "bin",
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                    fio::PERM_READABLE | fio::PERM_EXECUTABLE,
                 )
                 .await
                 .map_err(|_| LauncherError::ToolsBinaryRead)?;
@@ -246,14 +246,9 @@ fn directory_to_proxy(dir: Arc<PseudoDirectory>) -> Result<fio::DirectoryProxy, 
     let (client, server) =
         create_proxy::<fio::DirectoryMarker>().map_err(|_| LauncherError::Internal)?;
     let scope = vfs::execution_scope::ExecutionScope::new();
-    dir.open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
-        server.into_channel().into(),
-    );
+    let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
+    vfs::ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel())
+        .handle(|request| dir.open3(scope.clone(), vfs::path::Path::dot(), flags, request));
     Ok(client)
 }
 
@@ -310,9 +305,6 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fio::OpenFlags;
-    use fuchsia_fs::directory::open_file_deprecated;
-    use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
     use std::fmt;
     use vfs::execution_scope::ExecutionScope;
@@ -397,15 +389,14 @@ mod tests {
 
     async fn make_pkg(url: &str, name: &str, root: &Arc<PseudoDirectory>) -> PkgDir {
         let (url, resource) = parse_url(url).unwrap();
-        let (dir, server_end) =
+        let (dir, server) =
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-        root.clone().open(
-            ExecutionScope::new(),
-            flags,
-            name.try_into().unwrap(),
-            server_end.into_channel().into(),
-        );
+        let scope = ExecutionScope::new();
+        let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
+        let path = vfs::path::Path::validate_and_split(name).unwrap();
+        let root = root.clone();
+        vfs::ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel())
+            .handle(|request| root.open3(scope.clone(), path, flags, request));
         PkgDir { url, dir, resource }
     }
 
@@ -624,10 +615,7 @@ mod tests {
     #[fuchsia::test]
     async fn make_trampoline_vfs_test() {
         async fn contents_of(path: &str, dir: &fio::DirectoryProxy) -> String {
-            let file = open_file_deprecated(dir, path, OpenFlags::RIGHT_READABLE)
-                .await
-                .unwrap_or_else(|e| panic!("could not open file: {path}: {e:?}"));
-            read_to_string(&file)
+            fuchsia_fs::directory::read_file_to_string(dir, path)
                 .await
                 .unwrap_or_else(|e| panic!("could not read file: {path}: {e:?}"))
         }

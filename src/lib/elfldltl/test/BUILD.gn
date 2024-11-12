@@ -54,7 +54,6 @@ test("elfldltl-unittests") {
     "..",
     "../testing",
     "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",
     "//src/lib/trivial-allocator",
@@ -354,7 +353,6 @@ source_set("loader-tests") {
     ":test-data",
     "..",
     "../testing",
-    "//sdk/lib/stdcompat",
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",
   ]

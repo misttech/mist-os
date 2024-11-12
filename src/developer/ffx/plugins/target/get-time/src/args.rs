@@ -22,4 +22,7 @@ See https://fuchsia.dev/reference/syscalls/clock_get_monotonic"#,
 "
 )]
 
-pub struct GetTimeCommand {}
+pub struct GetTimeCommand {
+    #[argh(switch, short = 'b', description = "if true, return boot time")]
+    pub boot: bool,
+}

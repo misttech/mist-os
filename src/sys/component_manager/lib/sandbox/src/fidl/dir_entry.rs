@@ -13,7 +13,10 @@ use vfs::ToObjectRequest;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 impl RemotableCapability for DirEntry {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+    fn try_into_directory_entry(
+        self,
+        _scope: ExecutionScope,
+    ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(self.entry)
     }
 }
@@ -68,6 +71,10 @@ impl DirEntry {
     /// Forwards the open request.
     pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), Status> {
         self.entry.clone().open_entry(open_request)
+    }
+
+    pub fn dirent_type(&self) -> fio::DirentType {
+        self.entry.entry_info().type_()
     }
 }
 
@@ -155,7 +162,7 @@ mod tests {
         let flags = fio::OpenFlags::DIRECTORY;
         let (_client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut object_request = flags.to_object_request(server);
-        let dir_entry = dir_entry.clone().try_into_directory_entry().unwrap();
+        let dir_entry = dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap();
         dir_entry
             .open_entry(OpenRequest::new(
                 scope.clone(),

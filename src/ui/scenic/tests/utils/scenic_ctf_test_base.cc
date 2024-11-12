@@ -17,6 +17,7 @@ void ScenicCtfTest::SetUp() {
     req.set_realm_server(realm_proxy_.NewRequest());
     req.set_display_rotation(DisplayRotation());
     req.set_renderer(Renderer());
+    req.set_display_composition(DisplayComposition());
 
     ASSERT_EQ(realm_factory_->CreateRealm(std::move(req), &res), ZX_OK);
   }
@@ -31,5 +32,7 @@ uint64_t ScenicCtfTest::DisplayRotation() const { return 0; }
 fuchsia::ui::test::context::RendererType ScenicCtfTest::Renderer() const {
   return fuchsia::ui::test::context::RendererType::VULKAN;
 }
+
+bool ScenicCtfTest::DisplayComposition() const { return true; }
 
 }  // namespace integration_tests

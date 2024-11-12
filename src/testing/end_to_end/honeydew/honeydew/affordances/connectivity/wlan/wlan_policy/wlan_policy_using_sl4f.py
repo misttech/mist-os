@@ -58,7 +58,21 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         self._name: str = device_name
         self._sl4f: SL4F = sl4f
 
+        self.verify_supported()
+
     # List all the public methods
+    def verify_supported(self) -> None:
+        """Verifies that the WlanPolicy affordance using SL4F is supported by the Fuchsia device.
+
+        This method should be called in `__init__()` so that if this affordance was called on a
+        Fuchsia device that does not support it, it will raise NotSupportedError.
+
+        Raises:
+            NotSupportedError: If affordance is not supported.
+        """
+        # TODO(http://b/377585939): To Be Implemented
+        return
+
     def connect(
         self, target_ssid: str, security_type: SecurityType
     ) -> RequestStatus:

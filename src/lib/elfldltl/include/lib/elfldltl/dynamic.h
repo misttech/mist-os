@@ -5,16 +5,15 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_
 
-#include <lib/stdcompat/span.h>
-#include <zircon/compiler.h>
-
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
 #include "init-fini.h"
 #include "internal/dynamic-tag-error.h"
+#include "internal/no_unique_address.h"
 #include "layout.h"
 #include "relocation.h"
 #include "symbol.h"
@@ -56,7 +55,7 @@ struct DynamicTagObserver {};
 // Finish method is called, stopping early if one returns false.
 template <class DiagnosticsType, class Memory, class Dyn, size_t N, class... Observers>
 constexpr bool DecodeDynamic(DiagnosticsType&& diagnostics, Memory&& memory,
-                             cpp20::span<const Dyn, N> dyn, Observers&&... observers) {
+                             std::span<const Dyn, N> dyn, Observers&&... observers) {
   // The span is an upper bound but the section is terminated by a null entry.
   for (const auto& entry : dyn) {
     // At the terminator entry, call each observer's Finish() method.
@@ -636,14 +635,14 @@ class DynamicNeededObserver
 
  private:
   const SymbolInfo& si;
-  __NO_UNIQUE_ADDRESS Callback callback;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Callback callback;
 };
 
 // Deduction guides.
 
 template <class Elf, class AbiTraits, template <class, class> class SymbolInfo, class Callback>
-DynamicNeededObserver(const SymbolInfo<Elf, AbiTraits>& info,
-                      Callback) -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
+DynamicNeededObserver(const SymbolInfo<Elf, AbiTraits>& info, Callback)
+    -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
 
 // This provides a trivial observer that simply counts how many occurrences of
 // any of the given tags appear.

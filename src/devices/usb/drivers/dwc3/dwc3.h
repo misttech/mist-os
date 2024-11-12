@@ -26,9 +26,8 @@
 #include <mutex>
 
 #include <usb-endpoint/usb-endpoint-server.h>
-#include <usb/request-cpp.h>
+#include <usb/descriptors.h>
 #include <usb/request-fidl.h>
-#include <usb/usb.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 

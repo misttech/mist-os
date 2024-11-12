@@ -68,7 +68,6 @@ pub fn canonicalize_path(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::ServerEnd;
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
@@ -78,24 +77,6 @@ mod tests {
     use vfs::remote::remote_dir;
     use vfs::{pseudo_directory, ObjectRequest};
     use {fuchsia_async as fasync, zx_status};
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_deprecated_and_read_file_test() {
-        let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let data = "abc".repeat(10000);
-        fs::write(tempdir.path().join("myfile"), &data).expect("failed writing file");
-
-        let dir = crate::directory::open_in_namespace_deprecated(
-            tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
-        )
-        .expect("could not open tmp dir");
-        let file =
-            directory::open_file_no_describe_deprecated(&dir, "myfile", OpenFlags::RIGHT_READABLE)
-                .expect("could not open file");
-        let contents = file::read_to_string(&file).await.expect("could not read file");
-        assert_eq!(&contents, &data, "File contents did not match");
-    }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_and_read_file_test() {
@@ -111,32 +92,6 @@ mod tests {
         let file = directory::open_file_async(&dir, "myfile", fio::PERM_READABLE)
             .expect("could not open file");
         let contents = file::read_to_string(&file).await.expect("could not read file");
-        assert_eq!(&contents, &data, "File contents did not match");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_deprecated_and_write_file_test() {
-        // Create temp dir for test.
-        let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let dir = crate::directory::open_in_namespace_deprecated(
-            tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        )
-        .expect("could not open tmp dir");
-
-        // Write contents.
-        let file_name = Path::new("myfile");
-        let data = "abc".repeat(10000);
-        let file = directory::open_file_no_describe_deprecated(
-            &dir,
-            file_name.to_str().unwrap(),
-            OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        )
-        .expect("could not open file");
-        file::write(&file, &data).await.expect("could not write file");
-
-        // Verify contents.
-        let contents = std::fs::read_to_string(tempdir.path().join(file_name)).unwrap();
         assert_eq!(&contents, &data, "File contents did not match");
     }
 
@@ -175,71 +130,6 @@ mod tests {
         assert_eq!(canonicalize_path("."), ".");
         assert_eq!(canonicalize_path("./"), "./");
         assert_eq!(canonicalize_path("foo/bar/"), "foo/bar/");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open1_flags_test() {
-        let tempdir = TempDir::new().expect("failed to create tmp dir");
-        std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
-            .expect("failed to write file");
-        let dir = crate::directory::open_in_namespace_deprecated(
-            tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        )
-        .expect("could not open tmp dir");
-        let example_dir = pseudo_directory! {
-            "ro" => pseudo_directory! {
-                "read_only" => read_only("ro/read_only"),
-            },
-            "rw" => remote_dir(dir)
-        };
-        let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        example_dir.open(
-            scope,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(example_dir_service.into_channel()),
-        );
-
-        for (file_name, flags, should_succeed) in vec![
-            ("ro/read_only", OpenFlags::RIGHT_READABLE, true),
-            ("ro/read_only", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, false),
-            ("ro/read_only", OpenFlags::RIGHT_WRITABLE, false),
-            ("rw/read_write", OpenFlags::RIGHT_READABLE, true),
-            ("rw/read_write", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, true),
-            ("rw/read_write", OpenFlags::RIGHT_WRITABLE, true),
-        ] {
-            let file_proxy =
-                directory::open_file_no_describe_deprecated(&example_dir_proxy, file_name, flags)
-                    .unwrap();
-            match (should_succeed, file_proxy.query().await) {
-                (true, Ok(_)) => (),
-                (false, Err(_)) => continue,
-                (true, Err(e)) => {
-                    panic!("failed to open when expected success, couldn't describe: {:?}", e)
-                }
-                (false, Ok(d)) => {
-                    panic!("successfully opened when expected failure, could describe: {:?}", d)
-                }
-            }
-            if flags.intersects(OpenFlags::RIGHT_READABLE) {
-                assert_eq!(
-                    file_name,
-                    file::read_to_string(&file_proxy).await.expect("failed to read file")
-                );
-            }
-            if flags.intersects(OpenFlags::RIGHT_WRITABLE) {
-                let _: u64 = file_proxy
-                    .write(b"write_only")
-                    .await
-                    .expect("write failed")
-                    .map_err(zx_status::Status::from_raw)
-                    .expect("write error");
-            }
-            assert_eq!(file_proxy.close().await.unwrap(), Ok(()));
-        }
     }
 
     #[fasync::run_singlethreaded(test)]

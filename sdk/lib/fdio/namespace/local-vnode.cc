@@ -175,7 +175,7 @@ zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, const EnumerateCallb
                  [&path, &func, this](const LocalVnode::Intermediate& c) {
                    // If we added a node with children, add a separator and enumerate all the
                    // children.
-                   if (Name().length() > 0) {
+                   if (!Name().empty()) {
                      path->Append('/');
                    }
 

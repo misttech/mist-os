@@ -25,6 +25,7 @@ class PackageManagerRepo {
   final String _repoPath;
   final Logger _log;
   Optional<int> _servePort;
+  Optional<Process> _serveProcess;
 
   Optional<int> getServePort() => _servePort;
   String getRepoPath() => _repoPath;
@@ -32,6 +33,7 @@ class PackageManagerRepo {
   PackageManagerRepo._create(
       this._ffxPath, this._ffxIsolateDir, this._repoPath, this._log) {
     _servePort = Optional.absent();
+    _serveProcess = Optional.absent();
   }
 
   static Future<PackageManagerRepo> initRepo(String ffxPath, Logger log) async {
@@ -90,32 +92,36 @@ class PackageManagerRepo {
   ///
   /// Returns `true` if serve startup was successful.
   Future<bool> tryServe(String repoName, int port) async {
-    await stopServer(repoName);
-    final start_result = await ffxRun([
-      'repository',
-      'server',
-      'start',
-      '--background',
-      '--repository',
-      repoName,
-      '--repo-path',
-      _repoPath,
-      '--address',
-      '[::]:$port'
-    ]);
-    if (start_result.exitCode != 0) {
-      _log.info('ffx repository server start failed: ${start_result.stderr}');
-      return false;
-    }
+    await stopServer();
+    final port_path = _repoPath + '/port';
+    final process = await Process.start(
+        _ffxPath + "/ffx",
+        ffxArgs([
+          'repository',
+          'server',
+          'start',
+          '--foreground',
+          '--repository',
+          repoName,
+          '--repo-path',
+          _repoPath,
+          '--address',
+          '[::]:$port',
+          '--port-path',
+          port_path,
+        ]));
+    unawaited(process.exitCode.then((exitCode) async {
+      if (exitCode != 0) {
+        final stderr = await process.stderr.transform(utf8.decoder).join();
+        _log.warning('ffx repository server start failed: $stderr');
+      }
+    }));
+    _serveProcess = Optional.of(process);
 
-    final status = await serverStatus(repoName);
-    _log.info('Server status after start is: $status');
-    expect(status['ok']['data'][0]['name'], repoName,
-        reason: 'Status did not return $repoName in $status');
-
-    // parse the port out of the address.
-    _servePort = Optional.of(
-        Uri.parse('http://' + status['ok']['data'][0]['address']).port);
+    await RetryOptions(maxAttempts: 5).retry(() async {
+      final port_string = await File(port_path).readAsString();
+      _servePort = Optional.of(int.parse(port_string));
+    });
 
     if (port != 0) {
       expect(_servePort.value, port);
@@ -137,7 +143,7 @@ class PackageManagerRepo {
   /// Does not return until the serve begins listening, or times out.
   ///
   /// Uses these commands:
-  /// `ffx repository server start --background --address [::]:0`
+  /// `ffx repository server start --foreground --address [::]:0`
   Future<void> startServer(String repoName) async {
     _log.info('Server is starting.');
     final retryOptions = RetryOptions(maxAttempts: 5);
@@ -155,7 +161,7 @@ class PackageManagerRepo {
   /// Does not return until the serve begins listening, or times out.
   ///
   /// Uses these commands:
-  /// `ffx repository server start --background --address [::]:<port number>`
+  /// `ffx repository server start --foreground --address [::]:<port number>`
   Future<void> startServerUnusedPort(String repoName) async {
     await getUnusedPort<bool>((unusedPort) async {
       _log.info('Serve is starting on port: $unusedPort');
@@ -166,18 +172,6 @@ class PackageManagerRepo {
     });
 
     expect(_servePort.isPresent, isTrue);
-  }
-
-  Future<dynamic> serverStatus(String repoName) async {
-    return json.decode(await ffx([
-      '--machine',
-      'json',
-      'repository',
-      'server',
-      'list',
-      '--name',
-      repoName
-    ]));
   }
 
   /// Register the repo in target using `ffx target repository register`.
@@ -196,21 +190,22 @@ class PackageManagerRepo {
   }
 
   Future<ProcessResult> ffxRun(List<String> args) async {
+    return await Process.run(_ffxPath + "/ffx", ffxArgs(args));
+  }
+
+  List<String> ffxArgs(List<String> args) {
     var environment = Platform.environment;
     final dev_addr = environment['FUCHSIA_DEVICE_ADDR'];
     final port = environment['FUCHSIA_SSH_PORT'];
-    final result = await Process.run(
-        _ffxPath + "/ffx",
-        [
-              '--target',
-              '$dev_addr:$port',
-              '--config',
-              'ffx.subtool-search-paths=' + _ffxPath,
-              '--isolate-dir',
-              _ffxIsolateDir
-            ] +
-            args);
-    return result;
+    return [
+          '--target',
+          '$dev_addr:$port',
+          '--config',
+          'ffx.subtool-search-paths=' + _ffxPath,
+          '--isolate-dir',
+          _ffxIsolateDir
+        ] +
+        args;
   }
 
   /// Returns the output of `pkgctl repo` as a set.
@@ -363,21 +358,17 @@ class PackageManagerRepo {
     return true;
   }
 
-  Future<void> stopServer(String repoName) async {
-    final status = await serverStatus(repoName);
-    var info = {};
-    if (!status['ok']['data'].isEmpty) {
-      info = status['ok']['data'][0];
-    }
-    if (info['name'] == repoName) {
-      _log.info('Stopping server $repoName...');
-      await ffx(['repository', 'server', 'stop', repoName]);
-    } else {
-      _log.info('Server $repoName is not running: $status.');
+  Future<void> stopServer() async {
+    if (_serveProcess.isPresent) {
+      _log.info('Stopping server...');
+      await _serveProcess.value.kill();
+      _serveProcess = Optional.absent();
+      _servePort = Optional.absent();
     }
   }
 
   Future<void> cleanup() async {
+    await stopServer();
     await ffx(['daemon', 'stop']);
     await Future.wait([
       Directory(_repoPath).delete(recursive: true),

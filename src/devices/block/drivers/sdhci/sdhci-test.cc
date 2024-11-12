@@ -181,6 +181,10 @@ class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
 
   void SdhciHwReset() { hw_reset_invoked_ = true; }
 
+  zx_status_t SdhciVendorSetBusClock(uint32_t frequency_hz) {
+    return supports_set_bus_clock_ ? ZX_OK : ZX_ERR_STOP;
+  }
+
   void set_dma_paddrs(std::vector<zx_paddr_t> dma_paddrs) { dma_paddrs_ = std::move(dma_paddrs); }
   zx::unowned_bti& unowned_bti() { return unowned_bti_; }
   void set_base_clock(uint32_t base_clock) { base_clock_ = base_clock; }
@@ -189,6 +193,7 @@ class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
     dma_boundary_alignment_ = dma_boundary_alignment;
   }
   bool hw_reset_invoked() const { return hw_reset_invoked_; }
+  void set_supports_set_bus_clock() { supports_set_bus_clock_ = true; }
 
  private:
   std::vector<zx_paddr_t> dma_paddrs_;
@@ -197,6 +202,7 @@ class SdhciBanjoServer : public ddk::SdhciProtocol<SdhciBanjoServer> {
   uint64_t quirks_ = 0;
   uint64_t dma_boundary_alignment_ = 0;
   bool hw_reset_invoked_ = false;
+  bool supports_set_bus_clock_ = false;
 
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_SDHCI, this, &sdhci_protocol_ops_};
 };
@@ -438,24 +444,63 @@ TEST_F(SdhciTest, SetBusFreq) {
 
   auto clock = ClockControl::Get().FromValue(0);
 
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
+  EXPECT_TRUE(clock.ReadFrom(driver_test().driver()->mmio_).internal_clock_enable());
+
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(12'500'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 4);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(65'190));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 767);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(100'000'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 0);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(26'000'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 2);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
   EXPECT_FALSE(clock.ReadFrom(driver_test().driver()->mmio_).sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
+
+  ASSERT_OK(StopDriver());
+}
+
+TEST_F(SdhciTest, SetBusFreqVendorSpecific) {
+  driver_test().RunInEnvironmentTypeContext(
+      [&](Environment& env) { env.sdhci().set_supports_set_bus_clock(); });
+
+  ASSERT_OK(StartDriver());
+
+  auto clock_control = [&]() { return ClockControl::Get().ReadFrom(TestSdhci::mmio_).reg_value(); };
+
+  const uint32_t initial_value = clock_control();
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
+  EXPECT_EQ(clock_control(), initial_value);
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(12'500'000));
+  EXPECT_EQ(clock_control(), initial_value);
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(65'190));
+  EXPECT_EQ(clock_control(), initial_value);
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(100'000'000));
+  EXPECT_EQ(clock_control(), initial_value);
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(26'000'000));
+  EXPECT_EQ(clock_control(), initial_value);
+
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
+  EXPECT_EQ(clock_control(), initial_value);
 
   ASSERT_OK(StopDriver());
 }

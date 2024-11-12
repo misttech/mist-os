@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <zircon/lookup.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdarg>
 #include <mutex>
@@ -37,6 +38,7 @@ namespace fpacketsocket = fuchsia_posix_socket_packet;
 
 constexpr int kSockFlagsMask = SOCK_CLOEXEC | SOCK_NONBLOCK;
 
+namespace {
 template <typename T>
 zx_status_t get_socket_provider(zx_handle_t* provider_handle) {
   const auto& provider = get_client<T>();
@@ -46,6 +48,7 @@ zx_status_t get_socket_provider(zx_handle_t* provider_handle) {
   *provider_handle = provider.value().client_end().channel().get();
   return ZX_OK;
 }
+}  // namespace
 
 __EXPORT
 int socket(int domain, int type, int protocol) {
@@ -81,7 +84,7 @@ int socket(int domain, int type, int protocol) {
   if (out_code) {
     return ERRNO(out_code);
   }
-  const fdio_ptr io = result.value();
+  const fdio_ptr& io = result.value();
 
   if (type & SOCK_NONBLOCK) {
     io->ioflag() |= IOFLAG_NONBLOCK;
@@ -133,8 +136,9 @@ int connect(int fd, const struct sockaddr* addr, socklen_t len) {
   return 0;
 }
 
+namespace {
 template <typename F>
-static int delegate(int fd, F fn) {
+int delegate(int fd, F fn) {
   const fdio_ptr io = fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -149,6 +153,7 @@ static int delegate(int fd, F fn) {
   }
   return out_code;
 }
+}  // namespace
 
 __EXPORT
 int bind(int fd, const struct sockaddr* addr, socklen_t len) {
@@ -338,7 +343,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
         };
         const auto& octets = addr.ipv4().addr;
         static_assert(sizeof(address.addr) >= sizeof(octets));
-        std::copy(octets.begin(), octets.end(), address.addr);
+        std::ranges::copy(octets, address.addr);
       } break;
       case fnet::wire::IpAddress::Tag::kIpv6: {
         // TODO(https://fxbug.dev/42095276): Figure out a way to expose scope ID for IPv6
@@ -348,7 +353,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
         };
         const auto& octets = addr.ipv6().addr;
         static_assert(sizeof(address.addr) >= sizeof(octets));
-        std::copy(octets.begin(), octets.end(), address.addr);
+        std::ranges::copy(octets, address.addr);
       } break;
     }
   }
@@ -399,6 +404,8 @@ int getsockopt(int fd, int level, int optname, void* __restrict optval,
         return do_timeout(io->rcvtimeo());
       case SO_SNDTIMEO:
         return do_timeout(io->sndtimeo());
+      default:
+        break;
     }
   }
 
@@ -446,6 +453,8 @@ int setsockopt(int fd, int level, int optname, const void* optval, socklen_t opt
           return do_timeout(io->rcvtimeo());
         case SO_SNDTIMEO:
           return do_timeout(io->sndtimeo());
+        default:
+          break;
       }
       break;
     }

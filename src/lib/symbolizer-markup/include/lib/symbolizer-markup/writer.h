@@ -5,15 +5,13 @@
 #ifndef SRC_LIB_SYMBOLIZER_MARKUP_INCLUDE_LIB_SYMBOLIZER_MARKUP_WRITER_H_
 #define SRC_LIB_SYMBOLIZER_MARKUP_INCLUDE_LIB_SYMBOLIZER_MARKUP_WRITER_H_
 
-#include <lib/fit/defer.h>
-#include <lib/stdcompat/span.h>
-#include <zircon/assert.h>
-
+#include <cassert>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -82,12 +80,17 @@ class Writer {
   auto ChangeColor(Color color, bool bold = false) {
     using namespace std::string_view_literals;
 
+    struct ResetColor {
+      ~ResetColor() { writer.Literal("\033[0m"sv); }
+      Writer& writer;
+    };
+
     Literal("\033["sv).template DecimalDigits(static_cast<unsigned int>(color)).Literal('m');
     if (bold) {
       Literal("\033[1m"sv);
     }
 
-    return fit::defer([this]() { Literal("\033[0m"sv); });
+    return ResetColor{*this};
   }
 
   //
@@ -155,7 +158,7 @@ class Writer {
   // Emits the markup for a given ELF module.
   //
   // {{{module:$id:$name:elf:$build_id}}}
-  Writer& ElfModule(unsigned int id, std::string_view name, cpp20::span<const std::byte> build_id) {
+  Writer& ElfModule(unsigned int id, std::string_view name, std::span<const std::byte> build_id) {
     return BeginElement(kModule)
         .DecimalField(id)
         .Field(name)
@@ -170,7 +173,7 @@ class Writer {
   // {{mmap:$start:$size:load:$module_id:$perms:$static_start}}
   Writer& LoadImageMmap(uintptr_t start, size_t size, unsigned int module_id,
                         const MemoryPermissions& perms, uint64_t static_start) {
-    ZX_ASSERT(perms.read || perms.write || perms.execute);
+    assert(perms.read || perms.write || perms.execute);
     char perm_str[3];
     size_t perm_size = 0;
     if (perms.read) {
@@ -309,7 +312,7 @@ class Writer {
     return Separator().HexDigits(n);
   }
 
-  Writer& HexField(cpp20::span<const std::byte> bytes) {
+  Writer& HexField(std::span<const std::byte> bytes) {
     Separator();
     for (const std::byte byte : bytes) {
       const uint8_t b = static_cast<uint8_t>(byte);

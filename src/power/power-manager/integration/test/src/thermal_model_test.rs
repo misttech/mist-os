@@ -151,14 +151,16 @@ impl Simulator {
         let sample_interval = Self::get_sample_interval(power_manager_config_path);
 
         let temperature_ctrl_path = "/dev/sys/platform/soc_thermal/control";
-        let cpu_ctrl_path = "/dev/class/cpu-ctrl/000";
 
         test_env.wait_for_device(temperature_ctrl_path).await;
-        test_env.wait_for_device(cpu_ctrl_path).await;
 
         let temperature_ctrl_proxy =
             test_env.connect_to_device::<ftemperaturecontrol::DeviceMarker>(temperature_ctrl_path);
-        let cpu_proxy = test_env.connect_to_device::<fcpu_ctrl::DeviceMarker>(cpu_ctrl_path);
+        let cpu_proxy = test_env
+            .connect_to_first_service_instance(fcpu_ctrl::ServiceMarker)
+            .await
+            .connect_to_device()
+            .unwrap();
 
         // Make sure CPU numbers are initialized correctly.
         let idle_times = vec![Nanoseconds(0); p.cpu_params.logical_cpu_numbers.len() as usize];

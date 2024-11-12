@@ -1614,7 +1614,7 @@ impl<I: Ip, BC: TimerContext> TimerHeap<I, BC> {
         let Self { gc, neighbor: _ } = self;
         if num_entries > MAX_ENTRIES && bindings_ctx.scheduled_instant(gc).is_none() {
             let instant = if let Some(last_gc) = last_gc {
-                last_gc.add(MIN_GARBAGE_COLLECTION_INTERVAL.get())
+                last_gc.panicking_add(MIN_GARBAGE_COLLECTION_INTERVAL.get())
             } else {
                 bindings_ctx.now()
             };
@@ -2217,7 +2217,8 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                     assert_eq!(event, NudEvent::ReachableTime);
                     let link_address = *link_address;
 
-                    let expiration = last_confirmed_at.add(core_ctx.base_reachable_time().get());
+                    let expiration =
+                        last_confirmed_at.saturating_add(core_ctx.base_reachable_time().get());
                     if expiration > bindings_ctx.now() {
                         timer_heap.schedule_neighbor_at(
                             bindings_ctx,

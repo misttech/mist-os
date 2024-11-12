@@ -60,7 +60,8 @@ class Client {
   }
 
   zx::result<> MarkSlotUnbootable(AbrSlotIndex index) {
-    return AbrResultToZxStatus(AbrMarkSlotUnbootable(&abr_ops_, index));
+    return AbrResultToZxStatus(
+        AbrMarkSlotUnbootable(&abr_ops_, index, kAbrUnbootableReasonOsRequested));
   }
 
   // Only set |from_unbootable_ok| if this is the final boot into the current slot.

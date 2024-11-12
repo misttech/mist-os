@@ -102,17 +102,25 @@ closed protocol PushSource {
     });
 };
 
-/// A correspondence pair that describes a UTC time and the monotonic time at
-/// which the time was measured.
+/// A correspondence pair that describes a UTC and the reference clock readings
+/// at the measurement instant.
 type TimeSample = table {
     /// The UTC time sample. Must always be provided.
     1: utc zx.Time;
     /// The monotonic time at which the sample was most valid. Must always be
     /// provided.
+    /// DEPRECATED. Use `reference` below instead.
     2: monotonic zx.Time;
     /// The standard deviation representing the error distribution of the UTC
     /// measurement. Must always be provided.
     3: standard_deviation zx.Duration;
+    /// The timestamp on the reference timeline at which the sample was most
+    /// valid. Must always be provided.  The reference timeline is tracking
+    /// the rate of change of proper time [1].  So, for example, Fuchsia's boot
+    /// timeline will generate the appropriate reference instant.
+    ///
+    /// [1]: https://en.wikipedia.org/wiki/Proper_time
+    4: reference zx.InstantBoot;
 };
 
 /// Enum of urgencies used when requesting a sample from a PullSource. The time

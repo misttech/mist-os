@@ -451,6 +451,7 @@ impl Mapping {
         Mapping {
             backing: MappingBacking::PrivateAnonymous,
             flags,
+            max_access: Access::rwx(),
             name,
             file_write_guard: FileWriteGuardRef(None),
         }
@@ -679,7 +680,7 @@ impl PrivateAnonymousMemoryManager {
         options: MappingOptions,
     ) -> Result<UserAddress, Errno> {
         // Create a mapping with no protection in order to allocate address space for this mapping.
-        let flags = MappingFlags::from_prot_flags_and_options(ProtectionFlags::empty(), options);
+        let flags = MappingFlags::from_access_flags_and_options(ProtectionFlags::empty(), options);
         map_in_vmar(user_vmar, user_vmar_info, addr, &self.allocation, 0, length, flags, false)
     }
 
@@ -943,16 +944,12 @@ impl MemoryManagerState {
         self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
     }
 
-    // Map the memory without updating `self.mappings`.
-    fn map_internal(
+    fn select_desired_address(
         &self,
         mut addr: DesiredAddress,
-        memory: &MemoryObject,
-        memory_offset: u64,
         length: usize,
         flags: MappingFlags,
-        populate: bool,
-    ) -> Result<UserAddress, Errno> {
+    ) -> Result<DesiredAddress, Errno> {
         let adjusted_length = round_up_to_system_page_size(length)?;
 
         // If the hint is not acceptable, strip it.
@@ -986,10 +983,24 @@ impl MemoryManagerState {
 
             addr = DesiredAddress::Fixed(new_addr)
         }
+
+        Ok(addr)
+    }
+
+    // Map the memory without updating `self.mappings`.
+    fn map_internal(
+        &self,
+        addr: DesiredAddress,
+        memory: &MemoryObject,
+        memory_offset: u64,
+        length: usize,
+        flags: MappingFlags,
+        populate: bool,
+    ) -> Result<UserAddress, Errno> {
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            addr,
+            self.select_desired_address(addr, length, flags)?,
             memory,
             memory_offset,
             length,
@@ -1064,6 +1075,9 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
+        let addr = self.select_desired_address(addr, length, flags)?;
+
         let target_addr = self.private_anonymous.allocate_address_range(
             &self.user_vmar,
             &self.user_vmar_info,
@@ -1073,8 +1087,6 @@ impl MemoryManagerState {
         )?;
 
         let backing_memory_offset = target_addr.ptr();
-
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
 
         let mapped_addr = self.map_internal(
             DesiredAddress::FixedOverwrite(target_addr),
@@ -1413,7 +1425,7 @@ impl MemoryManagerState {
                 let dst_addr = self.private_anonymous.allocate_address_range(
                     &self.user_vmar,
                     &self.user_vmar_info,
-                    dst_addr_for_map,
+                    self.select_desired_address(dst_addr_for_map, dst_length, src_mapping.flags)?,
                     dst_length,
                     src_mapping.flags.options(),
                 )?;
@@ -1444,7 +1456,7 @@ impl MemoryManagerState {
                         mm,
                         DesiredAddress::FixedOverwrite(growth_start_addr),
                         growth_length,
-                        src_mapping.flags.prot_flags(),
+                        src_mapping.flags.access_flags(),
                         src_mapping.flags.options(),
                         src_mapping.name.clone(),
                         released_mappings,
@@ -3516,7 +3528,7 @@ impl MemoryManager {
         state.mmap_top = state
             .stack_origin
             .checked_sub(generate_random_offset_for_aslr())
-            .ok_or(errno!(EINVAL))?;
+            .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
@@ -3532,8 +3544,9 @@ impl MemoryManager {
         self: &Arc<Self>,
         executable_end: UserAddress,
     ) -> Result<(), Errno> {
-        self.state.write().brk_origin =
-            executable_end.checked_add(generate_random_offset_for_aslr()).ok_or(errno!(EINVAL))?;
+        self.state.write().brk_origin = executable_end
+            .checked_add(generate_random_offset_for_aslr())
+            .ok_or_else(|| errno!(EINVAL))?;
         Ok(())
     }
 
@@ -3544,7 +3557,7 @@ impl MemoryManager {
         // Place it at approx. 2/3 of the available mmap space, subject to ASLR adjustment.
         let base = round_up_to_system_page_size(2 * state.mmap_top.ptr() / 3).unwrap()
             + generate_random_offset_for_aslr();
-        if base.checked_add(length).ok_or(errno!(EINVAL))? <= state.mmap_top.ptr() {
+        if base.checked_add(length).ok_or_else(|| errno!(EINVAL))? <= state.mmap_top.ptr() {
             Ok(UserAddress::from_ptr(base))
         } else {
             Err(errno!(EINVAL))

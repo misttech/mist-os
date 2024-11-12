@@ -23,7 +23,7 @@ saved_lr .req x17
 .balign 64 // Align to cache line.  This code fits in one cache line.
 .function _arm64_user_copy, global
 
-  adr_global temp, .Lfault_from_user
+  adr_global temp, .Luser_copy_return
   and temp, temp, fault_return_mask
 
   mov saved_fault_return_ptr, fault_return_ptr
@@ -34,7 +34,8 @@ saved_lr .req x17
   // Just call our normal memcpy.  The caller has ensured that the
   // address range is in the user portion of the address space.
   // While fault_return_ptr is set, userspace data faults will be
-  // redirected to .Lfault_from_user, below.
+  // redirected to .Luser_copy_return, with the return values already filled out by the kernel fault
+  // handler.
   //
   // NOTE! We make important assumptions here about what the memcpy
   // code does: it never moves the stack pointer, and it never touches
@@ -52,20 +53,3 @@ saved_lr .req x17
   ret
   speculation_postfence
 .end_function
-
-.section .text.cold._arm64_user_copy,"ax"
-// If we are capturing faults the exception handler will have placed the faulting virtual address
-// for us in x1 and the flags in x2. We do not touch x1 and rely on the caller to know if the value
-// is meaningful based on whether it specified fault capture or not, we just need to construct a
-// valid x0 before jmping to user_copy_return.
-.Lfault_from_user:
-  .cfi_startproc
-  .cfi_register fault_return_ptr, saved_fault_return_ptr
-  .cfi_register lr, saved_lr
-  mov x0, #ZX_ERR_INVALID_ARGS
-  // If we are capturing faults the flags will have been placed in x2 and we want them placed in
-  // the high bits of x0. If not capturing faults then we will copy some garbage bits which will
-  // be ignored by the caller.
-  bfi x0, x2, 32, 32
-  b .Luser_copy_return
-  .cfi_endproc

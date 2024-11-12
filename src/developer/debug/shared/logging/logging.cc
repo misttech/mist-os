@@ -17,14 +17,14 @@ namespace {
 LogBackend* log_backend = nullptr;
 bool log_enable_syslog = true;
 
-FuchsiaLogSeverity ConvertSeverity(LogSeverity severity) {
+fuchsia_logging::LogSeverity ConvertSeverity(LogSeverity severity) {
   switch (severity) {
     case LogSeverity::kInfo:
-      return FUCHSIA_LOG_INFO;
+      return fuchsia_logging::LogSeverity::Info;
     case LogSeverity::kWarn:
-      return FUCHSIA_LOG_WARNING;
+      return fuchsia_logging::LogSeverity::Warn;
     case LogSeverity::kError:
-      return FUCHSIA_LOG_ERROR;
+      return fuchsia_logging::LogSeverity::Error;
   }
 }
 

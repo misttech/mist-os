@@ -26,7 +26,7 @@ class LogSettingsFixture : public ::testing::Test {
   }
 
  private:
-  FuchsiaLogSeverity old_severity_;
+  fuchsia_logging::RawLogSeverity old_severity_;
   fbl::unique_fd old_stderr_;
 };
 #ifndef __Fuchsia__

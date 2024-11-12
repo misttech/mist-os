@@ -135,8 +135,8 @@ impl Drop for FinishedElfComponentLaunchTest {
 /// to handle connection requests.
 async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::ReceiverRequestStream) {
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
-    let dict_id = 1;
-    store.dictionary_create(dict_id).await.unwrap().unwrap();
+    let svc_dict_id = 1;
+    store.dictionary_create(svc_dict_id).await.unwrap().unwrap();
 
     let (echo_receiver_client, echo_receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
@@ -144,7 +144,7 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
     store.connector_create(connector_id, echo_receiver_client).await.unwrap().unwrap();
     store
         .dictionary_insert(
-            dict_id,
+            svc_dict_id,
             &fsandbox::DictionaryItem {
                 key: fecho::EchoMarker::PROTOCOL_NAME.into(),
                 value: connector_id,
@@ -153,6 +153,18 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
         .await
         .unwrap()
         .unwrap();
+
+    let dict_id = 2;
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
+    store
+        .dictionary_insert(
+            dict_id,
+            &fsandbox::DictionaryItem { key: "svc".into(), value: svc_dict_id },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
     let dict_ref = match store.export(dict_id).await.unwrap().unwrap() {
         fsandbox::Capability::Dictionary(dict_ref) => dict_ref,
         cap @ _ => panic!("Unexpected {cap:?}"),

@@ -209,14 +209,14 @@ class DataProviderTest : public UnitTestFixture {
     // independently of the loop while the call to end it happens in a task that is posted on the
     // loop. So, as long the end time is set before the loop is run, a non-zero duration will be
     // recorded.
-    clock_.SetMonotonic(zx::time(0));
+    clock_.SetMonotonic(zx::time_monotonic(0));
     fuchsia::feedback::GetSnapshotParameters params;
     if (channel) {
       params.set_response_channel(*std::move(channel));
     }
     data_provider_->GetSnapshot(std::move(params),
                                 [&snapshot](Snapshot res) { snapshot = std::move(res); });
-    clock_.SetMonotonic(zx::time(0) + snapshot_flow_duration);
+    clock_.SetMonotonic(zx::time_monotonic(0) + snapshot_flow_duration);
     RunLoopUntilIdle();
     return snapshot;
   }
@@ -233,7 +233,7 @@ class DataProviderTest : public UnitTestFixture {
     // independently of the loop while the call to end it happens in a task that is posted on the
     // loop. So, as long the end time is set before the loop is run, a non-zero duration will be
     // recorded.
-    clock_.SetMonotonic(zx::time(0));
+    clock_.SetMonotonic(zx::time_monotonic(0));
     data_provider_->GetSnapshotInternal(
         kDefaultDataTimeout, uuid,
         [&annotations, &archive](feedback::Annotations resultAnnotations,
@@ -241,7 +241,7 @@ class DataProviderTest : public UnitTestFixture {
           annotations = std::move(resultAnnotations);
           archive = std::move(resultArchive);
         });
-    clock_.SetMonotonic(zx::time(0) + snapshot_flow_duration);
+    clock_.SetMonotonic(zx::time_monotonic(0) + snapshot_flow_duration);
     RunLoopUntilIdle();
     return {std::move(annotations), std::move(archive)};
   }

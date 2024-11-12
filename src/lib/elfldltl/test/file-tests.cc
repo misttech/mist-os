@@ -6,6 +6,7 @@
 #include <lib/elfldltl/file.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/unique-fd.h>
 #include <stdio.h>
 
 #include <gmock/gmock.h>
@@ -183,7 +184,7 @@ TYPED_TEST(ElfldltlFileTests, ReadArrayFromFile) {
   auto got = file.template ReadArrayFromFile<int>(0, allocator, 3);
 
   ASSERT_TRUE(got);
-  cpp20::span<const int> data = *got;
+  std::span<const int> data = *got;
   EXPECT_THAT(data, ElementsAreArray(kData));
 }
 

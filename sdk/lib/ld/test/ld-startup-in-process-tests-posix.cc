@@ -5,14 +5,15 @@
 #include "ld-startup-in-process-tests-posix.h"
 
 #include <fcntl.h>
+#include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/ld/abi.h>
-#include <lib/stdcompat/span.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include <numeric>
+#include <span>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -169,7 +170,7 @@ void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
   ASSERT_NO_FATAL_FAILURE(Load(std::exchange(executable_fd, {}), result));
 
   // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
-  cpp20::span phdrs = result->phdrs.get();
+  std::span phdrs = result->phdrs;
 
   // This non-template lambda gets called with the vaddr, offset, and filesz of
   // each segment.  It's called by the generic lambda passed to VisitSegments.
@@ -240,7 +241,7 @@ void LdStartupInProcessTests::PopulateStack(std::initializer_list<std::string_vi
   // Start at the top of the stack, and place the strings.
   std::byte* sp = static_cast<std::byte*>(stack_) + (kStackSize * 2);
   sp -= strings;
-  cpp20::span string_space{reinterpret_cast<char*>(sp), strings};
+  std::span string_space{reinterpret_cast<char*>(sp), strings};
 
   // Adjust down so everything will be aligned.
   const size_t strings_and_ptrs = strings + ((1 + ptrs) * sizeof(uintptr_t));
@@ -254,7 +255,7 @@ void LdStartupInProcessTests::PopulateStack(std::initializer_list<std::string_vi
   // Finally, the argc and pointers form what's seen right at the SP.
   sp -= (1 + ptrs) * sizeof(uintptr_t);
   ld::StartupStack* startup = new (sp) ld::StartupStack{.argc = argv.size()};
-  cpp20::span string_ptrs{startup->argv, ptrs};
+  std::span string_ptrs{startup->argv, ptrs};
 
   // Now copy the strings and write the pointers to them.
   for (auto list : {argv, envp}) {

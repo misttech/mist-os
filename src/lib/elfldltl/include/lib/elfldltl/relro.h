@@ -5,9 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RELRO_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RELRO_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <optional>
+#include <span>
 #include <utility>
 
 #include "layout.h"
@@ -32,7 +31,7 @@ constexpr auto RelroBounds(const Phdr& phdr, decltype(phdr.memsz()) pagesize)
 
 // Given a span of all the phdrs, find and reduce the PT_GNU_RELRO segment.
 template <class Phdr>
-constexpr auto RelroBounds(cpp20::span<const Phdr> phdrs, decltype(phdrs[0].memsz()) pagesize)
+constexpr auto RelroBounds(std::span<const Phdr> phdrs, decltype(phdrs[0].memsz()) pagesize)
     -> std::pair<decltype(phdrs[0].vaddr()), decltype(phdrs[0].memsz())> {
   for (const Phdr& phdr : phdrs) {
     if (phdr.type == elfldltl::ElfPhdrType::kRelro) {

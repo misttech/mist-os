@@ -26,6 +26,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_rust",
     "//third_party/rust_crates:anyhow",

@@ -165,8 +165,16 @@ int StartTimer(std::string path, std::optional<uint64_t> id, bool is_wait, int64
       return -1;
     }
     {
+      zx::event setup_event;
+      zx_status_t status = zx::event::create(0, &setup_event);
+      if (status != ZX_OK) {
+        std::cerr << "StartAndWait failed, could not create event: " << zx_status_get_string(status)
+                  << std::endl;
+        return -1;
+      }
       auto result_wait = client->StartAndWait(
-          {*id, fuchsia_hardware_hrtimer::Resolution::WithDuration(resolution_nsecs), ticks});
+          {*id, fuchsia_hardware_hrtimer::Resolution::WithDuration(resolution_nsecs), ticks,
+           std::move(setup_event)});
       if (!result_wait.is_ok()) {
         std::cerr << "StartAndWait failed: " << result_wait.error_value().FormatDescription()
                   << std::endl;

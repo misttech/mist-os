@@ -128,7 +128,7 @@ closed protocol Tracing {
     }) -> (struct {
         target TargetInfo;
         output_file string:MAX_PATH_LENGTH;
-        result fuchsia.tracing.controller.TerminateResult;
+        result fuchsia.tracing.controller.StopResult;
     }) error RecordingError;
 
     /// Reports the current status of all running traces.

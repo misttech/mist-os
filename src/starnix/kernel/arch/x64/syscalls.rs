@@ -337,7 +337,7 @@ pub fn sys_pause(
             Ok(()) => Ok(()),
         }
     });
-    result.map_eintr(errno!(ERESTARTNOHAND))
+    result.map_eintr(|| errno!(ERESTARTNOHAND))
 }
 
 pub fn sys_pipe(

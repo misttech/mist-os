@@ -140,6 +140,20 @@ class SystemPowerStateControllerUsingStarnix(
         )
         self._insect: inspect_affordance.Inspect = inspect
 
+        self.verify_supported()
+
+    # List all the public methods
+    def verify_supported(self) -> None:
+        """Verifies that the system_power_state_controller affordance using starnix is supported by
+        the Fuchsia device.
+
+        This method should be called in `__init__()` so that if this affordance was called on a
+        Fuchsia device that does not support it, it will raise NotSupportedError.
+
+        Raises:
+            NotSupportedError: If affordance is not supported.
+            StarnixError: In case of other starnix command failure.
+        """
         _LOGGER.debug(
             "Checking if %s supports %s affordance...",
             self._device_name,
@@ -154,7 +168,6 @@ class SystemPowerStateControllerUsingStarnix(
             self.__class__.__name__,
         )
 
-    # List all the public methods
     def suspend_resume(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,

@@ -228,20 +228,8 @@ async fn build_local_child() -> (
 
 /// Spawns a local child and populates the `SpawnedChild` struct.
 async fn spawn_local_child_controller_from_create_child() -> SpawnedChild {
-    let (builder, mut child_decl, handles_receiver, component_status, cancel_sender) =
+    let (builder, child_decl, handles_receiver, component_status, cancel_sender) =
         build_local_child().await;
-    // Add a use for the `fidl.examples.routing.echo.Echo` protocol.
-    // It is not statically routed from any other component. `StartChildArgs.dict`
-    // must contain an Open capability under the same name for the component
-    // to successfully connect to the protocol.
-    child_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-        source: cm_rust::UseSource::Parent,
-        source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        source_dictionary: Default::default(),
-        target_path: "/svc/fidl.examples.routing.echo.Echo".parse().unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
     builder.replace_realm_decl(child_decl).await.unwrap();
 
     let (url, local_child_task) = builder.initialize().await.unwrap();
@@ -487,15 +475,25 @@ async fn start_with_dict() {
     let connector_id = 10;
     store.connector_create(connector_id, receiver_client).await.unwrap().unwrap();
 
-    let dict_id = 1;
-    store.dictionary_create(dict_id).await.unwrap().unwrap();
+    let svc_dict_id = 1;
+    store.dictionary_create(svc_dict_id).await.unwrap().unwrap();
     store
         .dictionary_insert(
-            dict_id,
+            svc_dict_id,
             &fsandbox::DictionaryItem {
                 key: "fidl.examples.routing.echo.Echo".into(),
                 value: connector_id,
             },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let dict_id = 2;
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
+    store
+        .dictionary_insert(
+            dict_id,
+            &fsandbox::DictionaryItem { key: "svc".into(), value: svc_dict_id },
         )
         .await
         .unwrap()

@@ -336,6 +336,7 @@ impl ComponentInstance {
         hooks: Arc<Hooks>,
         persistent_storage: bool,
     ) -> Arc<Self> {
+        let execution_scope = (context.scope_factory)();
         let self_ = Arc::new(Self {
             environment,
             moniker,
@@ -351,7 +352,7 @@ impl ComponentInstance {
             hooks,
             nonblocking_task_group: TaskGroup::new(),
             persistent_storage,
-            execution_scope: ExecutionScope::new(),
+            execution_scope,
         });
         self_.actions().set_component_reference(WeakComponentInstance::new(&self_)).await;
         self_
@@ -669,14 +670,6 @@ impl ComponentInstance {
                 None
             }
         };
-
-        // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState` to avoid locking InstanceState.
-        {
-            let mut state = self.lock_state().await;
-            if let Some(resolved_state) = state.get_resolved_state_mut() {
-                let _ = resolved_state.program_input_dict_additions.drain();
-            };
-        }
 
         // When the component is stopped, any child instances in collections must be destroyed.
         self.destroy_dynamic_children()

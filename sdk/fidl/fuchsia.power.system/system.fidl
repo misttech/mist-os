@@ -233,10 +233,13 @@ open protocol ActivityGovernor {
     });
 
     /// Creates a lease that blocks the system from dropping below the Application
-    /// Activity 'Active' state.
+    /// Activity 'Active' state. In particular, this blocks suspension of the
+    /// hardware platform.
     ///
-    /// Note that when this lease is acquired for the first time, SAG will exit the
-    /// "booting" stage and begin enforcing the suspend power policy.
+    /// Additionally, during a given boot, SAG will not suspend the hardware
+    /// platform until the first time a lease provided by this method is acquired
+    /// and dropped. Due to this effect, clients wishing to block suspension
+    /// should default to using [`TakeWakeLease`].
     ///
     /// If an error occurs while creating a token for the activity lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no

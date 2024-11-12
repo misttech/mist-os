@@ -87,7 +87,7 @@ std::set<std::string> UIStateProvider::GetKeys() const {
 void UIStateProvider::OnStateChanged(fuchsia::ui::activity::State state, int64_t transition_time,
                                      OnStateChangedCallback callback) {
   current_state_ = ErrorOrString(GetUIStateString(state));
-  last_transition_time_ = zx::time(transition_time);
+  last_transition_time_ = zx::time_monotonic(transition_time);
   callback();
 
   if (on_update_) {
@@ -104,7 +104,7 @@ Annotations UIStateProvider::Get() {
              ErrorOrString(std::get<Error>(last_transition_time_))}};
   }
 
-  const auto& time = std::get<zx::time>(last_transition_time_);
+  const auto& time = std::get<zx::time_monotonic>(last_transition_time_);
   const auto formatted_duration = FormatDuration(clock_->MonotonicNow() - time);
 
   // FormatDuration returns std::nullopt if duration was negative- if so, send Error::kBadValue as

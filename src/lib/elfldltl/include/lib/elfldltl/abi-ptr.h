@@ -5,14 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 
-#include <lib/stdcompat/version.h>
-
 #include <cassert>
-#include <cstdint>
-
-#if __cpp_impl_three_way_comparison >= 201907L
 #include <compare>
-#endif
+#include <cstdint>
 
 #include "layout.h"
 
@@ -111,31 +106,9 @@ struct AbiPtr {
     return ComparisonValue() != other.ComparisonValue();
   }
 
-#if __cpp_impl_three_way_comparison >= 201907L
-
   constexpr std::strong_ordering operator<=>(const AbiPtr& other) const {
     return ComparisonValue() <=> other.ComparisonValue();
   }
-
-#else  // No operator<=> support.
-
-  constexpr bool operator<(const AbiPtr& other) const {
-    return ComparisonValue() < other.ComparisonValue();
-  }
-
-  constexpr bool operator>(const AbiPtr& other) const {
-    return ComparisonValue() > other.ComparisonValue();
-  }
-
-  constexpr bool operator<=(const AbiPtr& other) const {
-    return ComparisonValue() <= other.ComparisonValue();
-  }
-
-  constexpr bool operator>=(const AbiPtr& other) const {
-    return ComparisonValue() >= other.ComparisonValue();
-  }
-
-#endif  // operator<=> support.
 
   constexpr AbiPtr operator+(size_type n) const {
     return AbiPtr{storage_ + (n * kScale), std::in_place};

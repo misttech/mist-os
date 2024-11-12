@@ -206,7 +206,7 @@ class MmapLoader {
   }
 
  private:
-  cpp20::span<std::byte> image() const { return memory_.image(); }
+  std::span<std::byte> image() const { return memory_.image(); }
   uintptr_t base() const { return memory_.base(); }
 
   DirectMemory memory_;

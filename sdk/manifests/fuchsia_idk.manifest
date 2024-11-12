@@ -349,6 +349,7 @@ fidl_library://fidl/fuchsia.settings.policy
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
 fidl_library://fidl/fuchsia.sysmem2
+fidl_library://fidl/fuchsia.system.state (unstable)
 fidl_library://fidl/fuchsia.test
 fidl_library://fidl/fuchsia.thermal
 fidl_library://fidl/fuchsia.tracing
@@ -414,7 +415,6 @@ host_tool://tools/arm64/fvm
 host_tool://tools/arm64/gen-android-starnix-container
 host_tool://tools/arm64/merkleroot
 host_tool://tools/arm64/minfs
-host_tool://tools/arm64/pm
 host_tool://tools/arm64/symbolizer
 host_tool://tools/arm64/trace2json
 host_tool://tools/arm64/zbi
@@ -442,7 +442,6 @@ host_tool://tools/x64/fvm
 host_tool://tools/x64/gen-android-starnix-container
 host_tool://tools/x64/merkleroot
 host_tool://tools/x64/minfs
-host_tool://tools/x64/pm
 host_tool://tools/x64/symbolizer
 host_tool://tools/x64/trace2json
 host_tool://tools/x64/zbi

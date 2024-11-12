@@ -49,7 +49,7 @@ fuchsia_tracing::BufferingMode TranslateBufferingMode(BufferingMode mode);
 std::vector<controller::ProviderSpec> TranslateProviderSpecs(
     const std::vector<ProviderSpec>& specs);
 
-const char* StartErrorCodeToString(controller::StartErrorCode code);
+const char* StartErrorCodeToString(controller::StartError code);
 
 }  // namespace tracing
 

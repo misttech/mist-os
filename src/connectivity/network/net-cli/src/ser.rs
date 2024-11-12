@@ -87,7 +87,13 @@ impl<I: Iterator<Item = fidl_fuchsia_net_interfaces_ext::Address>> From<I> for A
         use itertools::Itertools as _;
 
         let (mut ipv4, mut ipv6): (Vec<_>, Vec<_>) = addresses.into_iter().partition_map(
-            |fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until, assignment_state }| {
+            |fidl_fuchsia_net_interfaces_ext::Address {
+                 addr,
+                 valid_until,
+                 assignment_state,
+                 // TODO(https://fxbug.dev/42051655): Expose address lifetimes.
+                 preferred_lifetime_info: _,
+             }| {
                 let fidl_fuchsia_net_ext::Subnet {
                     addr: fidl_fuchsia_net_ext::IpAddress(addr),
                     prefix_len,
@@ -97,10 +103,11 @@ impl<I: Iterator<Item = fidl_fuchsia_net_interfaces_ext::Address>> From<I> for A
                 fn new_address<I>(
                     addr: I,
                     prefix_len: u8,
-                    valid_until: i64,
+                    valid_until: fidl_fuchsia_net_interfaces_ext::PositiveMonotonicInstant,
                     assignment_state: AddressAssignmentState,
                 ) -> Address<I> {
-                    let valid_until = (valid_until != i64::MAX).then_some(valid_until);
+                    let valid_until =
+                        (!valid_until.is_infinite()).then_some(valid_until.into_nanos());
                     Address { subnet: Subnet { addr, prefix_len }, valid_until, assignment_state }
                 }
                 match addr {

@@ -3,12 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.fdomain;
 
-// Signals which are valid for Events.
-// See `Signals` in zx.fidl
-type EventSignals = flexible bits {
-    SIGNALED = 1; // 1 << 0
-};
-
 // FDomain operations on Events.
 open protocol Event {
     // Create a new event in this FDomain and return it.

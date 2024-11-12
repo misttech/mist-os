@@ -62,7 +62,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   const std::string aml_sdmmc_inspect_tree_name = "aml-sd-emmc";
   const std::string aml_sdmmc_moniker = "bootstrap/*-drivers*mmc-ffe07000*";
   // TODO(b/344044167): Fix inspect node names in aml-sdmmc driver.
-  const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-port-unknown",
+  const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-port-mmc@ffe07000",
                                                         "power_suspended"};
 
   // Driver monikers are unstable, so wildcard the moniker and use a tree name

@@ -6,13 +6,10 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SONAME_H_
 
 #include <cassert>
+#include <compare>
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
-
-#if __cpp_impl_three_way_comparison >= 201907L
-#include <compare>
-#endif
 
 #include "abi-ptr.h"
 #include "gnu-hash.h"
@@ -70,36 +67,10 @@ class Soname {
     return other.hash_ != hash_ || other.str() != str();
   }
 
-#if __cpp_impl_three_way_comparison >= 201907L
-
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
   constexpr auto operator<=>(const Soname& other) const {
     return str() <=> other.str();
   }
-
-#else  // No operator<=>.
-
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator<(const Soname& other) const {
-    return str() < other.str();
-  }
-
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator<=(const Soname& other) const {
-    return str() <= other.str();
-  }
-
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator>(const Soname& other) const {
-    return str() > other.str();
-  }
-
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator>=(const Soname& other) const {
-    return str() >= other.str();
-  }
-
-#endif  // operator<=>
 
  private:
   // This stores a pointer and 32-bit length directly rather than just using

@@ -113,7 +113,7 @@ async fn socket() {
     let proto::Error::TargetError(err) = error else {
         panic!();
     };
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_write_fail_2nd = 102.try_into().unwrap();
 
@@ -164,7 +164,7 @@ async fn socket() {
     let proto::Error::TargetError(err) = error else {
         panic!();
     };
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_read_fail = 105.try_into().unwrap();
     fdomain.read_socket(
@@ -272,19 +272,19 @@ async fn channel() {
     let got_handle = got_message.handles.pop().unwrap();
 
     assert_ne!(0, got_handle.handle.id & (1 << 31));
-    assert_eq!(proto::ObjType::Socket, got_handle.type_);
+    assert_eq!(fidl::ObjectType::SOCKET, got_handle.type_);
     assert_eq!(
-        proto::Rights::DUPLICATE
-            | proto::Rights::TRANSFER
-            | proto::Rights::READ
-            | proto::Rights::WRITE
-            | proto::Rights::GET_PROPERTY
-            | proto::Rights::SET_PROPERTY
-            | proto::Rights::SIGNAL
-            | proto::Rights::SIGNAL_PEER
-            | proto::Rights::WAIT
-            | proto::Rights::INSPECT
-            | proto::Rights::MANAGE_SOCKET,
+        fidl::Rights::DUPLICATE
+            | fidl::Rights::TRANSFER
+            | fidl::Rights::READ
+            | fidl::Rights::WRITE
+            | fidl::Rights::GET_PROPERTY
+            | fidl::Rights::SET_PROPERTY
+            | fidl::Rights::SIGNAL
+            | fidl::Rights::SIGNAL_PEER
+            | fidl::Rights::WAIT
+            | fidl::Rights::INSPECT
+            | fidl::Rights::MANAGE_SOCKET,
         got_handle.rights
     );
 
@@ -379,7 +379,7 @@ async fn channel() {
     };
 
     assert_eq!(tid_write_fail, got_tid);
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_write_fail_2nd = 102.try_into().unwrap();
 
@@ -430,7 +430,7 @@ async fn channel() {
     };
 
     assert_eq!(tid_write_fail_3rd, got_tid);
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_read_fail = 105.try_into().unwrap();
     fdomain.read_channel(
@@ -540,7 +540,7 @@ async fn bad_channel_writes() {
             proto::FDomainReplaceRequest {
                 handle: proto::Hid { id: socket_hid_b },
                 new_handle: proto::NewHid { id: socket_hid_c },
-                rights: proto::Rights::READ,
+                rights: fidl::Rights::READ,
             },
         )
         .unwrap();
@@ -557,7 +557,7 @@ async fn bad_channel_writes() {
             data: vec![],
             handles: proto::Handles::Dispositions(vec![proto::HandleDisposition {
                 handle: proto::HandleOp::Duplicate(proto::Hid { id: socket_hid_c }),
-                rights: proto::Rights::SAME_RIGHTS,
+                rights: fidl::Rights::SAME_RIGHTS,
             }]),
         },
     );
@@ -576,7 +576,7 @@ async fn bad_channel_writes() {
         panic!();
     };
 
-    assert_eq!(zx::Status::ACCESS_DENIED.into_raw(), e);
+    assert_eq!(fidl::Status::ACCESS_DENIED.into_raw(), e);
 
     assert!(fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
@@ -624,8 +624,8 @@ async fn event_signal() {
     assert!(fdomain
         .signal(proto::FDomainSignalRequest {
             handle: event_hid,
-            set: proto::Signals { general: proto::General::USER_5, typed: None },
-            clear: proto::Signals { general: proto::General::empty(), typed: None },
+            set: fidl::Signals::USER_5.bits(),
+            clear: fidl::Signals::empty().bits(),
         })
         .is_ok());
 
@@ -633,7 +633,7 @@ async fn event_signal() {
         tid,
         proto::FDomainWaitForSignalsRequest {
             handle: event_hid,
-            signals: proto::Signals { general: proto::General::USER_5, typed: None },
+            signals: fidl::Signals::USER_5.bits(),
         },
     );
 
@@ -641,14 +641,8 @@ async fn event_signal() {
         panic!()
     };
 
-    let proto::Signals { general, typed } = signals.signals;
-
     assert_eq!(tid, got_tid);
-    assert_eq!(proto::General::USER_5, general);
-
-    if let Some(typed) = typed {
-        assert_eq!(proto::Typed::EventPair(proto::EventPairSignals::empty()), *typed);
-    }
+    assert_eq!(fidl::Signals::USER_5, fidl::Signals::from_bits_retain(signals.signals));
 }
 
 #[fuchsia::test]
@@ -670,8 +664,8 @@ async fn eventpair_signal() {
     assert!(fdomain
         .signal_peer(proto::FDomainSignalPeerRequest {
             handle: event_hid_a,
-            set: proto::Signals { general: proto::General::USER_5, typed: None },
-            clear: proto::Signals { general: proto::General::empty(), typed: None },
+            set: fidl::Signals::USER_5.bits(),
+            clear: fidl::Signals::empty().bits(),
         })
         .is_ok());
 
@@ -679,7 +673,7 @@ async fn eventpair_signal() {
         tid,
         proto::FDomainWaitForSignalsRequest {
             handle: event_hid_b,
-            signals: proto::Signals { general: proto::General::USER_5, typed: None },
+            signals: fidl::Signals::USER_5.bits(),
         },
     );
 
@@ -687,14 +681,8 @@ async fn eventpair_signal() {
         panic!()
     };
 
-    let proto::Signals { general, typed } = signals.signals;
-
     assert_eq!(tid, got_tid);
-    assert_eq!(proto::General::USER_5, general);
-
-    if let Some(typed) = typed {
-        assert_eq!(proto::Typed::EventPair(proto::EventPairSignals::empty()), *typed);
-    }
+    assert_eq!(fidl::Signals::USER_5, fidl::Signals::from_bits_retain(signals.signals));
 }
 
 #[fuchsia::test]
@@ -736,7 +724,7 @@ async fn duplicate_socket() {
         .duplicate(proto::FDomainDuplicateRequest {
             handle: hid_a,
             new_handle: proto::NewHid { id: hid_c },
-            rights: proto::Rights::SAME_RIGHTS,
+            rights: fidl::Rights::SAME_RIGHTS,
         })
         .is_ok());
 
@@ -901,7 +889,7 @@ async fn socket_disposition() {
     };
     let proto::Error::TargetError(error) = error else { panic!() };
     assert_eq!(tid_3, got_tid);
-    assert_eq!(zx::Status::BAD_STATE.into_raw(), error);
+    assert_eq!(fidl::Status::BAD_STATE.into_raw(), error);
     assert_eq!(0, wrote_actual);
 }
 
@@ -971,7 +959,7 @@ async fn socket_disposition_peer() {
     };
     let proto::Error::TargetError(error) = error else { panic!() };
     assert_eq!(tid_3, got_tid);
-    assert_eq!(zx::Status::BAD_STATE.into_raw(), error);
+    assert_eq!(fidl::Status::BAD_STATE.into_raw(), error);
     assert_eq!(0, wrote_actual);
 }
 
@@ -1132,7 +1120,7 @@ async fn socket_async_read_detect_close() {
     else {
         panic!()
     };
-    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
+    assert_eq!(*err, proto::Error::TargetError(fidl::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 
@@ -1393,7 +1381,7 @@ async fn channel_async_read_detect_close() {
     else {
         panic!()
     };
-    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
+    assert_eq!(*err, proto::Error::TargetError(fidl::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 

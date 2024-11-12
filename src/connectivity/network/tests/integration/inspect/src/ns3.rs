@@ -693,8 +693,8 @@ async fn inspect_devices(name: &str) {
                     Addresses: {
                         "::1/128": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                             IsSlaac: false,
-                            Deprecated: false,
                             Assigned: true,
                         }
                     },
@@ -738,7 +738,7 @@ async fn inspect_devices(name: &str) {
                 IPv4: {
                     "Addresses": {
                         "192.168.0.1/24": {
-                            ValidUntil: "infinite"
+                            ValidUntil: "infinite",
                         }
                     },
                     Configuration: {
@@ -751,8 +751,8 @@ async fn inspect_devices(name: &str) {
                     "Addresses": {
                         "fe80::ff:fe00:1/64": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                             IsSlaac: true,
-                            Deprecated: false,
                             // This will always be `false` because DAD will never complete; we set
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
@@ -987,11 +987,20 @@ async fn inspect_counters(name: &str) {
                     TtlExpired: 0u64,
                 },
                 RxIcmpError: 0u64,
-                "Fragments": {
+                "FragmentsRx": {
                     ReassemblyError: 0u64,
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+                "FragmentsTx": {
+                    FragmentationRequired: 0u64,
+                    Fragments: 0u64,
+                    ErrorNotAllowed: 0u64,
+                    ErrorMtuTooSmall: 0u64,
+                    ErrorBodyTooLong: 0u64,
+                    ErrorInnerSizeLimitExceeded: 0u64,
+                    ErrorFragmentedSerializer: 0u64,
                 },
             },
             "IPv6": {
@@ -1024,11 +1033,20 @@ async fn inspect_counters(name: &str) {
                     TtlExpired: 0u64,
                 },
                 RxIcmpError: 0u64,
-                "Fragments": {
+                "FragmentsRx": {
                     ReassemblyError: 0u64,
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+                "FragmentsTx": {
+                    FragmentationRequired: 0u64,
+                    Fragments: 0u64,
+                    ErrorNotAllowed: 0u64,
+                    ErrorMtuTooSmall: 0u64,
+                    ErrorBodyTooLong: 0u64,
+                    ErrorInnerSizeLimitExceeded: 0u64,
+                    ErrorFragmentedSerializer: 0u64,
                 },
             },
             "MulticastForwarding": {

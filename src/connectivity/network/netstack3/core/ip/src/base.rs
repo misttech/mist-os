@@ -5,6 +5,7 @@
 use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
@@ -42,7 +43,10 @@ use netstack3_filter::{
     ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
     WeakConnectionError, WeakConntrackConnection,
 };
-use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
+use packet::{
+    Buf, BufferAlloc, BufferMut, GrowBuffer, PacketConstraints, ParseBufferMut, ParseMetadata,
+    SerializeError, Serializer as _,
+};
 use packet_formats::error::IpParseError;
 use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
@@ -57,6 +61,9 @@ use crate::internal::device::state::{
 };
 use crate::internal::device::{
     self, IpAddressId as _, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
+};
+use crate::internal::fragmentation::{
+    FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
 };
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
@@ -169,7 +176,7 @@ struct IpLayerPacketMetadataDropCheck {
 
 /// Metadata that is produced and consumed by the IP layer for each packet, but
 /// which also traverses the device layer.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DeviceIpLayerMetadata {
     /// Weak reference to this packet's connection tracking entry, if the packet is
     /// tracked.
@@ -604,10 +611,7 @@ impl AddressStatus<Ipv6PresentAddressStatus> {
         let assigned = core_ctx.with_ip_address_state(
             device,
             &addr_id,
-            |Ipv6AddressState {
-                 flags: Ipv6AddressFlags { deprecated: _, assigned },
-                 config: _,
-             }| { *assigned },
+            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
         );
 
         if assigned {
@@ -662,7 +666,9 @@ pub enum Ipv6PresentAddressStatus {
 }
 
 /// An extension trait providing IP layer properties.
-pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt + IcmpHandlerIpExt + FilterIpExt {
+pub trait IpLayerIpExt:
+    IpExt + MulticastRouteIpExt + IcmpHandlerIpExt + FilterIpExt + FragmentationIpExt
+{
     /// IP Address status.
     type AddressStatus: Debug;
     /// IP Address state.
@@ -1824,6 +1830,8 @@ pub struct IpCounters<I: IpLayerIpExt> {
     /// not be downcasted to the expected type. This would happen if, for example, a
     /// packet was modified to a different IP version between EGRESS and INGRESS.
     pub invalid_cached_conntrack_entry: Counter,
+    /// IP fragmentation counters.
+    pub fragmentation: FragmentationCounters,
 }
 
 /// IPv4-specific Rx counters.
@@ -2679,8 +2687,7 @@ where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
     CC: IpLayerEgressContext<I, BC> + IpDeviceMtuContext<I>,
-    S: Serializer + IpPacket<I>,
-    S::Buffer: BufferMut,
+    S: FragmentableIpSerializer<I, Buffer: BufferMut> + IpPacket<I>,
 {
     let (verdict, proof) = core_ctx.filter_handler().egress_hook(
         bindings_ctx,
@@ -2727,15 +2734,75 @@ where
     // Use the minimum MTU between the target device and the requested mtu.
     let mtu = limit_mtu.min(core_ctx.get_mtu(device));
 
-    // TODO(https://fxbug.dev/42148827): Check that the serializer fits in MTU
-    // and fragment if necessary instead of just applying the limit.
     let body = body.with_size_limit(mtu.into());
-    core_ctx
-        .send_ip_frame(bindings_ctx, device, destination, device_ip_layer_metadata, body, proof)
-        .map_err(|ErrorAndSerializer { serializer, error }| IpSendFrameError {
-            serializer: serializer.into_inner(),
-            error: error.into(),
-        })
+
+    let fits_mtu =
+        match body.serialize_new_buf(PacketConstraints::UNCONSTRAINED, AlwaysFailBufferAlloc) {
+            Ok(never) => match never {},
+            // We hit the allocator that refused to allocate new data, which
+            // means the MTU is respected.
+            Err(SerializeError::Alloc(())) => true,
+            // MTU failure, we should try to fragment.
+            Err(SerializeError::SizeLimitExceeded) => false,
+        };
+
+    if fits_mtu {
+        return core_ctx
+            .send_ip_frame(bindings_ctx, device, destination, device_ip_layer_metadata, body, proof)
+            .map_err(|ErrorAndSerializer { serializer, error }| IpSendFrameError {
+                serializer: serializer.into_inner(),
+                error: error.into(),
+            });
+    }
+
+    // Body doesn't fit MTU, we must fragment this serializer in order to send
+    // it out.
+    core_ctx.increment(|c: &IpCounters<I>| &c.fragmentation.fragmentation_required);
+    let body = body.into_inner();
+    let result = match IpFragmenter::new(bindings_ctx, &body, mtu) {
+        Ok(mut fragmenter) => loop {
+            let fragment = match fragmenter.next() {
+                None => break Ok(()),
+                Some(f) => f,
+            };
+            match core_ctx.send_ip_frame(
+                bindings_ctx,
+                device,
+                destination.clone(),
+                device_ip_layer_metadata.clone(),
+                fragment,
+                proof.clone_for_fragmentation(),
+            ) {
+                Ok(()) => {
+                    core_ctx.increment(|c: &IpCounters<I>| &c.fragmentation.fragments);
+                }
+                Err(ErrorAndSerializer { serializer: _, error }) => {
+                    core_ctx.increment(|c: &IpCounters<I>| {
+                        &c.fragmentation.error_fragmented_serializer
+                    });
+                    break Err(error);
+                }
+            }
+        },
+        Err(e) => {
+            core_ctx.increment(|c: &IpCounters<I>| &c.fragmentation.error_counter(e));
+            Err(SendFrameErrorReason::SizeConstraintsViolation)
+        }
+    };
+    result.map_err(|e| IpSendFrameError { serializer: body, error: e.into() })
+}
+
+/// A buffer allocator that always fails to allocate a new buffer.
+///
+/// Can be used to check for packet size constraints in serializer without in
+/// fact serializing the buffer.
+struct AlwaysFailBufferAlloc;
+
+impl BufferAlloc<Never> for AlwaysFailBufferAlloc {
+    type Error = ();
+    fn alloc(self, _len: usize) -> Result<Never, Self::Error> {
+        Err(())
+    }
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -4184,7 +4251,7 @@ impl<I: IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
 ///
 /// NOTE: Due to filtering rules, it is possible that the device provided in
 /// `meta` will not be the device that final IP packet is actually sent from.
-pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpLayerHandler<I: IpExt + FragmentationIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Encapsulate and send the provided transport packet and from the device
     /// provided in `meta`.
     fn send_ip_packet_from_device<S>(
@@ -4211,8 +4278,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         body: S,
     ) -> Result<(), IpSendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
-        S::Buffer: BufferMut;
+        S: FragmentableIpSerializer<I, Buffer: BufferMut> + IpPacket<I>;
 }
 
 impl<
@@ -4242,8 +4308,7 @@ impl<
         body: S,
     ) -> Result<(), IpSendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
-        S::Buffer: BufferMut,
+        S: FragmentableIpSerializer<I, Buffer: BufferMut> + IpPacket<I>,
     {
         send_ip_frame(
             self,
@@ -4331,6 +4396,7 @@ pub(crate) mod testutil {
 
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
     use netstack3_base::{SendFrameContext, SendFrameError, SendableFrameMeta};
+    use packet::Serializer;
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]

@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_SYMBOLIZER_MARKUP_INCLUDE_LIB_SYMBOLIZER_MARKUP_LINE_BUFFERED_SINK_H_
 #define SRC_LIB_SYMBOLIZER_MARKUP_INCLUDE_LIB_SYMBOLIZER_MARKUP_LINE_BUFFERED_SINK_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <array>
 #include <cassert>
+#include <span>
 #include <string_view>
 
 namespace symbolizer_markup {
@@ -40,7 +39,7 @@ struct LineBuffered {
     constexpr explicit Sink(LineSink line_sink) : line_sink_{std::move(line_sink)} {}
 
     void operator()(std::string_view str) {
-      cpp20::span left = cpp20::span{buffer_}.subspan(used_);
+      std::span left = std::span{buffer_}.subspan(used_);
       assert(!left.empty());  // Previous call should have flushed if full.
       while (!str.empty()) {
         size_t n = str.copy(left.data(), left.size());

@@ -5,11 +5,10 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOADINFO_MAPPED_MEMORY_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOADINFO_MAPPED_MEMORY_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include "memory.h"
 
@@ -31,12 +30,12 @@ class LoadInfoMappedMemory : public DirectMemory {
   LoadInfoMappedMemory(const LoadInfo& load_info, Memory& mem) : load_info_(load_info), mem_(mem) {}
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
     return ReadArrayImpl<T>(ptr, count);
   }
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr) {
     return ReadArrayImpl<T>(ptr, std::nullopt);
   }
 
@@ -47,7 +46,7 @@ class LoadInfoMappedMemory : public DirectMemory {
   // `read_underyling` calculates the target offset to begin to read from using
   // the segment's offset value, ensuring the `request_count` is within bounds.
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArrayImpl(uintptr_t ptr, std::optional<size_t> count) {
+  std::optional<std::span<const T>> ReadArrayImpl(uintptr_t ptr, std::optional<size_t> count) {
     auto target_vaddr = static_cast<size_type>(ptr);
     auto segment = load_info_.FindSegment(static_cast<size_type>(target_vaddr));
     if (segment == load_info_.segments().end()) {
@@ -55,7 +54,7 @@ class LoadInfoMappedMemory : public DirectMemory {
     }
 
     auto read_underlying = [this, target_vaddr,
-                            count](const auto& segment) -> std::optional<cpp20::span<const T>> {
+                            count](const auto& segment) -> std::optional<std::span<const T>> {
       const size_type offset_in_segment = target_vaddr - segment.vaddr();
       if (segment.filesz() < offset_in_segment) [[unlikely]] {
         return std::nullopt;

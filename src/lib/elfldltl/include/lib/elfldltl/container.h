@@ -76,6 +76,13 @@ struct StdContainer {
       return {};
     }
 
+    template <class Diagnostics>
+    constexpr std::true_type resize(Diagnostics& diagnostics, std::string_view error,
+                                    size_type size) {
+      Base::resize(size);
+      return {};
+    }
+
    private:
     // Make the original methods unavailable.
     using Base::emplace;
@@ -83,6 +90,7 @@ struct StdContainer {
     using Base::insert;
     using Base::push_back;
     using Base::reserve;
+    using Base::resize;
   };
 };
 

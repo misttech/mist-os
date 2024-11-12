@@ -152,8 +152,8 @@ void MarkSlotActive(MockZirconBootOps* dev, AbrSlotIndex slot) {
   if (slot != kAbrSlotIndexR) {
     AbrMarkSlotActive(&abr_ops, slot);
   } else {
-    AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexA);
-    AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB);
+    AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexA, kAbrUnbootableReasonVerificationFailure);
+    AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB, kAbrUnbootableReasonVerificationFailure);
   }
 }
 
@@ -660,6 +660,7 @@ void VerifySlotMetadataUnbootable(MockZirconBootOps* dev, const std::vector<AbrS
     auto slot_data = slot == kAbrSlotIndexA ? abr_data.slot_data[0] : abr_data.slot_data[1];
     ASSERT_EQ(slot_data.tries_remaining, 0);
     ASSERT_EQ(slot_data.successful_boot, 0);
+    ASSERT_EQ(slot_data.unbootable_reason, kAbrUnbootableReasonVerificationFailure);
   }
 }
 
@@ -810,7 +811,8 @@ TEST(BootTests, RollbackIndexUpdatedOnSuccessfulSlot) {
   constexpr AbrSlotIndex active_slot = kAbrSlotIndexA;
   AbrOps abr_ops = dev->GetAbrOps();
   ASSERT_EQ(AbrMarkSlotSuccessful(&abr_ops, kAbrSlotIndexA, false), kAbrResultOk);
-  ASSERT_EQ(AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB), kAbrResultOk);
+  ASSERT_EQ(AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB, kAbrUnbootableReasonNone),
+            kAbrResultOk);
 
   ASSERT_EQ(LoadAndBoot(&ops, kZirconBootFlagsNone), kBootResultBootReturn);
   ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(dev.get(), active_slot));

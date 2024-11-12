@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/dwarf/encoding.h>
-#include <lib/stdcompat/bit.h>
+
+#include <bit>
 
 namespace elfldltl::dwarf {
 
-std::optional<Uleb128> Uleb128::Read(cpp20::span<const std::byte> bytes) {
+std::optional<Uleb128> Uleb128::Read(std::span<const std::byte> bytes) {
   Uleb128 result;
   unsigned int shift = 0;
   while (!bytes.empty() && shift < 64) [[likely]] {
@@ -23,13 +24,13 @@ std::optional<Uleb128> Uleb128::Read(cpp20::span<const std::byte> bytes) {
   return std::nullopt;
 }
 
-std::optional<Sleb128> Sleb128::Read(cpp20::span<const std::byte> bytes) {
+std::optional<Sleb128> Sleb128::Read(std::span<const std::byte> bytes) {
   Sleb128 result;
   unsigned int shift = 0;
   while (!bytes.empty() && shift < 64) [[likely]] {
     ++result.size_bytes;
     const uint8_t byte = static_cast<uint8_t>(bytes.front());
-    result.value |= cpp20::bit_cast<int64_t>(static_cast<uint64_t>(byte & 0x7f) << shift);
+    result.value |= std::bit_cast<int64_t>(static_cast<uint64_t>(byte & 0x7f) << shift);
     if ((byte & 0x80) == 0) {
       // Shift up and then back down to sign-extend.
       shift = 64 - (shift + 7);

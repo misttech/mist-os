@@ -17,35 +17,43 @@ driver_bind_rules("clock-bind") {
   ]
 }
 
-fuchsia_cc_driver("clock-driver") {
-  output_name = "clock"
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "clock.cc" ]
   deps = [
-    ":clock-bind",
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/lib/ddktl",
+  ]
+}
+
+fuchsia_cc_driver("clock-driver") {
+  output_name = "clock"
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("clock") {
   visibility = [ ":*" ]
   component_name = "clock"
-  deps = [ ":clock-driver" ]
+  deps = [
+    ":clock-bind",
+    ":clock-driver",
+  ]
   info = "meta/clock-info.json"
   manifest = "meta/clock.cml"
 }
@@ -56,28 +64,15 @@ fuchsia_driver_package("package") {
 }
 
 test("clock-test-bin") {
-  sources = [
-    "clock-test.cc",
-    "clock.cc",
-  ]
+  sources = [ "clock-test.cc" ]
   deps = [
-    ":clock-bind",
+    ":common",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/mock-ddk:mock-ddk",
-    "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
