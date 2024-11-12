@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use crate::ota::state_machine::DataSharingConsent::Unknown;
 use crate::wlan::NetworkInfo;
+#[cfg(test)]
 use mockall::automock;
 pub use ota_lib::OtaStatus;
 
@@ -117,7 +118,7 @@ pub trait StateHandler {
     fn handle_state(&mut self, event: State);
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 pub trait EventProcessor {
     fn process_event(&mut self, event: Event) -> Option<State>;
 }
@@ -239,7 +240,7 @@ impl StateMachine {
     }
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 impl EventProcessor for StateMachine {
     fn process_event(&mut self, event: Event) -> Option<State> {
         self.event(event)
