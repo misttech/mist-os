@@ -358,9 +358,10 @@ TEST(PartitionCopyClientTest, BlockFdMultilplePartition) {
   paver::PartitionCopyClient client(std::move(partitions));
 }
 
-class FixedOffsetBlockPartitionClientTest : public zxtest::Test {
+class FixedOffsetBlockPartitionClientTest : public PaverTest {
  public:
   void SetUp() override {
+    PaverTest::SetUp();
     IsolatedDevmgr::Args args;
     args.disable_block_watcher = true;
 

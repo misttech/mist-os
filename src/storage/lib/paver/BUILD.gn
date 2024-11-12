@@ -9,7 +9,7 @@ group("tests") {
   # TODO(https://fxbug.dev/42165433): Paver tests are disabled on coverage builds due to flakiness.
   # TODO(b/301283466): Paver tests cannot run on RISCV64 builds due to Sv39 address space limits.
   if (!is_coverage && current_cpu != "riscv64") {
-    deps += [ "test:paver-test" ]
+    deps += [ "test:paver-tests" ]
   }
 }
 
