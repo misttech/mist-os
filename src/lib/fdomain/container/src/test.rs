@@ -113,7 +113,7 @@ async fn socket() {
     let proto::Error::TargetError(err) = error else {
         panic!();
     };
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_write_fail_2nd = 102.try_into().unwrap();
 
@@ -164,7 +164,7 @@ async fn socket() {
     let proto::Error::TargetError(err) = error else {
         panic!();
     };
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_read_fail = 105.try_into().unwrap();
     fdomain.read_socket(
@@ -379,7 +379,7 @@ async fn channel() {
     };
 
     assert_eq!(tid_write_fail, got_tid);
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_write_fail_2nd = 102.try_into().unwrap();
 
@@ -430,7 +430,7 @@ async fn channel() {
     };
 
     assert_eq!(tid_write_fail_3rd, got_tid);
-    assert_eq!(zx::Status::PEER_CLOSED.into_raw(), err);
+    assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_read_fail = 105.try_into().unwrap();
     fdomain.read_channel(
@@ -576,7 +576,7 @@ async fn bad_channel_writes() {
         panic!();
     };
 
-    assert_eq!(zx::Status::ACCESS_DENIED.into_raw(), e);
+    assert_eq!(fidl::Status::ACCESS_DENIED.into_raw(), e);
 
     assert!(fdomain
         .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
@@ -889,7 +889,7 @@ async fn socket_disposition() {
     };
     let proto::Error::TargetError(error) = error else { panic!() };
     assert_eq!(tid_3, got_tid);
-    assert_eq!(zx::Status::BAD_STATE.into_raw(), error);
+    assert_eq!(fidl::Status::BAD_STATE.into_raw(), error);
     assert_eq!(0, wrote_actual);
 }
 
@@ -959,7 +959,7 @@ async fn socket_disposition_peer() {
     };
     let proto::Error::TargetError(error) = error else { panic!() };
     assert_eq!(tid_3, got_tid);
-    assert_eq!(zx::Status::BAD_STATE.into_raw(), error);
+    assert_eq!(fidl::Status::BAD_STATE.into_raw(), error);
     assert_eq!(0, wrote_actual);
 }
 
@@ -1120,7 +1120,7 @@ async fn socket_async_read_detect_close() {
     else {
         panic!()
     };
-    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
+    assert_eq!(*err, proto::Error::TargetError(fidl::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 
@@ -1381,7 +1381,7 @@ async fn channel_async_read_detect_close() {
     else {
         panic!()
     };
-    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
+    assert_eq!(*err, proto::Error::TargetError(fidl::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 
