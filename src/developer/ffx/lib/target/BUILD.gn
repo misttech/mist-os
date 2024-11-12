@@ -31,6 +31,7 @@ if (is_host) {
       "//src/developer/ffx/lib/ssh:lib",
       "//src/developer/ffx/lib/timeout:lib",
       "//src/lib/async-utils",
+      "//src/lib/fdomain/client",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//src/lib/versioning/version-history/rust/data",
@@ -54,6 +55,7 @@ if (is_host) {
 
     sources = [
       "src/connection.rs",
+      "src/fdomain_transport.rs",
       "src/fidl_pipe.rs",
       "src/lib.rs",
       "src/resolve.rs",

@@ -28,6 +28,7 @@ use mockall::predicate::*;
 pub mod connection;
 pub mod ssh_connector;
 
+mod fdomain_transport;
 mod fidl_pipe;
 mod resolve;
 mod target_connector;

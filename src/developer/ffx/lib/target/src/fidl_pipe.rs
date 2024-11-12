@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fdomain_transport::FDomainTransport;
 use crate::target_connector::{TargetConnection, TargetConnectionError, TargetConnector};
-use crate::ConnectionError;
+use crate::{ConnectionError, FDomainConnection};
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
@@ -84,21 +85,25 @@ impl FidlPipe {
     /// therefore, should be interpreted as a non-recoverable error.
     pub(crate) async fn start_internal<C>(
         mut connector: C,
-    ) -> Result<(Self, Arc<overnet_core::Router>)>
+    ) -> Result<(Self, Option<Arc<overnet_core::Router>>, Option<Arc<fdomain_client::Client>>)>
     where
         C: TargetConnector + 'static,
     {
-        let node = overnet_core::Router::new(None)?;
-        let socket = create_overnet_socket(node.clone())
-            .map_err(|e| ConnectionError::InternalError(e.into()))?;
-        let (overnet_reader, overnet_writer) = tokio::io::split(socket);
-
         let mut wait_duration = Duration::from_millis(50);
-        let overnet_connection = loop {
+        // If we only see FDomain, we should retry once in case Overnet just needs another attempt.
+        // There are Zero FDomain-only devices today so this should be a good plan.
+        let mut fdomain_only_retry = 1;
+
+        let (overnet_connection, fdomain_connection) = loop {
             let error = match connector.connect().await {
-                Ok(TargetConnection::Overnet(o) | TargetConnection::Both(_, o)) => break o,
+                Ok(TargetConnection::Overnet(o)) => break (Some(o), None),
+                Ok(TargetConnection::Both(f, o)) => break (Some(o), Some(f)),
                 Err(TargetConnectionError::Fatal(e)) => return Err(e),
-                Ok(TargetConnection::FDomain(_)) => {
+                Ok(TargetConnection::FDomain(f)) => {
+                    if fdomain_only_retry == 0 {
+                        break (None, Some(f));
+                    }
+                    fdomain_only_retry -= 1;
                     anyhow::anyhow!("Only FDomain succeeded but FDomain isn't yet supported")
                 }
                 Err(TargetConnectionError::NonFatal(e)) => e,
@@ -110,24 +115,71 @@ impl FidlPipe {
             async_io::Timer::after(wait_duration).await;
             wait_duration *= 2;
         };
+
         let device_address = connector.device_address();
         let (error_sender, error_queue) = async_channel::unbounded();
-        let compat = overnet_connection.compat.clone();
-        let host_ssh_address = overnet_connection.ssh_host_address.clone();
-        let main_task = async move {
-            overnet_connection.run(overnet_writer, overnet_reader, error_sender).await;
-            // Explicit drop to force the struct into the closure.
-            drop(connector);
+        let compat = overnet_connection.as_ref().and_then(|x| x.compat.clone());
+        let host_ssh_address = overnet_connection.as_ref().and_then(|x| x.ssh_host_address.clone());
+
+        let (node, overnet_task) = if let Some(overnet_connection) = overnet_connection {
+            let node = overnet_core::Router::new(None)?;
+            let socket = create_overnet_socket(node.clone())
+                .map_err(|e| ConnectionError::InternalError(e.into()))?;
+            let error_sender = error_sender.clone();
+            let (overnet_reader, overnet_writer) = tokio::io::split(socket);
+            (
+                Some(node),
+                Some(async move {
+                    overnet_connection.run(overnet_writer, overnet_reader, error_sender).await;
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        let (client, fdomain_task) = if let Some(fdomain_connection) = fdomain_connection {
+            let FDomainConnection { output, input, mut errors, main_task } = fdomain_connection;
+            let error_send = async move {
+                while let Some(error) = errors.next().await {
+                    let Ok(()) = error_sender.send(error.into()).await else { break };
+                }
+            };
+
+            let (client, fut) = fdomain_client::Client::new(FDomainTransport::new(output, input));
+            (
+                Some(client),
+                Some(async move {
+                    futures::future::join(fut, error_send).await;
+                    // Explicit drop to own the task.
+                    drop(main_task);
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        let main_task = match (overnet_task, fdomain_task) {
+            (None, None) => unreachable!(),
+            (Some(o), None) => Task::local(async move {
+                o.await;
+                // Explicit drop to force the struct into the closure.
+                drop(connector);
+            }),
+            (None, Some(f)) => Task::local(async move {
+                f.await;
+                // Explicit drop to force the struct into the closure.
+                drop(connector);
+            }),
+            (Some(o), Some(f)) => Task::local(async move {
+                futures::future::join(o, f).await;
+                // Explicit drop to force the struct into the closure.
+                drop(connector);
+            }),
         };
         Ok((
-            Self {
-                task: Some(Task::local(main_task)),
-                error_queue,
-                compat,
-                device_address,
-                host_ssh_address,
-            },
+            Self { task: Some(main_task), error_queue, compat, device_address, host_ssh_address },
             node,
+            client,
         ))
     }
 
@@ -188,14 +240,28 @@ mod test {
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
             let (_error_tx, error_rx) = async_channel::unbounded();
             let error_task = Task::local(async move {});
-            Ok(TargetConnection::Overnet(OvernetConnection {
+            let overnet = OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            }))
+            };
+
+            let (sock1, sock2) = fidl::Socket::create_stream();
+            let sock1 = fidl::AsyncSocket::from_socket(sock1);
+            let sock2 = fidl::AsyncSocket::from_socket(sock2);
+            let (_error_tx, error_rx) = async_channel::unbounded();
+            let error_task = Task::local(async move {});
+            let fdomain = FDomainConnection {
+                output: Box::new(BufReader::new(sock1)),
+                input: Box::new(sock2),
+                errors: error_rx,
+                main_task: Some(error_task),
+            };
+
+            Ok(TargetConnection::Both(fdomain, overnet))
         }
     }
 
@@ -212,14 +278,30 @@ mod test {
             let error_task = Task::local(async move {
                 let _ = error_tx.send(anyhow::anyhow!("boom")).await;
             });
-            Ok(TargetConnection::Overnet(OvernetConnection {
+            let overnet = OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            }))
+            };
+
+            let (sock1, sock2) = fidl::Socket::create_stream();
+            let sock1 = fidl::AsyncSocket::from_socket(sock1);
+            let sock2 = fidl::AsyncSocket::from_socket(sock2);
+            let (error_tx, error_rx) = async_channel::unbounded();
+            let error_task = Task::local(async move {
+                let _ = error_tx.send(anyhow::anyhow!("boom")).await;
+            });
+            let fdomain = FDomainConnection {
+                output: Box::new(BufReader::new(sock1)),
+                input: Box::new(sock2),
+                errors: error_rx,
+                main_task: Some(error_task),
+            };
+
+            Ok(TargetConnection::Both(fdomain, overnet))
         }
     }
 
@@ -234,14 +316,28 @@ mod test {
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
             let (_error_tx, error_rx) = async_channel::unbounded();
             let error_task = Task::local(async move {});
-            Ok(TargetConnection::Overnet(OvernetConnection {
+            let overnet = OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            }))
+            };
+
+            let (sock1, sock2) = fidl::Socket::create_stream();
+            let sock1 = fidl::AsyncSocket::from_socket(sock1);
+            let sock2 = fidl::AsyncSocket::from_socket(sock2);
+            let (_error_tx, error_rx) = async_channel::unbounded();
+            let error_task = Task::local(async move {});
+            let fdomain = FDomainConnection {
+                output: Box::new(BufReader::new(sock1)),
+                input: Box::new(sock2),
+                errors: error_rx,
+                main_task: Some(error_task),
+            };
+
+            Ok(TargetConnection::Both(fdomain, overnet))
         }
     }
 
@@ -291,7 +387,8 @@ mod test {
     #[fuchsia::test]
     async fn test_error_queue() {
         // These sockets will do nothing of import.
-        let (fidl_pipe, _node) = FidlPipe::start_internal(AutoFailConnector).await.unwrap();
+        let (fidl_pipe, _node, _client) =
+            FidlPipe::start_internal(AutoFailConnector).await.unwrap();
         let mut errors = fidl_pipe.error_stream();
         let err = errors.next().await.unwrap();
         assert_eq!(anyhow::anyhow!("boom").to_string(), err.to_string());
@@ -299,7 +396,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_retry() {
-        let (fidl_pipe, _node) =
+        let (fidl_pipe, _node, _client) =
             FidlPipe::start_internal(FailOnceThenSucceedConnector { should_succeed: false })
                 .await
                 .unwrap();
@@ -309,7 +406,8 @@ mod test {
 
     #[fuchsia::test]
     async fn test_empty_error_queue() {
-        let (fidl_pipe, _node) = FidlPipe::start_internal(DoNothingConnector).await.unwrap();
+        let (fidl_pipe, _node, _client) =
+            FidlPipe::start_internal(DoNothingConnector).await.unwrap();
         // So, this DoNothingConnector is going to ensure no errors are placed onto the queue,
         // however, even if AutoFailConnector was used here it still wouldn't work, since there is
         // no polling happening between the creation of FidlPipe and the attempt to drain errors
@@ -320,10 +418,13 @@ mod test {
 
     #[fuchsia::test]
     async fn test_waits_for_overnet() {
-        let (fidl_pipe, _node) =
+        let (fidl_pipe, Some(_node), Some(_fdomain)) =
             FidlPipe::start_internal(FDomainThenOvernetConnector { tried_once: false })
                 .await
-                .unwrap();
+                .unwrap()
+        else {
+            panic!("Didn't get both connections")
+        };
         let errs = fidl_pipe.try_drain_errors();
         assert!(errs.is_none());
     }
