@@ -48,8 +48,8 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
                                                     fbl::String name,
                                                     std::in_place_type_t<T> in_place,
                                                     Args&&... args) {
-    fbl::RefPtr vn = fbl::AdoptRef(
-        new LocalVnode(std::move(parent), std::move(name), in_place, std::forward<Args>(args)...));
+    fbl::RefPtr vn = fbl::MakeRefCounted<LocalVnode>(std::move(parent), std::move(name), in_place,
+                                                     std::forward<Args>(args)...);
 
     if (vn->parent_ != nullptr) {
       zx_status_t status = vn->parent_->AddChild(vn);
@@ -168,6 +168,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   std::variant<Local, Intermediate, Remote>& NodeType() { return node_type_; }
 
  private:
+  friend class fbl::internal::MakeRefCountedHelper<LocalVnode>;
   friend class fbl::RefPtr<LocalVnode>;
 
   zx_status_t AddChild(fbl::RefPtr<LocalVnode> child);

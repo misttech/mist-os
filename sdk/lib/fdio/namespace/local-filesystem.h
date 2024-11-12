@@ -34,7 +34,6 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(fdio_namespace);
 
-  static fbl::RefPtr<fdio_namespace> Create() { return fbl::AdoptRef(new fdio_namespace()); }
   ~fdio_namespace();
 
   // Create a new object referring to the root of this namespace.
@@ -98,6 +97,8 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   bool IsBound(std::string_view path);
 
  private:
+  friend class fbl::internal::MakeRefCountedHelper<fdio_namespace>;
+
   fdio_namespace();
 
   void ResetRoot() __TA_REQUIRES(lock_);
