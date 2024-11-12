@@ -554,9 +554,10 @@ class Remote : public HasIo {
   }
 
   zx_status_t Clone(zx_handle_t* out_handle) {
-    auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
-    const fidl::Status result =
-        client()->Clone(fio::wire::OpenFlags::kCloneSameRights, std::move(server_end));
+    // fuchsia.io/Node composes fuchsia.unknown/Cloneable. The client end below will speak whatever
+    // protocol was negotiated for the current connection.
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
+    const fidl::Status result = client()->Clone2(std::move(server_end));
     if (!result.ok()) {
       return result.status();
     }
