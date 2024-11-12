@@ -152,6 +152,14 @@ SECTIONS {
   }
 
   /*
+   * Ideally there should be no .got section generated at all.
+   * But GNU (BFD) ld for arm64 insists on producing one unnecessarily.
+   * KERNEL_GOT_TOLERANCE is set via -defsym in BUILD.gn.
+   */
+  .got : { *(.got*) }
+  ASSERT(SIZEOF(.got) <= KERNEL_GOT_TOLERANCE, "unexpected GOT slots")
+
+  /*
    * LLD only makes particular named sections part of PT_GNU_RELRO, so
    * all the special RELRO sections have to be merged into one output section.
    */

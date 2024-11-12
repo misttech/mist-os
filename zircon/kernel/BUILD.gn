@@ -574,8 +574,21 @@ if (is_kernel) {
     outputs = [ zircon_elf_rspfile ]
   }
 
+  # See elf-kernel.ld where KERNEL_GOT_TOLERANCE is used.
+  if (current_cpu == "arm64" && is_gcc) {
+    # Each slot is 8 bytes.  The first two special slots are always there if
+    # .got is there at all, per psABI.  GNU (BFD) ld seems to emit two more
+    # unused slots with no associated relocs to explain their existence.
+    got_tolerance = 32
+  } else {
+    got_tolerance = 0
+  }
+
   # These are needed only in image.S and in the linker scripts.
-  image_defines = [ "BOOT_HEADER_SIZE=0x50" ]
+  image_defines = [
+    "BOOT_HEADER_SIZE=0x50",
+    "KERNEL_GOT_TOLERANCE=$got_tolerance",
+  ]
 
   # This supplies those variables for use in linker scripts.
   config("kernel_defsym") {
