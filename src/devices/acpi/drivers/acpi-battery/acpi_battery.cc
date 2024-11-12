@@ -311,6 +311,7 @@ void AcpiBattery::GetStateChangeEvent(GetStateChangeEventCompleter::Sync& comple
 void AcpiBattery::GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) {
   zx_status_t status = CheckAcpiBatteryState();
   std::scoped_lock lock(lock_);
+  ClearSignal();
   completer.Reply(status, battery_info_);
 }
 
