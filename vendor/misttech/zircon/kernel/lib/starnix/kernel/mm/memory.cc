@@ -427,10 +427,7 @@ fit::result<zx_status_t, fbl::Vector<uint8_t>> MemoryObject::read_to_vec(uint64_
                             return fit::error(ZX_ERR_NO_MEMORY);
                           }
                           ktl::span<uint8_t> data{buffer.data(), length};
-                          auto result = read_uninit(data, offset);
-                          if (result.is_error()) {
-                            return result.take_error();
-                          }
+                          _EP(read_uninit(data, offset));
                           {
                             // SAFETY: since read_uninit succeeded we know that we can consider the
                             // buffer initialized.

@@ -15,8 +15,6 @@
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 
-#include <utility>
-
 #include <ktl/enforce.h>
 
 namespace starnix {
@@ -55,10 +53,8 @@ FileMode FsContext::set_umask(FileMode umask) const {
 fbl::RefPtr<FsContext> FsContext::New(fbl::RefPtr<Namespace> _namespace) {
   auto root = _namespace->root();
   fbl::AllocChecker ac;
-  auto handle = fbl::AdoptRef(new (&ac) FsContext({.namespace_ = _namespace,
-                                                   .root = root,
-                                                   .cwd = ktl::move(root),
-                                                   .umask = FileMode::DEFAULT_UMASK}));
+  auto handle = fbl::AdoptRef(new (&ac) FsContext(FsContextState{
+      .namespace_ = _namespace, .root = root, .cwd = root, .umask = FileMode::DEFAULT_UMASK}));
   ZX_ASSERT(ac.check());
   return handle;
 }

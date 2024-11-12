@@ -646,12 +646,13 @@ class VecOutputBuffer : public OutputBuffer {
   }
 
   fit::result<Errno> advance(size_t length) final {
+    fbl::AllocChecker ac;
     if (length > available()) {
       return fit::error(errno(EINVAL));
     }
+
     capacity_ -= length;
     auto current_len = buffer_.size();
-    fbl::AllocChecker ac;
     buffer_.reserve(current_len + length, &ac);
     if (!ac.check()) {
       return fit::error(errno(ENOMEM));

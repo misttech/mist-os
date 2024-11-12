@@ -84,7 +84,7 @@ template <typename T>
   requires std::is_base_of_v<FileOps, T> && std::is_default_constructible_v<T>
 DeviceOps* simple_device_ops() {
   fbl::AllocChecker ac;
-  auto ptr = new (&ac) FunctionDeviceOps(std::move(open_impl<T>));
+  auto ptr = new (&ac) FunctionDeviceOps(ktl::move(open_impl<T>));
   if (!ac.check()) {
     return nullptr;
   }
@@ -424,7 +424,7 @@ class DeviceRegistry {
   ///
   /// This function should be used only by device that have registered an entire major device
   /// number. Individually registered minor device cannot be removed at this time.
-  void remove_device(const CurrentTask& current_task, Device device) const {
+  void remove_device(const CurrentTask& current_task, const Device& device) const {
     // dispatch_uevent(UEventAction::Remove, device);
     objects_.destroy_device(device);
 
@@ -464,7 +464,6 @@ class DeviceRegistry {
     return dev_ops->open(current_task, device_type, node, flags);
   }
 
- public:
   // impl Default for DeviceRegistry
   static DeviceRegistry Default() {
     fbl::AllocChecker ac;

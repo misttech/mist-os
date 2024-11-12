@@ -41,6 +41,8 @@ DirEntryOps::~DirEntryOps() = default;
 DefaultDirEntryOps::~DefaultDirEntryOps() = default;
 
 DirEntry::~DirEntry() {
+  LTRACE_ENTRY_OBJ;
+
   auto local_name = state_.Read()->local_name;
   LTRACEF_LEVEL(2, "local_name=[%.*s]\n", static_cast<int>(local_name.size()), local_name.data());
 
@@ -49,6 +51,8 @@ DirEntry::~DirEntry() {
     const auto& parent = maybe_parent.value();
     parent->internal_remove_child(this);
   }
+
+  LTRACE_EXIT_OBJ;
 }
 
 DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
@@ -104,7 +108,9 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
 FsString DirEntry::GetKey() const { return local_name(); }
 
 DirEntry::DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state)
-    : node_(ktl::move(node)), ops_(ktl::move(ops)), state_(ktl::move(state)), weak_factory_(this) {}
+    : node_(ktl::move(node)), ops_(ktl::move(ops)), state_(ktl::move(state)), weak_factory_(this) {
+  LTRACE_ENTRY_OBJ;
+}
 
 fit::result<Errno, DirEntryHandle> DirEntry::create_dir(const CurrentTask& current_task,
                                                         const FsStr& name) {

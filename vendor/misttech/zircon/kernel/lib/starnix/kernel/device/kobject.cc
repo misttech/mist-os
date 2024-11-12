@@ -59,14 +59,12 @@ ktl::optional<KObjectHandle> KObject::get_child(const FsString& name) const {
   return ktl::nullopt;
 }
 
-void KObject::insert_child(KObjectHandle child) {
-  auto guard = children_.Lock();
-  guard->try_emplace(child->name(), child);
-}
+void KObject::insert_child(KObjectHandle child) { insert_child_with_name(child->name(), child); }
 
 void KObject::insert_child_with_name(const FsString& name, KObjectHandle child) {
   auto guard = children_.Lock();
-  guard->try_emplace(name, child);
+  auto [_, inserted] = guard->try_emplace(name, child);
+  ZX_ASSERT_MSG(inserted, "Failed to insert child kobject");
 }
 
 fbl::Vector<FsString> KObject::get_children_names() const {

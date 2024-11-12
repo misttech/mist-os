@@ -18,13 +18,15 @@
 
 namespace unit_testing {
 
-using namespace starnix;
-using namespace starnix_uapi;
-using namespace starnix::testing;
+namespace {
+
+using starnix::FsContext;
+using starnix::Namespace;
+using starnix::TmpFs;
 
 bool test_umask() {
   BEGIN_TEST;
-  auto [kernel, _task] = create_kernel_and_task();
+  auto [kernel, _task] = starnix::testing::create_kernel_and_task();
 
   auto fs = FsContext::New(Namespace::New(TmpFs::new_fs(kernel)));
 
@@ -38,11 +40,13 @@ bool test_umask() {
 
 bool test_chdir() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked_with_bootfs();
 
   ASSERT_TRUE("/" == (*current_task)->fs()->cwd().path_escaping_chroot());
   END_TEST;
 }
+
+}  // namespace
 
 }  // namespace unit_testing
 

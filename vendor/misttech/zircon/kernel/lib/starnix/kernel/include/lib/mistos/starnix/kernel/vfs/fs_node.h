@@ -239,6 +239,8 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   ~FsNode();
 
  private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(FsNode);
+
   FsNode(WeakFsNodeHandle weak_handle, mtl::WeakPtr<Kernel> kernel, ktl::unique_ptr<FsNodeOps> ops,
          mtl::WeakPtr<FileSystem> fs, ino_t node_id, ktl::optional<PipeHandle>, FsNodeInfo info);
 

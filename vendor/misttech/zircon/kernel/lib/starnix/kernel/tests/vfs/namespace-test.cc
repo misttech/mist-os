@@ -35,8 +35,7 @@ bool test_namespace() {
   auto dev = ns->root().lookup_child(*current_task, context, "dev");
   ASSERT_TRUE(dev.is_ok(), "failed to lookup dev");
 
-  // auto dev = ASSERT_OK();
-  // dev->mount({.type = WhatToMountEnum::Fs, .what = dev_fs}, MountFlags::Empty()));
+  //dev->mount({.type = WhatToMountEnum::Fs, .what = dev_fs}, MountFlags::Empty()));
 
   /*context = LookupContext::Default();
   dev = ASSERT_OK(ns->root()->LookupChild(locked.get(), current_task.get(), &context, "dev"));

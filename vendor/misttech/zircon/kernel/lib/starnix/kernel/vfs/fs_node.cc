@@ -108,7 +108,9 @@ FsNode::FsNode(WeakFsNodeHandle weak_handle, mtl::WeakPtr<Kernel> kernel,
       node_id_(node_id),
       fifo_(ktl::move(fifo)),
       info_(ktl::move(info)),
-      weak_factory_(this) {}
+      weak_factory_(this) {
+  LTRACE_ENTRY_OBJ;
+}
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::create_file_ops(
     const CurrentTask& current_task, OpenFlags flags) const {

@@ -789,10 +789,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
                 flags.bits());
   context.update_for_path(path);
   auto parent_content = context.with(SymlinkMode::Follow);
-  auto lookup_parent_result = lookup_parent(parent_content, dir, path);
-  if (lookup_parent_result.is_error())
-    return lookup_parent_result.take_error();
-
+  auto lookup_parent_result = lookup_parent(parent_content, dir, path) _EP(lookup_parent_result);
   auto [parent, basename] = lookup_parent_result.value();
 
   context.remaining_follows = parent_content.remaining_follows;
@@ -843,7 +840,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
       auto readlink_result = name.readlink(*this) _EP(readlink_result);
       return ktl::visit(
           SymlinkTarget::overloaded{
-              [&, p = ktl::move(parent)](
+              [&, p = parent](
                   const FsString& path) -> fit::result<Errno, ktl::pair<NamespaceNode, bool>> {
                 auto dir = (path[0] == '/') ? (*this)->fs()->root() : p;
                 return resolve_open_path(context, dir, path, mode, flags);
@@ -889,64 +886,59 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const 
     return fit::error(errno(ENOENT));
   }
 
-  auto result = resolve_dir_fd(dir_fd, path, resolve_flags);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  auto [dir, _path] = result.value();
-  return open_namespace_node_at(dir, _path, flags, mode, resolve_flags);
+  auto result = resolve_dir_fd(dir_fd, path, resolve_flags) _EP(result);
+  auto& [dir, lpath] = result.value();
+  return open_namespace_node_at(dir, lpath, flags, mode, resolve_flags);
 }
 
 fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
-    NamespaceNode dir, const FsStr& path, OpenFlags _flags, FileMode mode,
+    NamespaceNode dir, const FsStr& path, OpenFlags flags, FileMode mode,
     ResolveFlags& resolve_flags) const {
   LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x, mode=0x%x, resolve_flags=0x%x\n",
-                static_cast<int>(path.length()), path.data(), _flags.bits(), mode.bits(),
+                static_cast<int>(path.length()), path.data(), flags.bits(), mode.bits(),
                 resolve_flags.bits());
 
   // 64-bit kernels force the O_LARGEFILE flag to be on.
-  OpenFlagsImpl flags(_flags | OpenFlagsEnum::LARGEFILE);
-
-  if (flags.contains(OpenFlagsEnum::PATH)) {
+  OpenFlagsImpl local_flags(flags | OpenFlagsEnum::LARGEFILE);
+  auto opath = local_flags.contains(OpenFlagsEnum::PATH);
+  if (opath) {
     // When O_PATH is specified in flags, flag bits other than O_CLOEXEC,
     // O_DIRECTORY, and O_NOFOLLOW are ignored.
     const OpenFlags ALLOWED_FLAGS = OpenFlags::from_bits_truncate(
         OpenFlags(OpenFlagsEnum::PATH).bits() | OpenFlags(OpenFlagsEnum::CLOEXEC).bits() |
         OpenFlags(OpenFlagsEnum::DIRECTORY).bits() | OpenFlags(OpenFlagsEnum::NOFOLLOW).bits());
-
     flags &= ALLOWED_FLAGS;
   }
 
-  if (flags.contains(OpenFlagsEnum::TMPFILE) && !flags.can_write()) {
+  if (local_flags.contains(OpenFlagsEnum::TMPFILE) && !local_flags.can_write()) {
     return fit::error(errno(EINVAL));
   }
 
-  bool nofollow = flags.contains(OpenFlagsEnum::NOFOLLOW);
-  bool must_create = flags.contains(OpenFlagsEnum::CREAT) && flags.contains(OpenFlagsEnum::EXCL);
+  bool nofollow = local_flags.contains(OpenFlagsEnum::NOFOLLOW);
+  bool must_create =
+      local_flags.contains(OpenFlagsEnum::CREAT) && local_flags.contains(OpenFlagsEnum::EXCL);
 
   auto symlink_mode = (nofollow || must_create) ? SymlinkMode::NoFollow : SymlinkMode::Follow;
 
-  // Define the resolve_base variable
-  ResolveBase resolve_base;
+  // Define the resolve_base variable based on BENEATH and IN_ROOT flags
   bool beneath = resolve_flags.contains(ResolveFlagsEnum::BENEATH);
   bool in_root = resolve_flags.contains(ResolveFlagsEnum::IN_ROOT);
 
-  if (!beneath && !in_root) /*(false, false)*/ {
-    resolve_base = {.type = ResolveBaseType::None, .node = NamespaceNode()};
-  } else if (beneath && !in_root) /*(true, false)*/ {
-    resolve_base = {.type = ResolveBaseType::Beneath, .node = dir};
-  } else if (!beneath && in_root) /* (false, true)*/ {
-    resolve_base = {.type = ResolveBaseType::InRoot, .node = dir};
+  ResolveBase resolve_base = ResolveBase::None();
+  if (!beneath && !in_root) {
+    resolve_base = ResolveBase::None();
+  } else if (beneath && !in_root) {
+    resolve_base = ResolveBase::Beneath(dir);
+  } else if (!beneath && in_root) {
+    resolve_base = ResolveBase::InRoot(dir);
   } else {
-    // Both flags are true, return error
     return fit::error(errno(EINVAL));
   }
 
   // `RESOLVE_BENEATH` and `RESOLVE_IN_ROOT` imply `RESOLVE_NO_MAGICLINKS`. This matches
   // Linux behavior. Strictly speaking it's is not really required, but it's hard to
   // implement `BENEATH` and `IN_ROOT` flags correctly otherwise.
-
-  if (resolve_base.type != ResolveBaseType::None) {
+  if (resolve_base != ResolveBase::None()) {
     resolve_flags.insert(ResolveFlagsEnum::NO_MAGICLINKS);
   }
 
@@ -972,11 +964,11 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   auto [name, created] = result.value();
 
   auto name_result = [&]() -> fit::result<Errno, NamespaceNode> {
-    if (flags.contains(OpenFlagsEnum::TMPFILE)) {
-      return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), flags);
+    if (local_flags.contains(OpenFlagsEnum::TMPFILE)) {
+      return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), local_flags);
     }
 
-    auto mode_ = name.entry_->node_->info()->mode;
+    auto local_mode = name.entry_->node_->info()->mode;
 
     // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
     // file we are opening. With `O_TMPFILE`, that file is the regular file we just
@@ -989,25 +981,31 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
     // Similarly, we never need to call `truncate` because `O_TMPFILE` is newly created
     // and therefor already an empty file.
 
-    if (nofollow && mode_.is_lnk()) {
+    if (!opath && nofollow && local_mode.is_lnk()) {
       return fit::error(errno(ELOOP));
     }
 
-    if (mode.is_dir()) {
+    if (local_mode.is_dir()) {
+      if (local_flags.can_write() || local_flags.contains(OpenFlagsEnum::CREAT) ||
+          local_flags.contains(OpenFlagsEnum::TRUNC)) {
+        return fit::error(errno(EISDIR));
+      }
+      if (local_flags.contains(OpenFlagsEnum::DIRECT)) {
+        return fit::error(errno(EINVAL));
+      }
     } else if (context.must_be_directory) {
       return fit::error(errno(ENOTDIR));
     }
 
-    if (flags.contains(OpenFlagsEnum::TRUNC) && mode.is_reg() && !created) {
+    if (local_flags.contains(OpenFlagsEnum::TRUNC) && local_mode.is_reg() && !created) {
       // You might think we should check file.can_write() at this
       // point, which is what the docs suggest, but apparently we
       // are supposed to truncate the file if this task can write
       // to the underlying node, even if we are opening the file
       // as read-only. See OpenTest.CanTruncateReadOnly.
-      if (auto truncate_result = name.truncate(*this, 0); truncate_result.is_error()) {
-        return truncate_result.take_error();
-      }
+      _EP(name.truncate(*this, 0));
     }
+
     return fit::ok(name);
   }() _EP(name_result);
 
@@ -1018,8 +1016,9 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   // > open() call that creates a read-only file may well return a  read/write  file
   // > descriptor.
 
-  auto _name = name_result.value();
-  return _name.open(*this, flags, !created);
+  // let access_check = if created { AccessCheck::skip() } else { access_check };
+  auto access_check = !created;
+  return name_result->open(*this, flags, access_check);
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at(

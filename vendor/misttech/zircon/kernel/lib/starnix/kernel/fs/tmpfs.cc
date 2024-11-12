@@ -16,14 +16,19 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
+#include <trace.h>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
+#include "../kernel_priv.h"
+
 #include <ktl/enforce.h>
 
 #include <linux/magic.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -139,7 +144,7 @@ fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
 
 const FsStr& TmpFs::name() { return name_; }
 
-TmpFs::~TmpFs() = default;
+TmpFs::~TmpFs() { LTRACE_ENTRY_OBJ; }
 
 TmpfsDirectory::TmpfsDirectory() : xattrs_(MemoryXattrStorage::Default()) {}
 

@@ -40,8 +40,8 @@ class SimpleDirectory;
                                    std::equal_to<ktl::string_view>,
                                    Allocator<ktl::pair<const ktl::string_view, TreeBuilder>>>;*/
 
-using HashMap = std::map<FsStr, TreeBuilder, std::less<const FsStr>,
-                         util::Allocator<ktl::pair<const FsStr, TreeBuilder>>>;
+using HashMap =
+    std::map<FsStr, TreeBuilder, std::less<>, util::Allocator<ktl::pair<const FsStr, TreeBuilder>>>;
 
 struct Directory {
   HashMap entries_;

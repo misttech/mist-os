@@ -8,9 +8,7 @@
 
 #include <lib/mistos/util/bitflags.h>
 
-// clang-format off
 #include <linux/mount.h>
-// clang-format on
 
 namespace starnix_uapi {
 

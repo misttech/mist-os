@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/starnix_uapi/unmount_flags.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
@@ -36,6 +37,7 @@ using starnix_uapi::FsCred;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
 using starnix_uapi::Access;
 using starnix_uapi::OpenFlags;
+using starnix_uapi::UnmountFlags;
 
 /// The path is reachable from the given root.
 struct Reachable {
@@ -194,6 +196,11 @@ class NamespaceNode {
   /// A task may have a custom root set by `chroot`.
   PathWithReachability path_from_root(ktl::optional<NamespaceNode>) const;
 
+  // fit::result<Errno> mount(WhatToMount what, MountFlags flags);
+
+  /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
+  fit::result<Errno> unmount(UnmountFlags flags);
+
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
@@ -206,6 +213,8 @@ class NamespaceNode {
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
 
   // C++
+  // NamespaceNode(const NamespaceNode& other);
+  NamespaceNode& operator=(const NamespaceNode& other);
   bool operator==(const NamespaceNode& other) const;
 
   ~NamespaceNode();

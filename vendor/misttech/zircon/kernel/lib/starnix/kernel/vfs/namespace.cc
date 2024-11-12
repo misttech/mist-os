@@ -60,7 +60,7 @@ LookupContext LookupContext::New(SymlinkMode _symlink_mode) {
           .remaining_follows = MAX_SYMLINK_FOLLOWS,
           .must_be_directory = false,
           .resolve_flags = ResolveFlags::empty(),
-          .resolve_base = {}};
+          .resolve_base = ResolveBase::None()};
 }
 
 LookupContext LookupContext::with(SymlinkMode _symlink_mode) {

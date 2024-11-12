@@ -122,8 +122,9 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
       return it->second;
     }
 
-    auto child = new_child<N>(name, fbl::RefPtr(this), ktl::forward<F>(create_fs_node_ops));
-    guard->try_emplace(name, child);
+    auto child = new_child<N>(name, fbl::RefPtr(this), create_fs_node_ops);
+    auto [_, inserted] = guard->try_emplace(name, child);
+    ZX_ASSERT_MSG(inserted, "Failed to insert child kobject");
     return child;
   }
 

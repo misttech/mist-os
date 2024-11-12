@@ -68,13 +68,12 @@ class FsContext : public fbl::RefCounted<FsContext> {
 
   FileMode apply_umask(FileMode mode) const;
 
-  FileMode set_umask(FileMode mode) const;
+  FileMode set_umask(FileMode umask) const;
 
- public:
   ~FsContext();
 
  private:
-  FsContext(FsContextState state);
+  explicit FsContext(FsContextState state);
 };
 
 }  // namespace starnix

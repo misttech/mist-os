@@ -124,84 +124,89 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
   auto child_result = [&]() -> fit::result<Errno, NamespaceNode> {
     if (basename.empty() || basename == ".") {
       return fit::ok(*this);
-    } else if (basename == "..") {
-      NamespaceNode root;
-      switch (context.resolve_base.type) {
-        case None:
-          root = current_task->fs()->root();
-          break;
-        case Beneath:
-          // Do not allow traversal out of the 'node'.
-          if (*this == context.resolve_base.node) {
-            return fit::error(errno(EXDEV));
-          }
-          root = current_task->fs()->root();
-          break;
-        case InRoot:
-          root = context.resolve_base.node;
-          break;
-      }
+    }
+
+    if (basename == "..") {
+      auto root =
+          ktl::visit(ResolveBase::overloaded{
+                         [&](const ktl::monostate&) -> fit::result<Errno, NamespaceNode> {
+                           return fit::ok(current_task->fs()->root());
+                         },
+                         [&](const BeneathTag& beneath) -> fit::result<Errno, NamespaceNode> {
+                           // Do not allow traversal out of the 'node'.
+                           if (*this == beneath.node) {
+                             return fit::error(errno(EXDEV));
+                           }
+                           return fit::ok(current_task->fs()->root());
+                         },
+                         [&](const InRootTag& in_root) -> fit::result<Errno, NamespaceNode> {
+                           return fit::ok(in_root.node);
+                         },
+                     },
+                     context.resolve_base.variant_) _EP(root);
 
       // Make sure this can't escape a chroot.
-      if (*this == root) {
-        return fit::ok(root);
+      if (*this == root.value()) {
+        return fit::ok(root.value());
       }
       return fit::ok(parent().value_or(*this));
-    } else {
-      auto lookup_result =
-          entry_->component_lookup(current_task, this->mount_, basename) _EP(lookup_result);
-      auto child = with_new_entry(lookup_result.value());
-      while (child.entry_->node_->is_lnk()) {
-        bool break_while = false;
-        switch (context.symlink_mode) {
-          case NoFollow:
-            break_while = true;
-            break;
-          case Follow: {
-            if ((context.remaining_follows == 0) ||
-                context.resolve_flags.contains(ResolveFlagsEnum::NO_SYMLINKS)) {
-              return fit::error(errno(ELOOP));
-            }
-            context.remaining_follows -= 1;
-            auto readlink_result = child.readlink(current_task) _EP(readlink_result);
-            auto node = ktl::visit(
-                SymlinkTarget::overloaded{
-                    [&](const FsString& link_target) -> fit::result<Errno, NamespaceNode> {
-                      NamespaceNode link_directory;
-                      if (link_target.data()[0] == '/') {
-                        switch (context.resolve_base.type) {
-                          case None:
-                            link_directory = current_task->fs()->root();
-                            break;
-                          case Beneath:
-                            return fit::error(errno(ELOOP));
-                          case InRoot:
-                            link_directory = context.resolve_base.node;
-                            break;
-                        }
-                        return current_task.lookup_path(context, link_directory,
-                                                        link_target.data());
-                      }
-                      return fit::ok(*this);
-                    },
-                    [&](const NamespaceNode& node) -> fit::result<Errno, NamespaceNode> {
-                      if (context.resolve_flags.contains(ResolveFlagsEnum::NO_MAGICLINKS)) {
-                        return fit::error(errno(ELOOP));
-                      }
-                      return fit::ok(node);
-                    },
-                },
-                readlink_result->variant_) _EP(node);
-
-            child = node.value();
-          }
-        };
-        if (break_while) {
-          break;
-        }
-      }
-      return fit::ok(child.enter_mount());
     }
+
+    auto lookup_result =
+        entry_->component_lookup(current_task, this->mount_, basename) _EP(lookup_result);
+    auto child = with_new_entry(lookup_result.value());
+    while (child.entry_->node_->is_lnk()) {
+      bool escape_while = false;
+      switch (context.symlink_mode) {
+        case SymlinkMode::NoFollow:
+          escape_while = true;
+          break;
+        case SymlinkMode::Follow: {
+          if ((context.remaining_follows == 0) ||
+              context.resolve_flags.contains(ResolveFlagsEnum::NO_SYMLINKS)) {
+            return fit::error(errno(ELOOP));
+          }
+          context.remaining_follows -= 1;
+          auto readlink_result = child.readlink(current_task) _EP(readlink_result);
+          auto node = ktl::visit(
+              SymlinkTarget::overloaded{
+                  [&](const FsString& link_target) -> fit::result<Errno, NamespaceNode> {
+                    if (link_target.data()[0] == '/') {
+                      auto link_directory = ktl::visit(
+                          ResolveBase::overloaded{
+                              [&](const ktl::monostate&) -> fit::result<Errno, NamespaceNode> {
+                                return fit::ok(current_task->fs()->root());
+                              },
+                              [&](const BeneathTag&) -> fit::result<Errno, NamespaceNode> {
+                                return fit::error(errno(ELOOP));
+                              },
+                              [&](const InRootTag& in_root) -> fit::result<Errno, NamespaceNode> {
+                                return fit::ok(in_root.node);
+                              },
+                          },
+                          context.resolve_base.variant_) _EP(link_directory);
+                      return current_task.lookup_path(context, link_directory.value(),
+                                                      link_target.data());
+                    }
+                    return fit::ok(*this);
+                  },
+                  [&](const NamespaceNode& node) -> fit::result<Errno, NamespaceNode> {
+                    if (context.resolve_flags.contains(ResolveFlagsEnum::NO_MAGICLINKS)) {
+                      return fit::error(errno(ELOOP));
+                    }
+                    return fit::ok(node);
+                  },
+              },
+              readlink_result->variant_) _EP(node);
+
+          child = node.value();
+        }
+      };
+      if (escape_while) {
+        break;
+      }
+    }
+    return fit::ok(child.enter_mount());
   }() _EP(child_result);
   auto child = child_result.value();
 
@@ -321,6 +326,10 @@ fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task,
 fit::result<Errno> NamespaceNode::truncate(const CurrentTask& current_task, uint64_t length) const {
   return fit::error(errno(ENOTSUP));
 }
+
+// NamespaceNode::NamespaceNode(const NamespaceNode& other) = default;
+
+NamespaceNode& NamespaceNode::operator=(const NamespaceNode& other) = default;
 
 NamespaceNode::~NamespaceNode() { LTRACE_ENTRY_OBJ; }
 

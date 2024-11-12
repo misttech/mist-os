@@ -495,6 +495,8 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
   FsString GetKey() const;
 
  private:
+  DISALLOW_COPY_ASSIGN_AND_MOVE(DirEntry);
+
   friend bool unit_testing::test_tmpfs();
 
   DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state);

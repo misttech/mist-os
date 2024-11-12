@@ -25,7 +25,7 @@ class FileSystem;
 class CurrentTask;
 class FsNode;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
-using BTreeMap = std::map<const FsStr, FsNodeHandle, std::less<const FsStr>,
+using BTreeMap = std::map<const FsStr, FsNodeHandle, std::less<>,
                           util::Allocator<ktl::pair<const FsStr, FsNodeHandle>>>;
 
 class SimpleDirectory : public FsNodeOps {

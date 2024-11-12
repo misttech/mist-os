@@ -64,7 +64,7 @@ class KObjectStore {
   // impl KObjectStore
 
   /// The virtual bus kobject where all virtual and pseudo devices are stored.
-  Bus virtual_bus() {
+  Bus virtual_bus() const {
     return Bus(devices_->get_or_create_child<FsNodeOps>(FsString("virtual"), KObjectDirectory::New),
                ktl::nullopt);
   }
@@ -99,7 +99,7 @@ class KObjectStore {
   /// Get a class by name.
   ///
   /// If the bus does not exist, this function will create it.
-  Class get_or_create_class(const FsString& name, Bus bus) const {
+  Class get_or_create_class(const FsString& name, const Bus& bus) const {
     auto collection =
         Collection(class_->get_or_create_child<FsNodeOps>(name, KObjectSymlinkDirectory::New));
     return Class(bus.kobject()->get_or_create_child<FsNodeOps>(name, KObjectDirectory::New), bus,
@@ -121,9 +121,8 @@ class KObjectStore {
                        F&& create_device_sysfs_ops) const {
     auto class_cloned = clazz;
     auto metadata_cloned = metadata;
-    auto device_kobject = clazz.kobject()->get_or_create_child<N>(
-        name,
-        [&create_device_sysfs_ops, class_cloned, metadata_cloned](mtl::WeakPtr<KObject> kobject) {
+    auto device_kobject =
+        clazz.kobject()->get_or_create_child<N>(name, [&](const mtl::WeakPtr<KObject>& kobject) {
           return create_device_sysfs_ops(Device(kobject.Lock(), class_cloned, metadata_cloned));
         });
 
@@ -174,7 +173,6 @@ class KObjectStore {
     kobject->remove();
   }
 
- public:
   // impl Default for KObjectStore
   static KObjectStore Default() {
     auto devices = KObject::new_root(FsString(SYSFS_DEVICES));
