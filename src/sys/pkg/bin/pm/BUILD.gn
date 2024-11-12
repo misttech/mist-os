@@ -28,15 +28,4 @@ if (is_host) {
       public_deps += [ label ]
     }
   }
-
-  go_binary("pm_bin") {
-    output_name = "pm"
-    library = "cmd/pm:main"
-    sdk_category = "partner"
-  }
-}
-
-install_host_tools("host") {
-  deps = [ ":pm_bin" ]
-  outputs = [ "pm" ]
 }

@@ -19,7 +19,6 @@ if (!is_host) {
   group("fx") {
     deps = [
       "//src/developer/ffx:ffx_tool",
-      "//src/sys/pkg/bin/pm:host",
       "//tools/bootserver_old:host",
       "//tools/net/device-finder:host",
       "//tools/symbolizer",
