@@ -12,6 +12,7 @@ rustc_library("lib") {
 
   deps = [
     "macro:lib",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/config:lib",
@@ -21,8 +22,10 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/rcs:lib_fdomain",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/fdomain/client",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
