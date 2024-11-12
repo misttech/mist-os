@@ -9,7 +9,7 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn file_resize_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_append {
+    if !harness.config.supports_truncate {
         return;
     }
 
@@ -31,7 +31,7 @@ async fn file_resize_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_resize_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_append {
+    if !harness.config.supports_truncate {
         return;
     }
 

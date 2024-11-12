@@ -690,7 +690,7 @@ async fn open3_file_append() {
 async fn open3_file_truncate_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_append {
+    if !harness.config.supports_truncate {
         return;
     }
 
@@ -710,7 +710,7 @@ async fn open3_file_truncate_invalid() {
 async fn open3_file_truncate() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_append {
+    if !harness.config.supports_truncate {
         return;
     }
 

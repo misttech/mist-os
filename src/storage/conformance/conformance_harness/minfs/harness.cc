@@ -76,6 +76,7 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
     // Supported options
     config.supports_get_token(true);
     config.supports_append(true);
+    config.supports_truncate(true);
     config.supports_modify_directory(true);
     config.supports_mutable_file(true);
     config.supported_attributes(

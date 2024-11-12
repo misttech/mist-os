@@ -43,6 +43,12 @@ impl TestHarness {
         if config.supports_append {
             assert!(config.supports_mutable_file, "Files supporting append must also be mutable.");
         }
+        if config.supports_truncate {
+            assert!(
+                config.supports_mutable_file,
+                "Files supporting truncate must also be mutable."
+            );
+        }
 
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));

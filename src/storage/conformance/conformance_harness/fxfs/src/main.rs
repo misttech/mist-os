@@ -67,6 +67,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                     supports_get_token: true,
                     supports_link_into: true,
                     supports_append: true,
+                    supports_truncate: true,
                     supports_modify_directory: true,
                     supports_mutable_file: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS

@@ -51,6 +51,9 @@ type HarnessConfig = struct {
     /// Files can be opened in append mode.
     supports_append bool;
 
+    /// Files can be truncated (resized).
+    supports_truncate bool;
+
     /// The set of attributes the filesystem supports. If mutable attributes are reported, the
     /// harness must support [`fuchsia.io/Node.SetAttr`] and [`fuchsia.io/Node.UpdateAttributes`].
     supported_attributes fuchsia.io.NodeAttributesQuery;

@@ -86,6 +86,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                     supports_link_into: false,
                     supports_get_token: false,
                     supports_append: false,
+                    supports_truncate: false,
                     supports_modify_directory: false,
                     supports_mutable_file: false,
                 };
