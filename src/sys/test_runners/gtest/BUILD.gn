@@ -67,6 +67,8 @@ rustc_binary("gtest_bin") {
   with_unit_tests = true
   edition = "2021"
 
+  configs += [ "//build/config/rust:bootfs" ]
+
   features = [ "gtest" ]
 
   deps = common_deps

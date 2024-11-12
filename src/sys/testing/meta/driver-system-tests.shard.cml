@@ -1,0 +1,36 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    collections: [
+        {
+            name: "driver-system-tests",
+            environment: "#test-env",
+            durability: "transient",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#driver-system-tests",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.driver.development.Manager",
+            from: "parent",
+            to: "#driver-system-tests",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "destroyed",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#driver-system-tests",
+            scope: "#driver-system-tests",
+        },
+    ],
+}

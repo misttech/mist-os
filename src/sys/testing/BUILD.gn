@@ -10,6 +10,13 @@ fuchsia_component("test_realm") {
   manifest = "meta/test_realm.cml"
 }
 
+# This is brought directly into the test_manager's 'pkg_for_bootstrap' target.
+fuchsia_component("bootstrap_test_realm") {
+  testonly = true
+  component_name = "bootstrap_test_realm"
+  manifest = "meta/bootstrap_test_realm.cml"
+}
+
 fuchsia_package("testing") {
   testonly = true
   package_name = "testing"

@@ -16,6 +16,8 @@ type_moniker_map = {
   test_arch = "/core/testing:test-arch-tests"
   vfs_compliance = "/core/testing:vfs-compliance-tests"
   vulkan = "/core/testing:vulkan-tests"
+  bootstrap_driver_system = "/bootstrap/testing:driver-system-tests"
+  driver_system = "/core/testing:driver-system-tests"
 }
 
 # Defines a Fuchsia component that is testonly.

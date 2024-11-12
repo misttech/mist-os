@@ -2507,6 +2507,46 @@ assembly_input_bundle("nanohub_support") {
   ]
 }
 
+# This AIB enables minimal testing support for bootstrap environments, and is meant to be used with
+# the `bootstrap_eng` AIB.
+#
+# This includes testing support in the bootfs packages.
+assembly_input_bundle("testing_support_bootstrap") {
+  testonly = true
+
+  bootfs_packages = [
+    # The test runner command.
+    "//src/sys/run_test_suite:package",
+
+    # test-manager and all of its runners, dependencies, and testing realms
+    # are in the same package and loaded using relative urls.
+    "//src/sys/test_manager:pkg_for_bootstrap",
+  ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [
+            "//src/sys/test_manager/meta/test_manager.bootstrap_shard.cml",
+            "//src/sys/testing/meta/test_realm.bootstrap_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+
+  shell_commands = [
+    {
+      bootfs_package = true
+      package = "run-test-suite"
+      components = [ "run-test-suite" ]
+    },
+  ]
+}
+
 # This AIB enables testing support, and is meant to be used with either the
 # `common_standard_eng` and `common_standard_userdebug` AIBs.
 #

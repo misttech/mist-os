@@ -157,6 +157,14 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("partitioning_tools");
         }
 
+        if config.include_bootstrap_testing_framework {
+            context.ensure_feature_set_level(
+                &[FeatureSupportLevel::Bootstrap],
+                "Bootstrap Testing Framework",
+            )?;
+            builder.platform_bundle("testing_support_bootstrap");
+        }
+
         Ok(())
     }
 }

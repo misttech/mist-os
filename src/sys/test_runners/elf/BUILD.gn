@@ -40,6 +40,9 @@ rustc_binary("bin") {
   edition = "2021"
   testonly = true
   name = "elf_test_runner"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
   deps = [
     "//src/lib/fuchsia",
     "//src/sys/test_runners/elf:lib",

@@ -58,6 +58,9 @@ product_assembly_configuration("product_assembly_config") {
     }
     development_support = {
       include_netsvc = true
+      if (include_bringup_test_support) {
+        include_bootstrap_testing_framework = true
+      }
     }
     storage = {
       filesystems = {

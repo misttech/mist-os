@@ -14,6 +14,9 @@
         "//src/sys/component_manager/tests/capability_provider_vfs_compliance/vfs_compliance_test_realm.shard.cml",
         "//src/sys/testing/meta/chromium_test_realm.shard.cml",
 
+        // Required: Include various test collections/realms.
+        "//src/sys/testing/meta/driver-system-tests.shard.cml",
+
         // Optional: Include optional runners.
         "//src/sys/testing/meta/runners/fuzz-test-runner.shard.cml",
         "//src/sys/testing/meta/runners/inspect-test-runner.shard.cml",
@@ -21,8 +24,6 @@
         "//src/sys/testing/meta/runners/standard-test-runners.shard.cml",
         "//src/sys/testing/meta/runners/starnix-test-runner.shard.cml",
         "//src/sys/testing/meta/runners/stress-test-runner.shard.cml",
-
-        // Required: Include various test collections/realms.
         "//src/sys/testing/meta/starnix-tests.shard.cml",
         "//src/sys/testing/meta/system-tests.shard.cml",
         "//src/sys/testing/meta/test-arch-tests.shard.cml",

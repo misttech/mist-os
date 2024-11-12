@@ -124,6 +124,8 @@ rustc_binary("bin") {
   with_unit_tests = true
   edition = "2021"
 
+  configs += [ "//build/config/rust:bootfs" ]
+
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
@@ -232,12 +234,20 @@ fuchsia_package("pkg") {
 fuchsia_package("pkg_for_bootstrap") {
   testonly = true
   package_name = "test_manager"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//bundles/assembly:*",
+  ]
   deps = [
     ":test_manager_for_bootstrap_cmp",
     "debug_data_processor",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
     "//src/storage/memfs:memfs_component",
+    "//src/sys/test_runners/elf:elf-test-runner-component",
+    "//src/sys/test_runners/gtest:gtest-runner-component",
+    "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache_cmp",
+    "//src/sys/testing:bootstrap_test_realm",
   ]
 }
 

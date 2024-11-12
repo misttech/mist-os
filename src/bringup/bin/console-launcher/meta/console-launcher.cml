@@ -204,5 +204,17 @@
             // The source of this protocol may not be available on all products.
             availability: "optional",
         },
+        {
+            // Used by run-test-suite.
+            protocol: [
+                "fuchsia.test.manager.Query",
+                "fuchsia.test.manager.RunBuilder",
+                "fuchsia.test.manager.SuiteRunner",
+                "fuchsia.test.manager.TestCaseEnumerator",
+            ],
+
+            // The source of this protocol may not be available on all products.
+            availability: "optional",
+        },
     ],
 }

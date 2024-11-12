@@ -329,6 +329,15 @@
                     "/core/sshd-host/shell:**",
                 ],
             },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/test_manager",
+                ],
+            },
         ],
         debug_registration_policy: [
             {
@@ -341,7 +350,19 @@
                 debug: "protocol",
                 environment_name: "test-env",
                 name: "fuchsia.debugdata.Publisher",
+                moniker: "/bootstrap/test_manager/**",
+            },
+            {
+                debug: "protocol",
+                environment_name: "test-env",
+                name: "fuchsia.debugdata.Publisher",
                 moniker: "/core/testing/**",
+            },
+            {
+                debug: "protocol",
+                environment_name: "test-env",
+                name: "fuchsia.debugdata.Publisher",
+                moniker: "/bootstrap/testing/**",
             },
             {
                 debug: "protocol",
@@ -354,6 +375,12 @@
                 environment_name: "test-env",
                 name: "fuchsia.debugdata.DebugData",
                 moniker: "/core/test_manager",
+            },
+            {
+                debug: "protocol",
+                environment_name: "test-env",
+                name: "fuchsia.debugdata.DebugData",
+                moniker: "/bootstrap/test_manager",
             },
         ],
     },

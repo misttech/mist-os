@@ -96,7 +96,12 @@ impl RunningSuite {
 
         let test_package = match AbsoluteComponentUrl::parse(test_url) {
             Ok(component_url) => component_url.package_url().name().to_string(),
-            Err(_) => return Err(LaunchTestError::InvalidResolverData),
+            Err(_) => match fuchsia_url::boot_url::BootUrl::parse(test_url) {
+                Ok(boot_url) => boot_url.path().to_string(),
+                Err(_) => {
+                    return Err(LaunchTestError::InvalidResolverData);
+                }
+            },
         };
         above_root_capabilities_for_test
             .validate(facets.collection)
