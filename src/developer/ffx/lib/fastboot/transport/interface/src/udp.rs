@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context as _, Result};
-use async_io::Async;
-use async_net::UdpSocket;
 use byteorder::{BigEndian, ByteOrder};
 use futures::io::{AsyncRead, AsyncWrite};
 use futures::task::{Context, Poll};
@@ -14,8 +12,10 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::Wrapping;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::time::Duration;
 use timeout::timeout;
+use tokio::net::UdpSocket;
 use zerocopy::byteorder::big_endian::U16;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
@@ -72,7 +72,7 @@ impl<B: SplitByteSlice> Packet<B> {
 pub struct UdpNetworkInterface {
     maximum_size: u16,
     sequence: Wrapping<u16>,
-    socket: UdpSocket,
+    socket: Rc<UdpSocket>,
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
 }
@@ -284,7 +284,7 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     );
 
     Ok(UdpNetworkInterface {
-        socket,
+        socket: socket.into(),
         maximum_size,
         sequence: Wrapping(sequence + 1),
         read_task: None,
@@ -332,7 +332,7 @@ async fn make_sender_socket(addr: SocketAddr) -> Result<UdpSocket> {
         .context("construct datagram socket")?,
     }
     .into();
-    let result: UdpSocket = Async::new(socket)?.into();
+    let result = UdpSocket::from_std(socket)?;
     result.connect(addr).await.context("connect to remote address")?;
     Ok(result)
 }

@@ -21,7 +21,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:async-net",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tokio",

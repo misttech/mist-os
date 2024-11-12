@@ -5,7 +5,6 @@
 use crate::{Config, ManualTargets};
 
 use anyhow::{anyhow, Context as _, Result};
-use async_net::TcpStream;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::Fastboot;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
@@ -14,11 +13,13 @@ use ffx_fastboot_interface::interface_factory::{
 };
 use ffx_fastboot_transport_interface::tcp::{open_once, TcpNetworkInterface};
 use fuchsia_async::{Task, Timer};
+use netext::TokioAsyncWrapper;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fmt::Display;
 use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
+use tokio::net::TcpStream;
 
 #[derive(Debug, PartialEq)]
 pub enum ManualTargetEvent {
@@ -265,13 +266,19 @@ where
 //
 
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
-async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface<TcpStream>>> {
+async fn tcp_proxy(
+    addr: &SocketAddr,
+) -> Result<FastbootProxy<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>>> {
     let mut factory = OneshotTcpFactory::new(*addr);
     let interface = factory
         .open()
         .await
         .with_context(|| format!("connecting via TCP to Fastboot address: {addr}"))?;
-    Ok(FastbootProxy::<TcpNetworkInterface<TcpStream>>::new(addr.to_string(), interface, factory))
+    Ok(FastbootProxy::<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>>::new(
+        addr.to_string(),
+        interface,
+        factory,
+    ))
 }
 
 #[derive(Debug, Clone)]
@@ -286,11 +293,14 @@ impl OneshotTcpFactory {
 }
 
 #[async_trait(?Send)]
-impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for OneshotTcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface<TcpStream>, InterfaceFactoryError> {
+impl InterfaceFactoryBase<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for OneshotTcpFactory {
+    async fn open(
+        &mut self,
+    ) -> Result<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>, InterfaceFactoryError> {
         let interface = open_once(&self.addr, Duration::from_secs(1))
             .await
             .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
+
         Ok(interface)
     }
 
@@ -304,7 +314,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for OneshotTcpFactory 
     }
 }
 
-impl InterfaceFactory<TcpNetworkInterface<TcpStream>> for OneshotTcpFactory {}
+impl InterfaceFactory<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for OneshotTcpFactory {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Tests

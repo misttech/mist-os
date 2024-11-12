@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Result};
-use async_net::TcpStream;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
@@ -13,9 +12,11 @@ use ffx_fastboot_transport_factory::udp::UdpFactory;
 use ffx_fastboot_transport_factory::usb::UsbFactory;
 use ffx_fastboot_transport_interface::tcp::TcpNetworkInterface;
 use ffx_fastboot_transport_interface::udp::UdpNetworkInterface;
+use netext::TokioAsyncWrapper;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use thiserror::Error;
+use tokio::net::TcpStream;
 use usb_bulk::AsyncInterface;
 
 #[derive(Error, Debug, Clone)]
@@ -149,7 +150,7 @@ pub async fn tcp_proxy(
     fastboot_device_file_path: Option<PathBuf>,
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
-) -> Result<FastbootProxy<TcpNetworkInterface<TcpStream>>> {
+) -> Result<FastbootProxy<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>>> {
     if target_name.is_empty() {
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
@@ -165,7 +166,11 @@ pub async fn tcp_proxy(
         .open()
         .await
         .with_context(|| format!("FastbootProxy connecting via TCP to Fastboot address: {addr}"))?;
-    Ok(FastbootProxy::<TcpNetworkInterface<TcpStream>>::new(addr.to_string(), interface, factory))
+    Ok(FastbootProxy::<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>>::new(
+        addr.to_string(),
+        interface,
+        factory,
+    ))
 }
 
 ///////////////////////////////////////////////////////////////////////////////
