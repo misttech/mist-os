@@ -156,11 +156,9 @@ impl OpenRequestHandler for OpenFailOrTempFs {
         } else {
             let (tempdir_proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            fdio::open_deprecated(
+            fdio::open(
                 self.tempdir.path().to_str().unwrap(),
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
                 server_end.into_channel(),
             )
             .unwrap();
@@ -235,11 +233,9 @@ impl WriteFailOrTempFs {
         let (tempdir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        fdio::open_deprecated(
+        fdio::open(
             tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
             server_end.into_channel(),
         )
         .expect("open temp directory");
@@ -527,11 +523,9 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         // Set up proxy to tmpdir and delegate to it on success.
         let (tempdir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::open_deprecated(
+        fdio::open(
             self.tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
             server_end.into_channel(),
         )
         .unwrap();
