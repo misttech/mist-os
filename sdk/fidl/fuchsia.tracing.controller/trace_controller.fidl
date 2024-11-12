@@ -60,7 +60,7 @@ open protocol Provisioner {
     flexible InitializeTracing(resource struct {
         controller server_end:Session;
         config TraceConfig;
-        output zx.Handle:SOCKET;
+        output zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 
     /// Return the set of registered providers.
