@@ -61,12 +61,15 @@ impl TestHarness {
     /// Creates a [`fio::DirectoryProxy`] with the given root directory structure.
     pub fn get_directory(
         &self,
-        root: io_test::Directory,
+        entries: Vec<io_test::DirectoryEntry>,
         flags: fio::OpenFlags,
     ) -> fio::DirectoryProxy {
+        let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
+            entries.into_iter().map(|e| Some(Box::new(e))).collect();
+        let directory = io_test::Directory { name: "/".to_string(), entries };
         let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("Cannot create proxy");
         self.proxy
-            .get_directory(root, flags, server)
+            .get_directory(directory, flags, server)
             .expect("Cannot get directory from test harness");
         client
     }

@@ -213,8 +213,7 @@ pub async fn create_file_and_get_backing_memory(
     vmo_flags: fio::VmoFlags,
 ) -> Result<(zx::Vmo, (fio::DirectoryProxy, fio::FileProxy)), zx::Status> {
     let file_path = get_directory_entry_name(&dir_entry);
-    let root = root_directory(vec![dir_entry]);
-    let dir_proxy = test_harness.get_directory(root, file_flags);
+    let dir_proxy = test_harness.get_directory(vec![dir_entry], file_flags);
     let file_proxy = open_node_status::<fio::FileMarker>(
         &dir_proxy,
         file_flags | fio::OpenFlags::NOT_DIRECTORY,
@@ -229,19 +228,11 @@ pub async fn create_file_and_get_backing_memory(
     Ok((vmo, (dir_proxy, file_proxy)))
 }
 
-/// Constructs a directory from a set of directory entries.
-pub fn root_directory(entries: Vec<io_test::DirectoryEntry>) -> io_test::Directory {
-    // Convert the simple vector of entries into the convoluted FIDL field type.
+/// Makes a directory with a name and set of entries.
+pub fn directory(name: &str, entries: Vec<io_test::DirectoryEntry>) -> io_test::DirectoryEntry {
     let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
         entries.into_iter().map(|e| Some(Box::new(e))).collect();
-    io_test::Directory { name: "/".to_string(), entries }
-}
-
-/// Makes a subdirectory with a name and a set of entries.
-pub fn directory(name: &str, entries: Vec<io_test::DirectoryEntry>) -> io_test::DirectoryEntry {
-    let mut dir = root_directory(entries);
-    dir.name = name.to_string();
-    io_test::DirectoryEntry::Directory(dir)
+    io_test::DirectoryEntry::Directory(io_test::Directory { name: name.to_string(), entries })
 }
 
 /// Makes a remote directory with a name, which forwards the requests to the given directory proxy.

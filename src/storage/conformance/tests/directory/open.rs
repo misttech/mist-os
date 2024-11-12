@@ -11,15 +11,13 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn open_dir_without_describe_flag() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         assert_eq!(dir_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
-        root_dir
-            .open(dir_flags | fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), ".", server)
+        dir.open(dir_flags | fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), ".", server)
             .expect("Cannot open directory");
 
         assert_on_open_not_received(&client).await;
@@ -32,18 +30,17 @@ async fn open_file_without_describe_flag() {
 
     for file_flags in harness.file_rights.combinations_deprecated() {
         assert_eq!(file_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
-        test_dir
-            .open(
-                file_flags | fio::OpenFlags::NOT_DIRECTORY,
-                fio::ModeType::empty(),
-                TEST_FILE,
-                server,
-            )
-            .expect("Cannot open file");
+        dir.open(
+            file_flags | fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
+            TEST_FILE,
+            server,
+        )
+        .expect("Cannot open file");
 
         assert_on_open_not_received(&client).await;
     }
@@ -52,12 +49,10 @@ async fn open_file_without_describe_flag() {
 #[fuchsia::test]
 async fn open1_epitaph_no_describe() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
 
     let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
-    root_dir
-        .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "does_not_exist", server)
+    dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "does_not_exist", server)
         .expect("Open should not fail!");
     // Since Open1 is asynchronous, we need to invoke another method on the channel to check that
     // opening failed.
@@ -73,12 +68,12 @@ async fn open1_epitaph_no_describe() {
 async fn open_path() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![directory("dir", vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![directory("dir", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
     // Valid paths:
     for path in [".", "/", "/dir/"] {
-        open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, path).await;
+        open_node::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_READABLE, path).await;
     }
 
     // Invalid paths:
@@ -87,7 +82,7 @@ async fn open_path() {
         "/dir/./", "/dir/.", "/./", "./dir",
     ] {
         assert_eq!(
-            open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, path)
+            open_node_status::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_READABLE, path)
                 .await
                 .expect_err("open succeeded"),
             zx::Status::INVALID_ARGS,
@@ -101,11 +96,10 @@ async fn open_path() {
 #[fuchsia::test]
 async fn open_trailing_slash_with_not_directory() {
     let harness = TestHarness::new().await;
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
     assert_eq!(
         open_node_status::<fio::NodeMarker>(
-            &root_dir,
+            &dir,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/"
         )
@@ -120,9 +114,9 @@ async fn open_trailing_slash_with_not_directory() {
 async fn validate_directory_rights() {
     let harness = TestHarness::new().await;
     // Create a test directory and ensure we can open it with all supported rights.
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let _root_dir = harness.get_directory(
-        root,
+    let entries = vec![file(TEST_FILE, vec![])];
+    let _dir = harness.get_directory(
+        entries,
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -134,30 +128,26 @@ async fn validate_directory_rights() {
 async fn validate_file_rights() {
     let harness = TestHarness::new().await;
     // Create a test directory with a single File object, and ensure the directory has all rights.
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
     // Opening as READABLE must succeed.
-    open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+    open_node::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
     if harness.config.supports_mutable_file {
         // Opening as WRITABLE must succeed.
-        open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+        open_node::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
     } else {
         // Opening as WRITABLE must fail.
         assert_eq!(
-            open_node_status::<fio::NodeMarker>(
-                &root_dir,
-                fio::OpenFlags::RIGHT_WRITABLE,
-                TEST_FILE
-            )
-            .await
-            .expect_err("Opening as writable should fail"),
+            open_node_status::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE)
+                .await
+                .expect_err("Opening as writable should fail"),
             zx::Status::ACCESS_DENIED
         );
     }
     // An executable file wasn't created, opening as EXECUTABLE must fail.
-    open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
+    open_node_status::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
         .await
         .expect_err("open succeeded");
 }
@@ -170,18 +160,18 @@ async fn validate_executable_file_rights() {
         return;
     }
     // Create a test directory with an ExecutableFile object, and ensure the directory has all rights.
-    let root = root_directory(vec![executable_file(TEST_FILE)]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![executable_file(TEST_FILE)];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
     // Opening with READABLE/EXECUTABLE should succeed.
     open_node::<fio::NodeMarker>(
-        &root_dir,
+        &dir,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         TEST_FILE,
     )
     .await;
     // Opening with WRITABLE must fail to ensure W^X enforcement.
     assert_eq!(
-        open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE)
+        open_node_status::<fio::NodeMarker>(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE)
             .await
             .expect_err("open succeeded"),
         zx::Status::ACCESS_DENIED
@@ -193,19 +183,17 @@ async fn validate_executable_file_rights() {
 async fn open_dir_with_sufficient_rights() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
-        root_dir
-            .open(
-                dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
-                ".",
-                server,
-            )
-            .expect("Cannot open directory");
+        dir.open(
+            dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server,
+        )
+        .expect("Cannot open directory");
 
         assert_eq!(get_open_status(&client).await, zx::Status::OK);
     }
@@ -216,22 +204,20 @@ async fn open_dir_with_sufficient_rights() {
 async fn open_dir_with_insufficient_rights() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, fio::OpenFlags::empty());
+    let dir = harness.get_directory(vec![], fio::OpenFlags::empty());
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         if dir_flags.is_empty() {
             continue;
         }
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
-        root_dir
-            .open(
-                dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
-                ".",
-                server,
-            )
-            .expect("Cannot open directory");
+        dir.open(
+            dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server,
+        )
+        .expect("Cannot open directory");
 
         assert_eq!(get_open_status(&client).await, zx::Status::ACCESS_DENIED);
     }
@@ -243,15 +229,12 @@ async fn open_child_dir_with_same_rights() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
-        let root = root_directory(vec![directory("child", vec![])]);
-        let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let entries = vec![directory("child", vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
-        let parent_dir = open_node::<fio::DirectoryMarker>(
-            &root_dir,
-            dir_flags | fio::OpenFlags::DIRECTORY,
-            ".",
-        )
-        .await;
+        let parent_dir =
+            open_node::<fio::DirectoryMarker>(&dir, dir_flags | fio::OpenFlags::DIRECTORY, ".")
+                .await;
 
         // Open child directory with same flags as parent.
         let (child_dir_client, child_dir_server) =
@@ -274,12 +257,12 @@ async fn open_child_dir_with_same_rights() {
 async fn open_child_dir_with_extra_rights() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![directory("child", vec![])]);
-    let root_dir = harness.get_directory(root, fio::OpenFlags::RIGHT_READABLE);
+    let entries = vec![directory("child", vec![])];
+    let dir = harness.get_directory(entries, fio::OpenFlags::RIGHT_READABLE);
 
     // Open parent as readable.
     let parent_dir = open_node::<fio::DirectoryMarker>(
-        &root_dir,
+        &dir,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         ".",
     )
@@ -307,15 +290,12 @@ async fn open_child_dir_with_posix_flags() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
-        let root = root_directory(vec![directory("child", vec![])]);
-        let root_dir = harness.get_directory(root, dir_flags);
+        let entries = vec![directory("child", vec![])];
+        let dir = harness.get_directory(entries, dir_flags);
         let readable = dir_flags & fio::OpenFlags::RIGHT_READABLE;
-        let parent_dir = open_node::<fio::DirectoryMarker>(
-            &root_dir,
-            dir_flags | fio::OpenFlags::DIRECTORY,
-            ".",
-        )
-        .await;
+        let parent_dir =
+            open_node::<fio::DirectoryMarker>(&dir, dir_flags | fio::OpenFlags::DIRECTORY, ".")
+                .await;
 
         let (child_dir_client, child_dir_server) =
             create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
@@ -366,16 +346,13 @@ async fn open_file_with_extra_rights() {
         ),
     ];
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
     for (dir_flags, file_flag_combos) in test_right_combinations.iter() {
-        let dir_proxy = open_node::<fio::DirectoryMarker>(
-            &root_dir,
-            *dir_flags | fio::OpenFlags::DIRECTORY,
-            ".",
-        )
-        .await;
+        let dir_proxy =
+            open_node::<fio::DirectoryMarker>(&dir, *dir_flags | fio::OpenFlags::DIRECTORY, ".")
+                .await;
 
         for file_flags in file_flag_combos {
             if file_flags.is_empty() {
@@ -418,19 +395,17 @@ async fn open3_rights() {
     let harness = TestHarness::new().await;
 
     const CONTENT: &[u8] = b"content";
-    let test_dir = harness.get_directory(
-        root_directory(vec![file(TEST_FILE, CONTENT.to_vec())]),
-        fio::OpenFlags::RIGHT_READABLE,
-    );
+    let dir = harness
+        .get_directory(vec![file(TEST_FILE, CONTENT.to_vec())], fio::OpenFlags::RIGHT_READABLE);
     // Should fail to open the file if the rights exceed those allowed by the directory.
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PERM_WRITE, None)
         .await
         .expect_err("open should fail if rights exceed those of the parent connection");
     assert_eq!(status, zx::Status::ACCESS_DENIED);
 
     // Calling open3 with no rights set is the same as calling open3 with empty rights.
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::PROTOCOL_FILE, None)
         .await
         .unwrap();
@@ -440,7 +415,7 @@ async fn open3_rights() {
     );
 
     // Opening with rights that the connection has should succeed.
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::FileMarker>(
             &TEST_FILE,
             fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
@@ -464,10 +439,8 @@ async fn open3_rights() {
 async fn open3_invalid() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
     // It's an error to specify more than one protocol when trying to create an object.
     for create_flag in [
@@ -476,7 +449,7 @@ async fn open3_invalid() {
         // FLAG_MUST_CREATE takes precedence over FLAG_MAYBE_CREATE.
         fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::FLAG_MUST_CREATE,
     ] {
-        let status = test_dir
+        let status = dir
             .open3_node::<fio::NodeMarker>(
                 "file",
                 fio::Flags::PROTOCOL_FILE | fio::Flags::PROTOCOL_DIRECTORY | create_flag,
@@ -496,12 +469,10 @@ async fn open3_create_dot_fails_with_already_exists() {
         return;
     }
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::DirectoryMarker>(
             ".",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
@@ -516,13 +487,13 @@ async fn open3_create_dot_fails_with_already_exists() {
 async fn open3_open_directory() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![directory("dir", vec![])]),
+    let dir = harness.get_directory(
+        vec![directory("dir", vec![])],
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
     // Should be able to open using the directory protocol.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_DIRECTORY,
@@ -533,14 +504,14 @@ async fn open3_open_directory() {
     assert_matches!(representation, fio::Representation::Directory(_));
 
     // Should also be able to open without specifying an exact protocol due to protocol resolution.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_SEND_REPRESENTATION, None)
         .await
         .expect("open using node protocol resolution failed");
     assert_matches!(representation, fio::Representation::Directory(_));
 
     // Should be able to open the file specifying multiple protocols as long as one matches.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::FileMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION
@@ -554,7 +525,7 @@ async fn open3_open_directory() {
     assert_matches!(representation, fio::Representation::Directory(_));
 
     // Attempting to open the directory as a file should fail with ZX_ERR_NOT_FILE.
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::NodeMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_FILE,
@@ -567,7 +538,7 @@ async fn open3_open_directory() {
     // Attempting to open with file protocols should fail with ZX_ERR_INVALID_ARGS. It is worth
     // noting that the behaviour for opening file flags with directory is not clearly defined. Linux
     // allows opening a directory with `O_APPEND` but not `O_TRUNC`.
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::NodeMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION
@@ -580,7 +551,7 @@ async fn open3_open_directory() {
     assert_eq!(status, zx::Status::INVALID_ARGS);
 
     // Attempting to open the directory as a symbolic link should fail with ZX_ERR_WRONG_TYPE.
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::NodeMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_SYMLINK,
@@ -596,13 +567,13 @@ async fn open3_open_file() {
     let harness = TestHarness::new().await;
 
     const CONTENT: &[u8] = b"content";
-    let test_dir = harness.get_directory(
-        root_directory(vec![file("file", CONTENT.to_vec())]),
+    let dir = harness.get_directory(
+        vec![file("file", CONTENT.to_vec())],
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
     // Should be able to open the file specifying just the file protocol.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::FileMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_FILE,
@@ -613,14 +584,14 @@ async fn open3_open_file() {
     assert_matches!(representation, fio::Representation::File(_));
 
     // Should also be able to open without specifying an exact protocol due to protocol resolution.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::FileMarker>("file", fio::Flags::FLAG_SEND_REPRESENTATION, None)
         .await
         .expect("failed to open file with protocol resolution");
     assert_matches!(representation, fio::Representation::File(_));
 
     // Should be able to open the file specifying multiple protocols as long as one matches.
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::FileMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION
@@ -634,7 +605,7 @@ async fn open3_open_file() {
     assert_matches!(representation, fio::Representation::File(_));
 
     // Attempting to open the file as a directory should fail with ZX_ERR_NOT_DIR.
-    let status = test_dir
+    let status = dir
         .open3_node_repr::<fio::NodeMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_DIRECTORY,
@@ -645,7 +616,7 @@ async fn open3_open_file() {
     assert_eq!(status, zx::Status::NOT_DIR);
 
     // Attempting to open the file as a symbolic link should fail with ZX_ERR_WRONG_TYPE.
-    let status = test_dir
+    let status = dir
         .open3_node_repr::<fio::NodeMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_SYMLINK,
@@ -664,12 +635,12 @@ async fn open3_file_append() {
         return;
     }
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![file("file", b"foo".to_vec())]),
+    let dir = harness.get_directory(
+        vec![file("file", b"foo".to_vec())],
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::FileMarker>(
             "file",
             fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_APPEND,
@@ -694,12 +665,10 @@ async fn open3_file_truncate_invalid() {
         return;
     }
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![file("file", b"foo".to_vec())]),
-        fio::OpenFlags::RIGHT_READABLE,
-    );
+    let dir =
+        harness.get_directory(vec![file("file", b"foo".to_vec())], fio::OpenFlags::RIGHT_READABLE);
 
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::FileMarker>("file", fio::Flags::FILE_TRUNCATE, None)
         .await
         .expect_err("open with truncate requires rights to write bytes");
@@ -714,12 +683,12 @@ async fn open3_file_truncate() {
         return;
     }
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![file("file", b"foo".to_vec())]),
+    let dir = harness.get_directory(
+        vec![file("file", b"foo".to_vec())],
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::FileMarker>(
             "file",
             fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_TRUNCATE,
@@ -735,9 +704,9 @@ async fn open3_file_truncate() {
 async fn open3_directory_get_representation() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(root_directory(vec![]), fio::OpenFlags::RIGHT_READABLE);
+    let dir = harness.get_directory(vec![], fio::OpenFlags::RIGHT_READABLE);
 
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::DirectoryMarker>(
             ".",
             fio::Flags::FLAG_SEND_REPRESENTATION,
@@ -771,10 +740,9 @@ async fn open3_directory_get_representation() {
 async fn open3_file_get_representation() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness
-        .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
+    let dir = harness.get_directory(vec![file("file", vec![])], fio::OpenFlags::RIGHT_READABLE);
 
-    let (_, representation) = test_dir
+    let (_, representation) = dir
         .open3_node_repr::<fio::FileMarker>(
             "file",
             fio::Flags::FLAG_SEND_REPRESENTATION
@@ -815,12 +783,10 @@ async fn open3_file_get_representation() {
 async fn open3_dir_optional_rights() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
-    let proxy = test_dir
+    let proxy = dir
         .open3_node::<fio::DirectoryMarker>(
             ".",
             fio::Flags::PROTOCOL_DIRECTORY
@@ -842,14 +808,12 @@ async fn open3_dir_optional_rights() {
 async fn open3_request_attributes_rights_failure() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![]),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
     // Open with no rights.
     let proxy =
-        test_dir.open3_node::<fio::DirectoryMarker>(".", fio::Flags::empty(), None).await.unwrap();
+        dir.open3_node::<fio::DirectoryMarker>(".", fio::Flags::empty(), None).await.unwrap();
 
     // Requesting attributes when re-opening via `proxy` should fail without `PERM_GET_ATTRIBUTES`.
     assert_matches!(
@@ -871,13 +835,13 @@ async fn open3_request_attributes_rights_failure() {
 async fn open3_open_existing_directory() {
     let harness = TestHarness::new().await;
 
-    let test_dir = harness.get_directory(
-        root_directory(vec![directory("dir", vec![])]),
+    let dir = harness.get_directory(
+        vec![directory("dir", vec![])],
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
     // Should not be able to open non-existing directory entry without `FLAG_*_CREATE`.
-    let status = test_dir
+    let status = dir
         .open3_node::<fio::NodeMarker>(
             "this_path_does_not_exist",
             fio::Flags::PROTOCOL_DIRECTORY,
@@ -887,23 +851,22 @@ async fn open3_open_existing_directory() {
         .expect_err("should fail to open non-existing entry when OpenExisting is set");
     assert_eq!(status, zx::Status::NOT_FOUND);
 
-    test_dir
-        .open3_node::<fio::NodeMarker>(
-            "dir",
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE,
-            None,
-        )
-        .await
-        .expect("failed to open existing entry");
+    dir.open3_node::<fio::NodeMarker>(
+        "dir",
+        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE,
+        None,
+    )
+    .await
+    .expect("failed to open existing entry");
 }
 
 #[fuchsia::test]
 async fn open3_directory_as_node_reference() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-    let directory_proxy = test_dir
+    let entries = vec![directory("dir", vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let directory_proxy = dir
         .open3_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY
@@ -934,9 +897,9 @@ async fn open3_directory_as_node_reference() {
 async fn open3_file_as_node_reference() {
     let harness = TestHarness::new().await;
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
-    let file_proxy = test_dir
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let file_proxy = dir
         .open3_node::<fio::FileMarker>(
             TEST_FILE,
             fio::Flags::PROTOCOL_FILE | fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,

@@ -10,7 +10,7 @@ const CONTENTS: &[u8] = b"abcdef";
 
 struct Fixture {
     _harness: TestHarness,
-    test_dir: fio::DirectoryProxy,
+    dir: fio::DirectoryProxy,
     file: fio::FileProxy,
 }
 
@@ -21,17 +21,16 @@ impl Fixture {
             return None;
         }
 
-        let root =
-            root_directory(vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let entries = vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
-        let file = open_file_with_flags(&test_dir, rights, TEST_FILE).await;
+        let file = open_file_with_flags(&dir, rights, TEST_FILE).await;
 
-        Some(Self { _harness: harness, test_dir, file })
+        Some(Self { _harness: harness, dir, file })
     }
 
     async fn get_token(&self) -> zx::Event {
-        io_conformance_util::get_token(&self.test_dir).await.into()
+        io_conformance_util::get_token(&self.dir).await.into()
     }
 }
 
@@ -50,7 +49,7 @@ async fn file_link_into() {
         .expect("link_into (FIDL) failed")
         .expect("link_into failed");
 
-    assert_eq!(read_file(&fixture.test_dir, "linked").await, CONTENTS);
+    assert_eq!(read_file(&fixture.dir, "linked").await, CONTENTS);
 }
 
 #[fuchsia::test]
@@ -99,7 +98,7 @@ async fn file_link_into_for_unlinked_file() {
     };
 
     fixture
-        .test_dir
+        .dir
         .unlink(TEST_FILE, &fio::UnlinkOptions::default())
         .await
         .expect("unlink (FIDL) failed")
@@ -144,7 +143,7 @@ async fn file_link_into_target_unlinked_dir() {
     };
 
     let target_dir = open_dir_with_flags(
-        &fixture.test_dir,
+        &fixture.dir,
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         "dir",
     )
@@ -153,7 +152,7 @@ async fn file_link_into_target_unlinked_dir() {
     let token = get_token(&target_dir).await.into();
 
     fixture
-        .test_dir
+        .dir
         .unlink("dir", &fio::UnlinkOptions::default())
         .await
         .expect("unlink (FIDL) failed")

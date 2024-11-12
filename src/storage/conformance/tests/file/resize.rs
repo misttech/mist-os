@@ -16,10 +16,10 @@ async fn file_resize_with_sufficient_rights() {
     for file_flags in
         harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
     {
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
-        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
+        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         file.resize(0)
             .await
             .expect("resize failed")
@@ -37,10 +37,10 @@ async fn file_resize_with_insufficient_rights() {
 
     for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES)
     {
-        let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let entries = vec![file(TEST_FILE, vec![])];
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
 
-        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
+        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result = file.resize(0).await.expect("resize failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE));
     }
