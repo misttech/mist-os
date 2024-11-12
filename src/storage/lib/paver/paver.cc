@@ -55,6 +55,7 @@ using fuchsia_paver::wire::Asset;
 using fuchsia_paver::wire::Configuration;
 using fuchsia_paver::wire::ConfigurationStatus;
 using fuchsia_paver::wire::kMaxPendingBootAttempts;
+using fuchsia_paver::wire::UnbootableReason;
 using fuchsia_paver::wire::WriteFirmwareResult;
 
 Partition PartitionType(Configuration configuration, Asset asset) {
@@ -771,8 +772,8 @@ bool BootManager::IsFinalBootAttempt(const AbrSlotInfo& slot_info, Configuration
 // Returns a pair containing:
 //   1. The `ConfigurationStatus`
 //   2. If status is pending, the number of boots attempted; otherwise, nullopt.
-zx::result<std::pair<ConfigurationStatus, std::optional<uint8_t>>>
-BootManager::GetConfigurationStatus(Configuration configuration) {
+zx::result<BootManager::ConfigurationState> BootManager::GetConfigurationState(
+    fuchsia_paver::wire::Configuration configuration) {
   auto slot_index = ConfigurationToSlotIndex(configuration);
   if (!slot_index) {
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -787,13 +788,20 @@ BootManager::GetConfigurationStatus(Configuration configuration) {
   if (!slot_info->is_bootable) {
     // If this is the final boot attempt, we aren't actually unbootable yet.
     if (IsFinalBootAttempt(*slot_info, configuration)) {
-      return zx::ok(std::make_pair(ConfigurationStatus::kPending, kMaxPendingBootAttempts));
+      return zx::ok(ConfigurationState{.status = ConfigurationStatus::kPending,
+                                       .boot_attempts = kMaxPendingBootAttempts,
+                                       .unbootable_reason = std::nullopt});
     }
-    return zx::ok(std::make_pair(ConfigurationStatus::kUnbootable, std::nullopt));
+    return zx::ok(
+        ConfigurationState{.status = ConfigurationStatus::kUnbootable,
+                           .boot_attempts = std::nullopt,
+                           .unbootable_reason = UnbootableReason(slot_info->unbootable_reason)});
   }
 
   if (slot_info->is_marked_successful) {
-    return zx::ok(std::make_pair(ConfigurationStatus::kHealthy, std::nullopt));
+    return zx::ok(ConfigurationState{.status = ConfigurationStatus::kHealthy,
+                                     .boot_attempts = std::nullopt,
+                                     .unbootable_reason = std::nullopt});
   }
 
   // Bootable but not successful = pending, and we also provide boot attempts.
@@ -805,25 +813,27 @@ BootManager::GetConfigurationStatus(Configuration configuration) {
           slot_info->num_tries_remaining);
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(std::make_pair(ConfigurationStatus::kPending,
-                               kMaxPendingBootAttempts - slot_info->num_tries_remaining));
+  return zx::ok(
+      ConfigurationState{.status = ConfigurationStatus::kPending,
+                         .boot_attempts = kMaxPendingBootAttempts - slot_info->num_tries_remaining,
+                         .unbootable_reason = std::nullopt});
 }
 
 void BootManager::QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                            QueryConfigurationStatusCompleter::Sync& completer) {
-  auto result = GetConfigurationStatus(request->configuration);
+  auto result = GetConfigurationState(request->configuration);
 
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
   } else {
-    completer.ReplySuccess(result->first);
+    completer.ReplySuccess(result->status);
   }
 }
 
 void BootManager::QueryConfigurationStatusAndBootAttempts(
     QueryConfigurationStatusAndBootAttemptsRequestView request,
     QueryConfigurationStatusAndBootAttemptsCompleter::Sync& completer) {
-  auto result = GetConfigurationStatus(request->configuration);
+  auto result = GetConfigurationState(request->configuration);
 
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
@@ -833,10 +843,12 @@ void BootManager::QueryConfigurationStatusAndBootAttempts(
         fuchsia_paver::wire::BootManagerQueryConfigurationStatusAndBootAttemptsResponse::Builder(
             arena);
 
-    const auto& [status, boot_attempts] = *result;
-    builder.status(status);
-    if (boot_attempts) {
-      builder.boot_attempts(*boot_attempts);
+    builder.status(result->status);
+    if (result->boot_attempts) {
+      builder.boot_attempts(*result->boot_attempts);
+    }
+    if (result->unbootable_reason) {
+      builder.unbootable_reason(*result->unbootable_reason);
     }
     completer.ReplySuccess(builder.Build());
   }

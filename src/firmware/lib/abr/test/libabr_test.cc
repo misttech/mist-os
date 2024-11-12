@@ -273,7 +273,7 @@ void GetBootSlotUnbootable(AbrSlotIndex slot_index) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, other_slot_index));
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, slot_index));
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   // |slot_index| has higher prio but is unbootable, AbrGetBootSlot() should ignore it and select
   // |other_slot_index| instead.
   bool is_slot_marked_successful = true;
@@ -284,8 +284,7 @@ void GetBootSlotUnbootable(AbrSlotIndex slot_index) {
   EXPECT_GT(ops.metadata_.slot_data[slot_index].priority, 0);
   EXPECT_EQ(ops.metadata_.slot_data[slot_index].tries_remaining, 0);
   EXPECT_EQ(ops.metadata_.slot_data[slot_index].successful_boot, 0);
-  EXPECT_EQ(ops.metadata_.slot_data[slot_index].unbootable_reason,
-            kAbrUnbootableReasonUserRequested);
+  EXPECT_EQ(ops.metadata_.slot_data[slot_index].unbootable_reason, kAbrUnbootableReasonOsRequested);
   EXPECT_GT(ops.metadata_.slot_data[other_slot_index].priority, 0);
   EXPECT_EQ(ops.metadata_.slot_data[other_slot_index].tries_remaining, kAbrMaxTriesRemaining - 1);
   EXPECT_EQ(ops.metadata_.slot_data[other_slot_index].successful_boot, 0);
@@ -311,10 +310,10 @@ void GetBootSlotLastBootDetection(AbrSlotIndex slot_index) {
   EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonNoMoreTries);
 
   // If we subsequently explicitly marks the slot unbootable, it should update the reason.
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   ASSERT_EQ(kAbrResultOk, AbrGetSlotInfo(ops, slot_index, &info));
   EXPECT_FALSE(info.is_bootable);
-  EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonUserRequested);
+  EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonOsRequested);
 }
 TEST(LibabrTest, GetBootSlotLastBootDetectionA) { GetBootSlotLastBootDetection(kAbrSlotIndexA); }
 TEST(LibabrTest, GetBootSlotLastBootDetectionB) { GetBootSlotLastBootDetection(kAbrSlotIndexB); }
@@ -768,12 +767,11 @@ void MarkSlotUnbootable(AbrSlotIndex slot_index) {
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotSuccessful(ops, slot_index, false));
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, other_slot_index));
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotSuccessful(ops, other_slot_index, false));
-  EXPECT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  EXPECT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   EXPECT_EQ(ops.metadata_.slot_data[slot_index].priority, kAbrMaxPriority - 1);
   EXPECT_EQ(ops.metadata_.slot_data[slot_index].tries_remaining, 0);
   EXPECT_EQ(ops.metadata_.slot_data[slot_index].successful_boot, 0);
-  EXPECT_EQ(ops.metadata_.slot_data[slot_index].unbootable_reason,
-            kAbrUnbootableReasonUserRequested);
+  EXPECT_EQ(ops.metadata_.slot_data[slot_index].unbootable_reason, kAbrUnbootableReasonOsRequested);
   EXPECT_EQ(ops.metadata_.slot_data[other_slot_index].priority, kAbrMaxPriority);
   EXPECT_EQ(ops.metadata_.slot_data[other_slot_index].tries_remaining, 0);
   EXPECT_GT(ops.metadata_.slot_data[other_slot_index].successful_boot, 0);
@@ -784,35 +782,48 @@ TEST(LibabrTest, MarkSlotUnbootableA) { MarkSlotUnbootable(kAbrSlotIndexA); }
 
 TEST(LibabrTest, MarkSlotUnbootableB) { MarkSlotUnbootable(kAbrSlotIndexB); }
 
+TEST(LibabrTest, MarkSlotUnbootableReason) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+  ASSERT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonVerificationFailure));
+  ASSERT_EQ(ops.metadata_.slot_data[kAbrSlotIndexA].unbootable_reason,
+            kAbrUnbootableReasonVerificationFailure);
+}
+
 TEST(LibabrTest, MarkSlotUnbootableR) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
-  EXPECT_EQ(kAbrResultErrorInvalidData, AbrMarkSlotUnbootable(ops, kAbrSlotIndexR));
+  EXPECT_EQ(kAbrResultErrorInvalidData,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexR, kAbrUnbootableReasonOsRequested));
 }
 
 TEST(LibabrTest, MarkSlotUnbootableInvalidIndex) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
-  EXPECT_EQ(kAbrResultErrorInvalidData, AbrMarkSlotUnbootable(ops, (AbrSlotIndex)-1));
+  EXPECT_EQ(kAbrResultErrorInvalidData,
+            AbrMarkSlotUnbootable(ops, (AbrSlotIndex)-1, kAbrUnbootableReasonOsRequested));
 }
 
 TEST(LibabrTest, MarkSlotUnbootableReadFailure) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, kAbrSlotIndexA));
   ops.read_metadata_result_ = false;
-  EXPECT_EQ(kAbrResultErrorIo, AbrMarkSlotUnbootable(ops, kAbrSlotIndexA));
+  EXPECT_EQ(kAbrResultErrorIo,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonOsRequested));
 }
 
 TEST(LibabrTest, MarkSlotUnbootableWriteFailure) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, kAbrSlotIndexA));
   ops.write_metadata_result_ = false;
-  EXPECT_EQ(kAbrResultErrorIo, AbrMarkSlotUnbootable(ops, kAbrSlotIndexA));
+  EXPECT_EQ(kAbrResultErrorIo,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonOsRequested));
 }
 
 TEST(LibabrTest, MarkSlotUnbootableNoExtraneousReads) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, kAbrSlotIndexA));
   ops.read_metadata_count_ = 0;
-  EXPECT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, kAbrSlotIndexA));
+  EXPECT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonOsRequested));
   EXPECT_EQ(1, ops.read_metadata_count_);
 }
 
@@ -820,10 +831,12 @@ TEST(LibabrTest, MarkSlotUnbootableNoExtraneousWrites) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, kAbrSlotIndexA));
   ops.write_metadata_count_ = 0;
-  EXPECT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, kAbrSlotIndexA));
+  EXPECT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonOsRequested));
   EXPECT_EQ(1, ops.write_metadata_count_);
   ops.write_metadata_count_ = 0;
-  EXPECT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, kAbrSlotIndexA));
+  EXPECT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexA, kAbrUnbootableReasonOsRequested));
   EXPECT_EQ(0, ops.write_metadata_count_);
 }
 
@@ -863,7 +876,7 @@ TEST(LibabrTest, MarkSlotSuccessfulUnbootable) {
 void MarkSlotSuccessfulFromUnbootableOk(AbrSlotIndex slot_index) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, slot_index));
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   // Marking successful should fail unless the |from_unbootable_ok| arg is set.
   ASSERT_EQ(kAbrResultErrorInvalidData, AbrMarkSlotSuccessful(ops, slot_index, false));
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotSuccessful(ops, slot_index, true));
@@ -974,13 +987,20 @@ void GetSlotInfo(AbrSlotIndex slot_index) {
   EXPECT_TRUE(info.is_marked_successful);
   EXPECT_EQ(info.num_tries_remaining, 0);
   EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonNone);
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   ASSERT_EQ(kAbrResultOk, AbrGetSlotInfo(ops, slot_index, &info));
   EXPECT_FALSE(info.is_bootable);
   EXPECT_FALSE(info.is_active);
   EXPECT_FALSE(info.is_marked_successful);
   EXPECT_EQ(info.num_tries_remaining, 0);
-  EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonUserRequested);
+  EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonOsRequested);
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonNone));
+  ASSERT_EQ(kAbrResultOk, AbrGetSlotInfo(ops, slot_index, &info));
+  EXPECT_FALSE(info.is_bootable);
+  EXPECT_FALSE(info.is_active);
+  EXPECT_FALSE(info.is_marked_successful);
+  EXPECT_EQ(info.num_tries_remaining, 0);
+  EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonNone);
 }
 
 TEST(LibabrTest, GetSlotInfoA) { GetSlotInfo(kAbrSlotIndexA); }
@@ -1004,7 +1024,8 @@ TEST(LibabrTest, GetSlotInfoR) {
   EXPECT_TRUE(info.is_marked_successful);
   EXPECT_EQ(info.num_tries_remaining, 0);
   EXPECT_EQ(info.unbootable_reason, kAbrUnbootableReasonNone);
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, kAbrSlotIndexB));
+  ASSERT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, kAbrSlotIndexB, kAbrUnbootableReasonOsRequested));
   ASSERT_EQ(kAbrResultOk, AbrMarkSlotActive(ops, kAbrSlotIndexA));
   ASSERT_EQ(kAbrResultOk, AbrGetSlotInfo(ops, kAbrSlotIndexR, &info));
   EXPECT_TRUE(info.is_bootable);
@@ -1111,7 +1132,7 @@ void GetSlotLastMarkedActiveTest(AbrSlotIndex slot_index) {
   EXPECT_EQ(slot_index, out);
 
   // Marking the slot unbootable shall not change the result
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index));
+  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, slot_index, kAbrUnbootableReasonOsRequested));
   ASSERT_EQ(kAbrResultOk, AbrGetSlotLastMarkedActive(ops, &out));
   EXPECT_EQ(slot_index, out);
 
@@ -1121,7 +1142,8 @@ void GetSlotLastMarkedActiveTest(AbrSlotIndex slot_index) {
   EXPECT_EQ(slot_index, out);
 
   // Marking the other slot unbootable shall not change the result.
-  ASSERT_EQ(kAbrResultOk, AbrMarkSlotUnbootable(ops, other_slot_index));
+  ASSERT_EQ(kAbrResultOk,
+            AbrMarkSlotUnbootable(ops, other_slot_index, kAbrUnbootableReasonOsRequested));
   ASSERT_EQ(kAbrResultOk, AbrGetSlotLastMarkedActive(ops, &out));
   EXPECT_EQ(slot_index, out);
 

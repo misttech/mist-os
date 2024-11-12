@@ -42,8 +42,11 @@ typedef enum {
   kAbrUnbootableReasonNone,
   /* Slot ran out of attempts before being marked successful. */
   kAbrUnbootableReasonNoMoreTries,
-  /* Slot was explicitly marked unbootable by AbrMarkSlotUnbootable(). */
-  kAbrUnbootableReasonUserRequested,
+  /* The OS requested the slot be marked unbootable, for example after marking a slot successful it
+   * may choose to mark the other slot unbootable. */
+  kAbrUnbootableReasonOsRequested,
+  /* The bootloader failed to load and/or verify this slot. */
+  kAbrUnbootableReasonVerificationFailure,
 } AbrUnbootableReason;
 
 /* This structure describes the current state of an A/B slot.
@@ -146,11 +149,13 @@ AbrResult AbrGetSlotLastMarkedActive(const AbrOps* abr_ops, AbrSlotIndex* out_sl
 
 /* Marks the given |slot_index| as unbootable. Returns kAbrResultOk on success.
  *
- * Calling this on kAbrSlotIndexR is an error and kAbrResultErrorInvalidData will be returned.
+ * |reason| will be written as the unbootable reason; kAbrUnbootableReasonNone can be used as the
+ * default if no more specific reason is applicable.
  *
- * This function is typically used by the OS update system before writing to a slot.
+ * Calling this on kAbrSlotIndexR is an error and kAbrResultErrorInvalidData will be returned.
  */
-AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index);
+AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index,
+                                AbrUnbootableReason reason);
 
 /* Marks the given |slot_index| as successful. Returns kAbrResultOk on success.
  *

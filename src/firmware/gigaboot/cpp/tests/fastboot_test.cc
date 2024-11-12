@@ -351,9 +351,9 @@ class FastbootSlotTest : public ::testing::Test {
     AbrResult res;
 
     if (slot == kAbrSlotIndexR) {
-      res = AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexA);
+      res = AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexA, kAbrUnbootableReasonNone);
       ASSERT_EQ(res, kAbrResultOk);
-      res = AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB);
+      res = AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB, kAbrUnbootableReasonNone);
       ASSERT_EQ(res, kAbrResultOk);
     } else {
       res = AbrMarkSlotActive(&abr_ops, slot);
@@ -365,7 +365,7 @@ class FastbootSlotTest : public ::testing::Test {
     mock_zb_ops_.AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
     ZirconBootOps zb_ops = mock_zb_ops_.GetZirconBootOps();
     AbrOps abr_ops = GetAbrOpsFromZirconBootOps(&zb_ops);
-    AbrResult res = AbrMarkSlotUnbootable(&abr_ops, slot);
+    AbrResult res = AbrMarkSlotUnbootable(&abr_ops, slot, kAbrUnbootableReasonNone);
     ASSERT_EQ(res, kAbrResultOk);
   }
 

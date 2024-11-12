@@ -351,7 +351,8 @@ static ZirconBootResult LoadAbr(ZirconBootOps* ops, uint32_t boot_flags, void** 
 
     // Otherwise, update A/B/R metadata to mark this slot unbootable so we
     // try the next one in the next loop.
-    if (AbrMarkSlotUnbootable(&abr_ops, *slot) != kAbrResultOk) {
+    if (AbrMarkSlotUnbootable(&abr_ops, *slot, kAbrUnbootableReasonVerificationFailure) !=
+        kAbrResultOk) {
       return kBootResultErrorMarkUnbootable;
     }
   } while (1);

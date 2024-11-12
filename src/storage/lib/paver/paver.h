@@ -293,9 +293,14 @@ class BootManager : public fidl::WireServer<fuchsia_paver::BootManager> {
   bool IsFinalBootAttempt(const AbrSlotInfo& slot_info,
                           fuchsia_paver::wire::Configuration configuration);
 
-  // Returns the status for the given `configuration`.
-  zx::result<std::pair<fuchsia_paver::wire::ConfigurationStatus, std::optional<uint8_t>>>
-  GetConfigurationStatus(fuchsia_paver::wire::Configuration configuration);
+  // Returns the current state for the given `configuration`.
+  struct ConfigurationState {
+    fuchsia_paver::wire::ConfigurationStatus status;
+    std::optional<uint8_t> boot_attempts;
+    std::optional<fuchsia_paver::wire::UnbootableReason> unbootable_reason;
+  };
+  zx::result<ConfigurationState> GetConfigurationState(
+      fuchsia_paver::wire::Configuration configuration);
 };
 
 }  // namespace paver
