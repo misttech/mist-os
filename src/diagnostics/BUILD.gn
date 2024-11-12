@@ -7,10 +7,20 @@ group("diagnostics") {
   deps = [
     ":tests",
     "archivist",
+    "archivist/bench:build-only",
     "config",
-    "kcounter",
-    "sampler",
-    "wasm",
+    "iquery",
+
+    # contains persistence, sampler, and detect
+    "launcher",
+    "log_listener",
+    "triage",
+    "validator",
+    "//src/lib/diagnostics",
+
+    # Disabled due to lack of support in Clang and Rust toolchain;
+    # see https://fxbug.dev/325488864.
+    # "wasm",
   ]
 }
 
@@ -28,6 +38,7 @@ group("tests") {
     "tests",
     "triage:tests",
     "validator:tests",
+    "//src/lib/diagnostics:tests",
 
     # Disabled due to lack of support in Clang and Rust toolchain;
     # see https://fxbug.dev/325488864.

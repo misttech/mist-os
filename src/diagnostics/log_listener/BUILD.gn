@@ -83,3 +83,7 @@ group("tests") {
   testonly = true
   deps = [ ":log_listener_tests" ]
 }
+
+group("log_listener") {
+  deps = [ ":bin" ]
+}

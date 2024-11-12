@@ -47,3 +47,7 @@ rustc_binary("bin_with_fake_time") {
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
+
+group("launcher") {
+  deps = [ ":bin" ]
+}

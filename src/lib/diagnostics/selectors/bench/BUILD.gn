@@ -31,6 +31,10 @@ fuchsia_component_perf_test("selectors-benchmark") {
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics.txt"
 }
 
+group("build-only") {
+  deps = [ ":selectors-benchmarks" ]
+}
+
 group("bench") {
   testonly = true
   deps = [ ":selectors-benchmark" ]
