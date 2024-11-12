@@ -24,6 +24,7 @@ pub trait FfxTool: FfxMain + Sized {
 
     fn supports_machine_output(&self) -> bool;
     fn has_schema(&self) -> bool;
+    fn requires_target() -> bool;
 
     async fn from_env(env: FhoEnvironment, cmd: Self::Command) -> Result<Self>;
 
@@ -153,7 +154,7 @@ impl<T: FfxTool> FhoTool<T> {
         ffx: FfxCommandLine,
         tool: T::Command,
     ) -> Result<Box<Self>> {
-        check_strict_constraints(&ffx.global)?;
+        check_strict_constraints(&ffx.global, T::requires_target())?;
 
         let is_machine_output = ffx.global.machine.is_some();
         let env = FhoEnvironment::new(context, &ffx).await?;

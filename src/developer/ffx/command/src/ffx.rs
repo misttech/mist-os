@@ -320,7 +320,7 @@ fn format_strict_check_error_enums(errors: &Vec<StrictCheckErrorEnum>) -> String
 
 /// When a tool is run in "strict" mode there are certain constraints on passed
 /// arguments. This ensures they are all satisfied
-pub fn check_strict_constraints(ffx: &Ffx) -> Result<()> {
+pub fn check_strict_constraints(ffx: &Ffx, requires_target: bool) -> Result<()> {
     // In this case we're not in strict mode so we just exit out
     if !ffx.strict {
         return Ok(());
@@ -345,24 +345,28 @@ pub fn check_strict_constraints(ffx: &Ffx) -> Result<()> {
         errors.push(StrictCheckErrorEnum::MustHaveLogDestination);
     }
 
-    match &ffx.target {
-        None => errors.push(StrictCheckErrorEnum::MustHaveTarget),
-        Some(t) => match netext::parse_address_parts(t.as_str()) {
-            Err(_) => errors.push(StrictCheckErrorEnum::TargetMustBeAddress(t.clone())),
-            Ok((_, scope, _)) => {
-                if let Some(scope) = scope {
-                    match netext::get_verified_scope_id(scope) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            errors.push(StrictCheckErrorEnum::TargetAddressMustHaveValidScopeId(
-                                scope.to_string(),
-                            ));
-                        }
+    if requires_target {
+        match &ffx.target {
+            None => errors.push(StrictCheckErrorEnum::MustHaveTarget),
+            Some(t) => match netext::parse_address_parts(t.as_str()) {
+                Err(_) => errors.push(StrictCheckErrorEnum::TargetMustBeAddress(t.clone())),
+                Ok((_, scope, _)) => {
+                    if let Some(scope) = scope {
+                        match netext::get_verified_scope_id(scope) {
+                            Ok(_) => {}
+                            Err(_) => {
+                                errors.push(
+                                    StrictCheckErrorEnum::TargetAddressMustHaveValidScopeId(
+                                        scope.to_string(),
+                                    ),
+                                );
+                            }
+                        };
                     };
-                };
-            }
-        },
-    };
+                }
+            },
+        };
+    }
 
     for potential_config in ffx.config.iter() {
         if ffx_config::runtime::try_parse_json(potential_config).is_err()
@@ -699,7 +703,7 @@ mod test {
         for case in cases {
             let cmd_line =
                 FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
-            let res = check_strict_constraints(&cmd_line.global);
+            let res = check_strict_constraints(&cmd_line.global, true);
             assert!(res.is_err(), "Test Case {} was not an error", case.name);
 
             let Error::User(got_err) = res.unwrap_err() else { panic!() };

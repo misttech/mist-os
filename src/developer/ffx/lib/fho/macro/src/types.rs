@@ -6,7 +6,7 @@ use crate::errors::ParseError;
 use syn::spanned::Spanned;
 use syn::ExprCall;
 
-fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
+pub(crate) fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
     if attr.path().segments.len() == 1 {
         Ok(attr.path().segments[0].ident.to_string())
     } else {

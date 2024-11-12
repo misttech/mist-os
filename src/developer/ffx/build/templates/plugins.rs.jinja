@@ -135,6 +135,13 @@ impl fho::FfxTool for SuiteAdapter {
       ffx_plugin_has_schema(&self.cmd)
     }
 
+    // This is provided only for completeness of the trait. Do not expect
+    // it be meaningful. The correct value for plugins is determined within
+    // ffx_plugin_impl().
+    fn requires_target() -> bool {
+      false
+    }
+
     async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self> {
         #[allow(deprecated)]
         let injector = env.injector.clone();
