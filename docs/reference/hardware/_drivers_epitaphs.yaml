@@ -668,3 +668,9 @@
   available_in_git: '9700936a3f0f0a02563ae1071e8029054ceb7b7d'
   areas: ['USB']
   path: 'src/devices/usb/drivers/crg-udc'
+- short_description: 'HISI clock driver'
+  deletion_reason: 'Driver is unused'
+  gerrit_change_id: '1152295'
+  available_in_git: '812b799f81b8561208beb13b23fbab1f77bb6f17'
+  areas: ['Clock']
+  path: 'src/devices/clock/lib/hisi'
