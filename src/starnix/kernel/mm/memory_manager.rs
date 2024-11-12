@@ -451,6 +451,7 @@ impl Mapping {
         Mapping {
             backing: MappingBacking::PrivateAnonymous,
             flags,
+            max_access: Access::rwx(),
             name,
             file_write_guard: FileWriteGuardRef(None),
         }
@@ -679,7 +680,7 @@ impl PrivateAnonymousMemoryManager {
         options: MappingOptions,
     ) -> Result<UserAddress, Errno> {
         // Create a mapping with no protection in order to allocate address space for this mapping.
-        let flags = MappingFlags::from_prot_flags_and_options(ProtectionFlags::empty(), options);
+        let flags = MappingFlags::from_access_flags_and_options(ProtectionFlags::empty(), options);
         map_in_vmar(user_vmar, user_vmar_info, addr, &self.allocation, 0, length, flags, false)
     }
 
@@ -1074,7 +1075,7 @@ impl MemoryManagerState {
 
         let backing_memory_offset = target_addr.ptr();
 
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
 
         let mapped_addr = self.map_internal(
             DesiredAddress::FixedOverwrite(target_addr),
@@ -1444,7 +1445,7 @@ impl MemoryManagerState {
                         mm,
                         DesiredAddress::FixedOverwrite(growth_start_addr),
                         growth_length,
-                        src_mapping.flags.prot_flags(),
+                        src_mapping.flags.access_flags(),
                         src_mapping.flags.options(),
                         src_mapping.name.clone(),
                         released_mappings,
