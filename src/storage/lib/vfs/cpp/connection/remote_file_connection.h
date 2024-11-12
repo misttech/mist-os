@@ -17,7 +17,6 @@
 
 namespace fs::internal {
 
-// TODO(https://fxbug.dev/324112857): Merge this into FileConnection.
 class RemoteFileConnection final : public FileConnection {
  public:
   // Refer to documentation for |Connection::Connection|.

@@ -52,8 +52,6 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
 
-    // TODO(https://fxbug.dev/324112857): Support append when finalizing Open3 support.
-
     completer.Reply(std::move(config));
   }
 

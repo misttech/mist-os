@@ -66,7 +66,6 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     config.supports_services(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
-    // TODO(https://fxbug.dev/324112857): Support append mode when adding open3 support.
 
     completer.Reply(config);
   }
