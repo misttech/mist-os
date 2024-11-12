@@ -148,8 +148,11 @@ impl FsNodeOps for NetworkDirectoryNode {
             Box::new(NetworkFile::new_node(id))
         };
 
-        let child =
-            node.fs().create_node(current_task, ops, FsNodeInfo::new_factory(mode, FsCred::root()));
+        let child = node.fs().create_node(
+            current_task,
+            ops,
+            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+        );
 
         Ok(child)
     }
