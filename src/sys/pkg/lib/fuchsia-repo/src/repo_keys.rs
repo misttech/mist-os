@@ -418,8 +418,8 @@ mod tests {
     macro_rules! assert_keys {
         ($actual:expr, $expected:expr) => {
             assert_eq!(
-                $actual.iter().map(|key| key.public()).collect::<Vec<_>>(),
-                $expected.iter().collect::<Vec<_>>(),
+                $actual.iter().map(|key| key.public()).collect::<Vec<&PublicKey>>(),
+                $expected.iter().collect::<Vec<&PublicKey>>(),
             )
         };
     }
