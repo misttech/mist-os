@@ -65,7 +65,8 @@ readonly SMP_DEFAULT=4
 
 # Host operating system. Will either be "Linux" or "Darwin" (macOS) on
 # supported platforms.
-readonly HOST_OS=$(uname -s)
+HOST_OS=$(uname -s)
+readonly HOST_OS
 
 # Determine host architecture.
 case "$(uname -m)" in
@@ -162,7 +163,7 @@ while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:S:M:h-:" FLAG; do
                 echo "error: HVF option (-H) is only supported on a ${ARCH} host architecture"
                 exit 1
             fi
-            if !$(sysctl -n kern.hv_support) ; then
+            if ! sysctl -n kern.hv_support ; then
                 echo "error: HVF is not supported"
             fi
             DO_HVF=1
@@ -238,7 +239,7 @@ if [[ -z $ARCH ]]; then
 fi
 
 if [[ -z "$QEMU_KERNEL" ]]; then
-  if (( $UEFI )); then
+  if (( UEFI )); then
     if [[ -z "$DISKFILE" ]]; then
         echo "with --uefi, one of -t or -D must be set"
         HELP
@@ -254,7 +255,7 @@ if [[ -z "$QEMU_KERNEL" ]]; then
   fi
 fi
 
-if (( $UEFI )) && [[ -z "$QEMU_KERNEL" ]]; then
+if (( UEFI )) && [[ -z "$QEMU_KERNEL" ]]; then
   readonly UEFI_DISK_BOOT=1
 else
   readonly UEFI_DISK_BOOT=0
@@ -263,7 +264,7 @@ fi
 # Fall back to disk type defaults if left unspecified with a provided emulated
 # disk file.
 if [[ -n "$DISKFILE" ]] && [[ -z "$DISKTYPE" ]]; then
-  if (( $VIRTIO )); then
+  if (( VIRTIO )); then
     DISKTYPE="virtio"
   else
     DISKTYPE="ahci"
@@ -277,7 +278,7 @@ if [[ -z $QEMUDIR && -d "$DIR/../prebuilt/downloads/qemu/bin" ]]; then
     QEMUDIR="$DIR/../prebuilt/downloads/qemu/bin/"
 fi
 
-if (( $UEFI )); then
+if (( UEFI )); then
   readonly EDK2DIR="$DIR/../../prebuilt/third_party/edk2/qemu-${ARCH}"
   case $ARCH in
     x64)
@@ -308,7 +309,7 @@ fi
 if [[ -n $DISKFILE ]]; then
   NAME="mydisk"
   EXTRA_ARGS=""
-  if (( $UEFI_DISK_BOOT )); then
+  if (( UEFI_DISK_BOOT )); then
     NAME="uefi"
     # `bootindex=0` ensures that this is the highest priority boot option.
     EXTRA_ARGS=",bootindex=0"
@@ -357,7 +358,7 @@ if [[ -n "$MONITOR_DEV" ]]; then
 fi
 
 ADD_SERIAL_ARG=1
-if (( !$GRAPHICS )); then
+if (( !GRAPHICS )); then
   ARGS+=("-nographic" "-vga" "none")
 
   # -nographic implies -serial stdio and will complain if you
@@ -376,18 +377,18 @@ else
   fi
 fi
 
-if (( $SERIAL && $ADD_SERIAL_ARG )); then
+if (( SERIAL && ADD_SERIAL_ARG )); then
   ARGS+=("-serial" "$SERIAL_DEV")
 fi
 
-for ahcifile in ${AHCI[@]}; do
+for ahcifile in "${AHCI[@]}"; do
   ARGS+=("-drive" "file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}")
   ARGS+=("-device" "ich9-ahci,id=ahci${AHCI_NUM}")
   ARGS+=("-device" "ide-hd,drive=ahcidisk${AHCI_NUM},bus=ahci.${AHCI_NUM}")
   AHCI_NUM=$((AHCI_NUM + 1))
 done
 
-if (( !$NET )); then
+if (( !NET )); then
   ARGS+=("-nic" "none")
 else
   if [[ $NET == 1 ]]; then
@@ -408,7 +409,7 @@ else
       fi
     else
       TAP_IFS=$(ip tuntap show 2>/dev/null)
-      if [[ ! "$TAP_IFS" =~ "${IFNAME}:" ]]; then
+      if [[ "$TAP_IFS" != *"${IFNAME}:"* ]]; then
         echo "To use qemu with networking on Linux, configure tun/tap:"
         echo
         echo "sudo ip tuntap add dev $IFNAME mode tap user $USER && \\"
@@ -425,8 +426,8 @@ else
     fi
     ARGS+=("-netdev" "tap,id=net0,ifname=$IFNAME,script=$UPSCRIPT,downscript=no")
   fi
-  HASH=$(echo $IFNAME | shasum)
-  SUFFIX=$(for i in {0..2}; do echo -n :${HASH:$(( 2 * $i )):2}; done)
+  HASH=$(echo "$IFNAME" | shasum)
+  SUFFIX=$(for i in {0..2}; do echo -n ":${HASH:$(( 2 * i )):2}"; done)
   MAC="52:54:00$SUFFIX"
   if [[ "$ARCH" == "x64" ]] && [[ $VIRTIO == 0 ]]; then
     ARGS+=("-device" "e1000,netdev=net0,mac=$MAC")
@@ -449,7 +450,7 @@ if [[ -n $AUDIO ]]; then
             AUDIODEV+=",path=${AUDIO_WAVFILE}"
             ;;
         *)
-            echo unrecognized QEMU host audio driver \"$AUDIO\"
+            echo unrecognized QEMU host audio driver \""${AUDIO}"\"
             exit
             ;;
     esac
@@ -461,13 +462,13 @@ if [[ $SMP != 1 ]]; then
 fi
 
 # start a few extra harmless virtio devices that can be ignored
-if (( $VIRTIO )); then
+if (( VIRTIO )); then
     ARGS+=("-device" "virtio-serial-pci")
     ARGS+=("-device" "virtio-mouse-pci")
     ARGS+=("-device" "virtio-keyboard-pci")
 fi
 
-if (( $DEBUGGER )); then
+if (( DEBUGGER )); then
     ARGS+=("-s" "-S")
 fi
 
@@ -497,10 +498,10 @@ fi
 case $ARCH in
     arm64)
         QEMU=${QEMUDIR}qemu-system-aarch64
-        if (( $DO_KVM )); then
+        if (( DO_KVM )); then
           ARGS+=("-enable-kvm" "-cpu" "host")
           GIC=host
-        elif (( $DO_HVF )); then
+        elif (( DO_HVF )); then
           ARGS+=("-machine" "accel=hvf")
           ARGS+=("-cpu" "host")
         else
@@ -517,7 +518,7 @@ case $ARCH in
         fi
         ARGS+=("-machine" "${MACHINEARG}")
 
-        if (( !$SERIAL )); then
+        if (( !SERIAL )); then
           CMDLINE+="kernel.serial=none "
         fi
         ;;
@@ -527,7 +528,7 @@ case $ARCH in
         ARGS+=("-machine" "virt")
         ARGS+=("-object" "rng-random,filename=/dev/urandom,id=rng0")
         ARGS+=("-device" "virtio-rng-device,rng=rng0")
-        if (( !$SERIAL )); then
+        if (( !SERIAL )); then
           CMDLINE+="kernel.serial=none "
         fi
         ;;
@@ -541,13 +542,13 @@ case $ARCH in
         # a terminal reset on start.
         ARGS+=("-fw_cfg" "name=etc/sercon-port,string=0")
 
-        if (( $DO_KVM )); then
+        if (( DO_KVM )); then
           ARGS+=("-enable-kvm" "-cpu" "host,migratable=no,+invtsc")
         else
           ARGS+=("-cpu" "Skylake-Client,-check")
         fi
 
-        if (( $SERIAL )); then
+        if (( SERIAL )); then
           CMDLINE+="kernel.serial=legacy "
         else
           CMDLINE+="kernel.serial=none "
@@ -572,14 +573,14 @@ CMDLINE+=$OPT_CMDLINE
 cd /
 
 # If dry run is set, simply echo all commands run from here on out.
-if (( $DRY_RUN )); then
+if (( DRY_RUN )); then
   RUN_CMD="echo"
 else
   RUN_CMD="exec"
   set -x
 fi
 
-if (( $UEFI_DISK_BOOT )); then
+if (( UEFI_DISK_BOOT )); then
   $RUN_CMD "$QEMU" "${ARGS[@]}" "$@"
 else
   echo "CMDLINE: $CMDLINE"
