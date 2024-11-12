@@ -181,11 +181,11 @@ void TestToolProcess::SandboxCommand(PipedCommand& command) {
   std::vector<fdio_spawn_action_t> actions;
   zx::channel client, server;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &client, &server));
-  ASSERT_EQ(ZX_OK, fdio_open(tmp_path_.c_str(),
-                             static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
-                                                   fuchsia_io::OpenFlags::kRightWritable |
-                                                   fuchsia_io::OpenFlags::kDirectory),
-                             server.release()));
+  ASSERT_EQ(ZX_OK,
+            fdio_open3(tmp_path_.c_str(),
+                       static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::kPermWritable |
+                                             fuchsia_io::Flags::kProtocolDirectory),
+                       server.release()));
   actions.push_back({.action = FDIO_SPAWN_ACTION_ADD_NS_ENTRY,
                      .ns = {
                          .prefix = "/tmp",
