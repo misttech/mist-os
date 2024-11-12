@@ -242,7 +242,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
     if (ArmUsePhysTimerInVdso()) {
       dprintf(INFO,
               "Using PCT instead of VCT as the system counter reference for zx_ticks_get in "
-              "the VDSO");
+              "the VDSO\n");
       use_pct_instead_of_vct = true;
     }
   }
