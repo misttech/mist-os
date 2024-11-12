@@ -261,7 +261,7 @@ class FuchsiaTaskPublish(FuchsiaTask):
             print(f"Deleted {args.repo_path}")
 
             # Remove the ffx repository.
-            run("ffx", "repository", "remove", args.repo_name)
+            run(args.ffx, "repository", "remove", args.repo_name)
             print(f"Removed the ffx repository {args.repo_name}")
 
     def run(self, parser: ScopedArgumentParser) -> None:
