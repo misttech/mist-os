@@ -64,6 +64,7 @@ type Capability = flexible resource union {
     10: dictionary_router client_end:DictionaryRouter;
     11: dir_entry_router client_end:DirEntryRouter;
     12: data_router client_end:DataRouter;
+    13: dir_connector_router client_end:DirConnectorRouter;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -590,6 +591,15 @@ open protocol DirEntryRouter {
 open protocol DataRouter {
     flexible Route(RouteRequest) -> (strict resource union {
         1: data Data;
+        2: unavailable Unit;
+    }) error RouterError;
+};
+
+@discoverable
+@available(added=HEAD)
+open protocol DirConnectorRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: dir_connector DirConnector;
         2: unavailable Unit;
     }) error RouterError;
 };

@@ -105,6 +105,12 @@ impl CapabilityBound for Router<crate::Dict> {
     }
 }
 
+impl CapabilityBound for Router<crate::DirConnector> {
+    fn debug_typename() -> &'static str {
+        "DirConnectorRouter"
+    }
+}
+
 impl<T: CapabilityBound> fmt::Debug for Router<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO(https://fxbug.dev/329680070): Require `Debug` on `Routable` trait.
