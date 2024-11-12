@@ -13,13 +13,14 @@ use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
-use starnix_uapi::errors::{Errno, ENOTSUP};
+use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, uapi, ucred, MSG_DONTWAIT,
-    MSG_WAITALL, SO_ATTACH_FILTER,
+    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, sock_fprog,
+    uapi, ucred, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
+use ebpf::EbpfProgram;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, OnceLock};
@@ -204,6 +205,36 @@ impl ZxioBackedSocket {
                 debug_assert_eq!(written, info.bytes_read);
                 Ok(())
             })
+        })
+    }
+
+    fn attach_cbpf_filter(&self, _task: &Task, code: Vec<sock_filter>) -> Result<(), Errno> {
+        // SO_ATTACH_FILTER is supported only for packet sockets.
+        let domain = self
+            .zxio
+            .getsockopt(SOL_SOCKET, SO_DOMAIN, std::mem::size_of::<u32>() as u32)
+            .map_err(|status| from_status_like_fdio!(status))?
+            .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+        let domain = u32::from_ne_bytes(domain.try_into().unwrap());
+        if domain != u32::from(AF_PACKET) {
+            return error!(ENOTSUP);
+        }
+
+        let program = EbpfProgram::<()>::from_cbpf(&code).map_err(|_| errno!(EINVAL))?;
+
+        // TODO(https://fxbug.dev/377332291) Use `zxio_borrow()` to avoid cloning the handle.
+        let packet_socket = fidl::endpoints::ClientEnd::<fposix_socket_packet::SocketMarker>::new(
+            self.zxio.clone_handle().map_err(|_| errno!(EIO))?.into(),
+        )
+        .into_sync_proxy();
+        let code = program.code();
+        let code = unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u64, code.len()) };
+        let result = packet_socket.attach_bpf_filter_unsafe(code, zx::MonotonicInstant::INFINITE);
+        result.map_err(|_: fidl::Error| errno!(EIO))?.map_err(|e| {
+            Errno::with_context(
+                ErrnoCode::from_error_code(e.into_primitive() as i16),
+                "AttachBfpFilterUnsafe",
+            )
         })
     }
 }
@@ -400,22 +431,28 @@ impl SocketOps for ZxioBackedSocket {
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        let optval = task.read_buffer(&user_opt)?;
-
-        if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
-            track_stub!(TODO("https://fxbug.dev/42079971"), "SOL_SOCKET.SO_ATTACH_FILTER");
-            return Ok(());
+        match (level, optname) {
+            (SOL_SOCKET, SO_ATTACH_FILTER) => {
+                let fprog = task.read_object::<sock_fprog>(user_opt.try_into()?)?;
+                if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+                    return error!(EINVAL);
+                }
+                let code: Vec<sock_filter> =
+                    task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                self.attach_cbpf_filter(task, code)
+            }
+            (SOL_IP, IP_RECVERR) => {
+                track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
+                Ok(())
+            }
+            _ => {
+                let optval = task.read_buffer(&user_opt)?;
+                self.zxio
+                    .setsockopt(level as i32, optname as i32, &optval)
+                    .map_err(|status| from_status_like_fdio!(status))?
+                    .map_err(|out_code| errno_from_zxio_code!(out_code))
+            }
         }
-
-        if level == SOL_IP && optname == IP_RECVERR {
-            track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
-            return Ok(());
-        }
-
-        self.zxio
-            .setsockopt(level as i32, optname as i32, &optval)
-            .map_err(|status| from_status_like_fdio!(status))?
-            .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
     fn getsockopt(

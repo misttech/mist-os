@@ -4965,6 +4965,10 @@ func (s *packetSocketImpl) SendMsg(_ fidl.Context, addr *packetsocket.PacketInfo
 	return packetsocket.SocketSendMsgResultWithResponse(packetsocket.SocketSendMsgResponse{}), nil
 }
 
+func (s *packetSocketImpl) AttachBpfFilterUnsafe(_ fidl.Context, program []uint64) (packetsocket.SocketAttachBpfFilterUnsafeResult, error) {
+	return packetsocket.SocketAttachBpfFilterUnsafeResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
 var _ packetsocket.ProviderWithCtx = (*packetProviderImpl)(nil)
 
 type packetProviderImpl struct {

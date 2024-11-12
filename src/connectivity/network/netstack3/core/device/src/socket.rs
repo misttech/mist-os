@@ -690,7 +690,8 @@ impl<'a> ReceivedFrame<&'a [u8]> {
 }
 
 impl<B> Frame<B> {
-    fn protocol(&self) -> Option<u16> {
+    /// Returns ether type for the packet if it's known.
+    pub fn protocol(&self) -> Option<u16> {
         let ethertype = match self {
             Self::Sent(SentFrame::Ethernet(frame))
             | Self::Received(ReceivedFrame::Ethernet { destination: _, frame }) => frame.ethertype,

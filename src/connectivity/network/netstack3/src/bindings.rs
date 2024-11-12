@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod integration_tests;
 
+mod bpf;
 mod counters;
 mod debug_fidl_worker;
 mod devices;

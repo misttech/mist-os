@@ -141,3 +141,32 @@ pub const BPF_CMPXCHG: u8 = linux_uapi::BPF_CMPXCHG as u8;
 
 // The load double operation that allows to write 64 bits into a register.
 pub const BPF_LDDW: u8 = BPF_LD | BPF_DW;
+
+// Offset used to access auxiliary packet information in cBPF.
+pub const SKF_AD_OFF: i32 = linux_uapi::SKF_AD_OFF;
+pub const SKF_AD_PROTOCOL: i32 = linux_uapi::SKF_AD_PROTOCOL as i32;
+pub const SKF_AD_PKTTYPE: i32 = linux_uapi::SKF_AD_PKTTYPE as i32;
+pub const SKF_AD_IFINDEX: i32 = linux_uapi::SKF_AD_IFINDEX as i32;
+pub const SKF_AD_NLATTR: i32 = linux_uapi::SKF_AD_NLATTR as i32;
+pub const SKF_AD_NLATTR_NEST: i32 = linux_uapi::SKF_AD_NLATTR_NEST as i32;
+pub const SKF_AD_MARK: i32 = linux_uapi::SKF_AD_MARK as i32;
+pub const SKF_AD_QUEUE: i32 = linux_uapi::SKF_AD_QUEUE as i32;
+pub const SKF_AD_HATYPE: i32 = linux_uapi::SKF_AD_HATYPE as i32;
+pub const SKF_AD_RXHASH: i32 = linux_uapi::SKF_AD_RXHASH as i32;
+pub const SKF_AD_CPU: i32 = linux_uapi::SKF_AD_CPU as i32;
+pub const SKF_AD_ALU_XOR_X: i32 = linux_uapi::SKF_AD_ALU_XOR_X as i32;
+pub const SKF_AD_VLAN_TAG: i32 = linux_uapi::SKF_AD_VLAN_TAG as i32;
+pub const SKF_AD_VLAN_TAG_PRESENT: i32 = linux_uapi::SKF_AD_VLAN_TAG_PRESENT as i32;
+pub const SKF_AD_PAY_OFFSET: i32 = linux_uapi::SKF_AD_PAY_OFFSET as i32;
+pub const SKF_AD_RANDOM: i32 = linux_uapi::SKF_AD_RANDOM as i32;
+pub const SKF_AD_VLAN_TPID: i32 = linux_uapi::SKF_AD_VLAN_TPID as i32;
+pub const SKF_AD_MAX: i32 = linux_uapi::SKF_AD_MAX as i32;
+
+// Offset used to reference IP headers in cBPF.
+pub const SKF_NET_OFF: i32 = linux_uapi::SKF_NET_OFF;
+
+// Offset used to reference Ethernet headers in cBPF.
+pub const SKF_LL_OFF: i32 = linux_uapi::SKF_LL_OFF;
+
+pub type EbpfInstruction = linux_uapi::bpf_insn;
+pub type CbpfInstruction = linux_uapi::sock_filter;

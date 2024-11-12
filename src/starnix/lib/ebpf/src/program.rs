@@ -320,7 +320,11 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
     /// Warning: If this program was a cBPF program then the `data` must be the
     /// packet. It's passed to the `PacketAccessor` as the packet. `packet_size`
     /// specified the value loaded by `BPF_LD | BPF_LEN`.
-    pub fn run<T: IntoBytes + FromBytes + Immutable>(
+    ///
+    /// TODO(https://fxbug.dev/376284982) Currently there is nothing to ensure that the type of
+    /// the argument matches the type specified when the program was verified and that it matches
+    /// the type of the packet expected by the `packet_accessor`.
+    pub fn run<T>(
         &self,
         run_context: &mut C::Context<'_>,
         packet_accessor: &dyn PacketAccessor<C>,
@@ -356,6 +360,14 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
 }
 
 impl EbpfProgram<()> {
+    pub fn from_verified_code(code: Vec<bpf_insn>) -> Self {
+        Self { code, helpers: Default::default() }
+    }
+
+    pub fn code(&self) -> &[bpf_insn] {
+        &self.code[..]
+    }
+
     /// This method instantiates an EbpfProgram given a cbpf original.
     pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
         let mut builder = EbpfProgramBuilder::default();

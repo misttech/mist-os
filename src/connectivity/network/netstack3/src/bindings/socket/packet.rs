@@ -13,7 +13,7 @@ use {
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _, RequestStream as _};
 use fidl::Peered as _;
 use futures::StreamExt as _;
-use log::{error, warn};
+use log::{error, info, warn};
 use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
 use netstack3_core::device::{
@@ -24,11 +24,12 @@ use netstack3_core::device_socket::{
     EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
     SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
 };
-use netstack3_core::sync::Mutex;
+use netstack3_core::sync::{Mutex, RwLock};
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
 use zx::{self as zx, HandleBased as _};
 
+use crate::bindings::bpf::{SocketFilterProgram, SocketFilterResult};
 use crate::bindings::devices::BindingId;
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
@@ -45,6 +46,7 @@ pub(crate) struct SocketState {
     /// The received messages for the socket.
     queue: Mutex<MessageQueue<Message>>,
     kind: fppacket::Kind,
+    bpf_filter: RwLock<Option<SocketFilterProgram>>,
 }
 
 impl DeviceSocketTypes for BindingsCtx {
@@ -59,7 +61,17 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         frame: Frame<&[u8]>,
         raw: &[u8],
     ) {
-        let SocketState { queue, kind } = state;
+        let SocketState { queue, kind, bpf_filter } = state;
+
+        // Run BPF filter if any. The filter may request the packet
+        // to be truncated or dropped.
+        let truncated_size = match bpf_filter.read().as_ref() {
+            Some(program) => match program.run(*kind, frame, raw) {
+                SocketFilterResult::Reject => return,
+                SocketFilterResult::Accept(size) => size,
+            },
+            None => usize::MAX,
+        };
 
         let data = MessageData::new(&frame, device);
 
@@ -67,8 +79,9 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         let body = match kind {
             fppacket::Kind::Network => frame.into_body(),
             fppacket::Kind::Link => raw,
-        }
-        .to_vec();
+        };
+        let truncated_size = body.len().min(truncated_size);
+        let body = body[..truncated_size].to_vec();
         let message = Message { data, body };
         queue.lock().receive(message);
     }
@@ -209,10 +222,11 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let id = ctx
-            .api()
-            .device_socket()
-            .create(SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind });
+        let id = ctx.api().device_socket().create(SocketState {
+            queue: Mutex::new(MessageQueue::new(local_event)),
+            kind,
+            bpf_filter: RwLock::new(None),
+        });
 
         BindingData { peer_event, id }
     }
@@ -243,7 +257,7 @@ impl worker::SocketWorkerHandler for BindingData {
     async fn close(self, ctx: &mut Ctx) {
         let Self { peer_event: _, id } = self;
         let weak = id.downgrade();
-        let SocketState { queue: _, kind: _ } = ctx
+        let SocketState { .. } = ctx
             .api()
             .device_socket()
             .remove(id)
@@ -317,7 +331,7 @@ impl<'a> RequestHandler<'a> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
 
         let SocketInfo { device, protocol } = ctx.api().device_socket().get_info(id);
-        let SocketState { queue: _, kind } = *id.socket_state();
+        let SocketState { kind, .. } = *id.socket_state();
 
         let interface = match device {
             TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
@@ -337,7 +351,7 @@ impl<'a> RequestHandler<'a> {
     fn receive(self) -> Result<Message, fposix::Errno> {
         let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let SocketState { queue, kind: _ } = id.socket_state();
+        let SocketState { queue, .. } = id.socket_state();
         let mut queue = queue.lock();
         queue.pop().ok_or(fposix::EWOULDBLOCK)
     }
@@ -345,7 +359,7 @@ impl<'a> RequestHandler<'a> {
     fn set_receive_buffer(self, size: u64) {
         let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let SocketState { queue, kind: _ } = id.socket_state();
+        let SocketState { queue, .. } = id.socket_state();
         let mut queue = queue.lock();
         queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
     }
@@ -353,7 +367,7 @@ impl<'a> RequestHandler<'a> {
     fn receive_buffer(self) -> u64 {
         let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
-        let SocketState { queue, kind: _ } = id.socket_state();
+        let SocketState { queue, .. } = id.socket_state();
         let queue = queue.lock();
         queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
@@ -364,7 +378,7 @@ impl<'a> RequestHandler<'a> {
         data: Vec<u8>,
     ) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let SocketState { kind, queue: _ } = *id.socket_state();
+        let SocketState { kind, .. } = *id.socket_state();
 
         let data = Buf::new(data, ..);
         // NB: Packet sockets require the packet_info be provided to specify
@@ -578,6 +592,12 @@ impl<'a> RequestHandler<'a> {
             }
             fppacket::SocketRequest::GetMark { domain: _, responder } => {
                 responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            }
+            fppacket::SocketRequest::AttachBpfFilterUnsafe { code, responder } => {
+                info!("AttachBpfFilterUnsafe is called on a packet socket.");
+                *self.data.id.socket_state().bpf_filter.write() =
+                    Some(SocketFilterProgram::new(code));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
         }
         ControlFlow::Continue(None)

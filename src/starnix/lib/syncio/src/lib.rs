@@ -778,10 +778,14 @@ impl Zxio {
     }
 
     pub fn clone(&self) -> Result<Zxio, zx::Status> {
+        Zxio::create(self.clone_handle()?)
+    }
+
+    pub fn clone_handle(&self) -> Result<zx::Handle, zx::Status> {
         let mut handle = 0;
         let status = unsafe { zxio::zxio_clone(self.as_ptr(), &mut handle) };
         zx::ok(status)?;
-        unsafe { Zxio::create(zx::Handle::from_raw(handle)) }
+        unsafe { Ok(zx::Handle::from_raw(handle)) }
     }
 
     pub fn read_at(&self, offset: u64, data: &mut [u8]) -> Result<usize, zx::Status> {
