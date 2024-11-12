@@ -1316,12 +1316,14 @@ static void brcmf_notify_disassoc(struct net_device* ndev, zx_status_t status) {
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocConfirm resp = {};
-  resp.status = status;
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest::Builder(*arena)
+                  .status(status)
+                  .Build();
+
   BRCMF_IFDBG(WLANIF, ndev, "Sending disassoc confirm to SME. status: %" PRIu32 "", status);
   auto result = ndev->if_proto.buffer(*arena)->DisassocConf(resp);
   if (!result.ok()) {
-    BRCMF_ERR("Failed to send disassoc msg result.status: %s", result.status_string());
+    BRCMF_ERR("Failed to send disassoc conf result.status: %s", result.status_string());
   }
 }
 

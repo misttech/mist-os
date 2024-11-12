@@ -366,11 +366,20 @@ pub fn convert_associate_indication(
         rsne: if ind.rsne.len() > 0 { Some(ind.rsne) } else { None },
     }
 }
+
 pub fn convert_disassociate_confirm(
-    conf: fidl_fullmac::WlanFullmacDisassocConfirm,
+    conf: fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest,
 ) -> fidl_mlme::DisassociateConfirm {
-    fidl_mlme::DisassociateConfirm { status: conf.status }
+    let status = conf
+        .status
+        .or_else(|| {
+            warn!("Got None for status when converting DisassocConf. Using error INTERNAL.");
+            Some(zx::Status::INTERNAL.into_raw())
+        })
+        .unwrap();
+    fidl_mlme::DisassociateConfirm { status }
 }
+
 pub fn convert_disassociate_indication(
     ind: fidl_fullmac::WlanFullmacDisassocIndication,
 ) -> fidl_mlme::DisassociateIndication {

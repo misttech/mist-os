@@ -91,7 +91,7 @@ class CreateSoftAPTest : public SimTest {
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind);
-  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
+  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
   void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
@@ -144,7 +144,7 @@ void SoftApInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::S
 }
 void SoftApInterface::DisassocConf(DisassocConfRequestView request,
                                    DisassocConfCompleter::Sync& completer) {
-  test_->OnDisassocConf(&request->resp);
+  test_->OnDisassocConf(request);
   completer.Reply();
 }
 void SoftApInterface::DisassocInd(DisassocIndRequestView request,
@@ -344,7 +344,9 @@ void CreateSoftAPTest::OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* 
   ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
 }
-void CreateSoftAPTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp) {
+void CreateSoftAPTest::OnDisassocConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp) {
+  ASSERT_TRUE(resp->has_status());
   disassoc_conf_recv_ = true;
 }
 void CreateSoftAPTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {

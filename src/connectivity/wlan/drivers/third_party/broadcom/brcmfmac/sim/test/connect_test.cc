@@ -141,7 +141,7 @@ class ConnectTest : public SimTest {
   // Event handlers
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
-  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
+  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
@@ -252,7 +252,7 @@ void ConnectInterface::ConnectConf(ConnectConfRequestView request,
 }
 void ConnectInterface::DisassocConf(DisassocConfRequestView request,
                                     DisassocConfCompleter::Sync& completer) {
-  test_->OnDisassocConf(&request->resp);
+  test_->OnDisassocConf(request);
   completer.Reply();
 }
 void ConnectInterface::DeauthConf(DeauthConfRequestView request,
@@ -378,8 +378,9 @@ void ConnectTest::OnConnectConf(
   }
 }
 
-void ConnectTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp) {
-  if (resp->status == ZX_OK) {
+void ConnectTest::OnDisassocConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp) {
+  if (resp->status() == ZX_OK) {
     context_.disassoc_conf_count++;
   }
 }

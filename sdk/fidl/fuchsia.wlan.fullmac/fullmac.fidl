@@ -103,11 +103,6 @@ type WlanAssocResult = flexible enum : uint8 {
     REFUSED_TEMPORARILY = 8;
 };
 
-
-type WlanFullmacDisassocConfirm = struct {
-    status zx.Status;
-};
-
 type WlanFullmacDisassocIndication = struct {
     peer_sta_address ieee80211.MacAddr;
     reason_code ieee80211.ReasonCode;
@@ -475,8 +470,16 @@ closed protocol WlanFullmacImplIfc {
     strict AssocInd(struct {
         resp WlanFullmacAssocInd;
     }) -> ();
-    strict DisassocConf(struct {
-        resp WlanFullmacDisassocConfirm;
+    /// Report the result of a previously-issued disassociate request. IEEE 802.11-2020 6.3.9.2.
+    strict DisassocConf(table {
+        /// ZX_OK indicates that the disassociate request was serviced and the peer was
+        /// disassociated. Other errors indicate that the request could not be serviced, for these
+        /// or other reasons:
+        ///   - ZX_ERR_BAD_STATE: association not possible in current state (e.g. disconnected)
+        ///   - ZX_ERR_INVALID_ARGS: no association exists with specified peer
+        ///   - ZX_ERR_SHOULD_WAIT: disassociate request could not be serviced because firmware or
+        ///     driver was busy
+        1: status zx.Status;
     }) -> ();
     strict DisassocInd(struct {
         ind WlanFullmacDisassocIndication;

@@ -1438,7 +1438,10 @@ mod handle_driver_event_tests {
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_conf = fidl_fullmac::WlanFullmacDisassocConfirm { status: 1 };
+        let disassoc_conf = fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest {
+            status: Some(1),
+            ..Default::default()
+        };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_conf(&disassoc_conf)),
             Poll::Ready(Ok(()))
