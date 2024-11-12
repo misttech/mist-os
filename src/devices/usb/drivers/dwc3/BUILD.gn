@@ -39,7 +39,6 @@ source_set("dwc3-common") {
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
-    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
@@ -49,6 +48,7 @@ source_set("dwc3-common") {
     "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
+    "//src/devices/usb/lib/usb:descriptors",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
