@@ -1526,3 +1526,29 @@ test_executable("backtrace") {
   sources = [ "backtrace.cc" ]
   deps = [ "//zircon/system/public" ]
 }
+
+# Each dep module exports first(), second(), and third() return that multiplier
+# of its value.  TestStart returns first() + second() + third().  So without
+# filtering, the first dep would define them all.  The SymbolFilter test tells
+# relocation to ignore second in dep17 and dep23; and third in dep23.  So the
+# test should get dep17's first, dep23's second, and dep42's third.
+symbol_filter_values = [
+  17,
+  23,
+  42,
+]
+test_executable("symbol-filter") {
+  sources = [ "symbol-filter.cc" ]
+  deps = []
+  foreach(value, symbol_filter_values) {
+    deps += [ ":symbol-filter-dep$value" ]
+  }
+}
+
+foreach(value, symbol_filter_values) {
+  test_shared_library("symbol-filter-dep$value") {
+    sources = [ "symbol-filter-dep.cc" ]
+    defines = [ "VALUE=$value" ]
+    deps = [ "//zircon/system/public" ]
+  }
+}

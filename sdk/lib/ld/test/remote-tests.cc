@@ -13,6 +13,13 @@
 
 namespace {
 
+using ::testing::Each;
+using ::testing::Field;
+using ::testing::IsTrue;
+using ::testing::NotNull;
+using ::testing::Pointee;
+using ::testing::Property;
+
 // These tests reuse the fixture that supports the LdLoadTests (load-tests.cc)
 // for the common handling of creating and launching a Zircon process.  The
 // Load method is not used here, since that itself uses the RemoteDynamicLinker
@@ -714,6 +721,77 @@ TEST_F(LdRemoteTests, LoadedBy) {
       }
     }
   }
+}
+
+TEST_F(LdRemoteTests, SymbolFilter) {
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  LdsvcPathPrefix("symbol-filter");
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  Linker linker;
+  linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  zx::vmo vdso_vmo;
+  zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  auto decode = [](zx::vmo vmo) {
+    auto diag = elfldltl::testing::ExpectOkDiagnostics();
+    return Linker::Module::Decoded::Create(diag, std::move(vmo), kPageSize);
+  };
+
+  Linker::InitModuleList init_modules = {
+      Linker::Executable(decode(GetExecutableVmo("symbol-filter"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep17.so"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep23.so"))),
+      Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep42.so"))),
+      Linker::Implicit(decode(std::move(vdso_vmo))),
+  };
+  ASSERT_THAT(init_modules,
+              Each(Field("decoded_module", &Linker::InitModule::decoded_module,
+                         Pointee(Property("successfully decoded", &Linker::DecodedModule::HasModule,
+                                          IsTrue())))));
+
+  auto init_result = linker.Init(diag, std::move(init_modules), GetDepFunction(diag));
+  ASSERT_TRUE(init_result);
+
+  auto filter_out = [](auto... ignore_names) {
+    return [ignore_names...](const auto& module,
+                             auto& name) -> fit::result<bool, const elfldltl::Elf<>::Sym*> {
+      auto diag = elfldltl::testing::ExpectOkDiagnostics();
+      const bool ignore = ((name == ignore_names) || ...);
+      return fit::ok(ignore ? nullptr : name.Lookup(module.symbol_info()));
+    };
+  };
+
+  // Dependency order should be dep17, dep23, dep42.
+  EXPECT_EQ(std::next(init_result->at(1)), init_result->at(2));
+  EXPECT_EQ(std::next(init_result->at(2)), init_result->at(3));
+
+  // first can come from dep17, but not second or third.
+  init_result->at(1)->set_symbol_filter(filter_out("second", "third"));
+
+  // first and second can come from dep23, but not third.
+  init_result->at(2)->set_symbol_filter(filter_out("third"));
+
+  // Hence: first from dep17; second from dep23; third from dep42.
+  constexpr int64_t kReturnValue = (17 * 1) + (23 * 2) + (42 * 3);
+
+  EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+  set_vdso_base(init_result->back()->module().vaddr_start());
+
+  EXPECT_TRUE(linker.Relocate(diag));
+  ASSERT_TRUE(linker.Load(diag));
+  linker.Commit();
+
+  EXPECT_EQ(Run(), kReturnValue);
+
+  ExpectLog("");
 }
 
 }  // namespace

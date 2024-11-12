@@ -164,6 +164,7 @@ if (is_fuchsia) {
   load_tests += [
     "second-session",
     "second-session-module",
+    "symbol-filter",
     "zygote",
     "zygote-secondary",
   ]
