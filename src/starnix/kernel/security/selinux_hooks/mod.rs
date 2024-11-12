@@ -409,7 +409,7 @@ fn may_unlink_or_rmdir(
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
 
     todo_check_permission!(
-        TODO("https://fxbug.dev/375590486", "Check rmdir permission."),
+        TODO("https://fxbug.dev/375590486", "Check remove_name permission."),
         &permission_check,
         current_sid,
         parent_sid,
