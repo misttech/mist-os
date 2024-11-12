@@ -11,34 +11,52 @@ jobs:
 
     steps:
       - checkout
-      - run: sudo apt-get update && sudo apt-get install -y rsync
       - run:
+          name: Update apt
+          command: sudo apt-get update && sudo apt-get install -y rsync
+      - run:
+          name: Bootstrap Jiri
           command: |
             curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
             export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri init -analytics-opt=true
             jiri import -name=integration flower https://github.com/misttech/integration
+      - run:
+          name: Retrieve jiri.lock to temp folder
+          command: |
+            mkdir -p tmp
+            curl -o tmp/jiri.lock "https://raw.githubusercontent.com/misttech/integration/refs/heads/main/jiri.lock"
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-packages-{{ checksum "integration/jiri.lock" }}
-            - jiri-packages
+            - &jiri-cache-v1 jiri-{{ checksum "tmp/jiri.lock" }}
+            - jiri
       - run:
+          name: Update Jiri
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri -v -vv update
-            git checkout $CIRCLE_BRANCH
+            jiri project-config --no-update=true --no-rebase=true
+            jiri update
       - save_cache:
-          name: Save Jiri Package Cache
-          key: *jiri-cache
+          name: Save Jiri Cache
+          key: *jiri-cache-v1
           paths:
             - .cipd
+            - .git/jiri
+            - .jiri_root
+            - .jiri_manifest
             - prebuilt
       - run:
+          name: Build
           command: |
-            make args gen
-            make starnix_lite_kernel
+            make kasan args gen
+            NOECHO= make kernel_unit_test
+      - run:
+          name: Test
+          command: NOECHO= make run_kernel_unit_test
 
 workflows:
-  build-workflow:
+  version: 2
+  build-and-test:
     jobs:
       - build

@@ -1,0 +1,1835 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library zx;
+
+alias new_utsname = byte;
+alias statx = byte;
+alias stat = byte;
+alias rusage = byte;
+
+//alias Pid = int32;
+@no_protocol_prefix
+@transport("Syscall")
+closed protocol Linux {
+
+    /// ## Summary
+    ///
+    /// Linux System Calls 
+    /// Kernel Version: v6.6
+    ///
+    /// ## Description
+    ///
+    /// THIS IS A HACK
+    /// Prefix explanation: The Zither tool (used to generate syscall headers) sort the functions 
+    /// by name. From the linux user space, syscalls have a specific order(number) defined in the kernel
+    /// so is also needed to append some prefix to guarantee that order. For functions we append the 
+    /// 'ADDDD' prefix where DDDD is a four digit number corresponding the system call. Four digits were choosen 
+    /// just to be in the safe side/future proof. Example: A0000Read will be generate 
+    /// a0000_read that by Zither sorting will be the first syscall in the syscall table.
+    ///
+
+    // #0, SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+    strict A0000Read(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    // #1, SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
+    strict A0001Write(resource struct {
+        fd uint32;
+        @in
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    // #2, SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+    strict A0002Open(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
+
+    // #3, SYSCALL_DEFINE1(close, unsigned int, fd)
+    strict A0003Close(resource struct {
+        fd uint32;
+    }) -> () error int64;
+
+    // #4, SYSCALL_DEFINE2(newstat, const char __user *, filename, struct stat __user *, statbuf)
+    strict A0004Stat(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        @voidptr
+        @out
+        statbuf experimental_pointer<stat>;
+    }) -> () error int64;
+
+    // #5, SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
+    strict A0005Fstat(resource struct {
+        fd uint32;
+        @voidptr
+        @out
+        statbuf experimental_pointer<stat>;
+    }) -> () error int64;
+
+    // STUB 6
+    strict A0006Lstat() -> () error int64;
+
+    // STUB 7
+    strict A0007Poll() -> () error int64;
+
+    // STUB 8
+    strict A0008Lseek() -> () error int64;
+
+    // #9, SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len, unsigned long, prot, unsigned long, flags, unsigned long, fd, unsigned long, off)
+    strict A0009Mmap(resource struct {
+        addr uint64;
+        len uint64;
+        prot uint64;
+        flags uint64;
+        fd uint64;
+        off uint64;
+    }) -> () error int64;
+
+    // #10, SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len, unsigned long, prot)
+    strict A0010Mprotect(resource struct {
+        start uint64;
+        len usize64;
+        prot uint64;
+    }) -> () error int64;
+
+    // #11, SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+    strict A0011Munmap(resource struct {
+        addr uint64;
+        len usize64;
+    }) -> () error int64;
+
+    // #12, SYSCALL_DEFINE1(brk, unsigned long, brk)
+    strict A0012Brk(resource struct {
+        brk uint64;
+    }) -> () error int64;
+
+    // STUB 13
+    strict A0013RtSigaction() -> () error int64;
+
+    // STUB 14
+    strict A0014RtSigprocmask() -> () error int64;
+
+    // STUB 15
+    strict A0015RtSigreturn() -> () error int64;
+
+    // STUB 16
+    strict A0016Ioctl() -> () error int64;
+
+    // #17, SYSCALL_DEFINE4(pread64, unsigned int, fd, char __user *, buf, size_t, count, loff_t, pos)
+    strict A0017Pread64(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+        pos int64;
+    }) -> () error int64;
+
+    // STUB 18
+    strict A0018Pwrite64() -> () error int64;
+
+    // STUB 19
+    strict A0019Readv() -> () error int64;
+
+    // #20, SYSCALL_DEFINE3(writev, unsigned long, fd, const struct iovec __user *, vec, unsigned long, vlen)
+    strict A0020Writev(resource struct {
+        fd uint64;
+        @voidptr
+        @in
+        vec experimental_pointer<byte>;
+        vlen uint64;
+    }) -> () error int64;
+
+    // #21, SYSCALL_DEFINE2(access, const char __user *, filename, int, mode)
+    strict A0021Access(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        mode int32;
+    }) -> () error int64;
+
+    // STUB 22
+    strict A0022Pipe() -> () error int64;
+
+    // STUB 23
+    strict A0023Select() -> () error int64;
+
+    // STUB 24
+    strict A0024SchedYield() -> () error int64;
+
+    // STUB 25
+    strict A0025Mremap() -> () error int64;
+
+    // STUB 26
+    strict A0026Msync() -> () error int64;
+
+    // STUB 27
+    strict A0027Mincore() -> () error int64;
+
+    // STUB 28
+    strict A0028Madvise() -> () error int64;
+
+    // STUB 29
+    strict A0029Shmget() -> () error int64;
+
+    // STUB 30
+    strict A0030Shmat() -> () error int64;
+
+    // STUB 31
+    strict A0031Shmctl() -> () error int64;
+
+    // STUB 32
+    strict A0032Dup() -> () error int64;
+
+    // STUB 33
+    strict A0033Dup2() -> () error int64;
+
+    // STUB 34
+    strict A0034Pause() -> () error int64;
+
+    // STUB 35
+    strict A0035Nanosleep() -> () error int64;
+
+    // STUB 36
+    strict A0036Getitimer() -> () error int64;
+
+    // STUB 37
+    strict A0037Alarm() -> () error int64;
+
+    // STUB 38
+    strict A0038Setitimer() -> () error int64;
+
+    // #39, SYSCALL_DEFINE0(getpid)
+    strict A0039Getpid() -> () error int64;
+
+    // STUB 40
+    strict A0040Sendfile() -> () error int64;
+
+    // STUB 41
+    strict A0041Socket() -> () error int64;
+
+    // STUB 42
+    strict A0042Connect() -> () error int64;
+
+    // STUB 43
+    strict A0043Accept() -> () error int64;
+
+    // STUB 44
+    strict A0044Sendto() -> () error int64;
+
+    // STUB 45
+    strict A0045Recvfrom() -> () error int64;
+
+    // STUB 46
+    strict A0046Sendmsg() -> () error int64;
+
+    // STUB 47
+    strict A0047Recvmsg() -> () error int64;
+
+    // STUB 48
+    strict A0048Shutdown() -> () error int64;
+
+    // STUB 49
+    strict A0049Bind() -> () error int64;
+
+    // STUB 50
+    strict A0050Listen() -> () error int64;
+
+    // STUB 51
+    strict A0051Getsockname() -> () error int64;
+
+    // STUB 52
+    strict A0052Getpeername() -> () error int64;
+
+    // STUB 53
+    strict A0053Socketpair() -> () error int64;
+
+    // STUB 54
+    strict A0054Setsockopt() -> () error int64;
+
+    // STUB 55
+    strict A0055Getsockopt() -> () error int64;
+
+    // #56, SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
+    // int __user *, parent_tidptr, int __user *, child_tidptr, unsigned long, tls)
+    strict A0056Clone(resource struct {
+        clone_flags uint64;
+        newsp uint64;
+        @out
+        parent_tidptr int32;
+        @out
+        child_tidptr int32;
+        tls uint64;
+    }) -> () error int64;
+
+    // #57, SYSCALL_DEFINE0(fork)
+    strict A0057Fork() -> () error int64;
+
+    // #58, SYSCALL_DEFINE0(vfork)
+    strict A0058Vfork() -> () error int64;
+
+    // #59, SYSCALL_DEFINE3(execve, const char __user *, filename,
+    // const char __user *const __user *, argv,
+    // const char __user *const __user *, envp)
+    strict A0059Execve(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        @in
+        argv experimental_pointer<uchar>;
+        @in
+        envp experimental_pointer<uchar>;
+    }) -> () error int64;
+
+    // #60, SYSCALL_DEFINE1(exit, int, error_code)
+    @noreturn
+    strict A0060Exit(resource struct {
+        error_code int32;
+    }) -> () error int64;
+
+    // #61, SYSCALL_DEFINE4(wait4, pid_t, upid, int __user *, stat_addr, int, options, struct rusage __user *, ru)
+    strict A0061Wait4(resource struct {
+        upid int32;
+        @in
+        stat_addr experimental_pointer<int32>;
+        options int32;
+        @voidptr
+        @out
+        ru experimental_pointer<rusage>;
+    }) -> () error int64;
+
+    // #62, SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
+    strict A0062Kill(resource struct {
+        pid int32;
+        sig int32;
+    }) -> () error int64;
+
+    // #63, SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
+    strict A0063Uname() -> (resource struct {
+        @voidptr
+        @out
+        name experimental_pointer<new_utsname>;
+    }) error int64;
+
+    // STUB 64
+    strict A0064Semget() -> () error int64;
+
+    // STUB 65
+    strict A0065Semop() -> () error int64;
+
+    // STUB 66
+    strict A0066Semctl() -> () error int64;
+
+    // STUB 67
+    strict A0067Shmdt() -> () error int64;
+
+    // STUB 68
+    strict A0068Msgget() -> () error int64;
+
+    // STUB 69
+    strict A0069Msgsnd() -> () error int64;
+
+    // STUB 70
+    strict A0070Msgrcv() -> () error int64;
+
+    // STUB 71
+    strict A0071Msgctl() -> () error int64;
+
+    // STUB 72
+    strict A0072Fcntl() -> () error int64;
+
+    // STUB 73
+    strict A0073Flock() -> () error int64;
+
+    // STUB 74
+    strict A0074Fsync() -> () error int64;
+
+    // STUB 75
+    strict A0075Fdatasync() -> () error int64;
+
+    // STUB 76
+    strict A0076Truncate() -> () error int64;
+
+    // STUB 77
+    strict A0077Ftruncate() -> () error int64;
+
+    // STUB 78
+    strict A0078Getdents() -> () error int64;
+
+    // STUB 79
+    strict A0079Getcwd() -> () error int64;
+
+    // STUB 80
+    strict A0080Chdir() -> () error int64;
+
+    // STUB 81
+    strict A0081Fchdir() -> () error int64;
+
+    // STUB 82
+    strict A0082Rename() -> () error int64;
+
+    // STUB 83
+    strict A0083Mkdir() -> () error int64;
+
+    // STUB 84
+    strict A0084Rmdir() -> () error int64;
+
+    // STUB 85
+    strict A0085Creat() -> () error int64;
+
+    // STUB 86
+    strict A0086Link() -> () error int64;
+
+    // STUB 87
+    strict A0087Unlink() -> () error int64;
+
+    // STUB 88
+    strict A0088Symlink() -> () error int64;
+
+    // #89, SYSCALL_DEFINE3(readlink, const char __user *, path, char __user *, buf, int, bufsiz)
+    strict A0089Readlink(resource struct {
+        @in
+        path experimental_pointer<uchar>;
+        @out
+        buf experimental_pointer<uchar>;
+        bufsiz int32;
+    }) -> () error int64;
+
+    // STUB 90
+    strict A0090Chmod() -> () error int64;
+
+    // STUB 91
+    strict A0091Fchmod() -> () error int64;
+
+    // STUB 92
+    strict A0092Chown() -> () error int64;
+
+    // STUB 93
+    strict A0093Fchown() -> () error int64;
+
+    // STUB 94
+    strict A0094Lchown() -> () error int64;
+
+    // STUB 95
+    strict A0095Umask() -> () error int64;
+
+    // STUB 96
+    strict A0096Gettimeofday() -> () error int64;
+
+    // STUB 97
+    strict A0097Getrlimit() -> () error int64;
+
+    // STUB 98
+    strict A0098Getrusage() -> () error int64;
+
+    // STUB 99
+    strict A0099Sysinfo() -> () error int64;
+
+    // STUB 100
+    strict A0100Times() -> () error int64;
+
+    // STUB 101
+    strict A0101Ptrace() -> () error int64;
+
+    // STUB 102
+    strict A0102Getuid() -> () error int64;
+
+    // STUB 103
+    strict A0103Syslog() -> () error int64;
+
+    // #104, SYSCALL_DEFINE0(getgid)
+    strict A0104Getgid() -> () error int64;
+
+    // STUB 105
+    strict A0105Setuid() -> () error int64;
+
+    // STUB 106
+    strict A0106Setgid() -> () error int64;
+
+    // STUB 107
+    strict A0107Geteuid() -> () error int64;
+
+    // #108, SYSCALL_DEFINE0(getegid)
+    strict A0108Getegid() -> () error int64;
+
+    // STUB 109
+    strict A0109Setpgid() -> () error int64;
+
+    // #110, SYSCALL_DEFINE0(getppid)
+    strict A0110Getppid() -> () error int64;
+
+    // #111, SYSCALL_DEFINE0(getpgrp)
+    strict A0111Getpgrp() -> () error int64;
+
+    // STUB 112
+    strict A0112Setsid() -> () error int64;
+
+    // STUB 113
+    strict A0113Setreuid() -> () error int64;
+
+    // STUB 114
+    strict A0114Setregid() -> () error int64;
+
+    // STUB 115
+    strict A0115Getgroups() -> () error int64;
+
+    // STUB 116
+    strict A0116Setgroups() -> () error int64;
+
+    // STUB 117
+    strict A0117Setresuid() -> () error int64;
+
+    // STUB 118
+    strict A0118Getresuid() -> () error int64;
+
+    // STUB 119
+    strict A0119Setresgid() -> () error int64;
+
+    // STUB 120
+    strict A0120Getresgid() -> () error int64;
+
+    // #121, SYSCALL_DEFINE1(getpgid, pid_t, pid)
+    strict A0121Getpgid(resource struct {
+        pid int32;
+    }) -> () error int64;
+
+    // STUB 122
+    strict A0122Setfsuid() -> () error int64;
+
+    // STUB 123
+    strict A0123Setfsgid() -> () error int64;
+
+    // STUB 124
+    strict A0124Getsid() -> () error int64;
+
+    // STUB 125
+    strict A0125Capget() -> () error int64;
+
+    // STUB 126
+    strict A0126Capset() -> () error int64;
+
+    // STUB 127
+    strict A0127RtSigpending() -> () error int64;
+
+    // STUB 128
+    strict A0128RtSigtimedwait() -> () error int64;
+
+    // STUB 129
+    strict A0129RtSigqueueinfo() -> () error int64;
+
+    // STUB 130
+    strict A0130RtSigsuspend() -> () error int64;
+
+    // STUB 131
+    strict A0131Sigaltstack() -> () error int64;
+
+    // STUB 132
+    strict A0132Utime() -> () error int64;
+
+    // STUB 133
+    strict A0133Mknod() -> () error int64;
+
+    // STUB (Not entry point) 134
+    strict A0134Uselib() -> () error int64;
+
+    // STUB 135
+    strict A0135Personality() -> () error int64;
+
+    // STUB 136
+    strict A0136Ustat() -> () error int64;
+
+    // STUB 137
+    strict A0137Statfs() -> () error int64;
+
+    // STUB 138
+    strict A0138Fstatfs() -> () error int64;
+
+    // STUB 139
+    strict A0139Sysfs() -> () error int64;
+
+    // STUB 140
+    strict A0140Getpriority() -> () error int64;
+
+    // STUB 141
+    strict A0141Setpriority() -> () error int64;
+
+    // STUB 142
+    strict A0142SchedSetparam() -> () error int64;
+
+    // STUB 143
+    strict A0143SchedGetparam() -> () error int64;
+
+    // STUB 144
+    strict A0144SchedSetscheduler() -> () error int64;
+
+    // STUB 145
+    strict A0145SchedGetscheduler() -> () error int64;
+
+    // STUB 146
+    strict A0146SchedGetPriorityMax() -> () error int64;
+
+    // STUB 147
+    strict A0147SchedGetPriorityMin() -> () error int64;
+
+    // STUB 148
+    strict A0148SchedRrGetInterval() -> () error int64;
+
+    // STUB 149
+    strict A0149Mlock() -> () error int64;
+
+    // STUB 150
+    strict A0150Munlock() -> () error int64;
+
+    // STUB 151
+    strict A0151Mlockall() -> () error int64;
+
+    // STUB 152
+    strict A0152Munlockall() -> () error int64;
+
+    // STUB 153
+    strict A0153Vhangup() -> () error int64;
+
+    // STUB 154
+    strict A0154ModifyLdt() -> () error int64;
+
+    // STUB 155
+    strict A0155PivotRoot() -> () error int64;
+
+    // STUB (Kernel NI) 156 Not Implemented syscall
+    strict A0156NotImpl() -> () error int64;
+
+    // #157, SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5)
+    strict A0157Prctl(resource struct {
+        option int32;
+        arg2 uint64;
+        arg3 uint64;
+        arg4 uint64;
+        arg5 uint64;
+    }) -> () error int64;
+
+    // #158, SYSCALL_DEFINE2(arch_prctl, int, option, unsigned long, arg2)
+    strict A0158ArchPrctl(resource struct {
+        option int32;
+        arg2 uint64;
+    }) -> () error int64;
+
+    // STUB 159
+    strict A0159Adjtimex() -> () error int64;
+
+    // STUB 160
+    strict A0160Setrlimit() -> () error int64;
+
+    // STUB 161
+    strict A0161Chroot() -> () error int64;
+
+    // STUB 162
+    strict A0162Sync() -> () error int64;
+
+    // STUB 163
+    strict A0163Acct() -> () error int64;
+
+    // STUB 164
+    strict A0164Settimeofday() -> () error int64;
+
+    // STUB 165
+    strict A0165Mount() -> () error int64;
+
+    // STUB 166
+    strict A0166Umount2() -> () error int64;
+
+    // STUB 167
+    strict A0167Swapon() -> () error int64;
+
+    // STUB 168
+    strict A0168Swapoff() -> () error int64;
+
+    // STUB 169
+    strict A0169Reboot() -> () error int64;
+
+    // STUB 170
+    strict A0170Sethostname() -> () error int64;
+
+    // STUB 171
+    strict A0171Setdomainname() -> () error int64;
+
+    // STUB 172
+    strict A0172Iopl() -> () error int64;
+
+    // STUB 173
+    strict A0173Ioperm() -> () error int64;
+
+    // STUB (Not entry point) 174
+    strict A0174CreateModule() -> () error int64;
+
+    // STUB 175
+    strict A0175InitModule() -> () error int64;
+
+    // STUB 176
+    strict A0176DeleteModule() -> () error int64;
+
+    // STUB (Not entry point) 177
+    strict A0177GetKernelSyms() -> () error int64;
+
+    // STUB (Not entry point) 178
+    strict A0178QueryModule() -> () error int64;
+
+    // STUB 179
+    strict A0179Quotactl() -> () error int64;
+
+    // STUB (Not entry point) 180
+    strict A0180Nfsservctl() -> () error int64;
+
+    // STUB (Not entry point) 181
+    strict A0181Getpmsg() -> () error int64;
+
+    // STUB (Not entry point) 182
+    strict A0182Putpmsg() -> () error int64;
+
+    // STUB (Not entry point) 183
+    strict A0183AfsSyscall() -> () error int64;
+
+    // STUB (Not entry point) 184
+    strict A0184Tuxcall() -> () error int64;
+
+    // STUB (Not entry point) 185
+    strict A0185Security() -> () error int64;
+
+    // #186, SYSCALL_DEFINE0(gettid)
+    strict A0186Gettid() -> () error int64;
+
+    // STUB 187
+    strict A0187Readahead() -> () error int64;
+
+    // STUB 188
+    strict A0188Setxattr() -> () error int64;
+
+    // STUB 189
+    strict A0189Lsetxattr() -> () error int64;
+
+    // STUB 190
+    strict A0190Fsetxattr() -> () error int64;
+
+    // STUB 191
+    strict A0191Getxattr() -> () error int64;
+
+    // STUB 192
+    strict A0192Lgetxattr() -> () error int64;
+
+    // STUB 193
+    strict A0193Fgetxattr() -> () error int64;
+
+    // STUB 194
+    strict A0194Listxattr() -> () error int64;
+
+    // STUB 195
+    strict A0195Llistxattr() -> () error int64;
+
+    // STUB 196
+    strict A0196Flistxattr() -> () error int64;
+
+    // STUB 197
+    strict A0197Removexattr() -> () error int64;
+
+    // STUB 198
+    strict A0198Lremovexattr() -> () error int64;
+
+    // STUB 199
+    strict A0199Fremovexattr() -> () error int64;
+
+    // STUB 200
+    strict A0200Tkill() -> () error int64;
+
+    // STUB 201
+    strict A0201Time() -> () error int64;
+
+    // STUB 202
+    strict A0202Futex() -> () error int64;
+
+    // STUB 203
+    strict A0203SchedSetaffinity() -> () error int64;
+
+    // STUB 204
+    strict A0204SchedGetaffinity() -> () error int64;
+
+    // STUB (Not entry point) 205
+    strict A0205SetThreadArea() -> () error int64;
+
+    // STUB 206
+    strict A0206IoSetup() -> () error int64;
+
+    // STUB 207
+    strict A0207IoDestroy() -> () error int64;
+
+    // STUB 208
+    strict A0208IoGetevents() -> () error int64;
+
+    // STUB 209
+    strict A0209IoSubmit() -> () error int64;
+
+    // STUB 210
+    strict A0210IoCancel() -> () error int64;
+
+    // STUB (Not entry point) 211
+    strict A0211GetThreadArea() -> () error int64;
+
+    // STUB 212
+    strict A0212LookupDcookie() -> () error int64;
+
+    // STUB 213
+    strict A0213EpollCreate() -> () error int64;
+
+    // STUB (Not entry point) 214
+    strict A0214EpollCtlOld() -> () error int64;
+
+    // STUB (Not entry point) 215
+    strict A0215EpollWaitOld() -> () error int64;
+
+    // STUB 216
+    strict A0216RemapFilePages() -> () error int64;
+
+    // STUB 217
+    strict A0217Getdents64() -> () error int64;
+
+    // STUB 218
+    strict A0218SetTidAddress() -> () error int64;
+
+    // STUB 219
+    strict A0219RestartSyscall() -> () error int64;
+
+    // STUB 220
+    strict A0220Semtimedop() -> () error int64;
+
+    // STUB 221
+    strict A0221Fadvise64() -> () error int64;
+
+    // STUB 222
+    strict A0222TimerCreate() -> () error int64;
+
+    // STUB 223
+    strict A0223TimerSettime() -> () error int64;
+
+    // STUB 224
+    strict A0224TimerGettime() -> () error int64;
+
+    // STUB 225
+    strict A0225TimerGetoverrun() -> () error int64;
+
+    // STUB 226
+    strict A0226TimerDelete() -> () error int64;
+
+    // STUB 227
+    strict A0227ClockSettime() -> () error int64;
+
+    // STUB 228
+    strict A0228ClockGettime() -> () error int64;
+
+    // STUB 229
+    strict A0229ClockGetres() -> () error int64;
+
+    // STUB 230
+    strict A0230ClockNanosleep() -> () error int64;
+
+    // #231, SYSCALL_DEFINE1(exit_group, int, error_code)
+    @noreturn
+    strict A0231ExitGroup(resource struct {
+        error_code int32;
+    }) -> () error int64;
+
+    // STUB 232
+    strict A0232EpollWait() -> () error int64;
+
+    // STUB 233
+    strict A0233EpollCtl() -> () error int64;
+
+    // STUB 234
+    strict A0234Tgkill() -> () error int64;
+
+    // STUB 235
+    strict A0235Utimes() -> () error int64;
+
+    // STUB (Not entry point) 236
+    strict A0236Vserver() -> () error int64;
+
+    // STUB 237
+    strict A0237Mbind() -> () error int64;
+
+    // STUB 238
+    strict A0238SetMempolicy() -> () error int64;
+
+    // STUB 239
+    strict A0239GetMempolicy() -> () error int64;
+
+    // STUB 240
+    strict A0240MqOpen() -> () error int64;
+
+    // STUB 241
+    strict A0241MqUnlink() -> () error int64;
+
+    // STUB 242
+    strict A0242MqTimedsend() -> () error int64;
+
+    // STUB 243
+    strict A0243MqTimedreceive() -> () error int64;
+
+    // STUB 244
+    strict A0244MqNotify() -> () error int64;
+
+    // STUB 245
+    strict A0245MqGetsetattr() -> () error int64;
+
+    // STUB 246
+    strict A0246KexecLoad() -> () error int64;
+
+    // STUB 247
+    strict A0247Waitid() -> () error int64;
+
+    // STUB 248
+    strict A0248AddKey() -> () error int64;
+
+    // STUB 249
+    strict A0249RequestKey() -> () error int64;
+
+    // STUB 250
+    strict A0250Keyctl() -> () error int64;
+
+    // STUB 251
+    strict A0251IoprioSet() -> () error int64;
+
+    // STUB 252
+    strict A0252IoprioGet() -> () error int64;
+
+    // STUB 253
+    strict A0253InotifyInit() -> () error int64;
+
+    // STUB 254
+    strict A0254InotifyAddWatch() -> () error int64;
+
+    // STUB 255
+    strict A0255InotifyRmWatch() -> () error int64;
+
+    // STUB 256
+    strict A0256MigratePages() -> () error int64;
+
+    // #257, SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, umode_t, mode)
+    strict A0257Openat(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
+
+    // #258, SYSCALL_DEFINE3(mkdirat, int, dfd, const char __user *, pathname, umode_t, mode)
+    strict A0258Mkdirat(resource struct {
+        dfd int32;
+        @in
+        pathname experimental_pointer<uchar>;
+        mode uint16;
+    }) -> () error int64;
+
+    // STUB 259
+    strict A0259Mknodat() -> () error int64;
+
+    // STUB 260
+    strict A0260Fchownat() -> () error int64;
+
+    // STUB 261
+    strict A0261Futimesat() -> () error int64;
+
+    // STUB 262
+    strict A0262Newfstatat() -> () error int64;
+
+    // STUB 263
+    strict A0263Unlinkat() -> () error int64;
+
+    // STUB 264
+    strict A0264Renameat() -> () error int64;
+
+    // STUB 265
+    strict A0265Linkat() -> () error int64;
+
+    // STUB 266
+    strict A0266Symlinkat() -> () error int64;
+
+    // #267, SYSCALL_DEFINE4(readlinkat, int, dfd, const char __user *, pathname, char __user *, buf, int, bufsiz)
+    strict A0267Readlinkat(resource struct {
+        dfd int32;
+        @in
+        pathname experimental_pointer<uchar>;
+        @out
+        buf experimental_pointer<uchar>;
+        bufsiz int32;
+    }) -> () error int64;
+
+    // STUB 268
+    strict A0268Fchmodat() -> () error int64;
+
+    // STUB 269
+    strict A0269Faccessat() -> () error int64;
+
+    // STUB 270
+    strict A0270Pselect6() -> () error int64;
+
+    // STUB 271
+    strict A0271Ppoll() -> () error int64;
+
+    // STUB 272
+    strict A0272Unshare() -> () error int64;
+
+    // STUB 273
+    strict A0273SetRobustList() -> () error int64;
+
+    // STUB 274
+    strict A0274GetRobustList() -> () error int64;
+
+    // STUB 275
+    strict A0275Splice() -> () error int64;
+
+    // STUB 276
+    strict A0276Tee() -> () error int64;
+
+    // STUB 277
+    strict A0277SyncFileRange() -> () error int64;
+
+    // STUB 278
+    strict A0278Vmsplice() -> () error int64;
+
+    // STUB 279
+    strict A0279MovePages() -> () error int64;
+
+    // STUB 280
+    strict A0280Utimensat() -> () error int64;
+
+    // STUB 281
+    strict A0281EpollPwait() -> () error int64;
+
+    // STUB 282
+    strict A0282Signalfd() -> () error int64;
+
+    // STUB 283
+    strict A0283TimerfdCreate() -> () error int64;
+
+    // STUB 284
+    strict A0284Eventfd() -> () error int64;
+
+    // STUB 285
+    strict A0285Fallocate() -> () error int64;
+
+    // STUB 286
+    strict A0286TimerfdSettime() -> () error int64;
+
+    // STUB 287
+    strict A0287TimerfdGettime() -> () error int64;
+
+    // STUB 288
+    strict A0288Accept4() -> () error int64;
+
+    // STUB 289
+    strict A0289Signalfd4() -> () error int64;
+
+    // STUB 290
+    strict A0290Eventfd2() -> () error int64;
+
+    // STUB 291
+    strict A0291EpollCreate1() -> () error int64;
+
+    // STUB 292
+    strict A0292Dup3() -> () error int64;
+
+    // STUB 293
+    strict A0293Pipe2() -> () error int64;
+
+    // STUB 294
+    strict A0294InotifyInit1() -> () error int64;
+
+    // STUB 295
+    strict A0295Preadv() -> () error int64;
+
+    // STUB 296
+    strict A0296Pwritev() -> () error int64;
+
+    // STUB 297
+    strict A0297RtTgsigqueueinfo() -> () error int64;
+
+    // STUB 298
+    strict A0298PerfEventOpen() -> () error int64;
+
+    // STUB 299
+    strict A0299Recvmmsg() -> () error int64;
+
+    // STUB 300
+    strict A0300FanotifyInit() -> () error int64;
+
+    // STUB 301
+    strict A0301FanotifyMark() -> () error int64;
+
+    // STUB 302
+    strict A0302Prlimit64() -> () error int64;
+
+    // STUB 303
+    strict A0303NameToHandleAt() -> () error int64;
+
+    // STUB 304
+    strict A0304OpenByHandleAt() -> () error int64;
+
+    // STUB 305
+    strict A0305ClockAdjtime() -> () error int64;
+
+    // STUB 306
+    strict A0306Syncfs() -> () error int64;
+
+    // STUB 307
+    strict A0307Sendmmsg() -> () error int64;
+
+    // STUB 308
+    strict A0308Setns() -> () error int64;
+
+    // STUB 309
+    strict A0309Getcpu() -> () error int64;
+
+    // STUB 310
+    strict A0310ProcessVmReadv() -> () error int64;
+
+    // STUB 311
+    strict A0311ProcessVmWritev() -> () error int64;
+
+    // STUB 312
+    strict A0312Kcmp() -> () error int64;
+
+    // STUB 313
+    strict A0313FinitModule() -> () error int64;
+
+    // STUB 314
+    strict A0314SchedSetattr() -> () error int64;
+
+    // STUB 315
+    strict A0315SchedGetattr() -> () error int64;
+
+    // STUB 316
+    strict A0316Renameat2() -> () error int64;
+
+    // STUB 317
+    strict A0317Seccomp() -> () error int64;
+
+    // #318, SYSCALL_DEFINE3(getrandom, char __user *, ubuf, size_t, len, unsigned int, flags)
+    strict A0318Getrandom(resource struct {
+        @out
+        buf experimental_pointer<uchar>;
+        len uint64;
+        flags uint32;
+    }) -> () error int64;
+
+    // STUB 319
+    strict A0319MemfdCreate() -> () error int64;
+
+    // STUB 320
+    strict A0320KexecFileLoad() -> () error int64;
+
+    // STUB 321
+    strict A0321Bpf() -> () error int64;
+
+    // #322, SYSCALL_DEFINE5(execveat, int, fd, const char __user *, filename,
+    // const char __user *const __user *, argv,
+    // const char __user *const __user *, envp,
+    // int, flags)
+    strict A0322Execveat(resource struct {
+        fd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        @in
+        argv experimental_pointer<uchar>;
+        @in
+        envp experimental_pointer<uchar>;
+        flags int32;
+    }) -> () error int64;
+
+    // STUB 323
+    strict A0323Userfaultfd() -> () error int64;
+
+    // STUB 324
+    strict A0324Membarrier() -> () error int64;
+
+    // STUB 325
+    strict A0325Mlock2() -> () error int64;
+
+    // STUB 326
+    strict A0326CopyFileRange() -> () error int64;
+
+    // STUB 327
+    strict A0327Preadv2() -> () error int64;
+
+    // STUB 328
+    strict A0328Pwritev2() -> () error int64;
+
+    // STUB 329
+    strict A0329PkeyMprotect() -> () error int64;
+
+    // STUB 330
+    strict A0330PkeyAlloc() -> () error int64;
+
+    // STUB 331
+    strict A0331PkeyFree() -> () error int64;
+
+    // #332 SYSCALL_DEFINE5(statx, int, dfd, const char __user *, filename, unsigned, flags, unsigned int, mask, struct statx __user *, buffer)
+    strict A0332Statx(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        flags uint32;
+        mask uint32;
+        @out
+        @voidptr
+        buffer experimental_pointer<statx>;
+    }) -> () error int64;
+
+    // STUB 333
+    strict A0333IoPgetevents() -> () error int64;
+
+    // STUB 334
+    strict A0334Rseq() -> () error int64;
+
+    // STUB (Blank Syscall) 335
+    strict A0335Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 336
+    strict A0336Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 337
+    strict A0337Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 338
+    strict A0338Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 339
+    strict A0339Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 340
+    strict A0340Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 341
+    strict A0341Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 342
+    strict A0342Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 343
+    strict A0343Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 344
+    strict A0344Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 345
+    strict A0345Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 346
+    strict A0346Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 347
+    strict A0347Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 348
+    strict A0348Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 349
+    strict A0349Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 350
+    strict A0350Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 351
+    strict A0351Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 352
+    strict A0352Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 353
+    strict A0353Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 354
+    strict A0354Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 355
+    strict A0355Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 356
+    strict A0356Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 357
+    strict A0357Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 358
+    strict A0358Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 359
+    strict A0359Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 360
+    strict A0360Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 361
+    strict A0361Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 362
+    strict A0362Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 363
+    strict A0363Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 364
+    strict A0364Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 365
+    strict A0365Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 366
+    strict A0366Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 367
+    strict A0367Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 368
+    strict A0368Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 369
+    strict A0369Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 370
+    strict A0370Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 371
+    strict A0371Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 372
+    strict A0372Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 373
+    strict A0373Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 374
+    strict A0374Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 375
+    strict A0375Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 376
+    strict A0376Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 377
+    strict A0377Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 378
+    strict A0378Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 379
+    strict A0379Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 380
+    strict A0380Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 381
+    strict A0381Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 382
+    strict A0382Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 383
+    strict A0383Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 384
+    strict A0384Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 385
+    strict A0385Blank() -> () error int64;
+
+    // STUB (Blank Syscall) 386
+    strict A0386Blank() -> () error int64;
+
+    // STUB (Don't use) 387
+    strict A0387DontUse() -> () error int64;
+
+    // STUB (Don't use) 388
+    strict A0388DontUse() -> () error int64;
+
+    // STUB (Don't use) 389
+    strict A0389DontUse() -> () error int64;
+
+    // STUB (Don't use) 390
+    strict A0390DontUse() -> () error int64;
+
+    // STUB (Don't use) 391
+    strict A0391DontUse() -> () error int64;
+
+    // STUB (Don't use) 392
+    strict A0392DontUse() -> () error int64;
+
+    // STUB (Don't use) 393
+    strict A0393DontUse() -> () error int64;
+
+    // STUB (Don't use) 394
+    strict A0394DontUse() -> () error int64;
+
+    // STUB (Don't use) 395
+    strict A0395DontUse() -> () error int64;
+
+    // STUB (Don't use) 396
+    strict A0396DontUse() -> () error int64;
+
+    // STUB (Don't use) 397
+    strict A0397DontUse() -> () error int64;
+
+    // STUB (Don't use) 398
+    strict A0398DontUse() -> () error int64;
+
+    // STUB (Don't use) 399
+    strict A0399DontUse() -> () error int64;
+
+    // STUB (Don't use) 400
+    strict A0400DontUse() -> () error int64;
+
+    // STUB (Don't use) 401
+    strict A0401DontUse() -> () error int64;
+
+    // STUB (Don't use) 402
+    strict A0402DontUse() -> () error int64;
+
+    // STUB (Don't use) 403
+    strict A0403DontUse() -> () error int64;
+
+    // STUB (Don't use) 404
+    strict A0404DontUse() -> () error int64;
+
+    // STUB (Don't use) 405
+    strict A0405DontUse() -> () error int64;
+
+    // STUB (Don't use) 406
+    strict A0406DontUse() -> () error int64;
+
+    // STUB (Don't use) 407
+    strict A0407DontUse() -> () error int64;
+
+    // STUB (Don't use) 408
+    strict A0408DontUse() -> () error int64;
+
+    // STUB (Don't use) 409
+    strict A0409DontUse() -> () error int64;
+
+    // STUB (Don't use) 410
+    strict A0410DontUse() -> () error int64;
+
+    // STUB (Don't use) 411
+    strict A0411DontUse() -> () error int64;
+
+    // STUB (Don't use) 412
+    strict A0412DontUse() -> () error int64;
+
+    // STUB (Don't use) 413
+    strict A0413DontUse() -> () error int64;
+
+    // STUB (Don't use) 414
+    strict A0414DontUse() -> () error int64;
+
+    // STUB (Don't use) 415
+    strict A0415DontUse() -> () error int64;
+
+    // STUB (Don't use) 416
+    strict A0416DontUse() -> () error int64;
+
+    // STUB (Don't use) 417
+    strict A0417DontUse() -> () error int64;
+
+    // STUB (Don't use) 418
+    strict A0418DontUse() -> () error int64;
+
+    // STUB (Don't use) 419
+    strict A0419DontUse() -> () error int64;
+
+    // STUB (Don't use) 420
+    strict A0420DontUse() -> () error int64;
+
+    // STUB (Don't use) 421
+    strict A0421DontUse() -> () error int64;
+
+    // STUB (Don't use) 422
+    strict A0422DontUse() -> () error int64;
+
+    // STUB (Don't use) 423
+    strict A0423DontUse() -> () error int64;
+
+    // STUB 424
+    strict A0424PidfdSendSignal() -> () error int64;
+
+    // STUB 425
+    strict A0425IoUringSetup() -> () error int64;
+
+    // STUB 426
+    strict A0426IoUringEnter() -> () error int64;
+
+    // STUB 427
+    strict A0427IoUringRegister() -> () error int64;
+
+    // STUB 428
+    strict A0428OpenTree() -> () error int64;
+
+    // STUB 429
+    strict A0429MoveMount() -> () error int64;
+
+    // STUB 430
+    strict A0430Fsopen() -> () error int64;
+
+    // STUB 431
+    strict A0431Fsconfig() -> () error int64;
+
+    // STUB 432
+    strict A0432Fsmount() -> () error int64;
+
+    // STUB 433
+    strict A0433Fspick() -> () error int64;
+
+    // STUB 434
+    strict A0434PidfdOpen() -> () error int64;
+
+    // STUB 435
+    strict A0435Clone3() -> () error int64;
+
+    // STUB 436
+    strict A0436CloseRange() -> () error int64;
+
+    // STUB 437
+    strict A0437Openat2() -> () error int64;
+
+    // STUB 438
+    strict A0438PidfdGetfd() -> () error int64;
+
+    // STUB 439
+    strict A0439Faccessat2() -> () error int64;
+
+    // STUB 440
+    strict A0440ProcessMadvise() -> () error int64;
+
+    // STUB 441
+    strict A0441EpollPwait2() -> () error int64;
+
+    // STUB 442
+    strict A0442MountSetattr() -> () error int64;
+
+    // STUB 443
+    strict A0443QuotactlFd() -> () error int64;
+
+    // STUB 444
+    strict A0444LandlockCreateRuleset() -> () error int64;
+
+    // STUB 445
+    strict A0445LandlockAddRule() -> () error int64;
+
+    // STUB 446
+    strict A0446LandlockRestrictSelf() -> () error int64;
+
+    // STUB 447
+    strict A0447MemfdSecret() -> () error int64;
+
+    // STUB 448
+    strict A0448ProcessMrelease() -> () error int64;
+
+    // STUB 449
+    strict A0449FutexWaitv() -> () error int64;
+
+    // STUB 450
+    strict A0450SetMempolicyHomeNode() -> () error int64;
+
+    // STUB 451
+    strict A0451Cachestat() -> () error int64;
+
+    // STUB 452
+    strict A0452Fchmodat2() -> () error int64;
+
+    // STUB 453
+    strict A0453MapShadowStack() -> () error int64;
+
+    // STUB (Blank syscall) 454
+    strict A0454Blank() -> () error int64;
+
+    // STUB (Blank syscall) 455
+    strict A0455Blank() -> () error int64;
+
+    // STUB (Blank syscall) 456
+    strict A0456Blank() -> () error int64;
+
+    // STUB (Blank syscall) 457
+    strict A0457Blank() -> () error int64;
+
+    // STUB (Blank syscall) 458
+    strict A0458Blank() -> () error int64;
+
+    // STUB (Blank syscall) 459
+    strict A0459Blank() -> () error int64;
+
+    // STUB (Blank syscall) 460
+    strict A0460Blank() -> () error int64;
+
+    // STUB (Blank syscall) 461
+    strict A0461Blank() -> () error int64;
+
+    // STUB (Blank syscall) 462
+    strict A0462Blank() -> () error int64;
+
+    // STUB (Blank syscall) 463
+    strict A0463Blank() -> () error int64;
+
+    // STUB (Blank syscall) 464
+    strict A0464Blank() -> () error int64;
+
+    // STUB (Blank syscall) 465
+    strict A0465Blank() -> () error int64;
+
+    // STUB (Blank syscall) 466
+    strict A0466Blank() -> () error int64;
+
+    // STUB (Blank syscall) 467
+    strict A0467Blank() -> () error int64;
+
+    // STUB (Blank syscall) 468
+    strict A0468Blank() -> () error int64;
+
+    // STUB (Blank syscall) 469
+    strict A0469Blank() -> () error int64;
+
+    // STUB (Blank syscall) 470
+    strict A0470Blank() -> () error int64;
+
+    // STUB (Blank syscall) 471
+    strict A0471Blank() -> () error int64;
+
+    // STUB (Blank syscall) 472
+    strict A0472Blank() -> () error int64;
+
+    // STUB (Blank syscall) 473
+    strict A0473Blank() -> () error int64;
+
+    // STUB (Blank syscall) 474
+    strict A0474Blank() -> () error int64;
+
+    // STUB (Blank syscall) 475
+    strict A0475Blank() -> () error int64;
+
+    // STUB (Blank syscall) 476
+    strict A0476Blank() -> () error int64;
+
+    // STUB (Blank syscall) 477
+    strict A0477Blank() -> () error int64;
+
+    // STUB (Blank syscall) 478
+    strict A0478Blank() -> () error int64;
+
+    // STUB (Blank syscall) 479
+    strict A0479Blank() -> () error int64;
+
+    // STUB (Blank syscall) 480
+    strict A0480Blank() -> () error int64;
+
+    // STUB (Blank syscall) 481
+    strict A0481Blank() -> () error int64;
+
+    // STUB (Blank syscall) 482
+    strict A0482Blank() -> () error int64;
+
+    // STUB (Blank syscall) 483
+    strict A0483Blank() -> () error int64;
+
+    // STUB (Blank syscall) 484
+    strict A0484Blank() -> () error int64;
+
+    // STUB (Blank syscall) 485
+    strict A0485Blank() -> () error int64;
+
+    // STUB (Blank syscall) 486
+    strict A0486Blank() -> () error int64;
+
+    // STUB (Blank syscall) 487
+    strict A0487Blank() -> () error int64;
+
+    // STUB (Blank syscall) 488
+    strict A0488Blank() -> () error int64;
+
+    // STUB (Blank syscall) 489
+    strict A0489Blank() -> () error int64;
+
+    // STUB (Blank syscall) 490
+    strict A0490Blank() -> () error int64;
+
+    // STUB (Blank syscall) 491
+    strict A0491Blank() -> () error int64;
+
+    // STUB (Blank syscall) 492
+    strict A0492Blank() -> () error int64;
+
+    // STUB (Blank syscall) 493
+    strict A0493Blank() -> () error int64;
+
+    // STUB (Blank syscall) 494
+    strict A0494Blank() -> () error int64;
+
+    // STUB (Blank syscall) 495
+    strict A0495Blank() -> () error int64;
+
+    // STUB (Blank syscall) 496
+    strict A0496Blank() -> () error int64;
+
+    // STUB (Blank syscall) 497
+    strict A0497Blank() -> () error int64;
+
+    // STUB (Blank syscall) 498
+    strict A0498Blank() -> () error int64;
+
+    // STUB (Blank syscall) 499
+    strict A0499Blank() -> () error int64;
+
+    // STUB (Blank syscall) 500
+    strict A0500Blank() -> () error int64;
+
+    // STUB (Blank syscall) 501
+    strict A0501Blank() -> () error int64;
+
+    // STUB (Blank syscall) 502
+    strict A0502Blank() -> () error int64;
+
+    // STUB (Blank syscall) 503
+    strict A0503Blank() -> () error int64;
+
+    // STUB (Blank syscall) 504
+    strict A0504Blank() -> () error int64;
+
+    // STUB (Blank syscall) 505
+    strict A0505Blank() -> () error int64;
+
+    // STUB (Blank syscall) 506
+    strict A0506Blank() -> () error int64;
+
+    // STUB (Blank syscall) 507
+    strict A0507Blank() -> () error int64;
+
+    // STUB (Blank syscall) 508
+    strict A0508Blank() -> () error int64;
+
+    // STUB (Blank syscall) 509
+    strict A0509Blank() -> () error int64;
+
+    // STUB (Blank syscall) 510
+    strict A0510Blank() -> () error int64;
+
+    // STUB (Blank syscall) 511
+    strict A0511Blank() -> () error int64;
+
+    // STUB 512
+    strict A0512CompatRtSigaction() -> () error int64;
+
+    // STUB 513
+    strict A0513CompatRtSigreturn() -> () error int64;
+
+    // STUB 514
+    strict A0514CompatIoctl() -> () error int64;
+
+    // STUB 515
+    strict A0515CompatReadv() -> () error int64;
+
+    // STUB 516
+    strict A0516CompatWritev() -> () error int64;
+
+    // STUB 517
+    strict A0517CompatRecvfrom() -> () error int64;
+
+    // STUB 518
+    strict A0518CompatSendmsg() -> () error int64;
+
+    // STUB 519
+    strict A0519CompatRecvmsg() -> () error int64;
+
+    // STUB 520
+    strict A0520CompatExecve() -> () error int64;
+
+    // STUB 521
+    strict A0521CompatPtrace() -> () error int64;
+
+    // STUB 522
+    strict A0522CompatRtSigpending() -> () error int64;
+
+    // STUB 523
+    strict A0523CompatRtSigtimedwait() -> () error int64;
+
+    // STUB 524
+    strict A0524CompatRtSigqueueinfo() -> () error int64;
+
+    // STUB 525
+    strict A0525CompatSigaltstack() -> () error int64;
+
+    // STUB 526
+    strict A0526CompatTimerCreate() -> () error int64;
+
+    // STUB 527
+    strict A0527CompatMqNotify() -> () error int64;
+
+    // STUB 528
+    strict A0528CompatKexecLoad() -> () error int64;
+
+    // STUB 529
+    strict A0529CompatWaitid() -> () error int64;
+
+    // STUB 530
+    strict A0530CompatSetRobustList() -> () error int64;
+
+    // STUB 531
+    strict A0531CompatGetRobustList() -> () error int64;
+
+    // STUB 532
+    strict A0532CompatVmsplice() -> () error int64;
+
+    // STUB 533
+    strict A0533CompatMovePages() -> () error int64;
+
+    // STUB 534
+    strict A0534CompatPreadv() -> () error int64;
+
+    // STUB 535
+    strict A0535CompatPwritev() -> () error int64;
+
+    // STUB 536
+    strict A0536CompatRtTgsigqueueinfo() -> () error int64;
+
+    // STUB 537
+    strict A0537CompatRecvmmsg() -> () error int64;
+
+    // STUB 538
+    strict A0538CompatSendmmsg() -> () error int64;
+
+    // STUB 539
+    strict A0539CompatProcessVmReadv() -> () error int64;
+
+    // STUB 540
+    strict A0540CompatProcessVmWritev() -> () error int64;
+
+    // STUB 541
+    strict A0541CompatSetsockopt() -> () error int64;
+
+    // STUB 542
+    strict A0542CompatGetsockopt() -> () error int64;
+
+    // STUB 543
+    strict A0543CompatIoSetup() -> () error int64;
+
+    // STUB 544
+    strict A0544CompatIoSubmit() -> () error int64;
+
+    // STUB 545
+    strict A0545CompatExecveat() -> () error int64;
+
+    // STUB 546
+    strict A0546CompatPreadv2() -> () error int64;
+
+    // STUB 547
+    strict A0547CompatPwritev2() -> () error int64;
+};

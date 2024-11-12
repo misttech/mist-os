@@ -12,6 +12,9 @@ assert(is_kernel, current_toolchain)
 
 zx_library("syscalls") {
   visibility = [ "//zircon/kernel/*" ]
+  if (is_mistos) {
+    visibility += [ "//vendor/misttech/zircon/kernel/*" ]
+  }
 
   # This can be used for headers only by the vDSO and test code.
 
@@ -88,6 +91,9 @@ source_set("impl") {
       "//zircon/kernel/lib/acpi_lite",
       "//zircon/kernel/platform/pc",
     ]
+  }
+  if (is_mistos) {
+    deps += [ "//vendor/misttech/zircon/kernel/lib/syscalls:linux_impl" ]
   }
 }
 

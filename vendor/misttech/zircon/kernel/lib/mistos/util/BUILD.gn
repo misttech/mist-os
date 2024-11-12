@@ -1,0 +1,25 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("util") {
+  sources = [
+    "bstring.cc",
+    "cprng.cc",
+    "split_string.cc",
+    "third_party/icu/icu_utf.cc",
+    "trim.cc",
+    "try_from.cc",
+    "utf_codecs.cc",
+    "weak_ptr_internal.cc",
+    "zx_cprng_draw.cc",
+    "zx_status_get_string.cc",
+  ]
+
+  deps = [
+    "//zircon/kernel/lib/crypto",
+    "//zircon/system/ulib/explicit-memory",
+  ]
+}

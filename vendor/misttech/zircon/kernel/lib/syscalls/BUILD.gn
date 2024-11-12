@@ -1,0 +1,41 @@
+# Copyright 2024 Mist Tecnologia LTDA
+# Copyright 2019 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/zircon/zircon_cpu.gni")
+import("//build/zircon/zx_library.gni")
+import("//zircon/kernel/params.gni")
+
+assert(is_kernel, current_toolchain)
+
+source_set("linux_impl") {
+  visibility = [ "//zircon/kernel/lib/syscalls:*" ]
+  sources = [
+    "arch/${current_cpu}/kernel/process_64.cc",
+    "arch/${current_cpu}/kernel/sys_x86_64.cc",
+    "drivers/char/random.cc",
+    "fs/exec.cc",
+    "fs/namei.cc",
+    "fs/open.cc",
+    "fs/read_write.cc",
+    "fs/stat.cc",
+    "kernel/exit.cc",
+    "kernel/fork.cc",
+    "kernel/signal.cc",
+    "kernel/sys.cc",
+    "mm/mmap.cc",
+    "mm/mprotect.cc",
+    "not_implemented.cc",
+    "static_assert.cc",
+  ]
+  deps = [
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core",
+    "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon",
+    "//zircon/kernel/lib/syscalls:headers",
+    "//zircon/kernel/object",
+  ]
+}

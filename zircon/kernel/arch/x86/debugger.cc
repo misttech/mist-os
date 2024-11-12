@@ -12,6 +12,9 @@
 #include <zircon/types.h>
 
 #include <arch/debugger.h>
+#if __mist_os__
+#include <arch/mistos.h>
+#endif
 #include <arch/regs.h>
 #include <arch/x86.h>
 #include <arch/x86/feature.h>
@@ -429,3 +432,33 @@ zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs
 uint8_t arch_get_hw_breakpoint_count() { return HW_DEBUG_REGISTERS_COUNT; }
 
 uint8_t arch_get_hw_watchpoint_count() { return HW_DEBUG_REGISTERS_COUNT; }
+
+#if __mist_os__
+
+void arch_get_general_regs_mistos(Thread* thread, zx_thread_state_general_regs_t* out) {
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(),
+                             CLT_TAG("arch_get_general_regs_mistos")};
+
+  // registers got pushed to rsp0 during the x86_syscall (syscall.S)
+  x86_fill_in_gregs_from_syscall(
+      out, (syscall_regs_t*)(x86_get_percpu()->default_tss.rsp0 - sizeof(syscall_regs_t)));
+
+  out->fs_base = thread->arch().fs_base;
+  out->gs_base = thread->arch().gs_base;
+}
+
+void arch_set_iframe_from_general_regs_mistos(Thread* thread, iframe_t* iframe,
+                                              const zx_thread_state_general_regs_t* in) {
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(),
+                             CLT_TAG("arch_set_iframe_from_general_regs_mistos")};
+  // make sure we are in the same frame
+  ZX_ASSERT(iframe->ip == in->rip);
+  ZX_ASSERT(iframe->user_sp == in->rsp);
+
+  x86_fill_in_iframe_from_gregs(iframe, in);
+
+  thread->arch().fs_base = in->fs_base;
+  thread->arch().gs_base = in->gs_base;
+}
+
+#endif

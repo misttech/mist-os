@@ -17,6 +17,7 @@ zx_library("counters") {
     "//src/zircon/bin/kcounter:*",
     "//src/zircon/tests/kcounter:*",
     "//vendor/google/*",
+    "//vendor/misttech/*",
     "//zircon/kernel/*",
     "//zircon/system/ulib/*",
     "//zircon/system/ulib/kcounter/*",

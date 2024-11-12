@@ -43,6 +43,9 @@
 #include <arch/debugger.h>
 #include <arch/exception.h>
 #include <arch/interrupt.h>
+#if __mist_os__
+#include <arch/mistos.h>
+#endif
 #include <arch/ops.h>
 #include <arch/thread.h>
 #include <kernel/auto_preempt_disabler.h>
@@ -94,6 +97,10 @@ KCOUNTER(thread_timeslice_extended, "thread.timeslice_extended")
 KCOUNTER(thread_restricted_kick_count, "thread.restricted_kick")
 // counts the number of failed samples
 KCOUNTER(thread_sampling_failed, "thread.sampling_failed")
+#if __mist_os__
+// counts the number of calls to fork_kick() that succeeded.
+KCOUNTER(thread_restricted_fork_count, "thread.fork_kick")
+#endif
 
 // The global thread list. This is a lazy_init type, since initial thread code
 // manipulates the list before global constructors are run. This is initialized by
@@ -660,6 +667,30 @@ zx_status_t Thread::RestrictedKick() {
   kcounter_add(thread_restricted_kick_count, 1);
   return ZX_OK;
 }
+
+#if __mist_os__
+
+zx_status_t Thread::SetForkFrame(const zx_thread_state_general_regs_t& fork_frame) {
+  LTRACE_ENTRY;
+
+  canary_.Assert();
+
+  {
+    SingleChainLockGuard thread_guard{IrqSaveOption, get_lock(), CLT_TAG("Thread::SetForkFrame")};
+
+    if (state() != THREAD_INITIAL) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    signals_.fetch_or(THREAD_SIGNAL_FORK, ktl::memory_order_relaxed);
+    fork_frame_ = fork_frame;
+  }
+
+  kcounter_add(thread_restricted_fork_count, 1);
+  return ZX_OK;
+}
+
+#endif
 
 // Signal an exception on the current thread, to be handled when the
 // current syscall exits.  Unlike other signals, this is synchronous, in
@@ -1487,7 +1518,21 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       Thread::Current::DoSampleStack(source, gregs);
       arch_disable_ints();
     }
+
+#if __mist_os__
+    // THREAD_SIGNAL_FORK
+    if (signals & THREAD_SIGNAL_FORK) {
+      ZX_ASSERT(source == GeneralRegsSource::Iframe);
+      current_thread->signals_.fetch_and(~THREAD_SIGNAL_FORK, ktl::memory_order_relaxed);
+
+      arch_set_iframe_from_general_regs_mistos(current_thread, reinterpret_cast<iframe_t*>(gregs),
+                                               &current_thread->fork_frame_);
+      if (LOCAL_TRACE) {
+        PrintFrame(stdout, *reinterpret_cast<iframe_t*>(gregs));
+      }
+    }
   }
+#endif
 
   // Interrupts must remain disabled for the remainder of this function. If for any reason we need
   // to enable interrupts in handling we have to re-enter the loop above in order to process signals

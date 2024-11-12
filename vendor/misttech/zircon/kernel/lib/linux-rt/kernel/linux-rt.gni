@@ -1,0 +1,17 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Define the target_linux_toolchain variable which is the GN linux toolchain to
+# use for the target CPU architecture.
+if (target_cpu == "x64") {
+  target_linux_toolchain = "//build/toolchain:linux_x64"
+} else if (target_cpu == "arm64") {
+  target_linux_toolchain = "//build/toolchain:linux_arm64"
+} else if (target_cpu == "riscv64") {
+  target_linux_toolchain = "//build/toolchain:linux_riscv64"
+} else {
+  assert(false, "Need definition for target linux toolchain for $target_cpu")
+}
+
+host_toolchain_for_target_arch = "//build/toolchain:host_$target_cpu"

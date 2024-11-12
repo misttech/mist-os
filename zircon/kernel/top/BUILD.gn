@@ -36,6 +36,9 @@ source_set("top") {
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/platform",
   ]
+  if (is_mistos) {
+    deps += [ "//vendor/misttech/zircon/kernel/lib/starnix" ]
+  }
 
   # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
   defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]

@@ -302,7 +302,12 @@ struct Elf : private Layout<Class, Data> {
     }
 
     constexpr bool Loadable(std::optional<ElfMachine> target = ElfMachine::kNative) const {
+#if __mist_os__
+      return Valid() && (type == ElfType::kDyn || type == ElfType::kExec) &&
+             (!target || machine == target);
+#else
       return Valid() && type == ElfType::kDyn && (!target || machine == target);
+#endif
     }
 
     // This is the verbose version that uses the Diagnostics template API (see
@@ -326,7 +331,7 @@ struct Elf : private Layout<Class, Data> {
           [[likely]];
           break;
         case ElfType::kExec:
-#if _KERNEL_MISTOS
+#if __mist_os__
           [[likely]];
           break;
 #else

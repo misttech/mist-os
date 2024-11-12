@@ -550,6 +550,9 @@ typedef void (*thread_trampoline_routine)() __NO_RETURN;
 #define THREAD_SIGNAL_POLICY_EXCEPTION       (1 << 2)
 #define THREAD_SIGNAL_RESTRICTED_KICK        (1 << 3)
 #define THREAD_SIGNAL_SAMPLE_STACK           (1 << 4)
+#if __mist_os__
+#define THREAD_SIGNAL_FORK                  (1 << 5)
+#endif
 // clang-format on
 
 // thread priority
@@ -1206,6 +1209,9 @@ struct Thread : public ChainLockable {
   zx_status_t Suspend() { return SuspendOrKillInternal(SuspendOrKillOp::Suspend); }
   void Forget();
   zx_status_t RestrictedKick();
+#if __mist_os__
+  zx_status_t SetForkFrame(const zx_thread_state_general_regs_t& fork_frame);
+#endif
   // Marks a thread as detached, in this state its memory will be released once
   // execution is done.
   zx_status_t Detach();
@@ -1899,6 +1905,10 @@ struct Thread : public ChainLockable {
 
   // Node storage for existing on the save state list.
   fbl::SinglyLinkedListNodeState<Thread*> save_state_list_node_ TA_GUARDED(get_lock());
+
+#if __mist_os__
+  zx_thread_state_general_regs_t fork_frame_ TA_GUARDED(get_lock());
+#endif
 };
 
 // For the moment, the arch-specific current thread implementations need to come here, after the

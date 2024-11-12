@@ -136,6 +136,13 @@ if (toolchain_environment == "kernel") {
     if (!kernel_no_userabi) {
       sources += [ "userboot_tests.cc" ]
       deps += [ "//zircon/kernel/lib/userabi" ]
+      if (is_mistos) {
+        deps += [ "//vendor/misttech/zircon/kernel/lib/starnix:tests" ]
+        deps += [
+          "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:tests",
+        ]
+        deps += [ "//vendor/misttech/zircon/kernel/lib/mistos/util/tests" ]
+      }
     }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]
   }

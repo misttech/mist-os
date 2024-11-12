@@ -36,11 +36,19 @@ rustc_binary("shared-multi-call-tool-binary") {
     "//build/config/rust:bootfs",
   ]
 
-  # Statically link rust standard library
-  # TODO(https://fxbug.dev/42163719): Dynamically link once this is in a bootfs_package.
-  configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-  configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+  if (is_mistos) {
+    # Statically link rust standard library
+    # TODO(https://fxbug.dev/42163719): Dynamically link once this is in a bootfs_package.
+    configs += [ "//build/config/mistos:dynamic_rust_standard_library" ]
+    configs -= [ "//build/config/mistos:dynamic_rust_standard_library" ]
+    configs += [ "//build/config/mistos:static_rust_standard_library" ]
+  } else {
+    # Statically link rust standard library
+    # TODO(https://fxbug.dev/42163719): Dynamically link once this is in a bootfs_package.
+    configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+  }
 
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
   # enabled, shift it to the large RBE worker pool)

@@ -1,0 +1,28 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("starnix-uapi") {
+  sources = [
+    "device_type.cc",
+    "errors.cc",
+    "file_mode.cc",
+    "math.cc",
+    "signals.cc",
+    "user_address.cc",
+    "user_buffer.cc",
+    "vfs.cc",
+  ]
+  public_deps = [
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+  ]
+  deps = []
+  public_configs = []
+}
+
+group("tests") {
+  deps = [ "tests" ]
+}

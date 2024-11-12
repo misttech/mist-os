@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
+#[cfg(not(feature = "starnix_lite"))]
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
@@ -20,6 +21,8 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
+#[cfg(feature = "starnix_lite")]
+use fidl_fuchsia_io as fio;
 use fuchsia_runtime::UtcInstant;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
@@ -51,6 +54,7 @@ use syncio::{
 };
 use vfs::{ProtocolsExt, ToFlags};
 use zx::{HandleBased, Status};
+#[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder,
     fidl_fuchsia_unknown as funknown,
@@ -327,12 +331,14 @@ pub fn new_remote_file_ops(handle: zx::Handle) -> Result<Box<dyn FileOps>, Errno
 }
 
 fn remote_file_attrs_and_ops(
-    mut handle: zx::Handle,
+    #[cfg(not(feature = "starnix_lite"))] mut handle: zx::Handle,
+    #[cfg(feature = "starnix_lite")] handle: zx::Handle,
 ) -> Result<(zxio_node_attr, Box<dyn FileOps>), Errno> {
     let handle_type =
         handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
 
     // Check whether the channel implements a Starnix specific protoocol.
+    #[cfg(not(feature = "starnix_lite"))]
     if handle_type == zx::ObjectType::CHANNEL {
         let channel = zx::Channel::from(handle);
         let queryable = funknown::QueryableSynchronousProxy::new(channel);

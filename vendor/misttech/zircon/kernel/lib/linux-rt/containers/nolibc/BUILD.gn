@@ -1,0 +1,26 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("//build/zbi/kernel_cmdline.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
+
+# Pre compiled linux binary see build.sh
+resource("linux-bin") {
+  sources = [ "nolibc-test.linux" ]
+  outputs = [ "test/nolibc-test" ]
+  allow_binary_output_dir = true
+}
+
+zbi("nolibc") {
+  deps = [
+    ":linux-bin",
+    "//zircon/kernel",
+  ]
+
+  output_name = "nolibc"
+  output_dir = root_out_dir
+  output_extension = "zbi"
+}

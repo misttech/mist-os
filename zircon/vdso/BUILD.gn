@@ -87,6 +87,11 @@ fidl("zx") {
   # TODO(https://fxbug.dev/42061412): Burn these down.
   experimental_flags = [ "zx_c_types" ]
 
+  if (is_mistos) {
+    sources += [ "//vendor/misttech/zircon/vdso/linux.fidl" ]
+    experimental_flags += [ "allow_arbitrary_error_types" ]
+  }
+
   enable_zither = true
   enable_cpp = false
   enable_rust = false

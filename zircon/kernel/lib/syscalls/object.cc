@@ -13,6 +13,9 @@
 #include <platform.h>
 #include <trace.h>
 #include <zircon/errors.h>
+#if __mist_os__
+#include <zircon/mistos/syscalls/object.h>
+#endif
 #include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/time.h>
@@ -1557,6 +1560,14 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
       }
       return stream->SetAppendMode(value);
     }
+#if __mist_os__
+    case ZX_PROP_MISTOS_PROCESS_STACK: {
+      if (size < sizeof(zx_mistos_process_stack_t)) {
+        return ZX_ERR_BUFFER_TOO_SMALL;
+      }
+      return ZX_OK;
+    }
+#endif
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }

@@ -1,0 +1,37 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("tests") {
+  sources = [
+    "arch/${current_cpu}/syscalls-test.cc",
+    "atomic_counter-test.cc",
+    "device/kobject-test.cc",
+    "device/registry-test.cc",
+    "fd_table-test.cc",
+    "fs/mistos/bootfs-test.cc",
+    "fs/mistos/tree_builder-test.cc",
+    "fs/sysfs/bus_collection_directory-test.cc",
+    "fs/sysfs/kobject_symlink_directory-test.cc",
+    "fs/tmpfs-test.cc",
+    "fs_args-test.cc",
+    "fs_node-test.cc",
+    "io_buffers-test.cc",
+    "loader-test.cc",
+    "memory_manager-test.cc",
+    "path-test.cc",
+    "pid_table-test.cc",
+    "signal/syscalls-test.cc",
+    "signal/types-test.cc",
+    "task-test.cc",
+    "task/syscalls-test.cc",
+    "thread_group-test.cc",
+    "vfs/fs_context-test.cc",
+    "vfs/namespace-test.cc",
+    "vfs/syscalls-test.cc",
+  ]
+  deps = [
+    "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core",
+    "//zircon/kernel/lib/unittest",
+  ]
+}

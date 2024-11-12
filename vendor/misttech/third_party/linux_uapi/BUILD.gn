@@ -1,0 +1,55 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+import("//build/zircon/zircon_cpu.gni")
+import("uapi.gni")
+
+zx_library("linux_uapi") {
+  sources = []
+  public_configs = [
+    ":uapi",
+    ":headers.after",
+  ]
+}
+
+config("uapi") {
+  include_dirs = [
+    "uapi/$linux_kernel_version/$zircon_cpu/include",
+    "stub",
+  ]
+  defines = [ "_STRUCT_TIMESPEC" ]
+}
+
+config("headers.after") {
+  visibility = [ ":*" ]
+  cflags = [
+    "-idirafter",
+    rebase_path("include-after", root_build_dir),
+  ]
+}
+
+# Run generate_uapi_headers.sh manually and commit the headers save some build time
+# mkdir -p uapi/$linux_kernel_version
+# ./generate_uapi_headers.sh --download-kernel --branch $linux_kernel_version --out-dir uapi/$linux_kernel_version
+# cd uapi/$linux_kernel_version/uapi
+# mv $zircon_cpu ../
+
+#
+# Leave it here for documentation purpodes.
+# NOTE: This action generate the header in root_build_dir not in the current dir.
+#
+#action("generate_uapi_headers") {
+#  script = "generate_uapi_headers.sh"
+#  outputs = [ "$target_gen_dir/uapi" ]
+#  no_output_dir_leaks = false
+#  args = [
+#    "--download-kernel",
+#
+#    "--branch",
+#    "$linux_kernel_version",
+#    "--out-dir",
+#    rebase_path(target_gen_dir, root_build_dir),
+#  ]
+#}

@@ -32,6 +32,9 @@
 #include <vm/vm_address_region.h>
 
 class ProcessDispatcher;
+#if __mist_os__
+class TaskWrapper;
+#endif
 
 class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAULT_THREAD_RIGHTS>,
                                public fbl::DoublyLinkedListable<ThreadDispatcher*> {
@@ -118,6 +121,15 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
 
   // accessors
   ProcessDispatcher* process() const { return process_.get(); }
+
+#if __mist_os__
+  // Set/Get the associated Starnix Task.
+  void SetTask(fbl::RefPtr<TaskWrapper> task);
+
+  fbl::RefPtr<TaskWrapper> task();
+
+  zx_status_t SetForkFrame(const zx_thread_state_general_regs_t& fork_frame);
+#endif
 
   // Returns true if the thread is dying or dead. Threads never return to a previous state
   // from dying/dead so once this is true it will never flip back to false.
@@ -423,6 +435,13 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // through to clean up after a session as when a new session is created, the koid recorded in
   // `sampler_id_` will no longer match.
   uint64_t sampler_id_ TA_GUARDED(get_lock()){0};
+
+#if __mist_os__
+  // Strong reference to Starnix Task
+  // In the common case freeing ThreadDispatcher will also free Task when this
+  // reference is dropped.
+  fbl::RefPtr<TaskWrapper> starnix_task_;
+#endif
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_THREAD_DISPATCHER_H_

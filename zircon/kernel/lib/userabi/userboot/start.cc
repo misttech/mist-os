@@ -61,7 +61,6 @@ using namespace userboot;
 // allocating the initial stack) stay out of this area, and then destroyed.
 // The process's own allocations can then use the full address space; if
 // it's using a sanitizer, it will set up its shadow memory first thing.
-#ifndef __mist_os__
 zx::vmar ReserveLowAddressSpace(const zx::debuglog& log, const zx::vmar& root_vmar) {
   zx_info_vmar_t info;
   check(log, root_vmar.get_info(ZX_INFO_VMAR, &info, sizeof(info), nullptr, nullptr),
@@ -78,7 +77,6 @@ zx::vmar ReserveLowAddressSpace(const zx::debuglog& log, const zx::vmar& root_vm
   }
   return vmar;
 }
-#endif
 
 void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, uint32_t& argc,
                                char* argv) {
@@ -233,20 +231,14 @@ struct ChildContext {
 ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
                                 cpp20::span<const zx_handle_t> handles) {
   ChildContext child;
-  uint32_t flags = 0;
-  if constexpr (__mist_os__)
-    flags = ZX_PROCESS_SHARED;
-
   auto status =
       zx::process::create(*zx::unowned_job{handles[kRootJob]}, name.data(),
-                          static_cast<uint32_t>(name.size()), flags, &child.process, &child.vmar);
+                          static_cast<uint32_t>(name.size()), 0, &child.process, &child.vmar);
   check(log, status, "Failed to create child process(%.*s).", static_cast<int>(name.length()),
         name.data());
 
-#ifndef __mist_os__
   // Squat on some address space before we start loading it up.
   child.reserved_vmar = {ReserveLowAddressSpace(log, child.vmar)};
-#endif
 
   // Create the initial thread in the new process
   status = zx::thread::create(child.process, name.data(), static_cast<uint32_t>(name.size()), 0,
@@ -374,8 +366,8 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
          reinterpret_cast<void*>(stack_base + stack_size), reinterpret_cast<void*>(sp));
 
   // We're done doing mappings, so clear out the reservation VMAR.
-  // check(log, child.reserved_vmar.destroy(), "zx_vmar_destroy failed on reservation VMAR handle");
-  // child.reserved_vmar.reset();
+  check(log, child.reserved_vmar.destroy(), "zx_vmar_destroy failed on reservation VMAR handle");
+  child.reserved_vmar.reset();
   // Now send the bootstrap message.  This transfers away all the handles
   // we have left except the process and thread themselves.
   status = to_child.write(0, &child_message, sizeof(child_message), child.handles.data(),

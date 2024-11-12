@@ -1,0 +1,47 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/boot_tests/boot_test.gni")
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("_userloader") {
+  sources = [
+    "debugcommands.cc",
+    "elf.cc",
+    "resource.cc",
+    "start.cc",
+    "userloader.cc",
+    "util.cc",
+  ]
+
+  public_deps = [
+    "//src/lib/elfldltl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zbi_parser",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
+
+    # <lib/userabi/userboot.h> has #include <lib/instrumentation/vmo.h>.
+    "//zircon/kernel/lib/instrumentation:headers",
+  ]
+
+  defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+
+  deps = [
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/elfldltl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zbitl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
+    "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/console",
+    "//zircon/kernel/lib/counters",
+    "//zircon/kernel/lib/crashlog",
+    "//zircon/kernel/lib/debuglog",
+    "//zircon/kernel/lib/init",
+    "//zircon/kernel/lib/persistent-debuglog",
+    "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/vm",
+    "//zircon/system/ulib/region-alloc",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}

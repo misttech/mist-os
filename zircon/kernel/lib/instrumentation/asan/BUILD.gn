@@ -77,6 +77,9 @@ if (is_asan) {
       "asan-poisoning.cc",
       "asan-stubs.cc",
     ]
+    if (is_mistos) {
+      sources += [ "asan-poisoning-mistos.cc" ]
+    }
     sources += [ "asan-init-$zircon_cpu.cc" ]
     deps = [
       "..:headers",

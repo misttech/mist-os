@@ -1,0 +1,23 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("tests") {
+  sources = [
+    #"bitflags-test.cc",
+    "cprng-test.cc",
+
+    #"range-map-test.cc",
+    "bstring-test.cc",
+    "range_ext-test.cc",
+    "split_string_unittest.cc",
+
+    #"trim_unittest.cc",
+    "weak_ptr_thread_unittest.cc",
+    "weak_ptr_unittest.cc",
+  ]
+  deps = [
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//zircon/kernel/lib/unittest",
+  ]
+}

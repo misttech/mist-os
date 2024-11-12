@@ -149,10 +149,12 @@ impl SeccompFilter {
     }
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 impl EbpfRunContext for SeccompFilter {
     type Context<'a> = seccomp_data;
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 impl EbpfRunContext for SeccompFilter {
     type Context<'a> = seccomp_data;
 }
