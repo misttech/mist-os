@@ -14,20 +14,15 @@
 #include <lib/code-patching/asm.h>
 #include <lib/arch/asm.h>
 
-// This code is purely position-independent and generates no relocations
-// that need boot-time fixup.
+// This code is entered at its physical address.  However, relocatable data
+// (including RELRO "constants") have already been relocated by physboot to
+// their final virtual addresses.  This code takes care to manage the
+// transition of physical to virtual precisely.
 
-// Note within this file, the difference between lla and la is subtle when loading the address
-// of a symbol.
-// - lla will use PC-relative instructions and thus will compute the physical address of the
-// label since the code is running in physical space.
-// - la will emit a literal pool load from a hidden symbol and thus will load the proper
-// virtual address of the label, since the kernel has already been relocated by physboot
-// by the time we get here.
 .text
 FUNCTION(_start)
-.globl PhysbootHandoff
-PhysbootHandoff = _start
+.label PhysbootHandoff, global
+
     // collect the starting time stamp
     rdtime a2
 
@@ -37,17 +32,35 @@ PhysbootHandoff = _start
     unimp
     .code_patching.end
 
-    // save a0 (physboot handoff paddr) for later passing to lk_main
-    mv      s0, a0
+    // Save a0 (physboot handoff paddr) in a called-saved register for later
+    // passing to lk_main after other calls below.  s0 is fp, so start with s1.
+    mv      s1, a0
 
     // save the time stamp we recorded earlier
     lla     t0, kernel_entry_ticks
     sd      a2, (t0)
 
-    // save the physical address the kernel is loaded at
-    lla     a0, __executable_start
+    // Materialize the the physical base address in s2 (call-saved).
+    // It will be used again after calls below.
+    lla     s2, __executable_start
+
+    // Load the relocated virtual address corresponding in s3 (call-saved).
+    // This avoids the `la` pseudoinstruction while doing something equivalent
+    // so that we can avoid generating a .got relocation and thus can assert
+    // that there should never be any use of .got and ensure compiler-generated
+    // and other unintended uses don't creep in.  (`lla` computes the address
+    // of the symbol using PC-relative relocations, while `la` under __PIC__
+    // does a PC-relative load from the symbol's GOT slot.)
+    lla     t0, .Lvirtual_executable_start
+    ld      s3, (t0)
+.pushsection .data.rel.ro, "aw", %progbits
+.Lvirtual_executable_start:
+    .quad __executable_start
+.popsection
+
+    // Store the physical address for C++ code to use later.
     lla     t0, kernel_base_phys
-    sd      a0, (t0)
+    sd      s2, (t0)
 
     // set the default stack
     lla     sp, boot_cpu_kstack_end
@@ -57,9 +70,7 @@ PhysbootHandoff = _start
 #endif
 
     // call into the riscv64 boot mapping code to give it a chance to initialize its page tables
-    la      a0, __executable_start // virtual
-    lla     a1, __executable_start // physical
-    sub     a0, a0, a1 // compute the delta between the virtual and physical address the kernel is at
+    sub     a0, s3, s2  // Argument is (virtual - physical) delta.
     call    riscv64_boot_map_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
@@ -85,10 +96,10 @@ PhysbootHandoff = _start
     // map the kernel to a fixed address
     // note: mapping the kernel here with full rwx, this will get locked down later in vm initialization
     lla     a0, riscv64_kernel_bootstrap_translation_table
-    la      a1, __executable_start
-    lla     a2, __executable_start
-    lla     a3, _end
-    sub     a3, a3, a2
+    mv      a1, s3                 // 2nd arg: Virtual __executable_start.
+    lla     a2, __executable_start // 3rd arg: Physical __executable_start.
+    lla     a3, _end               // Physical _end.
+    sub     a3, a3, a2             // 4th arg: Total image size.
     li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
     call    riscv64_boot_map
 
@@ -109,9 +120,7 @@ PhysbootHandoff = _start
     // mmu is initialized and we're running out of an identity physical map
 
     // compute the delta between the old physical and newer high addresses
-    lla     t0, _start
-    la      t1, _start
-    sub     t0, t1, t0
+    sub     t0, s3, s2
 
     // fix up the stack pointer
     add     sp, sp, t0
@@ -131,7 +140,7 @@ PhysbootHandoff = _start
     // This will do basic initialization of the cpu such as initializing
     // the main control registers and loading the exception vector table.
     // Also loads the per cpu register.
-    mv      a0, s0
+    mv      a0, s1
     call    riscv64_boot_cpu_init
 
     // save the time stamp just before entering C
@@ -139,8 +148,8 @@ PhysbootHandoff = _start
     lla     a1, kernel_virtual_entry_ticks
     sd      a0, (a1)
 
-    // recover the zbi pointer
-    mv      a0, s0
+    // Recover the PhysHandoff pointer.
+    mv      a0, s1
 
     // Call main
     call    lk_main
@@ -164,8 +173,9 @@ FUNCTION(riscv64_secondary_entry_asm)
     sfence.vma  zero, zero
 
     // Compute the relocation offset
-    la      t1, __executable_start
+    lla     t1, .Lvirtual_executable_start
     lla     t0, __executable_start
+    ld      t1, (t1)
     sub     t0, t1, t0
 
     // Jump to high memory
