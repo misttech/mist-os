@@ -48,8 +48,9 @@ use std::{fmt, hash};
 /// When a scope is created it is open, meaning it accepts new tasks. Scopes are
 /// closed when one of the following happens:
 ///
-/// 1. When the scope is cancelled or dropped, the scope is closed immediately.
-/// 2. When the scope is joined and all tasks complete, the scope is closed
+/// 1. When [`close()`][Scope::close] is called.
+/// 2. When the scope is cancelled or dropped, the scope is closed immediately.
+/// 3. When the scope is joined and all tasks complete, the scope is closed
 ///    before the join future resolves.
 ///
 /// When a scope is closed it no longer accepts tasks. Tasks spawned on the
@@ -110,6 +111,13 @@ impl Scope {
     /// `IntoFuture`. `scope.join().await` is a more explicit form of
     /// `scope.await`.
     pub fn join(self) -> Join {
+        Join::new(self)
+    }
+
+    /// Stop accepting new tasks on the scope. Returns a future that waits for
+    /// every task on the scope to complete.
+    pub fn close(self) -> Join {
+        self.inner.close();
         Join::new(self)
     }
 
@@ -231,7 +239,7 @@ where
             state.add_waker(this.waker_entry, cx.waker().clone());
             Poll::Pending
         } else {
-            state.close();
+            state.mark_finished();
             Poll::Ready(())
         }
     }
@@ -285,8 +293,10 @@ impl ScopeHandle {
         JoinHandle::new(self.clone(), self.executor().spawn_local(self, future, false))
     }
 
-    /// Like `spawn`, but for tasks that return a result.  NOTE: Unlike `spawn`, when tasks are
-    /// dropped, the future will be *cancelled*.
+    /// Like `spawn`, but for tasks that return a result.
+    ///
+    /// NOTE: Unlike `spawn`, when tasks are dropped, the future will be
+    /// *cancelled*.
     pub fn compute<T: Send + 'static>(
         &self,
         future: impl Future<Output = T> + Send + 'static,
@@ -295,8 +305,10 @@ impl ScopeHandle {
             .into()
     }
 
-    /// Like `spawn`, but for tasks that return a result.  NOTE: Unlike `spawn`, when tasks are
-    /// dropped, the future will be *cancelled*.
+    /// Like `spawn`, but for tasks that return a result.
+    ///
+    /// NOTE: Unlike `spawn`, when tasks are dropped, the future will be
+    /// *cancelled*.
     ///
     /// NOTE: This is not supported with a [`SendExecutor`][crate::SendExecutor]
     /// and will cause a runtime panic. Use [`ScopeHandle::spawn`] instead.
@@ -316,19 +328,29 @@ impl ScopeHandle {
         }
     }
 
+    /// Stop the scope from accepting new tasks.
+    ///
+    /// Note that unlike [`Scope::close`], this does not return a future that
+    /// waits for all tasks to complete. This could lead to resource leaks
+    /// because it is not uncommon to access a TaskGroup from a task running on
+    /// the scope itself. If such a task were to await a future returned by this
+    /// method it would suspend forever waiting for itself to complete.
+    pub fn close(&self) {
+        self.lock().close();
+    }
+
     /// Cancel all the scope's tasks.
+    ///
+    /// Note that if this is called from within a task running on the scope, the
+    /// task will not resume from the next await point.
     pub fn cancel(self) -> impl Future<Output = ()> {
         self.cancel_all_tasks();
         Join::new(self)
     }
 
     // Joining the scope could be allowed from a ScopeHandle, but the use case
-    // seems less common and more bug prone than cancelling. Someone might want
-    // to cancel a scope from within the scope. But it's impossible to join a
-    // scope from within a task on that scope; the task and scope would spend
-    // forever waiting on each other. As a minor additional point, seeing calls
-    // to `.join()` on a ScopeHandle might cause a reader to think they have a
-    // Scope.
+    // seems less common and more bug prone than cancelling. We don't allow this
+    // for the same reason we don't return a future from close().
 
     /// Wait for there to be no tasks. This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
@@ -413,16 +435,28 @@ mod state {
     #[derive(Default, Debug, Clone, Copy)]
     pub enum Status {
         #[default]
+        /// The scope is accepting new tasks.
         Open,
+        /// The scope is no longer accepting new tasks.
         Closed,
-        Cancelled,
+        /// The scope is not accepting new tasks and all tasks have completed.
+        ///
+        /// This is purely an optimization; it is not guaranteed to be set.
+        Finished,
     }
 
     impl Status {
         pub fn can_spawn(&self) -> bool {
             match self {
                 Status::Open => true,
-                Status::Closed | Status::Cancelled => false,
+                Status::Closed | Status::Finished => false,
+            }
+        }
+
+        pub fn might_have_running_tasks(&self) -> bool {
+            match self {
+                Status::Open | Status::Closed => true,
+                Status::Finished => false,
             }
         }
     }
@@ -476,16 +510,12 @@ mod state {
             self.status
         }
 
-        pub fn might_have_running_tasks(&self) -> bool {
-            self.status.can_spawn()
-        }
-
         pub fn close(&mut self) {
             self.status = Status::Closed;
         }
 
-        pub fn set_cancelled(&mut self) {
-            self.status = Status::Cancelled;
+        pub fn mark_finished(&mut self) {
+            self.status = Status::Finished;
         }
 
         pub fn has_tasks(&self) -> bool {
@@ -600,14 +630,14 @@ mod state {
             }
         }
 
-        pub fn set_cancelled_and_drain(
+        pub fn set_closed_and_drain(
             &mut self,
         ) -> (
             HashMap<usize, Arc<Task>>,
             HashMap<usize, JoinResult>,
             hash_set::Drain<'_, WeakScopeHandle>,
         ) {
-            self.status = Status::Cancelled;
+            self.close();
             let all_tasks = std::mem::take(&mut self.all_tasks);
             let join_results = std::mem::take(&mut self.join_results);
             if !all_tasks.is_empty() {
@@ -801,7 +831,7 @@ impl ScopeHandle {
         let mut scopes = vec![self.clone()];
         while let Some(scope) = scopes.pop() {
             let mut state = scope.lock();
-            if !state.might_have_running_tasks() {
+            if !state.status().might_have_running_tasks() {
                 // Already cancelled or closed.
                 continue;
             }
@@ -814,7 +844,7 @@ impl ScopeHandle {
             }
             // Copy children to a vec so we don't hold the lock for too long.
             scopes.extend(state.children().iter().filter_map(|child| child.upgrade()));
-            state.set_cancelled();
+            state.mark_finished();
         }
     }
 
@@ -829,7 +859,7 @@ impl ScopeHandle {
         while let Some(scope) = scopes.pop() {
             let (tasks, join_results) = {
                 let mut state = ScopeWaker::from(scope.lock());
-                let (tasks, join_results, children) = state.set_cancelled_and_drain();
+                let (tasks, join_results, children) = state.set_closed_and_drain();
                 scopes.extend(children.filter_map(|child| child.upgrade()));
                 (tasks, join_results)
             };
@@ -951,7 +981,31 @@ mod tests {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
         let handle = scope.to_handle();
-        assert_eq!(executor.run_until_stalled(&mut pin!(scope.cancel())), Poll::Ready(()));
+        let mut cancel = pin!(scope.cancel());
+        assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
+        let mut task = pin!(handle.compute(async { 1 }));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
+    }
+
+    #[test]
+    fn tasks_do_not_spawn_on_closed_empty_scopes() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let handle = scope.to_handle();
+        let mut close = pin!(scope.cancel());
+        assert_eq!(executor.run_until_stalled(&mut close), Poll::Ready(()));
+        let mut task = pin!(handle.compute(async { 1 }));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
+    }
+
+    #[test]
+    fn tasks_do_not_spawn_on_closed_nonempty_scopes() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let handle = scope.to_handle();
+        handle.spawn(pending());
+        let mut close = pin!(scope.close());
+        assert_eq!(executor.run_until_stalled(&mut close), Poll::Pending);
         let mut task = pin!(handle.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
     }
@@ -1046,13 +1100,27 @@ mod tests {
     }
 
     #[test]
-    fn join_blocks_if_detached_task_never_completes() {
+    fn join_blocks_but_cancel_succeeds_if_detached_task_never_completes() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
         // The default is to detach.
         scope.spawn(pending::<()>());
         let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+        let mut cancel = pin!(join.cancel());
+        assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
+    }
+
+    #[test]
+    fn close_blocks_but_cancel_succeeds_if_detached_task_never_completes() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        // The default is to detach.
+        scope.spawn(pending::<()>());
+        let mut close = pin!(scope.close());
+        assert_eq!(executor.run_until_stalled(&mut close), Poll::Pending);
+        let mut cancel = pin!(close.cancel());
+        assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
     }
 
     #[test]
@@ -1065,6 +1133,19 @@ mod tests {
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
+    }
+
+    #[test]
+    fn close_scope_blocks_until_spawned_task_completes() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let remote = RemoteControlFuture::new();
+        let mut task = scope.spawn(remote.as_future());
+        let mut scope_close = pin!(scope.close());
+        assert_eq!(executor.run_until_stalled(&mut scope_close), Poll::Pending);
+        remote.resolve();
+        assert_eq!(executor.run_until_stalled(&mut scope_close), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
     }
 
@@ -1185,6 +1266,34 @@ mod tests {
         );
         assert_eq!(
             executor.run_until_stalled(&mut grandchild_after_join.compute(async { 1 })),
+            Poll::Pending
+        );
+    }
+
+    #[test]
+    fn closed_scope_child_cannot_spawn() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let handle = scope.to_handle();
+        let child_before_close = scope.new_child();
+        assert_eq!(
+            executor.run_until_stalled(&mut child_before_close.compute(async { 1 })),
+            Poll::Ready(1)
+        );
+        let mut scope_close = pin!(scope.close());
+        assert_eq!(executor.run_until_stalled(&mut scope_close), Poll::Ready(()));
+        let child_after_close = handle.new_child();
+        let grandchild_after_close = child_before_close.new_child();
+        assert_eq!(
+            executor.run_until_stalled(&mut child_before_close.compute(async { 1 })),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut child_after_close.compute(async { 1 })),
+            Poll::Pending
+        );
+        assert_eq!(
+            executor.run_until_stalled(&mut grandchild_after_close.compute(async { 1 })),
             Poll::Pending
         );
     }
