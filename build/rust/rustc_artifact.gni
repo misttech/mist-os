@@ -316,6 +316,11 @@ template("rustc_artifact") {
                              "visibility",
                              "output_prefix_override",
                            ])
+
+    # Add production-oriented lints to non-test code.
+    if (!(defined(testonly) && testonly)) {
+      configs += [ "//build/config/rust/lints:clippy_warn_production" ]
+    }
     if (defined(visibility)) {
       visibility += [ ":${_group_name}" ]
     }
