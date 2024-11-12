@@ -4,6 +4,7 @@
 
 import("//build/config/compilation_modes.gni")
 import("//build/config/python_interpreter.gni")
+import("//build/icu/build_config.gni")
 import("//build/rust/build.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")

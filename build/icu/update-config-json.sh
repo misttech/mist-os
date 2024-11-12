@@ -54,6 +54,8 @@ function get_git_commit_id() {
 }
 
 
+icu_default_dir=
+icu_latest_dir=
 output_file="${_DEFAULT_OUTPUT}"
 fuchsia_dir=.
 timestamp_file=
@@ -62,6 +64,12 @@ for OPT; do
   case "$OPT" in
     --output=*)
       output_file="${OPT#--*=}"
+      ;;
+    --icu-default-dir=*)
+      icu_default_dir="${OPT#--*=}"
+      ;;
+    --icu-latest-dir=*)
+      icu_latest_dir="${OPT#--*=}"
       ;;
     --mode=*)
       mode="${OPT#--*=}"
@@ -84,8 +92,12 @@ for OPT; do
   esac
 done
 
-icu_default_dir="${fuchsia_dir}/third_party/icu/default"
-icu_latest_dir="${fuchsia_dir}/third_party/icu/latest"
+if [[ -z "${icu_default_dir}" ]]; then
+  icu_default_dir="${fuchsia_dir}/third_party/icu/default"
+fi
+if [[ -z "${icu_latest_dir}" ]]; then
+  icu_latest_dir="${fuchsia_dir}/third_party/icu/latest"
+fi
 
 [[ -d "$icu_default_dir" ]] || die "Missing directory: ${icu_default_dir}"
 [[ -d "$icu_latest_dir" ]] || die "Missing directory: ${icu_latest_dir}"

@@ -15,7 +15,6 @@ generated_file("git_info_json") {
   outputs = [ "${target_gen_dir}/icu_git_info.json" ]
   contents = icu_git_info
   output_conversion = "json"
-  deps = [ icu_config_validation_target ]
 }
 
 rustc_library("config_schema") {

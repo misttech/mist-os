@@ -1,0 +1,44 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file must be included from //build/config/BUILDCONFIG.gni to ensure
+# the generator script is always called first in the context of the default
+# toolchain (in which case `current_toolchain` will be "").
+import("//build/config/python_interpreter.gni")
+declare_args() {
+  # The GN files for the ICU library are located in this directory.
+  # Some Fuchsia builds use a different value here.
+  icu_root = "//third_party/icu/default"
+}
+
+_icu_build_config_json_path = "$root_build_dir/icu_build_config.json"
+
+if (current_toolchain == "") {
+  _generator_script = "//build/icu/update-config-json.sh"
+  _icu_default_dir = icu_root
+  _icu_latest_dir = string_replace(icu_root, "/default", "/latest")
+
+  icu_git_info = exec_script(
+          "//build/config/generate_then_print.sh",
+          [
+            # The output file.
+            rebase_path(_icu_build_config_json_path, root_build_dir),
+
+            # The generator script and its arguments.
+            rebase_path(_generator_script, root_build_dir),
+            "--fuchsia-dir=" + rebase_path("//", root_build_dir),
+            "--icu-default-dir=" +
+                rebase_path(_icu_default_dir, root_build_dir),
+            "--icu-latest-dir=" + rebase_path(_icu_latest_dir, root_build_dir),
+            "--mode=print",
+          ],
+          "json",
+          [
+            _generator_script,
+            _icu_default_dir,
+            _icu_latest_dir,
+          ])
+} else {
+  icu_git_info = read_file(_icu_build_config_json_path, "json")
+}
