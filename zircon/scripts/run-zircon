@@ -110,12 +110,8 @@ CMDLINE=""
 OPT_CMDLINE=""
 QEMU_KERNEL=
 QEMU_INITRD=
-
-if [[ $HOST_OS == "Darwin" ]]; then
-  IFNAME="tap0"
-else
-  IFNAME="qemu"
-fi
+QEMU_WRAPPER=()
+IFNAME="qemu"
 
 # Propagate our TERM environment variable as a kernel command line
 # argument.  This is first so that an explicit -c TERM=foo argument
@@ -397,16 +393,17 @@ else
 
   if [[ $NET == 2 ]]; then
     if [[ "$(uname -s)" == "Darwin" ]]; then
-      if [[ ! -c "/dev/$IFNAME" ]]; then
-        echo "To use qemu with networking on macOS, install the tun/tap driver:"
-        echo "http://tuntaposx.sourceforge.net/download.xhtml"
-        exit 1
+      SOCKET_VMNET_SOCKET=$(brew --prefix)/var/run/socket_vmnet
+      if [[ -S "$SOCKET_VMNET_SOCKET" ]]; then
+        QEMU_WRAPPER=("$(brew --prefix socket_vmnet)/bin/socket_vmnet_client" "$SOCKET_VMNET_SOCKET")
+        ARGS+=("-netdev" "socket,id=net0,fd=3")
+      else
+        echo "socket_vmnet socket not found: falling back to vmnet with sudo." >&2
+        # See https://gitlab.com/qemu-project/qemu/-/issues/1364.
+        QEMU_WRAPPER=(sudo)
+        ARGS+=("-netdev" "vmnet-shared,id=net0")
       fi
-      if [[ ! -w "/dev/$IFNAME" ]]; then
-        echo "For networking /dev/$IFNAME must be owned by $USER. Please run:"
-        echo "  sudo chown $USER /dev/$IFNAME"
-        exit 1
-      fi
+
     else
       TAP_IFS=$(ip tuntap show 2>/dev/null)
       if [[ "$TAP_IFS" != *"${IFNAME}:"* ]]; then
@@ -423,8 +420,8 @@ else
       if (which ufw && grep -q "^ENABLED=yes" /etc/ufw/ufw.conf) >/dev/null 2>&1; then
         echo "Active firewall detected: If this emulator is unreachable, run: fx setup-ufw"
       fi
+      ARGS+=("-netdev" "tap,id=net0,ifname=$IFNAME,script=$UPSCRIPT,downscript=no")
     fi
-    ARGS+=("-netdev" "tap,id=net0,ifname=$IFNAME,script=$UPSCRIPT,downscript=no")
   fi
   HASH=$(echo "$IFNAME" | shasum)
   SUFFIX=$(for i in {0..2}; do echo -n ":${HASH:$(( 2 * i )):2}"; done)
@@ -581,8 +578,8 @@ else
 fi
 
 if (( UEFI_DISK_BOOT )); then
-  $RUN_CMD "$QEMU" "${ARGS[@]}" "$@"
+  $RUN_CMD "${QEMU_WRAPPER[@]}" "$QEMU" "${ARGS[@]}" "$@"
 else
   echo "CMDLINE: $CMDLINE"
-  $RUN_CMD "$QEMU" "${ARGS[@]}" -append "$CMDLINE" "$@"
+  $RUN_CMD "${QEMU_WRAPPER[@]}" "$QEMU" "${ARGS[@]}" -append "$CMDLINE" "$@"
 fi
