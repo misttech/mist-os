@@ -371,25 +371,37 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     }
   }
 
-  if (capture_fault) {
-    iframe->elr = kernel_addr_from_dfr(dfr);
-    // TODO(https://fxbug.dev/42175395): x1 is relayed back to user_copy where it will be stored in
-    // page fault info. Currently, the only users of this page fault info is VmAspace::SoftFault,
-    // but the kernel page fault handler shouldn't accept/work with tags. To avoid
-    // architecture-specific tags reaching the VM layer at all, we can strip it here so it never
-    // reaches user_copy page fault results.
-    iframe->r[1] = arch_detag_ptr(far);
-    iframe->r[2] = pf_flags;
-    return;
-  }
-
   // Only invoke the page fault handler for access, translation, and permission faults. Any other
   // kind of fault cannot be resolved by the handler.
   // 0b0010XX is access faults.
   // 0b0001XX is translation faults.
   // 0b0011XX is permission faults.
+  const bool invoke_page_fault_handler = (dfsc & 0b001100) != 0 && (dfsc & 0b110000) == 0;
+
+  if (capture_fault) {
+    iframe->elr = kernel_addr_from_dfr(dfr);
+    // Need to inform the user_copy routine whether this is a fault that can be handled by the page
+    // fault handler or not, which is done by encoding a different status code.
+    if (likely(invoke_page_fault_handler)) {
+      // The user_copy routine expects the status and the flags combined into the low and high parts
+      // of x0 respectively, and since status values are negative we need to construct this
+      // carefully to control the sign extensions.
+      iframe->r[0] = static_cast<uint64_t>(static_cast<uint32_t>(ZX_ERR_INVALID_ARGS)) |
+                     (static_cast<uint64_t>(pf_flags) << 32);
+      // TODO(https://fxbug.dev/42175395): x1 is relayed back to user_copy where it will be stored
+      // in page fault info. Currently, the only users of this page fault info is
+      // VmAspace::SoftFault, but the kernel page fault handler shouldn't accept/work with tags. To
+      // avoid architecture-specific tags reaching the VM layer at all, we can strip it here so it
+      // never reaches user_copy page fault results.
+      iframe->r[1] = arch_detag_ptr(far);
+    } else {
+      iframe->r[0] = ZX_ERR_BAD_STATE;
+    }
+    return;
+  }
+
   zx_status_t err = ZX_OK;
-  if (likely((dfsc & 0b001100) != 0 && (dfsc & 0b110000) == 0)) {
+  if (likely(invoke_page_fault_handler)) {
     if (is_access) {
       DEBUG_ASSERT((pf_flags & VMM_PF_FLAG_ACCESS) != 0);
       kcounter_add(exceptions_access, 1);
@@ -413,6 +425,8 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     // bit before, which should be a one.
     DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT - 1));
     iframe->elr = dfr;
+    // Set the return status for the user copy routine.
+    iframe->r[0] = ZX_ERR_INVALID_ARGS;
     return;
   }
 

@@ -82,13 +82,12 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
   Arm64UserCopyRet ret = _arm64_user_copy(
       dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, fault_return_mask);
 
-  // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
-  // responsibility of the caller to check the status and ignore.
-  if (ret.status == ZX_OK) {
-    return UserCopyCaptureFaultsResult{ZX_OK};
-  } else {
+  // A return result of ZX_ERR_INVALID_ARGS means both that a fault occurred and there is valid
+  // fault data to resolve it. Any other status is either success (ZX_OK), or a fault without data.
+  if (ret.status == ZX_ERR_INVALID_ARGS) {
     return {ret.status, {ret.pf_va, ret.pf_flags}};
   }
+  return UserCopyCaptureFaultsResult{ret.status};
 }
 
 UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src, size_t len,
@@ -108,11 +107,10 @@ UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const vo
   Arm64UserCopyRet ret = _arm64_user_copy(
       dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, fault_return_mask);
 
-  // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
-  // responsibility of the caller to check the status and ignore.
-  if (ret.status == ZX_OK) {
-    return UserCopyCaptureFaultsResult{ZX_OK};
-  } else {
+  // A return result of ZX_ERR_INVALID_ARGS means both that a fault occurred and there is valid
+  // fault data to resolve it. Any other status is either success (ZX_OK), or a fault without data.
+  if (ret.status == ZX_ERR_INVALID_ARGS) {
     return {ret.status, {ret.pf_va, ret.pf_flags}};
   }
+  return UserCopyCaptureFaultsResult{ret.status};
 }
