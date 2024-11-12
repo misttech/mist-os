@@ -7,21 +7,23 @@
 #include <lib/pci/root_host.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 #include <zircon/limits.h>
-#include <zircon/syscalls/object.h>
+#include <zircon/syscalls.h>
 
+#include <limits>
 #include <memory>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+#include <region-alloc/region-alloc.h>
 
-class PciRootHostTests : public zxtest::Test {
- public:
-  PciRootHostTests() {
-    ASSERT_OK(fake_root_resource_create(fake_root_resource_.reset_and_get_address()));
-  }
+#include "src/lib/testing/predicates/status.h"
 
+class PciRootHostTests : public testing::Test {
  protected:
   void SetUp() final {
+    ASSERT_OK(fake_root_resource_create(fake_root_resource_.reset_and_get_address()));
+    page_size_ = zx_system_get_page_size();
     root_host_ =
         std::make_unique<PciRootHost>(fake_root_resource_.borrow(), fake_root_resource_.borrow(),
                                       fake_root_resource_.borrow(), PCI_ADDRESS_SPACE_IO);
@@ -29,8 +31,10 @@ class PciRootHostTests : public zxtest::Test {
 
   zx::resource& fake_root_resource() { return fake_root_resource_; }
   PciRootHost& root_host() { return *root_host_; }
+  size_t page_size() const { return page_size_; }
 
  private:
+  size_t page_size_;
   zx::resource fake_root_resource_;
   std::unique_ptr<PciRootHost> root_host_;
 };
@@ -68,11 +72,14 @@ TEST_F(PciRootHostTests, Mcfg) {
       .start_bus_number = 0,
       .end_bus_number = 64,
   };
-  McfgAllocation out_mcfg;
+  McfgAllocation out_mcfg{};
   ASSERT_EQ(ZX_ERR_NOT_FOUND, root_host().GetSegmentMcfgAllocation(in_mcfg.pci_segment, &out_mcfg));
   root_host().mcfgs().push_back(in_mcfg);
   ASSERT_EQ(ZX_OK, root_host().GetSegmentMcfgAllocation(in_mcfg.pci_segment, &out_mcfg));
-  ASSERT_BYTES_EQ(&in_mcfg, &out_mcfg, sizeof(McfgAllocation));
+  ASSERT_EQ(in_mcfg.address, out_mcfg.address);
+  ASSERT_EQ(in_mcfg.pci_segment, out_mcfg.pci_segment);
+  ASSERT_EQ(in_mcfg.start_bus_number, out_mcfg.start_bus_number);
+  ASSERT_EQ(in_mcfg.end_bus_number, out_mcfg.end_bus_number);
 }
 
 TEST_F(PciRootHostTests, MsiAllocationTest) {
@@ -82,5 +89,60 @@ TEST_F(PciRootHostTests, MsiAllocationTest) {
   zx_info_msi_t info;
   ASSERT_OK(msi.get_info(ZX_INFO_MSI, &info, sizeof(info), nullptr, nullptr));
   ASSERT_EQ(info.num_irq, irq_cnt);
-  ASSERT_EQ(info.interrupt_count, 0);
+  ASSERT_EQ(info.interrupt_count, 0u);
+}
+
+constexpr size_t kU32Max = std::numeric_limits<uint32_t>::max();
+constexpr size_t kU64Max = std::numeric_limits<uint64_t>::max();
+TEST_F(PciRootHostTests, MmioHelperTests) {
+  struct {
+    ralloc_region_t r;
+    size_t u32_cnt;
+    size_t u64_cnt;
+  } kValidBoundaries[] = {
+      // 1 byte edge boundaries for both of the types
+      {.r = {.base = kU32Max, .size = 1}, .u32_cnt = 1, .u64_cnt = 0},
+      {.r = {.base = 1, .size = kU32Max}, .u32_cnt = 1, .u64_cnt = 0},
+      {.r = {.base = 0xFFFF'FFF0, .size = 16}, .u32_cnt = 1, .u64_cnt = 0},
+      {.r = {.base = kU32Max / 2, .size = 32}, .u32_cnt = 1, .u64_cnt = 0},
+      // Add one entry within 64 bit bounds, right at 4GiB.
+      {.r = {.base = 0x1'0000'0000, .size = page_size()}, .u32_cnt = 0, .u64_cnt = 1},
+      {.r = {.base = kU64Max - page_size(), .size = page_size()}, .u32_cnt = 0, .u64_cnt = 1}};
+
+  for (auto& tc : kValidBoundaries) {
+    printf("Test case: {%#lx, %#lx}, %zu, %zu}\n", tc.r.base, tc.r.size, tc.u32_cnt, tc.u64_cnt);
+    EXPECT_OK(root_host().AddMmioRange(tc.r.base, tc.r.size));
+    EXPECT_EQ(tc.u32_cnt, root_host().Mmio32().AvailableRegionCount());
+    EXPECT_EQ(tc.u64_cnt, root_host().Mmio64().AvailableRegionCount());
+    root_host().Mmio32().Reset();
+    root_host().Mmio64().Reset();
+  }
+}
+
+TEST_F(PciRootHostTests, MmioHelperBoundaryViolations) {
+  struct ralloc_region_t kTestCases[] = {
+      // size is zero
+      {.base = 0u, .size = 0u},
+      // size is greater than u32 max, but overflow result is 0
+      {.base = 0u, .size = 0x1'0000'0000},
+      // same as above but twice overflowed
+      {.base = 0u, .size = 0x2'0000'0000},
+      // overflow from both parameters for u32
+      {.base = kU32Max, .size = kU32Max},
+      {.base = kU32Max, .size = 2},
+      {.base = 2, .size = kU32Max},
+      // region spans from < 4GB to > 4GB
+      {.base = kU32Max, .size = 2},
+      {.base = 0, .size = kU64Max},
+      // Overflow 64 bit address space
+      {.base = 2, .size = kU64Max},
+      {.base = kU64Max, .size = 2},
+  };
+
+  for (auto& tc : kTestCases) {
+    printf("Test case: {%#lx, %#lx}\n", tc.base, tc.size);
+    EXPECT_EQ(root_host().AddMmioRange(tc.base, tc.size).status_value(), ZX_ERR_INVALID_ARGS);
+    EXPECT_EQ(0u, root_host().Mmio32().AvailableRegionCount());
+    EXPECT_EQ(0u, root_host().Mmio64().AvailableRegionCount());
+  }
 }
