@@ -7,6 +7,11 @@ use crate::target_connector::TargetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
+use fdomain_client::fidl::DiscoverableProtocolMarker;
+use fdomain_fuchsia_developer_remotecontrol::{
+    RemoteControlMarker as FDRemoteControlMarker, RemoteControlProxy as FDRemoteControlProxy,
+};
+use fdomain_fuchsia_io as fio;
 use ffx_ssh::parse::HostAddr;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
@@ -102,12 +107,26 @@ impl Connection {
     /// Attempts to retrieve an instance of the remote control proxy. When invoked for the first
     /// time, this function will run indefinitely until it finds a remote control proxy, so it is
     /// the caller's responsibility to time out.
-    pub async fn rcs_proxy_fdomain(&self) -> Result<RemoteControlProxy, ConnectionError> {
-        let Some(_fdomain) = &self.fdomain else {
-            todo!();
+    pub async fn rcs_proxy_fdomain(&self) -> Result<FDRemoteControlProxy, ConnectionError> {
+        let Some(fdomain) = &self.fdomain else {
+            todo!("overnet passthrough unsupported");
         };
 
-        todo!();
+        let (proxy, server_end) = fdomain
+            .create_proxy::<FDRemoteControlMarker>()
+            .await
+            .map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let ns = fdomain.namespace().await.map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let ns = fio::DirectoryProxy::new(ns);
+        ns.open3(
+            FDRemoteControlMarker::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end.into_channel(),
+        )
+        .map_err(|e| ConnectionError::InternalError(e.into()))?;
+
+        Ok(proxy)
     }
 
     /// Takes a given connection error and, if there have been underlying connection errors, adds
