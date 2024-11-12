@@ -54,7 +54,10 @@ def parse_args():
 
 
 def write_file(manifest_path, content_map):
-    meta_contents = [dest + "=" + src for dest, src in content_map.items()]
+    # Sort by dest for deterministic ordering.
+    meta_contents = [
+        dest + "=" + src for dest, src in sorted(content_map.items())
+    ]
     with open(manifest_path, "w") as f:
         f.writelines("\n".join(meta_contents))
 

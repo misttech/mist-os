@@ -346,7 +346,7 @@ def _build_fuchsia_package_impl(ctx):
             fail("Please use `test_components` for test components.")
 
     # Collect all the resources from the deps
-    # TODO(342560609) Move all resource publishing from componennts into the
+    # TODO(342560609) Move all resource publishing from components into the
     # component rules so they get collected into the collected_resources attr.
     for dep in ctx.attr.test_components + ctx.attr.components:
         if FuchsiaStructuredConfigInfo in dep:
@@ -389,10 +389,10 @@ def _build_fuchsia_package_impl(ctx):
 
     meta_content_inputs = []
     if ctx.attr.subpackages_to_flatten:
-        subpackage_manfiests = []
+        subpackage_manifests = []
         for package in ctx.attr.subpackages_to_flatten:
             meta_content_inputs.extend(package[FuchsiaPackageInfo].files)
-            subpackage_manfiests.append(package[FuchsiaPackageInfo].package_manifest.path)
+            subpackage_manifests.append(package[FuchsiaPackageInfo].package_manifest.path)
 
         meta_contents_dir = ctx.actions.declare_directory(pkg_dir + "_meta_contents_dir")
         ffx_meta_extract_dir = ctx.actions.declare_directory(pkg_dir + "_extract_archive.ffx")
@@ -411,7 +411,7 @@ def _build_fuchsia_package_impl(ctx):
                 "--meta-contents-dir",
                 meta_contents_dir.path,
                 "--subpackage-manifests",
-            ] + subpackage_manfiests,
+            ] + subpackage_manifests,
             inputs = meta_content_inputs + [sdk.ffx_package],
             outputs = [
                 manifest,
