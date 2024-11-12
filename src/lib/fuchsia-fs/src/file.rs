@@ -76,28 +76,6 @@ mod fuchsia {
         }
     }
 
-    /// *DEPRECATED* - Use [`open_in_namespace`] instead.
-    ///
-    /// Opens the given `path` from the current namespace as a [`FileProxy`].
-    ///
-    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-    /// [`fuchsia_component::client`] instead.
-    ///
-    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
-    /// filesystem server doesn't exist, this will still return success. Instead, the returned
-    /// FileProxy channel pair will be closed with an epitaph.
-    // TODO(https://fxbug.dev/361450366): Migrate to [`open_in_namespace`] and remove this.
-    pub fn open_in_namespace_deprecated(
-        path: &str,
-        flags: fio::OpenFlags,
-    ) -> Result<fio::FileProxy, OpenError> {
-        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
-        open_channel_in_namespace_deprecated(path, flags, request)?;
-        Ok(node)
-    }
-
     /// Opens the given `path` from the current namespace as a [`FileProxy`].
     ///
     /// To connect to a filesystem node which doesn't implement fuchsia.io.File, use the functions
@@ -111,28 +89,6 @@ mod fuchsia {
         let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
-    }
-
-    /// *DEPRECATED* - Use [`open_channel_in_namespace`] instead.
-    ///
-    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
-    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
-    ///
-    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-    /// [`fuchsia_component::client`] instead.
-    ///
-    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
-    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
-    // TODO(https://fxbug.dev/361450366): Migrate to [`open_channel_in_namespace`] and remove this.
-    pub fn open_channel_in_namespace_deprecated(
-        path: &str,
-        flags: fio::OpenFlags,
-        request: fidl::endpoints::ServerEnd<fio::FileMarker>,
-    ) -> Result<(), OpenError> {
-        let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open_deprecated(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
@@ -449,8 +405,8 @@ pub async fn read_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, ReadE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::directory;
     use crate::node::{take_on_open_event, Kind};
-    use crate::{directory, OpenFlags};
     use assert_matches::assert_matches;
     use fidl_fidl_test_schema::{DataTable1, DataTable2};
     use fuchsia_async as fasync;
@@ -463,31 +419,6 @@ mod tests {
     use zx::{self as zx, HandleBased as _};
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
-
-    // open_in_namespace_deprecated
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_deprecated_opens_real_file() {
-        let exists =
-            open_in_namespace_deprecated("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
-        assert_matches!(close(exists).await, Ok(()));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_deprecated_opens_fake_file_under_of_root_namespace_entry() {
-        let notfound =
-            open_in_namespace_deprecated("/pkg/fake", OpenFlags::RIGHT_READABLE).unwrap();
-        // The open error is not detected until the proxy is interacted with.
-        assert_matches!(close(notfound).await, Err(_));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_deprecated_rejects_fake_root_namespace_entry() {
-        assert_matches!(
-            open_in_namespace_deprecated("/fake", OpenFlags::RIGHT_READABLE),
-            Err(OpenError::Namespace(zx_status::Status::NOT_FOUND))
-        );
-    }
 
     // open_in_namespace
 
