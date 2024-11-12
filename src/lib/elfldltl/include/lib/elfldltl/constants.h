@@ -213,6 +213,7 @@ enum class ElfSymVisibility : uint8_t {
 enum class ElfMachine : uint16_t {
   kNone = 0,
   k386 = 3,
+  kArm = 40,  // aka AArch32
   kX86_64 = 62,
   kAarch64 = 183,
   kRiscv = 243,
@@ -221,6 +222,8 @@ enum class ElfMachine : uint16_t {
       []() {
 #ifdef __aarch64__
         return kAarch64;
+#elif defined(__arm__)
+        return kArm;
 #elif defined(__i386__)
         return k386;
 #elif defined(__x86_64__)

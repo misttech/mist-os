@@ -42,6 +42,18 @@ struct AbiTraits<ElfMachine::kNone> {
 template <>
 struct AbiTraits<ElfMachine::kAarch64> : public AbiTraits<ElfMachine::kNone> {};
 
+// ARM (AArch32) has only 8-byte stack alignment.
+template <>
+struct AbiTraits<ElfMachine::kArm> {
+  template <typename SizeType = uint32_t>
+  static constexpr SizeType kStackAlignment = 8;
+
+  template <typename SizeType = uint32_t>
+  static constexpr SizeType InitialStackPointer(SizeType base, SizeType size) {
+    return (base + size) & -kStackAlignment<SizeType>;
+  }
+};
+
 // x86-64 requires exactly 8 below 16-byte alignment for the entry SP,
 // consistent with the CALL instruction pushing the return address on
 // the stack when it was 16-byte-aligned at the call site.
@@ -144,8 +156,6 @@ struct RelocationTraits<ElfMachine::kNone> {
   // addend applies to, and for REL format is stored in, the *second* slot.
   // The runtime setup updates that slot to hold state used by its callback.
   static constexpr std::optional<uint32_t> kTlsDesc = std::nullopt;
-
-  // TODO(https://fxbug.dev/42165043): TLS computations
 };
 
 // Specialization for AArch64.  TODO(mcgrathr): Different types used for same
@@ -164,6 +174,23 @@ struct RelocationTraits<ElfMachine::kAarch64> {
   };
   static constexpr std::optional<uint32_t> kGot = 1025;      // R_AARCH64_GLOB_DAT
   static constexpr std::optional<uint32_t> kTlsDesc = 1031;  // R_AARCH64_TLSDESC
+};
+
+// Specialization for ARM (AArch32).
+template <>
+struct RelocationTraits<ElfMachine::kArm> {
+  enum class Type : uint32_t {
+    kNone = 0,          // R_ARM_NONE
+    kRelative = 23,     // R_ARM_RELATIVE
+    kAbsolute = 2,      // R_ARM_ABS32
+    kPlt = 22,          // R_ARM_JUMP_SLOT
+    kTlsAbsolute = 11,  // R_ARM_TLS_TPOFF32
+    kTlsRelative = 9,   // R_ARM_TLS_DTPOFF32
+    kTlsModule = 7,     // R_ARM_TLS_DTPMOD32
+  };
+
+  static constexpr std::optional<uint32_t> kGot = 21;      // R_ARM_GLOB_DAT
+  static constexpr std::optional<uint32_t> kTlsDesc = 13;  // R_ARM_TLS_DESC
 };
 
 // Specialization for x86-64.
@@ -206,7 +233,6 @@ struct RelocationTraits<ElfMachine::kRiscv> {
     kNone = 0,          // R_RISCV_NONE
     kRelative = 3,      // R_RISCV_RELATIVE
     kAbsolute = 2,      // R_RISCV_64
-    kGot = kAbsolute,   // R_RISCV_64
     kPlt = 5,           // R_RISCV_JUMP_SLOT
     kTlsAbsolute = 11,  // R_RISCV_TPREL64
     kTlsRelative = 9,   // R_RISCV_DTPREL64
@@ -277,6 +303,10 @@ struct TlsTraits<Elf, ElfMachine::kAarch64> {
   static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
+// ARM (AArch32) is just the same.
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::kArm> : public TlsTraits<Elf, ElfMachine::kAarch64> {};
+
 // RISC-V puts TLS above TP with no offset, as shown in the exemplar.
 template <class Elf>
 struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {
@@ -298,7 +328,8 @@ struct TlsTraits<Elf, ElfMachine::k386> : public TlsTraits<Elf, ElfMachine::kX86
 // This should list all the fully-defined specializations except for kNone.
 template <template <ElfMachine...> class Template>
 using AllSupportedMachines = Template<  //
-    ElfMachine::kAarch64, ElfMachine::kX86_64, ElfMachine::k386, ElfMachine::kRiscv>;
+    ElfMachine::kAarch64, ElfMachine::kArm, ElfMachine::kX86_64, ElfMachine::k386,
+    ElfMachine::kRiscv>;
 
 }  // namespace elfldltl
 

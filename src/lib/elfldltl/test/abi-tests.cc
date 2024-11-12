@@ -16,8 +16,11 @@ constexpr void CheckMachine() {
 
   constexpr decltype(auto) align = Traits::template kStackAlignment<SizeType>;
   EXPECT_TRUE((std::is_same_v<decltype(align), const SizeType>));
-  EXPECT_EQ(align, 16u);
-
+  if constexpr (Machine == elfldltl::ElfMachine::kArm) {
+    EXPECT_EQ(align, 8u);
+  } else {
+    EXPECT_EQ(align, 16u);
+  }
   constexpr SizeType base = 1025, size = 2000;
   constexpr decltype(auto) sp = Traits::InitialStackPointer(base, size);
   EXPECT_TRUE((std::is_same_v<decltype(sp), const SizeType>));
