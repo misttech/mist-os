@@ -562,7 +562,7 @@ pub fn sb_mount(
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::sb_mount(
+        selinux_hooks::superblock::sb_mount(
             &security_server.as_permission_check(),
             current_task,
             dev_name,
@@ -584,7 +584,12 @@ pub fn sb_umount(
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.sb_umount");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::sb_umount(&security_server.as_permission_check(), current_task, node, flags)
+        selinux_hooks::superblock::sb_umount(
+            &security_server.as_permission_check(),
+            current_task,
+            node,
+            flags,
+        )
     })
 }
 

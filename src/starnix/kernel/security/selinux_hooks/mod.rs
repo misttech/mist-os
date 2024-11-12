@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
@@ -9,8 +10,8 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, PathBuilder,
+    UnlinkKind, ValueOrSize, XattrOp,
 };
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -28,8 +29,6 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
-use starnix_uapi::mount_flags::MountFlags;
-use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -37,33 +36,6 @@ use std::sync::Arc;
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
-
-/// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
-/// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
-pub(super) fn sb_mount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _dev_name: &bstr::BStr,
-    _path: &NamespaceNode,
-    _fs_type: &bstr::BStr,
-    _flags: MountFlags,
-    _data: &bstr::BStr,
-) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/352507622"), "sb_mount: validate permission");
-    Ok(())
-}
-
-/// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
-/// `_node` using the unmount flags `_flags`.
-pub(super) fn sb_umount(
-    _permission_check: &PermissionCheck<'_>,
-    _current_task: &CurrentTask,
-    _node: &NamespaceNode,
-    _flags: UnmountFlags,
-) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/353936182"), "sb_umount: validate permission");
-    Ok(())
-}
 
 /// Returns the relative path from the root of the file system containing this `DirEntry`.
 fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
