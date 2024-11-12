@@ -135,69 +135,17 @@ abspath() {
   local path="$1"
   case "$path" in
       /*) echo "$path";;
-      *) echo "`pwd`/$path";;
+      *) echo "$PWD/$path";;
   esac
 }
 
 # The QEMU command-line arguments to be built up below.
-ARGS=""
+ARGS=()
 
 # The running number of certain disks by type.
 AHCI_NUM=0
 VIRTIO_SCSI_NUM=0
 USB_NUM=0
-
-#######################################
-# Append disk-related arguments to ARGS.
-#
-# Globals:
-#   ARGS
-#   AHCI_NUM
-#   VIRTIO_SCSI_NUM
-#   USB_NUM
-#
-# Arguments:
-#   Disk type, a string.
-#   Disk file, a path.
-#   Disk format, a string.
-#   Disk ID, a string.
-#   Extra -device argunents, a string.
-#######################################
-function append-disk-args {
-   local type="$1"
-   local file="$2"
-   local fmt="$3"
-   local id="$4"
-   local extra_args="$5"
-   ARGS+=" -drive if=none,format=${fmt},file=${file},id=${id}"
-    if [[ "${type}" == "virtio" ]]; then
-        ARGS+=" -device virtio-blk-pci,drive=${id}"
-    elif [[ "${type}" == "ahci" ]]; then
-        if [[ $AHCI_NUM -eq 0 ]]; then
-            ARGS+=" -device ich9-ahci,id=ahci0"
-        fi
-        ARGS+=" -device ide-hd,drive=${id},bus=ahci0.${AHCI_NUM}"
-        AHCI_NUM=$((AHCI_NUM + 1))
-    elif [[ "${type}" == "nvme" ]]; then
-        ARGS+=" -device nvme,drive=${id},serial=zircon"
-    elif [[ "${type}" == "virtio-scsi" ]]; then
-        if [[ $VIRTIO_SCSI_NUM -eq 0 ]]; then
-            ARGS+=" -device virtio-scsi-pci,id=scsi0"
-        fi
-        ARGS+=" -device scsi-hd,drive=${id},scsi-id=${VIRTIO_SCSI_NUM},lun=1"
-        VIRTIO_SCSI_NUM=$((VIRTIO_SCSI_NUM + 1))
-    elif [[ "${type}" == "usb" ]]; then
-        if [[ $USB_NUM -eq 0 ]]; then
-            ARGS+=" -device nec-usb-xhci,id=xhci0"
-        fi
-        ARGS+=" -device usb-storage,bus=xhci0.0,removable=on,drive=${id}"
-        USB_NUM=$((USB_NUM + 1))
-    else
-        echo unrecognized disk type "${type}"
-        exit
-    fi
-    ARGS+="$extra_args"
-}
 
 while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:S:M:h-:" FLAG; do
     case $FLAG in
@@ -342,19 +290,19 @@ if (( $UEFI )); then
     ;;
   esac
 
-  ARGS+=" -drive if=pflash,format=raw,readonly=on,file=${UEFI_FIRMWARE}"
+  ARGS+=("-drive" "if=pflash,format=raw,readonly=on,file=${UEFI_FIRMWARE}")
   # The UEFI variable store. Without 'snapshot=true' this file would need to be
   # writable and state would persist across invocations; with it, the image
   # will be copy-on-write and state should persist across reboots.
-  ARGS+=" -drive if=pflash,format=raw,snapshot=true,file=${UEFI_VARS}"
+  ARGS+=("-drive" "if=pflash,format=raw,snapshot=true,file=${UEFI_VARS}")
 fi
 
 if [[ -n "$QEMU_KERNEL" ]]; then
-  ARGS+=" -kernel $QEMU_KERNEL"
+  ARGS+=("-kernel" "$QEMU_KERNEL")
 fi
 
 if [[ -n "$QEMU_INITRD" ]]; then
-  ARGS+=" -initrd $QEMU_INITRD"
+  ARGS+=("-initrd" "$QEMU_INITRD")
 fi
 
 if [[ -n $DISKFILE ]]; then
@@ -365,25 +313,52 @@ if [[ -n $DISKFILE ]]; then
     # `bootindex=0` ensures that this is the highest priority boot option.
     EXTRA_ARGS=",bootindex=0"
   fi
-  append-disk-args "${DISKTYPE}" "${DISKFILE}" "${DISKFMT}" "${NAME}"
+  ARGS+=("-drive" "if=none,format=${DISKFMT},file=${DISKFILE},id=${NAME}")
+  if [[ "${DISKTYPE}" == "virtio" ]]; then
+    DISKARG="virtio-blk-pci,drive=${NAME}"
+  elif [[ "${DISKTYPE}" == "ahci" ]]; then
+    if [[ $AHCI_NUM -eq 0 ]]; then
+        DISKARG="ich9-ahci,id=ahci0"
+    fi
+    DISKARG="ide-hd,drive=${NAME},bus=ahci0.${AHCI_NUM}"
+    AHCI_NUM=$((AHCI_NUM + 1))
+  elif [[ "${DISKTYPE}" == "nvme" ]]; then
+    DISKARG="nvme,drive=${NAME},serial=zircon"
+  elif [[ "${DISKTYPE}" == "virtio-scsi" ]]; then
+    if [[ $VIRTIO_SCSI_NUM -eq 0 ]]; then
+        DISKARG="virtio-scsi-pci,id=scsi0"
+    fi
+    DISKARG="scsi-hd,drive=${NAME},scsi-id=${VIRTIO_SCSI_NUM},lun=1"
+    VIRTIO_SCSI_NUM=$((VIRTIO_SCSI_NUM + 1))
+  elif [[ "${DISKTYPE}" == "usb" ]]; then
+    if [[ $USB_NUM -eq 0 ]]; then
+        DISKARG="nec-usb-xhci,id=xhci0"
+    fi
+    DISKARG="usb-storage,bus=xhci0.0,removable=on,drive=${NAME}"
+    USB_NUM=$((USB_NUM + 1))
+  else
+    echo unrecognized disk type "${DISKTYPE}"
+    exit
+  fi
+  ARGS+=("-device" "${DISKARG}${EXTRA_ARGS}")
 fi
 
 # construct the args for qemu
-ARGS+=" -m $MEMSIZE"
+ARGS+=("-m" "$MEMSIZE")
 if [[ -n $VNC ]]; then
-    ARGS+=" -vnc $VNC"
+    ARGS+=("-vnc" "$VNC")
 fi
 
 # Always use virtio as the rng source
-ARGS+=" -device virtio-rng-pci"
+ARGS+=("-device" "virtio-rng-pci")
 
 if [[ -n "$MONITOR_DEV" ]]; then
-  ARGS+=" -monitor $MONITOR_DEV"
+  ARGS+=("-monitor" "$MONITOR_DEV")
 fi
 
 ADD_SERIAL_ARG=1
 if (( !$GRAPHICS )); then
-  ARGS+=" -nographic -vga none"
+  ARGS+=("-nographic" "-vga" "none")
 
   # -nographic implies -serial stdio and will complain if you
   # try to set anything else pointing at stdio.
@@ -393,30 +368,30 @@ if (( !$GRAPHICS )); then
 else
   if [[ "$ARCH" == "x64" && $VIRTIO == 0 ]]; then
     # Enable Bochs VBE device, which Zircon has a device for
-    ARGS+=" -vga std"
+    ARGS+=("-vga" "std")
   else
     # use the virtio gpu for display
-    ARGS+=" -vga none"
-    ARGS+=" -device virtio-gpu-pci"
+    ARGS+=("-vga" "none")
+    ARGS+=("-device" "virtio-gpu-pci")
   fi
 fi
 
 if (( $SERIAL && $ADD_SERIAL_ARG )); then
-  ARGS+=" -serial $SERIAL_DEV"
+  ARGS+=("-serial" "$SERIAL_DEV")
 fi
 
 for ahcifile in ${AHCI[@]}; do
-  ARGS+=" -drive file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}"
-  ARGS+=" -device ich9-ahci,id=ahci${AHCI_NUM}"
-  ARGS+=" -device ide-hd,drive=ahcidisk${AHCI_NUM},bus=ahci.${AHCI_NUM}"
+  ARGS+=("-drive" "file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}")
+  ARGS+=("-device" "ich9-ahci,id=ahci${AHCI_NUM}")
+  ARGS+=("-device" "ide-hd,drive=ahcidisk${AHCI_NUM},bus=ahci.${AHCI_NUM}")
   AHCI_NUM=$((AHCI_NUM + 1))
 done
 
 if (( !$NET )); then
-  ARGS+=" -nic none"
+  ARGS+=("-nic" "none")
 else
   if [[ $NET == 1 ]]; then
-    ARGS+=" -nic user,hostname=$IFNAME"
+    ARGS+=("-nic" "user,hostname=$IFNAME")
   fi
 
   if [[ $NET == 2 ]]; then
@@ -448,52 +423,52 @@ else
         echo "Active firewall detected: If this emulator is unreachable, run: fx setup-ufw"
       fi
     fi
-    ARGS+=" -netdev tap,id=net0,ifname=$IFNAME,script=$UPSCRIPT,downscript=no"
+    ARGS+=("-netdev" "tap,id=net0,ifname=$IFNAME,script=$UPSCRIPT,downscript=no")
   fi
   HASH=$(echo $IFNAME | shasum)
   SUFFIX=$(for i in {0..2}; do echo -n :${HASH:$(( 2 * $i )):2}; done)
   MAC="52:54:00$SUFFIX"
   if [[ "$ARCH" == "x64" ]] && [[ $VIRTIO == 0 ]]; then
-    ARGS+=" -device e1000,netdev=net0,mac=$MAC"
+    ARGS+=("-device" "e1000,netdev=net0,mac=$MAC")
   else
     # Disable iPXE romfile. OVMF (UEFI implementation) defaults to using iPXE to
     # talk to the network device, but iPXE's driver is more than 2x slower than
     # OVMF's own virtio-net driver.
-    ARGS+=" -device virtio-net-pci,romfile=,netdev=net0,vectors=8,mac=$MAC"
+    ARGS+=("-device" "virtio-net-pci,romfile=,netdev=net0,vectors=8,mac=$MAC")
   fi
 fi
 
 if [[ -n $AUDIO ]]; then
-    ARGS+=" -device intel-hda -device hda-duplex -audiodev id=${AUDIO},driver=${AUDIO}"
-
+    AUDIODEV="id=${AUDIO},driver=${AUDIO}"
     case $AUDIO in
         none) ;;
         alsa) ;;
         oss) ;;
         pa) ;;
         wav)
-            ARGS+=",path=${AUDIO_WAVFILE}"
+            AUDIODEV+=",path=${AUDIO_WAVFILE}"
             ;;
         *)
             echo unrecognized QEMU host audio driver \"$AUDIO\"
             exit
             ;;
     esac
+    ARGS+=("-device" "intel-hda" "-device" "hda-duplex" "-audiodev" "${AUDIODEV}")
 fi
 
 if [[ $SMP != 1 ]]; then
-    ARGS+=" -smp $SMP"
+    ARGS+=("-smp" "$SMP")
 fi
 
 # start a few extra harmless virtio devices that can be ignored
 if (( $VIRTIO )); then
-    ARGS+=" -device virtio-serial-pci"
-    ARGS+=" -device virtio-mouse-pci"
-    ARGS+=" -device virtio-keyboard-pci"
+    ARGS+=("-device" "virtio-serial-pci")
+    ARGS+=("-device" "virtio-mouse-pci")
+    ARGS+=("-device" "virtio-keyboard-pci")
 fi
 
 if (( $DEBUGGER )); then
-    ARGS+=" -s -S"
+    ARGS+=("-s" "-S")
 fi
 
 # Auto-detect if KVM or HVF support exists if not explicitly specified.
@@ -523,23 +498,24 @@ case $ARCH in
     arm64)
         QEMU=${QEMUDIR}qemu-system-aarch64
         if (( $DO_KVM )); then
-          ARGS+=" -enable-kvm -cpu host"
+          ARGS+=("-enable-kvm" "-cpu" "host")
           GIC=host
         elif (( $DO_HVF )); then
-          ARGS+=" -machine accel=hvf"
-          ARGS+=" -cpu host"
+          ARGS+=("-machine" "accel=hvf")
+          ARGS+=("-cpu" "host")
         else
           # Ask for all of the features TCG emulates
-          ARGS+=" -machine virtualization=true -cpu max"
+          ARGS+=("-machine" "virtualization=true" "-cpu" "max")
         fi
         # Ask for a specific virt machine version.
         # TODO(https://fxbug.dev/42131826) add support for high PCIe aperture
         # Can switch to plain 'virt' once this is fixed.
-        ARGS+=" -machine virt-2.12"
+        MACHINEARG="virt-2.12"
         # append a gic version to the machine specifier
         if [[ $GIC != 0 ]]; then
-            ARGS+=",gic-version=${GIC}"
+            MACHINEARG+=",gic-version=${GIC}"
         fi
+        ARGS+=("-machine" "${MACHINEARG}")
 
         if (( !$SERIAL )); then
           CMDLINE+="kernel.serial=none "
@@ -547,10 +523,10 @@ case $ARCH in
         ;;
     riscv64)
         QEMU=${QEMUDIR}qemu-system-riscv64
-        ARGS+=" -cpu rv64,svpbmt=true,v=true,vext_spec=v1.0"
-        ARGS+=" -machine virt"
-        ARGS+=" -object rng-random,filename=/dev/urandom,id=rng0"
-        ARGS+=" -device virtio-rng-device,rng=rng0"
+        ARGS+=("-cpu" "rv64,svpbmt=true,v=true,vext_spec=v1.0")
+        ARGS+=("-machine" "virt")
+        ARGS+=("-object" "rng-random,filename=/dev/urandom,id=rng0")
+        ARGS+=("-device" "virtio-rng-device,rng=rng0")
         if (( !$SERIAL )); then
           CMDLINE+="kernel.serial=none "
         fi
@@ -558,17 +534,17 @@ case $ARCH in
     x64)
         QEMU=${QEMUDIR}qemu-system-x86_64
         # The kernel only supports the v2.1 (32-bit) SMBIOS entry point.
-        ARGS+=" -machine q35,smbios-entry-point-type=32"
-        ARGS+=" -device isa-debug-exit,iobase=0xf4,iosize=0x04"
+        ARGS+=("-machine" "q35,smbios-entry-point-type=32")
+        ARGS+=("-device" "isa-debug-exit,iobase=0xf4,iosize=0x04")
 
         # Override the SeaBIOS serial port to keep it from outputting
         # a terminal reset on start.
-        ARGS+=" -fw_cfg name=etc/sercon-port,string=0"
+        ARGS+=("-fw_cfg" "name=etc/sercon-port,string=0")
 
         if (( $DO_KVM )); then
-          ARGS+=" -enable-kvm -cpu host,migratable=no,+invtsc"
+          ARGS+=("-enable-kvm" "-cpu" "host,migratable=no,+invtsc")
         else
-          ARGS+=" -cpu Skylake-Client,-check"
+          ARGS+=("-cpu" "Skylake-Client,-check")
         fi
 
         if (( $SERIAL )); then
@@ -603,11 +579,9 @@ else
   set -x
 fi
 
-# TODO(joshuaseaton): this and other command-line building logic above can be
-# tidied up in having $ARGS be an array.
 if (( $UEFI_DISK_BOOT )); then
-  $RUN_CMD $QEMU $ARGS "$@"
+  $RUN_CMD "$QEMU" "${ARGS[@]}" "$@"
 else
   echo "CMDLINE: $CMDLINE"
-  $RUN_CMD $QEMU $ARGS -append "$CMDLINE" "$@"
+  $RUN_CMD "$QEMU" "${ARGS[@]}" -append "$CMDLINE" "$@"
 fi
