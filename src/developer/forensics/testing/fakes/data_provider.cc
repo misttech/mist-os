@@ -5,14 +5,11 @@
 #include "src/developer/forensics/testing/fakes/data_provider.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/mem/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <memory>
 #include <vector>
 
 #include "src/developer/forensics/utils/archive.h"
-#include "src/lib/fsl/vmo/file.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -52,23 +49,6 @@ Attachment CreateSnapshot() {
   return {.key = "snapshot.zip", .value = std::move(archive).ToTransport()};
 }
 
-std::unique_ptr<Screenshot> LoadPngScreenshot() {
-  fsl::SizedVmo image;
-  FX_CHECK(fsl::VmoFromFilename("/pkg/data/checkerboard_100.png", &image))
-      << "Failed to create image vmo";
-
-  const size_t image_dim_in_px = 100u;
-  fuchsia::math::Size dimensions;
-  dimensions.width = image_dim_in_px;
-  dimensions.height = image_dim_in_px;
-
-  std::unique_ptr<Screenshot> screenshot = std::make_unique<Screenshot>();
-  screenshot->image = std::move(image).ToTransport();
-  screenshot->dimensions_in_px = dimensions;
-
-  return screenshot;
-}
-
 }  // namespace
 
 void DataProvider::GetAnnotations(fuchsia::feedback::GetAnnotationsParameters params,
@@ -88,13 +68,8 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters parms,
 }
 
 void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback callback) {
-  switch (encoding) {
-    case ImageEncoding::PNG:
-      callback(LoadPngScreenshot());
-      break;
-    default:
-      callback(nullptr);
-  }
+  FX_LOGS(FATAL) << "fuchsia.feedback/DataProvider.GetScreenshot is removed. "
+                 << "Use fuchsia.ui.composition/Screenshot instead.";
 }
 
 }  // namespace fakes

@@ -5,8 +5,6 @@
 #include "src/developer/forensics/feedback_data/data_provider.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/math/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/syslog/cpp/macros.h>
@@ -16,7 +14,6 @@
 #include <zircon/types.h>
 
 #include <cstddef>
-#include <deque>
 #include <memory>
 #include <optional>
 #include <set>
@@ -31,18 +28,12 @@
 #include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
-#include "src/developer/forensics/feedback_data/metadata.h"
 #include "src/developer/forensics/feedback_data/tests/stub_attachment_provider.h"
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
-#include "src/developer/forensics/testing/stubs/screenshot.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/archive.h"
-#include "src/lib/fostr/fidl/fuchsia/math/formatting.h"
-#include "src/lib/fsl/vmo/file.h"
-#include "src/lib/fsl/vmo/sized_vmo.h"
-#include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/timekeeper/test_clock.h"
 #include "src/lib/uuid/uuid.h"
@@ -62,8 +53,6 @@ namespace feedback_data {
 namespace {
 
 using fuchsia::feedback::Annotation;
-using fuchsia::feedback::ImageEncoding;
-using fuchsia::feedback::Screenshot;
 using fuchsia::feedback::Snapshot;
 using testing::UnorderedElementsAreArray;
 
@@ -78,72 +67,6 @@ constexpr zx::duration kDefaultSnapshotFlowDuration = zx::usec(5);
 //
 // 30s seems reasonable to collect everything.
 constexpr zx::duration kDefaultDataTimeout = zx::sec(30);
-
-// Returns a Screenshot with the right dimensions, no image.
-std::unique_ptr<Screenshot> MakeUniqueScreenshot(const size_t image_dim_in_px) {
-  std::unique_ptr<Screenshot> screenshot = std::make_unique<Screenshot>();
-  screenshot->dimensions_in_px.height = image_dim_in_px;
-  screenshot->dimensions_in_px.width = image_dim_in_px;
-  return screenshot;
-}
-
-// Represents arguments for DataProvider::GetScreenshotCallback.
-struct GetScreenshotResponse {
-  std::unique_ptr<Screenshot> screenshot;
-
-  // This should be kept in sync with DoGetScreenshotResponseMatch() as we only want to display what
-  // we actually compare, for now the presence of a screenshot and its dimensions if present.
-  operator std::string() const {
-    if (!screenshot) {
-      return "no screenshot";
-    }
-    const fuchsia::math::Size& dimensions_in_px = screenshot->dimensions_in_px;
-    return fxl::StringPrintf("a %d x %d screenshot", dimensions_in_px.width,
-                             dimensions_in_px.height);
-  }
-
-  // This is used by gTest to pretty-prints failed expectations instead of the default byte string.
-  friend std::ostream& operator<<(std::ostream& os, const GetScreenshotResponse& response) {
-    return os << std::string(response);
-  }
-};
-
-// Compares two GetScreenshotResponse objects.
-//
-// This should be kept in sync with std::string() as we only want to display what we actually
-// compare, for now the presence of a screenshot and its dimensions.
-template <typename ResultListenerT>
-bool DoGetScreenshotResponseMatch(const GetScreenshotResponse& actual,
-                                  const GetScreenshotResponse& expected,
-                                  ResultListenerT* result_listener) {
-  if (actual.screenshot == nullptr && expected.screenshot == nullptr) {
-    return true;
-  }
-  if (actual.screenshot == nullptr && expected.screenshot != nullptr) {
-    *result_listener << "Got no screenshot, expected one";
-    return false;
-  }
-  if (expected.screenshot == nullptr && actual.screenshot != nullptr) {
-    *result_listener << "Expected no screenshot, got one";
-    return false;
-  }
-  // actual.screenshot and expected.screenshot are now valid.
-
-  if (!::fidl::Equals(actual.screenshot->dimensions_in_px, expected.screenshot->dimensions_in_px)) {
-    *result_listener << "Expected screenshot dimensions " << expected.screenshot->dimensions_in_px
-                     << ", got " << actual.screenshot->dimensions_in_px;
-    return false;
-  }
-
-  // We do not compare the VMOs.
-
-  return true;
-}
-
-// Returns true if gMock |arg| matches |expected|, assuming two GetScreenshotResponse objects.
-MATCHER_P(MatchesGetScreenshotResponse, expected, "matches " + std::string(expected.get())) {
-  return DoGetScreenshotResponseMatch(arg, expected, result_listener);
-}
 
 // Unit-tests the implementation of the fuchsia.feedback.DataProvider FIDL interface.
 //
@@ -178,25 +101,6 @@ class DataProviderTest : public UnitTestFixture {
         dispatcher(), services(), &clock_, &redactor_, /*is_first_instance=*/true,
         annotation_allowlist, attachment_allowlist, cobalt_.get(), annotation_manager_.get(),
         attachment_manager_.get(), inspect_data_budget_.get());
-  }
-
-  void SetUpScreenshotServer(std::unique_ptr<stubs::ScreenshotBase> server) {
-    screenshot_server_ = std::move(server);
-    if (screenshot_server_) {
-      InjectServiceProvider(screenshot_server_.get());
-    }
-  }
-
-  GetScreenshotResponse GetScreenshot() {
-    FX_CHECK(data_provider_);
-
-    GetScreenshotResponse out_response;
-    data_provider_->GetScreenshot(ImageEncoding::PNG,
-                                  [&out_response](std::unique_ptr<Screenshot> screenshot) {
-                                    out_response.screenshot = std::move(screenshot);
-                                  });
-    RunLoopUntilIdle();
-    return out_response;
   }
 
   Snapshot GetSnapshot(std::optional<zx::channel> channel = std::nullopt,
@@ -267,98 +171,9 @@ class DataProviderTest : public UnitTestFixture {
   std::unique_ptr<DataProvider> data_provider_;
 
  private:
-  std::unique_ptr<stubs::ScreenshotBase> screenshot_server_;
   std::unique_ptr<InspectNodeManager> inspect_node_manager_;
   std::unique_ptr<InspectDataBudget> inspect_data_budget_;
 };
-
-TEST_F(DataProviderTest, GetScreenshot_SucceedOnScreenshotReturningSuccess) {
-  const size_t image_dim_in_px = 100;
-  std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
-  auto fake_png = stubs::CreateFakePNGScreenshot(image_dim_in_px);
-  zx::vmo fake_png_dup;
-  fake_png.vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &fake_png_dup);
-  screenshot_responses.emplace_back(std::move(fake_png));
-  auto screenshot = std::make_unique<stubs::Screenshot>();
-  screenshot->set_responses(std::move(screenshot_responses));
-  SetUpScreenshotServer(std::move(screenshot));
-  SetUpDataProvider();
-
-  GetScreenshotResponse feedback_response = GetScreenshot();
-
-  ASSERT_NE(feedback_response.screenshot, nullptr);
-  EXPECT_EQ(static_cast<size_t>(feedback_response.screenshot->dimensions_in_px.height),
-            image_dim_in_px);
-  EXPECT_EQ(static_cast<size_t>(feedback_response.screenshot->dimensions_in_px.width),
-            image_dim_in_px);
-  EXPECT_TRUE(feedback_response.screenshot->image.vmo.is_valid());
-
-  std::vector<uint8_t> actual_pixels;
-  ASSERT_TRUE(fsl::VectorFromVmo(feedback_response.screenshot->image, &actual_pixels));
-
-  std::vector<uint8_t> expected_pixels;
-  uint64_t fake_png_size = 0;
-  fake_png_dup.get_size(&fake_png_size);
-  ASSERT_TRUE(
-      fsl::VectorFromVmo(fsl::SizedVmo(std::move(fake_png_dup), fake_png_size), &expected_pixels));
-
-  EXPECT_EQ(actual_pixels, expected_pixels);
-}
-
-TEST_F(DataProviderTest, GetScreenshot_FailOnScreenshotNotAvailable) {
-  SetUpDataProvider();
-
-  GetScreenshotResponse feedback_response = GetScreenshot();
-  EXPECT_EQ(feedback_response.screenshot, nullptr);
-}
-
-TEST_F(DataProviderTest, GetScreenshot_ParallelRequests) {
-  // We simulate two calls to DataProvider::GetScreenshot(): one for which the stub Screenshot
-  // will return a checkerboard 10x10, and one for a 20x20.
-  const size_t num_calls = 2u;
-  const size_t image_dim_in_px_0 = 10u;
-  const size_t image_dim_in_px_1 = 20u;
-  std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
-  screenshot_responses.emplace_back(stubs::CreateFakePNGScreenshot(image_dim_in_px_0));
-  screenshot_responses.emplace_back(stubs::CreateFakePNGScreenshot(image_dim_in_px_1));
-  ASSERT_EQ(screenshot_responses.size(), num_calls);
-  auto screenshot = std::make_unique<stubs::Screenshot>();
-  screenshot->set_responses(std::move(screenshot_responses));
-  SetUpScreenshotServer(std::move(screenshot));
-  SetUpDataProvider();
-
-  std::vector<GetScreenshotResponse> feedback_responses;
-  for (size_t i = 0; i < num_calls; i++) {
-    data_provider_->GetScreenshot(ImageEncoding::PNG,
-                                  [&feedback_responses](std::unique_ptr<Screenshot> screenshot) {
-                                    feedback_responses.push_back({std::move(screenshot)});
-                                  });
-  }
-  RunLoopUntilIdle();
-  EXPECT_EQ(feedback_responses.size(), num_calls);
-
-  // We cannot assume that the order of the DataProvider::GetScreenshot() calls match the order
-  // of the Screenshot::Take() callbacks because of the async message loop. Thus we need to
-  // match them as sets.
-  //
-  // We set the expectations in advance and then pass a reference to the gMock matcher using
-  // testing::ByRef() because the underlying VMO is not copyable.
-  const GetScreenshotResponse expected_0 = {MakeUniqueScreenshot(image_dim_in_px_0)};
-  const GetScreenshotResponse expected_1 = {MakeUniqueScreenshot(image_dim_in_px_1)};
-  EXPECT_THAT(feedback_responses, testing::UnorderedElementsAreArray({
-                                      MatchesGetScreenshotResponse(testing::ByRef(expected_0)),
-                                      MatchesGetScreenshotResponse(testing::ByRef(expected_1)),
-                                  }));
-
-  // Additionally, we check that in the non-empty responses, the VMO is valid.
-  for (const auto& response : feedback_responses) {
-    if (response.screenshot == nullptr) {
-      continue;
-    }
-    EXPECT_TRUE(response.screenshot->image.vmo.is_valid());
-    EXPECT_GE(response.screenshot->image.size, 0u);
-  }
-}
 
 TEST_F(DataProviderTest, GetSnapshot_SmokeTest) {
   SetUpDataProvider();

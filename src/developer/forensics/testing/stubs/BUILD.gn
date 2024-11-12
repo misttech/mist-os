@@ -306,26 +306,6 @@ source_set("reboot_methods_watcher_register") {
   ]
 }
 
-source_set("screenshot") {
-  testonly = true
-
-  sources = [
-    "screenshot.cc",
-    "screenshot.h",
-  ]
-
-  public_deps = [
-    ":fidl_server_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-  ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
-    "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 source_set("system_activity_governor") {
   testonly = true
 

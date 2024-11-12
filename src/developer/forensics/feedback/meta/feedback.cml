@@ -44,7 +44,6 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.settings.Privacy",
                 "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Screenshot",
                 "fuchsia.update.channelcontrol.ChannelControl",
             ],
             availability: "optional",

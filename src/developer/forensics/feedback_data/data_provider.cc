@@ -5,7 +5,6 @@
 #include "src/developer/forensics/feedback_data/data_provider.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
@@ -25,12 +24,10 @@
 #include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
-#include "src/developer/forensics/feedback_data/screenshot.h"
 #include "src/developer/forensics/utils/archive.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
-#include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/uuid/uuid.h"
 
 namespace forensics {
@@ -38,20 +35,13 @@ namespace feedback_data {
 namespace {
 
 using fuchsia::feedback::ImageEncoding;
-using fuchsia::feedback::Screenshot;
 using fuchsia::feedback::Snapshot;
-using fuchsia::ui::composition::ScreenshotFormat;
 
 // Timeout for a single asynchronous piece of data, e.g., syslog collection, if the client didn't
 // specify one.
 //
 // 30s seems reasonable to collect everything.
 const zx::duration kDefaultDataTimeout = zx::sec(30);
-
-// Timeout for requesting the screenshot from Scenic.
-//
-// 10 seconds seems reasonable to take a screenshot.
-const zx::duration kScreenshotTimeout = zx::sec(10);
 
 }  // namespace
 
@@ -248,34 +238,8 @@ bool ServedArchive::Serve(fidl::ServerEnd<fuchsia_io::File> file_server,
 }
 
 void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback callback) {
-  FX_CHECK(encoding == ImageEncoding::PNG);
-  auto promise =
-      TakeScreenshot(dispatcher_, services_, ScreenshotFormat::PNG, kScreenshotTimeout)
-          .or_else([this](const Error& error) {
-            if (error != Error::kTimeout) {
-              return ::fpromise::error();
-            }
-
-            cobalt_->LogOccurrence(cobalt::TimedOutData::kScreenshot);
-            return ::fpromise::error();
-          })
-          .and_then([](ScreenshotData& screenshot_data) -> ::fpromise::result<Screenshot> {
-            Screenshot screenshot;
-            screenshot.dimensions_in_px.height = screenshot_data.info.height;
-            screenshot.dimensions_in_px.width = screenshot_data.info.width;
-            screenshot.image =
-                fsl::SizedVmo(std::move(screenshot_data.data.vmo()), screenshot_data.data.size())
-                    .ToTransport();
-            return ::fpromise::ok(std::move(screenshot));
-          })
-          .then([callback = std::move(callback)](::fpromise::result<Screenshot>& result) {
-            if (!result.is_ok()) {
-              callback(/*screenshot=*/nullptr);
-            } else {
-              callback(std::make_unique<Screenshot>(result.take_value()));
-            }
-          });
-  executor_.schedule_task(std::move(promise));
+  FX_LOGS(ERROR) << "fuchsia.feedback/DataProvider.GetScreenshot is removed. "
+                 << "Use fuchsia.ui.composition/Screenshot instead.";
 }
 
 }  // namespace feedback_data
