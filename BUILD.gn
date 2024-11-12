@@ -24,6 +24,10 @@ declare_args() {
   # These will be added to the build using the host toolchain.
   host_labels = []
 
+  # Platform builders can add targets to this list so that they get built with
+  # the //:default target
+  additional_default_targets = []
+
   # These labels are added as dependencies of '//:default' transitively via
   # '//:build_only'.  These are used to add targets that need to be built
   # but aren't part of any product, board, etc.
@@ -273,8 +277,7 @@ group("tool_paths.metadata") {
     "//prebuilt/third_party/go/$host_platform/bin/gofmt",
     "//prebuilt/third_party/ninja/$host_platform/ninja",
     "//prebuilt/third_party/python3/$host_platform/bin/python3",
-
-    #"//prebuilt/tools/shac/shac",
+    "//prebuilt/tools/shac/shac",
 
     #"//third_party/catapult/tracing/bin/trace2html",
   ]
@@ -439,6 +442,9 @@ group("default") {
     "//vendor/misttech/zircon/kernel/lib/linux-rt",
     "//vendor/misttech/zircon/kernel/lib/starnix/examples",
   ]
+
+  # Add any additional targets from the product.
+  deps += additional_default_targets
 }
 
 ###
@@ -473,6 +479,16 @@ group("host") {
   # TODO(https://fxbug.dev/42160904) investigate removing testonly here
   testonly = true
   public_deps = [
+    #"//build/input/product:host($host_toolchain)",
+
+    # Static analysis tools used by shac should always be built so that
+    # `fx format-code` and other static analysis entrypoints can be run on any
+    # build configuration.
+    "//bundles/tools/shac:shac_tools",
+
+    # Host tests for //build/api/client
+    "//build/api:tests",
+
     # Tools & tests added by the developer
     ":developer_host_tools",
   ]
