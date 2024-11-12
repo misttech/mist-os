@@ -47,8 +47,10 @@ TEST(AstroAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root;
-  ASSERT_NOT_OK(paver::AstroAbrClientFactory().New(*devices, svc_root, nullptr));
+  std::shared_ptr<paver::Context> context;
+  zx::result partitioner = paver::AstroPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
+                                                                paver::Arch::kArm64, context, {});
+  ASSERT_NOT_OK(partitioner);
 }
 
 TEST(SherlockAbrTests, CreateFails) {
@@ -62,8 +64,10 @@ TEST(SherlockAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(
-      paver::SherlockAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
+  std::shared_ptr<paver::Context> context;
+  zx::result partitioner = paver::SherlockPartitionerFactory().New(
+      *devices, devmgr.RealmExposedDir(), paver::Arch::kArm64, context, {});
+  ASSERT_NOT_OK(partitioner);
 }
 
 TEST(KolaAbrTests, CreateFails) {
@@ -77,7 +81,10 @@ TEST(KolaAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
+  std::shared_ptr<paver::Context> context;
+  zx::result partitioner = paver::KolaPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
+                                                               paver::Arch::kArm64, context, {});
+  ASSERT_NOT_OK(partitioner);
 }
 
 TEST(LuisAbrTests, CreateFails) {
@@ -91,7 +98,10 @@ TEST(LuisAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
+  std::shared_ptr<paver::Context> context;
+  zx::result partitioner = paver::LuisPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
+                                                               paver::Arch::kArm64, context, {});
+  ASSERT_NOT_OK(partitioner);
 }
 
 TEST(X64AbrTests, CreateFails) {
@@ -105,7 +115,10 @@ TEST(X64AbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
+  std::shared_ptr<paver::Context> context;
+  zx::result partitioner = paver::X64PartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
+                                                              paver::Arch::kX64, context, {});
+  ASSERT_NOT_OK(partitioner);
 }
 
 class CurrentSlotUuidTest : public PaverTest {
@@ -275,9 +288,13 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
 
     zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
     ASSERT_OK(devices);
-    auto abr_client =
-        paver::KolaAbrClientFactory().Create(*devices, devmgr_.RealmExposedDir(), nullptr);
+    std::shared_ptr<paver::Context> context;
+    zx::result partitioner = paver::KolaPartitionerFactory().New(
+        *devices, devmgr_.RealmExposedDir(), paver::Arch::kArm64, context, {});
+    ASSERT_OK(partitioner);
+    zx::result abr_client = partitioner->CreateAbrClient();
     ASSERT_OK(abr_client);
+    partitioner_ = std::move(*partitioner);
     abr_client_ = std::move(*abr_client);
   }
 
@@ -306,6 +323,7 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
 
   void AbrClientFlush() { ASSERT_OK(abr_client_->Flush()); }
 
+  std::unique_ptr<paver::DevicePartitioner> partitioner_;
   std::unique_ptr<abr::Client> abr_client_;
 };
 

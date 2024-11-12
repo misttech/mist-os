@@ -43,6 +43,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3Partitioner::Initialize(
   return zx::ok(std::move(partitioner));
 }
 
+const paver::BlockDevices& Vim3Partitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> Vim3Partitioner::SvcRoot() const {
+  return gpt_->svc_root();
+}
+
 bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
   const PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA),
@@ -162,22 +168,13 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3PartitionerFactory::New(
   return Vim3Partitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> Vim3AbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = Vim3Partitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> Vim3Partitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }
-  LOG("Found partition\n");
 
   return abr::AbrPartitionClient::Create(std::move(partition.value()));
 }

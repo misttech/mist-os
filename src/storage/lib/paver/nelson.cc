@@ -43,6 +43,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitioner::Initialize(
   return zx::ok(std::move(partitioner));
 }
 
+const paver::BlockDevices& NelsonPartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> NelsonPartitioner::SvcRoot() const {
+  return gpt_->svc_root();
+}
+
 bool NelsonPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   const PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA, "bl2"),
@@ -238,18 +244,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitionerFactory::New(
   return NelsonPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> NelsonAbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = NelsonPartitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> NelsonPartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }

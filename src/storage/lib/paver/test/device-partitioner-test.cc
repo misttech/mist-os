@@ -172,14 +172,17 @@ TEST(PartitionSpec, ToStringWithContentType) {
 class GptDevicePartitionerTests : public PaverTest {
  protected:
   explicit GptDevicePartitionerTests(fbl::String board_name = fbl::String(),
-                                     uint32_t block_size = 512)
-      : board_name_(std::move(board_name)), block_size_(block_size) {}
+                                     uint32_t block_size = 512, std::string boot_arg = "")
+      : board_name_(std::move(board_name)),
+        boot_arg_(std::move(boot_arg)),
+        block_size_(block_size) {}
 
   void SetUp() override {
     PaverTest::SetUp();
     paver::g_wipe_timeout = 0;
     IsolatedDevmgr::Args args = BaseDevmgrArgs();
     args.board_name = board_name_;
+    args.boot_arg = boot_arg_;
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
@@ -342,6 +345,7 @@ class GptDevicePartitionerTests : public PaverTest {
 
   IsolatedDevmgr devmgr_;
   fbl::String board_name_;
+  std::string boot_arg_;
   const uint32_t block_size_;
 };
 
@@ -398,7 +402,7 @@ class FakeSvc {
 
 class EfiDevicePartitionerTests : public GptDevicePartitionerTests {
  protected:
-  EfiDevicePartitionerTests() : GptDevicePartitionerTests(fbl::String(), 512) {
+  EfiDevicePartitionerTests() : GptDevicePartitionerTests(fbl::String()) {
     EXPECT_OK(loop_.StartThread("efi-devicepartitioner-tests-loop"));
   }
 
@@ -799,7 +803,7 @@ class FixedDevicePartitionerTests : public PaverTest {
 TEST_F(FixedDevicePartitionerTests, UseBlockInterfaceTest) {
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices);
+  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
   ASSERT_OK(status);
   ASSERT_FALSE(status->IsFvmWithinFtl());
 }
@@ -807,7 +811,7 @@ TEST_F(FixedDevicePartitionerTests, UseBlockInterfaceTest) {
 TEST_F(FixedDevicePartitionerTests, WipeFvmTest) {
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices);
+  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
   ASSERT_OK(status);
   ASSERT_OK(status->WipeFvm());
 }
@@ -815,7 +819,7 @@ TEST_F(FixedDevicePartitionerTests, WipeFvmTest) {
 TEST_F(FixedDevicePartitionerTests, FinalizePartitionTest) {
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices);
+  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
   ASSERT_OK(status);
   auto& partitioner = status.value();
 
@@ -862,7 +866,7 @@ TEST_F(FixedDevicePartitionerTests, FindPartitionTest) {
 TEST_F(FixedDevicePartitionerTests, SupportsPartitionTest) {
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices);
+  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
   ASSERT_OK(status);
   auto& partitioner = status.value();
 
@@ -887,7 +891,7 @@ TEST_F(FixedDevicePartitionerTests, SupportsPartitionTest) {
 
 class SherlockPartitionerTests : public GptDevicePartitionerTests {
  protected:
-  SherlockPartitionerTests() : GptDevicePartitionerTests("sherlock", 512) {}
+  SherlockPartitionerTests() : GptDevicePartitionerTests("sherlock") {}
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
@@ -1077,9 +1081,7 @@ TEST_F(SherlockPartitionerTests, SupportsPartition) {
 
 class KolaPartitionerTests : public GptDevicePartitionerTests {
  protected:
-  static constexpr size_t kKolaBlockSize = 512;
-
-  KolaPartitionerTests() : GptDevicePartitionerTests("kola", kKolaBlockSize) {}
+  KolaPartitionerTests() : GptDevicePartitionerTests("kola") {}
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
@@ -1163,7 +1165,7 @@ TEST_F(KolaPartitionerTests, SupportsPartition) {
 
 class LuisPartitionerTests : public GptDevicePartitionerTests {
  protected:
-  LuisPartitionerTests() : GptDevicePartitionerTests("luis", 512) {}
+  LuisPartitionerTests() : GptDevicePartitionerTests("luis", 512, "_a") {}
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(
@@ -1254,7 +1256,10 @@ TEST_F(LuisPartitionerTests, CreateAbrClient) {
   std::shared_ptr<paver::Context> context;
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  EXPECT_OK(paver::LuisAbrClientFactory().New(*devices, svc_root, context));
+  zx::result partitioner =
+      paver::LuisPartitionerFactory().New(*devices, svc_root, paver::Arch::kArm64, context, {});
+  ASSERT_OK(partitioner);
+  EXPECT_OK(partitioner->CreateAbrClient());
 }
 
 TEST_F(LuisPartitionerTests, SupportsPartition) {
@@ -1299,7 +1304,7 @@ class NelsonPartitionerTests : public GptDevicePartitionerTests {
   static constexpr size_t kTplSlotBOffset = 0x4000;
   static constexpr size_t kUserTplBlockCount = 0x1000;
 
-  NelsonPartitionerTests() : GptDevicePartitionerTests("nelson", kNelsonBlockSize) {}
+  NelsonPartitionerTests() : GptDevicePartitionerTests("nelson", kNelsonBlockSize, "_a") {}
 
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
@@ -1508,7 +1513,10 @@ TEST_F(NelsonPartitionerTests, CreateAbrClient) {
   std::shared_ptr<paver::Context> context;
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
-  EXPECT_OK(paver::NelsonAbrClientFactory().New(*devices, svc_root, context));
+  zx::result partitioner =
+      paver::NelsonPartitionerFactory().New(*devices, svc_root, paver::Arch::kArm64, context, {});
+  ASSERT_OK(partitioner);
+  EXPECT_OK(partitioner->CreateAbrClient());
 }
 
 TEST_F(NelsonPartitionerTests, SupportsPartition) {

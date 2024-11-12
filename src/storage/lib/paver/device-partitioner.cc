@@ -4,6 +4,7 @@
 
 #include "device-partitioner.h"
 
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -197,12 +198,12 @@ void DevicePartitionerFactory::Register(std::unique_ptr<DevicePartitionerFactory
 constexpr PartitionScheme kFixedDevicePartitionScheme = PartitionScheme::kLegacy;
 
 zx::result<std::unique_ptr<DevicePartitioner>> FixedDevicePartitioner::Initialize(
-    const paver::BlockDevices& devices) {
+    const paver::BlockDevices& devices, fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
   if (HasSkipBlockDevice(devices)) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   LOG("Successfully initialized FixedDevicePartitioner Device Partitioner\n");
-  return zx::ok(new FixedDevicePartitioner(devices.Duplicate()));
+  return zx::ok(new FixedDevicePartitioner(devices.Duplicate(), std::move(svc_root)));
 }
 
 bool FixedDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const {
@@ -267,7 +268,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> DefaultPartitionerFactory::New(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     Arch arch, std::shared_ptr<Context> context,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return FixedDevicePartitioner::Initialize(devices);
+  return FixedDevicePartitioner::Initialize(devices, component::MaybeClone(svc_root));
 }
 
 }  // namespace paver

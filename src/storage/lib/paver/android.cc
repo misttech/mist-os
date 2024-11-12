@@ -57,6 +57,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> AndroidDevicePartitioner::Initial
   return zx::ok(std::move(partitioner));
 }
 
+const paver::BlockDevices& AndroidDevicePartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> AndroidDevicePartitioner::SvcRoot() const {
+  return gpt_->svc_root();
+}
+
 bool AndroidDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const {
   constexpr PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA, "boot_shim"),
@@ -311,19 +317,9 @@ class AndroidAbrClient : public abr::Client, android::IoOps {
   android::BootControl boot_control_;
 };
 
-zx::result<std::unique_ptr<abr::Client>> AndroidAbrClientFactory::New(
-    const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  auto partitioner = AndroidDevicePartitioner::Initialize(devices, svc_root, GetCurrentArch(), {},
-                                                          std::move(context));
-
-  if (partitioner.is_error()) {
-    ERROR("Failed to initialize android partitioner: %s\n", partitioner.status_string());
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> AndroidDevicePartitioner::CreateAbrClient() const {
   // Assume ABR Metadata partition indicate it is android partition layout.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  zx::result partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     ERROR("Failed to find abr partition\n");
     return partition.take_error();

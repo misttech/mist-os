@@ -20,6 +20,12 @@ class LuisPartitioner : public DevicePartitioner {
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override;
+
+  const paver::BlockDevices& Devices() const override;
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const override;
+
   bool IsFvmWithinFtl() const override { return false; }
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
@@ -55,12 +61,6 @@ class LuisPartitionerFactory : public DevicePartitionerFactory {
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
-class LuisAbrClientFactory : public abr::ClientFactory {
- public:
-  zx::result<std::unique_ptr<abr::Client>> New(
-      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-      std::shared_ptr<paver::Context> context) final;
-};
 }  // namespace paver
 
 #endif  // SRC_STORAGE_LIB_PAVER_LUIS_H_

@@ -689,21 +689,38 @@ void BootManager::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                        fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                        std::shared_ptr<Context> context,
                        fidl::ServerEnd<fuchsia_paver::BootManager> server) {
-  auto status = abr::ClientFactory::Create(devices, svc_root.borrow(), std::move(context));
-  if (status.is_error()) {
-    ERROR("Failed to get ABR client: %s\n", status.status_string());
-    fidl_epitaph_write(server.channel().get(), status.error_value());
+  zx::result supports_abr = abr::SupportsVerifiedBoot(devices, svc_root);
+  if (supports_abr.is_error()) {
+      ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
+      fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
+      return;
+  } else if (!*supports_abr) {
+      LOG("System doesn't support verified boot; not creating BootManager\n");
+      fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
+      return;
+  }
+
+  zx::result partitioner =
+      DevicePartitionerFactory::Create(devices, svc_root, GetCurrentArch(), std::move(context));
+  if (partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
+    fidl_epitaph_write(server.channel().get(), partitioner.error_value());
     return;
   }
-  auto& abr_client = status.value();
+  zx::result abr = partitioner->CreateAbrClient();
+  if (abr.is_error()) {
+    ERROR("Failed to get ABR client: %s\n", abr.status_string());
+    fidl_epitaph_write(server.channel().get(), abr.error_value());
+    return;
+  }
 
-  auto boot_manager =
-      std::make_unique<BootManager>(std::move(abr_client), std::move(devices), std::move(svc_root));
+  auto boot_manager = std::make_unique<BootManager>(std::move(*partitioner), std::move(*abr));
   fidl::BindServer(dispatcher, std::move(server), std::move(boot_manager));
 }
 
 void BootManager::QueryCurrentConfiguration(QueryCurrentConfigurationCompleter::Sync& completer) {
-  zx::result<Configuration> status = abr::QueryBootConfig(devices_, svc_root_);
+  zx::result<Configuration> status =
+      abr::QueryBootConfig(partitioner_->Devices(), partitioner_->SvcRoot());
   if (status.is_error()) {
     completer.ReplyError(status.status_value());
     return;
@@ -763,7 +780,8 @@ bool BootManager::IsFinalBootAttempt(const AbrSlotInfo& slot_info, Configuration
   }
 
   // If the slot in question is our current boot slot, we're on our last attempt.
-  zx::result<Configuration> current_configuration = abr::QueryBootConfig(devices_, svc_root_);
+  zx::result<Configuration> current_configuration =
+      abr::QueryBootConfig(partitioner_->Devices(), partitioner_->SvcRoot());
   return current_configuration.is_ok() && *current_configuration == configuration;
 }
 

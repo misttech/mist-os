@@ -2371,13 +2371,6 @@ class PaverServiceLuisTest : public PaverServiceGptDeviceTest {
   }
 };
 
-TEST_F(PaverServiceLuisTest, CreateAbr) {
-  ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
-  std::shared_ptr<paver::Context> context;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-  EXPECT_OK(abr::ClientFactory::Create(paver_->devices(), svc_root, context));
-}
-
 TEST_F(PaverServiceLuisTest, SysconfigNotSupportedAndFailWithPeerClosed) {
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
   auto [local, remote] = fidl::Endpoints<fuchsia_paver::Sysconfig>::Create();

@@ -189,12 +189,17 @@ zx::result<Configuration> QueryBootConfig(const paver::BlockDevices& devices,
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-namespace {
-zx::result<> SupportsVerifiedBoot(const paver::BlockDevices& devices,
-                                  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
-  return zx::make_result(QueryBootConfig(devices, svc_root).status_value());
+zx::result<bool> SupportsVerifiedBoot(const paver::BlockDevices& devices,
+                                      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
+  if (zx::result result = QueryBootConfig(devices, svc_root); result.is_error()) {
+    if (result.error_value() == ZX_ERR_NOT_SUPPORTED) {
+      return zx::ok(false);
+    } else {
+      return result.take_error();
+    }
+  }
+  return zx::ok(true);
 }
-}  // namespace
 
 zx::result<std::unique_ptr<abr::Client>> AbrPartitionClient::Create(
     std::unique_ptr<paver::PartitionClient> partition) {
@@ -239,38 +244,6 @@ zx::result<> AbrPartitionClient::Write(const uint8_t* buffer, size_t size) {
     return status.take_error();
   }
   return zx::ok();
-}
-
-std::vector<std::unique_ptr<ClientFactory>>* ClientFactory::registered_factory_list() {
-  static std::vector<std::unique_ptr<ClientFactory>>* registered_factory_list = nullptr;
-  if (registered_factory_list == nullptr) {
-    registered_factory_list = new std::vector<std::unique_ptr<ClientFactory>>();
-  }
-  return registered_factory_list;
-}
-
-zx::result<std::unique_ptr<abr::Client>> ClientFactory::Create(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  if (auto status = SupportsVerifiedBoot(devices, svc_root); status.is_error()) {
-    ERROR("System doesn't support verified boot\n");
-    return status.take_error();
-  }
-
-  for (auto& factory : *registered_factory_list()) {
-    if (auto status = factory->New(devices, svc_root, std::move(context)); status.is_ok()) {
-      return status.take_value();
-    } else if (status.status_value() != ZX_ERR_NOT_SUPPORTED) {
-      ERROR("Failed to create client: %s\n", status.status_string());
-    }
-  }
-
-  ERROR("Unabled to initialize ABR Client\n");
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-void ClientFactory::Register(std::unique_ptr<ClientFactory> factory) {
-  registered_factory_list()->push_back(std::move(factory));
 }
 
 bool Client::ReadAbrMetaData(void* context, size_t size, uint8_t* buffer) {

@@ -42,6 +42,12 @@ zx::result<std::unique_ptr<DevicePartitioner>> LuisPartitioner::Initialize(
   return zx::ok(std::move(partitioner));
 }
 
+const paver::BlockDevices& LuisPartitioner::Devices() const { return gpt_->devices(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> LuisPartitioner::SvcRoot() const {
+  return gpt_->svc_root();
+}
+
 bool LuisPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   const PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA),
@@ -170,18 +176,10 @@ zx::result<std::unique_ptr<DevicePartitioner>> LuisPartitionerFactory::New(
   return LuisPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
-zx::result<std::unique_ptr<abr::Client>> LuisAbrClientFactory::New(
-    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-    std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = LuisPartitioner::Initialize(devices, svc_root, {});
-
-  if (partitioner.is_error()) {
-    return partitioner.take_error();
-  }
-
+zx::result<std::unique_ptr<abr::Client>> LuisPartitioner::CreateAbrClient() const {
   // ABR metadata has no need of a content type since it's always local rather
   // than provided in an update package, so just use the default content type.
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+  auto partition = FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
     return partition.take_error();
   }

@@ -23,6 +23,7 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/paver-context.h"
@@ -101,6 +102,16 @@ class DevicePartitioner {
  public:
   virtual ~DevicePartitioner() = default;
 
+  // Creates the ABR client for the partitioner.
+  // NOTE: The ABR client must not outlive the partitioner.
+  virtual zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const = 0;
+
+  // Returns an accessor for the block devices managed by the partitioner.
+  virtual const paver::BlockDevices& Devices() const = 0;
+
+  // Returns the service root for the partitioner.
+  virtual fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const = 0;
+
   // Whether or not the Fuchsia Volume Manager exists within an FTL.
   virtual bool IsFvmWithinFtl() const = 0;
 
@@ -178,7 +189,14 @@ class DevicePartitionerFactory {
 // ZIRCON-R).
 class FixedDevicePartitioner : public DevicePartitioner {
  public:
-  static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(const BlockDevices& devices);
+  static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
+      const BlockDevices& devices, fidl::ClientEnd<fuchsia_io::Directory> svc_root);
+
+  const BlockDevices& Devices() const override { return devices_; }
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> SvcRoot() const override {
+    return svc_root_.borrow();
+  }
 
   bool IsFvmWithinFtl() const override { return false; }
 
@@ -199,10 +217,17 @@ class FixedDevicePartitioner : public DevicePartitioner {
   zx::result<> Flush() const override { return zx::ok(); }
   zx::result<> OnStop() const override { return zx::ok(); }
 
+ protected:
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
  private:
-  explicit FixedDevicePartitioner(BlockDevices devices) : devices_(std::move(devices)) {}
+  FixedDevicePartitioner(BlockDevices devices, fidl::ClientEnd<fuchsia_io::Directory> svc_root)
+      : devices_(std::move(devices)), svc_root_(std::move(svc_root)) {}
 
   BlockDevices devices_;
+  fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
 };
 
 class DefaultPartitionerFactory : public DevicePartitionerFactory {
