@@ -17,7 +17,6 @@ group("tests") {
 }
 
 source_set("fake-lib") {
-  configs += [ "//build/config:all_source" ]
   sources = [
     "fake-display.cc",
     "fake-display.h",
@@ -51,8 +50,6 @@ source_set("fake-lib") {
 static_library("fake-display-stack") {
   testonly = true
 
-  configs += [ "//build/config:all_source" ]
-
   sources = [
     "fake-display-stack.cc",
     "fake-display-stack.h",
@@ -72,7 +69,6 @@ static_library("fake-display-stack") {
 
 test("fake-display-unittests-bin") {
   sources = [ "fake-display-test.cc" ]
-  configs += [ "//build/config:all_source" ]
 
   deps = [
     ":fake-display-stack",

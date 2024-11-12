@@ -5,10 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_FENCE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_FENCE_H_
 
-#ifndef _ALL_SOURCE
-#define _ALL_SOURCE  // To get MTX_INIT
-#endif
-
 #include <lib/async/cpp/wait.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>

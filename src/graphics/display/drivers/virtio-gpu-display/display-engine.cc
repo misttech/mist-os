@@ -565,7 +565,7 @@ zx_status_t DisplayEngine::Start() {
     static_cast<DisplayEngine*>(arg)->virtio_gpu_flusher();
     return 0;
   };
-  thrd_create_with_name(&flush_thread_, virtio_gpu_flusher_entry, this, "virtio-gpu-flusher");
+  thrd_create(&flush_thread_, virtio_gpu_flusher_entry, this);
   thrd_detach(flush_thread_);
 
   FDF_LOG(TRACE, "Start() completed");

@@ -20,10 +20,7 @@ driver_bind_rules("framebuffer-intel-display-bind") {
 
 fuchsia_cc_driver("driver") {
   output_name = "framebuffer-intel-display"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   sources = [ "framebuffer-intel-display.cc" ]
   deps = [

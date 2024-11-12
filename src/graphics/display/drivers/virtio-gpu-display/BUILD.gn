@@ -41,7 +41,6 @@ source_set("gpu_control_server") {
 }
 
 source_set("common_srcs") {
-  configs += [ "//build/config:all_source" ]
   sources = [
     "display-controller-banjo.cc",
     "display-controller-banjo.h",
@@ -101,10 +100,7 @@ test("virtio-gpu-display-test") {
 }
 
 fuchsia_cc_driver("driver") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   output_name = "virtio-gpu-display"
   sources = [
     "gpu-device-driver.cc",

@@ -11,8 +11,6 @@ executable("bin") {
   testonly = true
   output_name = "fake_display_coordinator_connector"
 
-  configs += [ "//build/config:all_source" ]
-
   sources = [ "main.cc" ]
 
   deps = [
@@ -25,8 +23,6 @@ executable("bin") {
 
 source_set("service") {
   testonly = true
-
-  configs += [ "//build/config:all_source" ]
 
   sources = [
     "service.cc",

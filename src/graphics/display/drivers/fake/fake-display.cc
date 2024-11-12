@@ -831,10 +831,9 @@ zx_status_t FakeDisplay::Initialize() {
   }
 
   if (!device_config_.manual_vsync_trigger) {
-    status = thrd_status_to_zx_status(thrd_create_with_name(
+    status = thrd_status_to_zx_status(thrd_create(
         &vsync_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,
-        "vsync_thread"));
+        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this));
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
       return status;
@@ -843,10 +842,9 @@ zx_status_t FakeDisplay::Initialize() {
   }
 
   if (IsCaptureSupported()) {
-    status = thrd_status_to_zx_status(thrd_create_with_name(
+    status = thrd_status_to_zx_status(thrd_create(
         &capture_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
-        "capture_thread"));
+        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this));
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
       return status;
