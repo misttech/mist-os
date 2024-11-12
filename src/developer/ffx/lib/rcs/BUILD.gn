@@ -35,6 +35,8 @@ rustc_library("lib") {
            "//src/connectivity/overnet/lib/core",
            "//src/lib/fuchsia-async",
            "//src/lib/network/fidl_fuchsia_net_ext",
+           "//src/sys/lib/component_debug",
+           "//src/sys/lib/moniker",
          ]
 
   sources = rcs_sources + [ "src/port_forward.rs" ]
