@@ -51,7 +51,7 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   // platform tables offered to us.
   std::optional<fdf::MmioBuffer> ecam;
   if (info.cam.vmo != ZX_HANDLE_INVALID) {
-    if (auto result = pci::Bus::MapEcam(zx::vmo(info.cam.vmo)); result.is_ok()) {
+    if (auto result = pci::Bus::MapConfigRegion(zx::vmo(info.cam.vmo)); result.is_ok()) {
       ecam = std::move(result.value());
     } else {
       return result.status_value();
@@ -65,7 +65,7 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if ((status = bus->Initialize()) != ZX_OK) {
+  if (zx_status_t status = bus->Initialize(); status != ZX_OK) {
     zxlogf(ERROR, "failed to initialize driver: %s", zx_status_get_string(status));
     if (bus->zxdev() != nullptr) {
       bus->DdkAsyncRemove();
@@ -124,7 +124,7 @@ zx_status_t Bus::Initialize() {
 
 // Maps a vmo as an mmio_buffer to be used as this Bus driver's ECAM region
 // for config space access.
-zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo cam_vmo) {
+zx::result<fdf::MmioBuffer> Bus::MapConfigRegion(zx::vmo cam_vmo) {
   size_t size;
   zx_status_t status = cam_vmo.get_size(&size);
   if (status != ZX_OK) {
@@ -143,20 +143,17 @@ zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo cam_vmo) {
   return zx::ok(std::move(*result));
 }
 
-zx_status_t Bus::MakeConfig(pci_bdf_t bdf, std::unique_ptr<Config>* out_config) {
-  zx_status_t status;
+zx::result<std::unique_ptr<Config>> Bus::MakeConfig(pci_bdf_t bdf) {
   if (ecam_) {
-    status = MmioConfig::Create(bdf, &(*ecam_), info_.start_bus_num, info_.end_bus_num, out_config);
-  } else {
-    status = ProxyConfig::Create(bdf, &pciroot_, out_config);
+    zx::result result = MmioConfig::Create(bdf, ecam_.value(), info_.start_bus_num,
+                                           info_.end_bus_num, info_.cam.is_extended);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok(std::move(result.value()));
   }
 
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to create config for %02x:%02x.%1x: %d!", bdf.bus_id, bdf.device_id,
-           bdf.function_id, status);
-  }
-
-  return status;
+  return ProxyConfig::Create(bdf, &pciroot_);
 }
 
 // Scan downstream starting at the bus id managed by the Bus's Root.
@@ -198,10 +195,9 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
   for (uint8_t dev_id = _dev_id; dev_id < PCI_MAX_DEVICES_PER_BUS; dev_id++) {
     uint8_t max_functions = 1;
     for (uint8_t func_id = _func_id; func_id < max_functions; func_id++) {
-      std::unique_ptr<Config> config;
       pci_bdf_t bdf = {static_cast<uint8_t>(bus_id), dev_id, func_id};
-      zx_status_t status = MakeConfig(bdf, &config);
-      if (status != ZX_OK) {
+      zx::result<std::unique_ptr<Config>> config = MakeConfig(bdf);
+      if (config.is_error()) {
         continue;
       }
 
@@ -229,8 +225,8 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       if (is_bridge) {
         fbl::RefPtr<Bridge> bridge;
         uint8_t mbus_id = config->Read(Config::kSecondaryBusId);
-        status = Bridge::Create(zxdev(), std::move(config), upstream, this, std::move(node),
-                                mbus_id, &bridge);
+        zx_status_t status = Bridge::Create(zxdev(), std::move(config.value()), upstream, this,
+                                            std::move(node), mbus_id, &bridge);
         if (status != ZX_OK) {
           zxlogf(ERROR, "failed to create Bridge at %s: %s", config->addr(),
                  zx_status_get_string(status));
@@ -263,8 +259,9 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       // We're at a leaf node in the topology so create a normal device.
       char addr[ZX_MAX_NAME_LEN];
       strncpy(addr, config->addr(), sizeof(addr));
-      status = pci::Device::Create(zxdev(), std::move(config), upstream, this, std::move(node),
-                                   /*has_acpi=*/DeviceHasAcpi(config->bdf()));
+      zx_status_t status =
+          pci::Device::Create(zxdev(), std::move(config.value()), upstream, this, std::move(node),
+                              /*has_acpi=*/DeviceHasAcpi(config->bdf()));
       if (status != ZX_OK) {
         zxlogf(ERROR, "failed to create device at %s: %s", addr, zx_status_get_string(status));
       }

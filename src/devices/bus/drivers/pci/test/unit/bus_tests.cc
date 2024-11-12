@@ -33,7 +33,7 @@ namespace pci {
 class PciBusTests : public ::testing::Test {
  public:
   // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
-  PciBusTests() : pciroot_(0, 1), parent_(MockDevice::FakeRootParent()) {
+  PciBusTests() : pciroot_(0, 2, /*is_extended=*/true), parent_(MockDevice::FakeRootParent()) {
     parent_->AddProtocol(ZX_PROTOCOL_PCIROOT, pciroot_.proto()->ops, pciroot_.proto()->ctx);
   }
 
@@ -43,11 +43,11 @@ class PciBusTests : public ::testing::Test {
   uint32_t SetupTopology() {
     uint8_t idx = 1;
     auto& ecam = pciroot_.ecam();
-    ecam.get({0, 0, 0}).device.set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
+    ecam.get_device({0, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
         PCI_HEADER_TYPE_MULTI_FN);
-    ecam.get({0, 0, 1}).device.set_vendor_id(0x8086).set_device_id(idx++);
-    ecam.get({0, 1, 0})
-        .bridge.set_vendor_id(0x8086)
+    ecam.get_device({0, 0, 1})->set_vendor_id(0x8086).set_device_id(idx++);
+    ecam.get_bridge({0, 1, 0})
+        ->set_vendor_id(0x8086)
         .set_device_id(idx++)
         .set_header_type(PCI_HEADER_TYPE_PCI_BRIDGE)
         .set_io_base(0x10)
@@ -55,9 +55,9 @@ class PciBusTests : public ::testing::Test {
         .set_memory_base(0x1000)
         .set_memory_limit(0xFFFFFFFF)
         .set_secondary_bus_number(1);
-    ecam.get({1, 0, 0}).device.set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
+    ecam.get_device({1, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
         PCI_HEADER_TYPE_MULTI_FN);
-    ecam.get({1, 0, 1}).device.set_vendor_id(0x8086).set_device_id(idx);
+    ecam.get_device({1, 0, 1})->set_vendor_id(0x8086).set_device_id(idx);
     return idx;
   }
 
@@ -137,9 +137,9 @@ TEST_F(PciBusTests, Lifecycle) {
 }
 
 TEST_F(PciBusTests, BdiGetBti) {
-  pciroot().ecam().get(pci_bdf_t{}).device.set_vendor_id(8086).set_device_id(8086);
+  pciroot().ecam().get_device(pci_bdf_t{})->set_vendor_id(8086).set_device_id(8086);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(bus->GetDeviceCount(), 1u);
@@ -160,7 +160,7 @@ TEST_F(PciBusTests, BdiGetBti) {
 
 TEST_F(PciBusTests, BdiAllocateMsi) {
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
 
@@ -175,9 +175,9 @@ TEST_F(PciBusTests, BdiAllocateMsi) {
 }
 
 TEST_F(PciBusTests, BdiLinkUnlinkDevice) {
-  pciroot().ecam().get(pci_bdf_t{}).device.set_vendor_id(8086).set_device_id(8086);
+  pciroot().ecam().get_device(pci_bdf_t{})->set_vendor_id(8086).set_device_id(8086);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(bus->GetDeviceCount(), 1u);
@@ -210,7 +210,7 @@ TEST_F(PciBusTests, IrqRoutingEntries) {
     // The bus will take ownership of this.
     (void)interrupt.release();
   }
-  pciroot().ecam().get(pci_bdf_t{}).device.set_vendor_id(1).set_device_id(2).set_interrupt_pin(1);
+  pciroot().ecam().get_device(pci_bdf_t{})->set_vendor_id(1).set_device_id(2).set_interrupt_pin(1);
 
   pciroot().routing_entries().push_back(
       pci_irq_routing_entry_t{.port_device_id = PCI_IRQ_ROUTING_NO_PARENT,
@@ -219,7 +219,7 @@ TEST_F(PciBusTests, IrqRoutingEntries) {
                               .pins = {1, 2, 3, 4}});
 
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(int_mod, bus->GetSharedIrqCount());
@@ -236,10 +236,10 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // SetupTopology for the device itself.
   SetupTopology();
   // These devices need interrupt pins mapped before Bus scans the topology.
-  pciroot().ecam().get({0, 0, 0}).device.set_interrupt_pin(0x1);
-  pciroot().ecam().get({0, 0, 1}).device.set_interrupt_pin(0x2);
+  pciroot().ecam().get_device({0, 0, 0})->set_interrupt_pin(0x1);
+  pciroot().ecam().get_device({0, 0, 1})->set_interrupt_pin(0x2);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(1u, bus->GetSharedIrqCount());
@@ -267,7 +267,7 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // Timestamps of the original vector must match.
   zx::time_boot receive_time;
   zx::time_boot trigger_time = zx::clock::get_boot();
-  pciroot().ecam().get({0, 0, 1}).device.set_status(PCI_STATUS_INTERRUPT);
+  pciroot().ecam().get_device({0, 0, 1})->set_status(PCI_STATUS_INTERRUPT);
   ASSERT_OK(interrupt.trigger(0, trigger_time));
 
   // Only the device at 00:00.1 should trigger because 00:00.0 does not have the interrupt status
@@ -286,8 +286,8 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   pci_bdf_t device = {0, 0, 0};
   pciroot()
       .ecam()
-      .get(device)
-      .device.set_vendor_id(0x8086)
+      .get_device(device)
+      ->set_vendor_id(0x8086)
       .set_device_id(0x8086)
       .set_interrupt_pin(0x1)
       .set_status(PCI_STATUS_INTERRUPT);
@@ -297,7 +297,7 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_OK(
@@ -336,11 +336,11 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
 TEST_F(PciBusTests, ObeysHeaderTypeMultiFn) {
   auto& ecam = pciroot().ecam();
 
-  ecam.get({0, 0, 0}).device.set_vendor_id(0x8086).set_device_id(1).set_header_type(
+  ecam.get_device({0, 0, 0})->set_vendor_id(0x8086).set_device_id(1).set_header_type(
       PCI_HEADER_TYPE_MULTI_FN);
-  ecam.get({0, 0, 1}).device.set_vendor_id(0x8086).set_device_id(2);
-  ecam.get({0, 1, 0}).device.set_vendor_id(0x8086).set_device_id(3).set_header_type(0);
-  ecam.get({0, 1, 1}).device.set_vendor_id(0x8086).set_device_id(4);
+  ecam.get_device({0, 0, 1})->set_vendor_id(0x8086).set_device_id(2);
+  ecam.get_device({0, 1, 0})->set_vendor_id(0x8086).set_device_id(3).set_header_type(0);
+  ecam.get_device({0, 1, 1})->set_vendor_id(0x8086).set_device_id(4);
 
   auto owned_bus =
       std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(), std::nullopt);
@@ -357,7 +357,7 @@ TEST_F(PciBusTests, Inspect) {
   AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().EcamView());
+                                             pciroot().ecam().mmio());
   ASSERT_OK(owned_bus->Initialize());
   ASSERT_NO_FATAL_FAILURE(owned_bus->ReadInspect(owned_bus->GetInspectVmo()));
 

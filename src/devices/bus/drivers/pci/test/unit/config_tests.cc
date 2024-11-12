@@ -6,6 +6,8 @@
 #include <lib/zx/result.h>
 #include <zircon/limits.h>
 
+#include <memory>
+
 #include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/config.h"
@@ -14,224 +16,262 @@
 
 namespace pci {
 
+static constexpr pci_bdf_t kDefaultBdf1 = {0, 1, 2};
+static constexpr pci_bdf_t kDefaultBdf2 = {1, 2, 3};
+
+template <bool IsExtended>
 class PciConfigTests : public ::testing::Test {
  public:
-  FakePciroot& pciroot_proto() { return *pciroot_; }
+  FakePciroot& pciroot() { return *pciroot_; }
   ddk::PcirootProtocolClient& pciroot_client() { return *client_; }
-
-  const pci_bdf_t default_bdf1() { return {0, 1, 2}; }
-  const pci_bdf_t default_bdf2() { return {1, 2, 3}; }
 
  protected:
   void SetUp() final {
-    pciroot_.reset(new FakePciroot(0, 1));
+    pciroot_ = std::make_unique<FakePciroot>(/*bus_start=*/0, /*bus_cnt=*/2, IsExtended);
     client_ = std::make_unique<ddk::PcirootProtocolClient>(pciroot_->proto());
   }
-  void TearDown() final { pciroot_->ecam().reset(); }
-  void ConfigReadWriteImpl(Config* cfg);
-  void IntegrationTestImpl(Config* cfg1, Config* cfg2);
+
+  void TearDown() final {
+    client_.reset();
+    pciroot_.reset();
+  }
 
  private:
   std::unique_ptr<FakePciroot> pciroot_;
   std::unique_ptr<ddk::PcirootProtocolClient> client_;
 };
 
-void PciConfigTests::IntegrationTestImpl(Config* cfg1, Config* cfg2) {
-  {
-    FakePciType0Config& dev = pciroot_proto().ecam().get(default_bdf1()).device;
-    dev.set_vendor_id(0x8086)
-        .set_device_id(0x1234)
-        .set_header_type(0x01)
-        .set_revision_id(12)
-        .set_expansion_rom_address(0xFF0000EE);
-    // Test 8, 16, and 32 bit reads.
-    EXPECT_EQ(cfg1->Read(Config::kRevisionId), dev.revision_id());
-    EXPECT_EQ(cfg1->Read(Config::kVendorId), dev.vendor_id());
-    EXPECT_EQ(cfg1->Read(Config::kDeviceId), dev.device_id());
-    EXPECT_EQ(cfg1->Read(Config::kHeaderType), dev.header_type());
-    EXPECT_EQ(cfg1->Read(Config::kExpansionRomAddress), dev.expansion_rom_address());
-  }
+using PciConfigBaseTests = PciConfigTests<false>;
+using PciConfigExtendedTests = PciConfigTests<true>;
+
+namespace {
+
+void DeviceConfigIntegrationImpl(FakeEcam& ecam) {
+  FakePciType0Config* dev1 = ecam.get_device(kDefaultBdf1);
+  dev1->set_vendor_id(0x8086)
+      .set_device_id(0x1234)
+      .set_header_type(0x01)
+      .set_revision_id(12)
+      .set_expansion_rom_address(0xFF0000EE);
+  // Test 8, 16, and 32 bit reads.
+  auto cfg1 = ecam.CreateMmioConfig(kDefaultBdf1);
+  EXPECT_EQ(dev1->revision_id(), cfg1->Read(Config::kRevisionId));
+  EXPECT_EQ(dev1->vendor_id(), cfg1->Read(Config::kVendorId));
+  EXPECT_EQ(dev1->device_id(), cfg1->Read(Config::kDeviceId));
+  EXPECT_EQ(dev1->header_type(), cfg1->Read(Config::kHeaderType));
+  EXPECT_EQ(dev1->expansion_rom_address(), cfg1->Read(Config::kExpansionRomAddress));
   // Now try the same thing for a different, unconfigured device and ensure they aren't
   // overlapping somehow.
-  {
-    FakePciType0Config& dev = pciroot_proto().ecam().get(default_bdf2()).device;
-    EXPECT_EQ(cfg2->Read(Config::kRevisionId), 0x0u);
-    EXPECT_EQ(cfg2->Read(Config::kVendorId), 0xFFFF);
-    EXPECT_EQ(cfg2->Read(Config::kDeviceId), 0xFFFF);
-    EXPECT_EQ(cfg2->Read(Config::kHeaderType), 0x0u);
-    EXPECT_EQ(cfg2->Read(Config::kExpansionRomAddress), 0x0u);
+  auto cfg2 = ecam.CreateMmioConfig(kDefaultBdf2);
+  EXPECT_EQ(0x0u, cfg2->Read(Config::kRevisionId));
+  EXPECT_EQ(0xFFFFu, cfg2->Read(Config::kVendorId));
+  EXPECT_EQ(0xFFFFu, cfg2->Read(Config::kDeviceId));
+  EXPECT_EQ(0x0u, cfg2->Read(Config::kHeaderType));
+  EXPECT_EQ(0x0u, cfg2->Read(Config::kExpansionRomAddress));
 
-    dev.set_vendor_id(0x8680)
-        .set_device_id(0x4321)
-        .set_header_type(0x02)
-        .set_revision_id(3)
-        .set_expansion_rom_address(0xFF0000EE);
+  FakePciType0Config* dev2 = ecam.get_device(kDefaultBdf2);
+  dev2->set_vendor_id(0x8680)
+      .set_device_id(0x4321)
+      .set_header_type(0x02)
+      .set_revision_id(3)
+      .set_expansion_rom_address(0xEE0000FF);
 
-    EXPECT_EQ(cfg2->Read(Config::kRevisionId), dev.revision_id());
-    EXPECT_EQ(cfg2->Read(Config::kVendorId), dev.vendor_id());
-    EXPECT_EQ(cfg2->Read(Config::kDeviceId), dev.device_id());
-    EXPECT_EQ(cfg2->Read(Config::kHeaderType), dev.header_type());
-    EXPECT_EQ(cfg2->Read(Config::kExpansionRomAddress), dev.expansion_rom_address());
-  }
+  EXPECT_EQ(dev2->revision_id(), cfg2->Read(Config::kRevisionId));
+  EXPECT_EQ(dev2->vendor_id(), cfg2->Read(Config::kVendorId));
+  EXPECT_EQ(dev2->device_id(), cfg2->Read(Config::kDeviceId));
+  EXPECT_EQ(dev2->header_type(), cfg2->Read(Config::kHeaderType));
+  EXPECT_EQ(dev2->expansion_rom_address(), cfg2->Read(Config::kExpansionRomAddress));
 }
 
-void PciConfigTests::ConfigReadWriteImpl(Config* cfg) {
-  FakePciType0Config& dev = pciroot_proto().ecam().get(default_bdf1()).device;
-  ASSERT_EQ(dev.vendor_id(), 0xFFFF);
-  ASSERT_EQ(dev.device_id(), 0xFFFF);
-  ASSERT_EQ(dev.command(), 0x0u);
-  ASSERT_EQ(dev.status(), 0x0u);
-  ASSERT_EQ(dev.revision_id(), 0x0u);
-  ASSERT_EQ(dev.program_interface(), 0x0u);
-  ASSERT_EQ(dev.sub_class(), 0x0u);
-  ASSERT_EQ(dev.base_class(), 0x0u);
-  ASSERT_EQ(dev.cache_line_size(), 0x0u);
-  ASSERT_EQ(dev.latency_timer(), 0x0u);
-  ASSERT_EQ(dev.header_type(), 0x0u);
-  ASSERT_EQ(dev.bist(), 0x0u);
-  ASSERT_EQ(dev.cardbus_cis_ptr(), 0x0u);
-  ASSERT_EQ(dev.subsystem_vendor_id(), 0x0u);
-  ASSERT_EQ(dev.subsystem_id(), 0x0u);
-  ASSERT_EQ(dev.expansion_rom_address(), 0x0u);
-  ASSERT_EQ(dev.capabilities_ptr(), 0x0u);
-  ASSERT_EQ(dev.interrupt_line(), 0x0u);
-  ASSERT_EQ(dev.interrupt_pin(), 0x0u);
-  ASSERT_EQ(dev.min_grant(), 0x0u);
-  ASSERT_EQ(dev.max_latency(), 0x0u);
+void ConfirmDevConfigReadResetImpl(pci::Config* cfg, FakePciType0Config* dev) {
+  ASSERT_EQ(0xFFFFu, dev->vendor_id());
+  ASSERT_EQ(0xFFFFu, dev->device_id());
+  ASSERT_EQ(0x0u, dev->command());
+  ASSERT_EQ(0x0u, dev->status());
+  ASSERT_EQ(0x0u, dev->revision_id());
+  ASSERT_EQ(0x0u, dev->program_interface());
+  ASSERT_EQ(0x0u, dev->sub_class());
+  ASSERT_EQ(0x0u, dev->base_class());
+  ASSERT_EQ(0x0u, dev->cache_line_size());
+  ASSERT_EQ(0x0u, dev->latency_timer());
+  ASSERT_EQ(0x0u, dev->header_type());
+  ASSERT_EQ(0x0u, dev->bist());
+  ASSERT_EQ(0x0u, dev->cardbus_cis_ptr());
+  ASSERT_EQ(0x0u, dev->subsystem_vendor_id());
+  ASSERT_EQ(0x0u, dev->subsystem_id());
+  ASSERT_EQ(0x0u, dev->expansion_rom_address());
+  ASSERT_EQ(0x0u, dev->capabilities_ptr());
+  ASSERT_EQ(0x0u, dev->interrupt_line());
+  ASSERT_EQ(0x0u, dev->interrupt_pin());
+  ASSERT_EQ(0x0u, dev->min_grant());
+  ASSERT_EQ(0x0u, dev->max_latency());
 
   // Ensure the config header reads match the reset values above, this time
   // through the config interface.
-  EXPECT_EQ(cfg->Read(Config::kVendorId), 0xFFFF);
-  EXPECT_EQ(cfg->Read(Config::kDeviceId), 0xFFFF);
-  EXPECT_EQ(cfg->Read(Config::kCommand), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kStatus), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kLatencyTimer), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kHeaderType), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kBist), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kCardbusCisPtr), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemVendorId), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemId), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x0u);
-  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x0u);
+  EXPECT_EQ(0xFFFFu, cfg->Read(Config::kVendorId));
+  EXPECT_EQ(0xFFFFu, cfg->Read(Config::kDeviceId));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kCommand));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kStatus));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kRevisionId));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kProgramInterface));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kSubClass));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kBaseClass));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kCacheLineSize));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kLatencyTimer));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kHeaderType));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kBist));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kCardbusCisPtr));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kSubsystemVendorId));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kSubsystemId));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kExpansionRomAddress));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kCapabilitiesPtr));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kInterruptLine));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kInterruptPin));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kMinGrant));
+  EXPECT_EQ(0x0u, cfg->Read(Config::kMaxLatency));
+}
 
+// This tests verifies the read/write interface for config works with both the actual config type,
+// and the test based PciType0Config type.
+void ConfigReadWriteIntegrationImpl(pci::Config* cfg, FakePciType0Config* dev) {
   // Write test data to the config header registers.
-  cfg->Write(Config::kVendorId, 0x1111);
-  cfg->Write(Config::kDeviceId, 0x2222);
-  cfg->Write(Config::kCommand, 0x3333);
-  cfg->Write(Config::kStatus, 0x4444);
-  cfg->Write(Config::kRevisionId, 0x55);
-  cfg->Write(Config::kProgramInterface, 0x66);
-  cfg->Write(Config::kSubClass, 0x77);
-  cfg->Write(Config::kBaseClass, 0x88);
-  cfg->Write(Config::kCacheLineSize, 0x99);
-  cfg->Write(Config::kLatencyTimer, 0xAA);
-  cfg->Write(Config::kHeaderType, 0xBB);
-  cfg->Write(Config::kBist, 0xCC);
-  cfg->Write(Config::kCardbusCisPtr, 0xDDDDDDDD);
-  cfg->Write(Config::kSubsystemVendorId, 0xEEEE);
-  cfg->Write(Config::kSubsystemId, 0xFFFF);
-  cfg->Write(Config::kExpansionRomAddress, 0x11111111);
-  cfg->Write(Config::kCapabilitiesPtr, 0x22);
-  cfg->Write(Config::kInterruptLine, 0x33);
-  cfg->Write(Config::kInterruptPin, 0x44);
-  cfg->Write(Config::kMinGrant, 0x55);
-  cfg->Write(Config::kMaxLatency, 0x66);
+  uint32_t value = 0x00;
+  cfg->Write(Config::kVendorId, ++value);
+  EXPECT_EQ(value, dev->vendor_id());
+  EXPECT_EQ(value, cfg->Read(Config::kVendorId));
 
-  // Verify the config header reads match through the fake ecam.
-  EXPECT_EQ(dev.vendor_id(), 0x1111u);
-  EXPECT_EQ(dev.device_id(), 0x2222u);
-  EXPECT_EQ(dev.command(), 0x3333u);
-  EXPECT_EQ(dev.status(), 0x4444u);
-  EXPECT_EQ(dev.revision_id(), 0x55u);
-  EXPECT_EQ(dev.program_interface(), 0x66u);
-  EXPECT_EQ(dev.sub_class(), 0x77u);
-  EXPECT_EQ(dev.base_class(), 0x88u);
-  EXPECT_EQ(dev.cache_line_size(), 0x99u);
-  EXPECT_EQ(dev.latency_timer(), 0xAA);
-  EXPECT_EQ(dev.header_type(), 0xBB);
-  EXPECT_EQ(dev.bist(), 0xCC);
-  EXPECT_EQ(dev.cardbus_cis_ptr(), 0xDDDDDDDD);
-  EXPECT_EQ(dev.subsystem_vendor_id(), 0xEEEE);
-  EXPECT_EQ(dev.subsystem_id(), 0xFFFF);
-  EXPECT_EQ(dev.expansion_rom_address(), 0x11111111u);
-  EXPECT_EQ(dev.capabilities_ptr(), 0x22u);
-  EXPECT_EQ(dev.interrupt_line(), 0x33u);
-  EXPECT_EQ(dev.interrupt_pin(), 0x44u);
-  EXPECT_EQ(dev.min_grant(), 0x55u);
-  EXPECT_EQ(dev.max_latency(), 0x66u);
+  cfg->Write(Config::kDeviceId, ++value);
+  EXPECT_EQ(value, dev->device_id());
+  EXPECT_EQ(value, cfg->Read(Config::kDeviceId));
 
-  // Verify the config header reads match through the config interface.
-  EXPECT_EQ(cfg->Read(Config::kVendorId), 0x1111u);
-  EXPECT_EQ(cfg->Read(Config::kDeviceId), 0x2222u);
-  EXPECT_EQ(cfg->Read(Config::kCommand), 0x3333u);
-  EXPECT_EQ(cfg->Read(Config::kStatus), 0x4444u);
-  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x55u);
-  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x66u);
-  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x77u);
-  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x88u);
-  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x99u);
-  EXPECT_EQ(cfg->Read(Config::kLatencyTimer), 0xAA);
-  EXPECT_EQ(cfg->Read(Config::kHeaderType), 0xBB);
-  EXPECT_EQ(cfg->Read(Config::kBist), 0xCC);
-  EXPECT_EQ(cfg->Read(Config::kCardbusCisPtr), 0xDDDDDDDD);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemVendorId), 0xEEEE);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemId), 0xFFFF);
-  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x11111111u);
-  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x22u);
-  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x33u);
-  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x44u);
-  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x55u);
-  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x66u);
+  cfg->Write(Config::kCommand, ++value);
+  EXPECT_EQ(value, dev->command());
+  EXPECT_EQ(value, cfg->Read(Config::kCommand));
+
+  cfg->Write(Config::kStatus, ++value);
+  EXPECT_EQ(value, dev->status());
+  EXPECT_EQ(value, cfg->Read(Config::kStatus));
+
+  cfg->Write(Config::kRevisionId, ++value);
+  EXPECT_EQ(value, dev->revision_id());
+  EXPECT_EQ(value, cfg->Read(Config::kRevisionId));
+
+  cfg->Write(Config::kProgramInterface, ++value);
+  EXPECT_EQ(value, dev->program_interface());
+  EXPECT_EQ(value, cfg->Read(Config::kProgramInterface));
+
+  cfg->Write(Config::kSubClass, ++value);
+  EXPECT_EQ(value, dev->sub_class());
+  EXPECT_EQ(value, cfg->Read(Config::kSubClass));
+
+  cfg->Write(Config::kBaseClass, ++value);
+  EXPECT_EQ(value, dev->base_class());
+  EXPECT_EQ(value, cfg->Read(Config::kBaseClass));
+
+  cfg->Write(Config::kCacheLineSize, ++value);
+  EXPECT_EQ(value, dev->cache_line_size());
+  EXPECT_EQ(value, cfg->Read(Config::kCacheLineSize));
+
+  cfg->Write(Config::kLatencyTimer, ++value);
+  EXPECT_EQ(value, dev->latency_timer());
+  EXPECT_EQ(value, cfg->Read(Config::kLatencyTimer));
+
+  cfg->Write(Config::kHeaderType, ++value);
+  EXPECT_EQ(value, dev->header_type());
+  EXPECT_EQ(value, cfg->Read(Config::kHeaderType));
+
+  cfg->Write(Config::kBist, ++value);
+  EXPECT_EQ(value, dev->bist());
+  EXPECT_EQ(value, cfg->Read(Config::kBist));
+
+  cfg->Write(Config::kCardbusCisPtr, ++value);
+  EXPECT_EQ(value, dev->cardbus_cis_ptr());
+  EXPECT_EQ(value, cfg->Read(Config::kCardbusCisPtr));
+
+  cfg->Write(Config::kSubsystemVendorId, ++value);
+  EXPECT_EQ(value, dev->subsystem_vendor_id());
+  EXPECT_EQ(value, cfg->Read(Config::kSubsystemVendorId));
+
+  cfg->Write(Config::kSubsystemId, ++value);
+  EXPECT_EQ(value, dev->subsystem_id());
+  EXPECT_EQ(value, cfg->Read(Config::kSubsystemId));
+
+  cfg->Write(Config::kExpansionRomAddress, ++value);
+  EXPECT_EQ(value, dev->expansion_rom_address());
+  EXPECT_EQ(value, cfg->Read(Config::kExpansionRomAddress));
+
+  cfg->Write(Config::kCapabilitiesPtr, ++value);
+  EXPECT_EQ(value, dev->capabilities_ptr());
+  EXPECT_EQ(value, cfg->Read(Config::kCapabilitiesPtr));
+
+  cfg->Write(Config::kInterruptLine, ++value);
+  EXPECT_EQ(value, dev->interrupt_line());
+  EXPECT_EQ(value, cfg->Read(Config::kInterruptLine));
+
+  cfg->Write(Config::kInterruptPin, ++value);
+  EXPECT_EQ(value, dev->interrupt_pin());
+  EXPECT_EQ(value, cfg->Read(Config::kInterruptPin));
+
+  cfg->Write(Config::kMinGrant, ++value);
+  EXPECT_EQ(value, dev->min_grant());
+  EXPECT_EQ(value, cfg->Read(Config::kMinGrant));
+
+  cfg->Write(Config::kMaxLatency, ++value);
+  EXPECT_EQ(value, dev->max_latency());
+  EXPECT_EQ(value, cfg->Read(Config::kMaxLatency));
 }
 
-TEST_F(PciConfigTests, MmioIntegration) {
-  std::unique_ptr<Config> cfg1, cfg2;
-  ASSERT_OK(MmioConfig::Create(default_bdf1(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg1));
-  ASSERT_OK(MmioConfig::Create(default_bdf2(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg2));
-  IntegrationTestImpl(cfg1.get(), cfg2.get());
+void MmioConfigGetViewImpl(FakePciroot& pciroot) {
+  auto& ecam = pciroot.ecam();
+  zx::result<fdf::MmioView> view = ecam.CreateMmioConfig(kDefaultBdf1)->get_view();
+  ASSERT_OK(view);
+  ASSERT_EQ(view->get_size(), pciroot.ecam().config_size());
+  ASSERT_EQ(view->get_offset(), ecam.GetConfigOffset(kDefaultBdf1));
+  ASSERT_EQ(view->get_vmo()->get(), pciroot.ecam().mmio().get_vmo()->get());
 }
 
-TEST_F(PciConfigTests, MmioConfigReadWrite) {
-  std::unique_ptr<Config> cfg;
-  ASSERT_OK(MmioConfig::Create(default_bdf1(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg));
-  ConfigReadWriteImpl(cfg.get());
+}  // namespace
+
+TEST_F(PciConfigBaseTests, DeviceConfigIntegration) {
+  DeviceConfigIntegrationImpl(pciroot().ecam());
 }
 
-TEST_F(PciConfigTests, ProxyIntegration) {
-  std::unique_ptr<Config> cfg1, cfg2;
-  ASSERT_OK(ProxyConfig::Create(default_bdf1(), &pciroot_client(), &cfg1));
-  ASSERT_OK(ProxyConfig::Create(default_bdf2(), &pciroot_client(), &cfg2));
-  IntegrationTestImpl(cfg1.get(), cfg2.get());
+TEST_F(PciConfigExtendedTests, DeviceConfigIntegration) {
+  DeviceConfigIntegrationImpl(pciroot().ecam());
 }
 
-TEST_F(PciConfigTests, ProxyConfigReadWrite) {
-  std::unique_ptr<Config> cfg;
-  ASSERT_OK(ProxyConfig::Create(default_bdf1(), &pciroot_client(), &cfg));
-  ConfigReadWriteImpl(cfg.get());
+TEST_F(PciConfigBaseTests, MmioConfigReadWrite) {
+  auto cfg = pciroot().ecam().CreateMmioConfig(kDefaultBdf1);
+  auto* dev = pciroot().ecam().get_device(kDefaultBdf1);
+  ConfirmDevConfigReadResetImpl(cfg.get(), dev);
+  ConfigReadWriteIntegrationImpl(cfg.get(), dev);
 }
 
-TEST_F(PciConfigTests, ConfigGetView) {
-  std::unique_ptr<Config> cfg;
-  ASSERT_OK(ProxyConfig::Create(default_bdf1(), &pciroot_client(), &cfg));
-  ASSERT_EQ(cfg->get_view().status_value(), ZX_ERR_NOT_SUPPORTED);
-  cfg.reset();
-  auto& ecam_mmio = pciroot_proto().ecam().mmio();
-  ASSERT_OK(MmioConfig::Create(default_bdf2(), &ecam_mmio, /*start_bus=*/1, /*end_bus=*/2, &cfg));
-  zx::result result = cfg->get_view();
-  ASSERT_TRUE(result.is_ok());
-  auto view = std::move(result.value());
-  ASSERT_EQ(view.get_size(), PCIE_EXTENDED_CONFIG_SIZE);
-  ASSERT_EQ(view.get_offset(), bdf_to_ecam_offset(default_bdf2(), /*start_bus=*/1));
-  ASSERT_EQ(view.get_vmo()->get(), ecam_mmio.get_vmo()->get());
+TEST_F(PciConfigExtendedTests, MmioConfigReadWrite) {
+  auto cfg = pciroot().ecam().CreateMmioConfig(kDefaultBdf1);
+  auto* dev = pciroot().ecam().get_device(kDefaultBdf1);
+  ConfirmDevConfigReadResetImpl(cfg.get(), dev);
+  ConfigReadWriteIntegrationImpl(cfg.get(), dev);
 }
+
+TEST_F(PciConfigBaseTests, ProxyConfigReadWrite) {
+  auto cfg = ProxyConfig::Create(kDefaultBdf1, &pciroot_client());
+  auto* dev = pciroot().ecam().get_device(kDefaultBdf1);
+  ConfigReadWriteIntegrationImpl(cfg.value().get(), dev);
+}
+
+TEST_F(PciConfigExtendedTests, ProxyConfigReadWrite) {
+  auto cfg = ProxyConfig::Create(kDefaultBdf1, &pciroot_client());
+  auto* dev = pciroot().ecam().get_device(kDefaultBdf1);
+  ConfigReadWriteIntegrationImpl(cfg.value().get(), dev);
+}
+
+TEST_F(PciConfigBaseTests, ProxyConfigGetView) {
+  auto proxy_cfg = ProxyConfig::Create(kDefaultBdf1, &pciroot_client());
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, proxy_cfg->get_view().status_value());
+}
+
+TEST_F(PciConfigBaseTests, MmioConfigGetView) { MmioConfigGetViewImpl(pciroot()); }
+TEST_F(PciConfigExtendedTests, MmioConfigGetView) { MmioConfigGetViewImpl(pciroot()); }
 
 }  // namespace pci

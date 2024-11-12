@@ -11,7 +11,6 @@
 
 #include <cstdint>
 
-#include "src/devices/bus/drivers/pci/common.h"
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/test/fakes/test_device.h"
 
@@ -26,7 +25,7 @@ namespace pci {
 
 class FakeMmioConfig final : public MmioConfig {
  public:
-  FakeMmioConfig(pci_bdf_t bdf, fdf::MmioView&& view) : MmioConfig(bdf, std::move(view)) {}
+  FakeMmioConfig(pci_bdf_t bdf, fdf::MmioView&& view) : MmioConfig(bdf, view) {}
   void MockBarProbeSideEffects(uint32_t bar_id) const {
     uint32_t bar_val = MmioConfig::Read(Config::kBar(bar_id));
     auto reg = config::BaseAddress::Get().FromValue(bar_val);

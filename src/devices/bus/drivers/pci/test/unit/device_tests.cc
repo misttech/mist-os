@@ -30,31 +30,46 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/testing/predicates/status.h"
 #include "test_helpers.h"
+
 namespace pci {
 
 // Creates a test device with a given device config using test defaults)
 
+template <bool IsExtended>
 class PciDeviceTests : protected ::pci_testing::InspectHelper, public ::testing::Test {
  public:
   static constexpr char kTestNodeName[] = "Test";
-  FakePciroot& pciroot_proto() { return pciroot_; }
-  ddk::PcirootProtocolClient& pciroot_client() { return client_; }
-  FakeBus& bus() { return bus_; }
-  FakeUpstreamNode& upstream() { return upstream_; }
-  pci_bdf_t default_bdf() { return default_bdf_; }
-  Device& CreateTestDevice(zx_device_t* parent, const uint8_t* cfg_buf, size_t cfg_size);
-  zx_device_t* parent() { return parent_.get(); }
-
-  zx::vmo& inspect_vmo() { return inspect_vmo_; }
-  inspect::Inspector& inspector() { return inspector_; }
-  void ConfigureDownstreamDevices() { return upstream_.ConfigureDownstreamDevices(); }
+  static const char* name() { return kTestNodeName; }
+  static pci_bdf_t bdf() { return {1, 2, 3}; }
 
  protected:
+  FakeBus& bus() { return bus_; }
+  FakeUpstreamNode& upstream() { return upstream_; }
+  zx::vmo& inspect_vmo() { return inspect_vmo_; }
+  inspect::Inspector& inspector() { return inspector_; }
+
+  inspect::Node GetInspectNode() { return inspector_.GetRoot().CreateChild(name()); }
+
+  Device& CreateTestDevice(zx_device_t* parent, const uint8_t* cfg_buf, size_t cfg_size) {
+    // Copy the config dump into a device entry in the ecam.
+    auto& ecam = bus_.pciroot().ecam();
+    ecam.get_config_view(bdf()).WriteBuffer(0, cfg_buf, cfg_size);
+    // Create the config object for the device.
+
+    auto mmio_cfg = ecam.CreateMmioConfig(bdf());
+    auto view = mmio_cfg->get_view();
+    EXPECT_TRUE(view.is_ok());
+    auto fake_cfg = std::make_unique<FakeMmioConfig>(bdf(), std::move(view.value()));
+    // Create and initialize the fake device.
+    EXPECT_OK(Device::Create(parent, std::move(fake_cfg), &upstream(), &bus(), GetInspectNode(),
+                             /*has_acpi=*/false));
+    return bus().get_device(bdf());
+  }
+  void ConfigureDownstreamDevices() { return upstream_.ConfigureDownstreamDevices(); }
+
   // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
   PciDeviceTests()
-      : pciroot_(0, 1),
-        client_(pciroot_.proto()),
-        parent_(MockDevice::FakeRootParent()),
+      : bus_(/*bus_start=*/0, /*bus_end=*/2, /*is_extended=*/IsExtended),
         upstream_(UpstreamNode::Type::ROOT, 0),
         inspect_vmo_(inspector_.DuplicateVmo()) {}
   ~PciDeviceTests() override {
@@ -62,36 +77,15 @@ class PciDeviceTests : protected ::pci_testing::InspectHelper, public ::testing:
     upstream_.UnplugDownstream();
   }
 
-  inspect::Node GetInspectNode() { return inspector_.GetRoot().CreateChild(kTestNodeName); }
-
  private:
-  // These are wiped out for each test
-  FakePciroot pciroot_;
-  ddk::PcirootProtocolClient client_;
-  std::shared_ptr<MockDevice> parent_;
-
   FakeBus bus_;
   FakeUpstreamNode upstream_;
-  const pci_bdf_t default_bdf_ = {1, 2, 3};
   inspect::Inspector inspector_;
   zx::vmo inspect_vmo_;
 };
 
-Device& PciDeviceTests::CreateTestDevice(zx_device_t* parent, const uint8_t* cfg_buf,
-                                         size_t cfg_size) {
-  // Copy the config dump into a device entry in the ecam.
-  memcpy(pciroot_proto().ecam().get(default_bdf()).config, cfg_buf, cfg_size);
-  // Create the config object for the device.
-  std::unique_ptr<Config> mmio_cfg;
-  EXPECT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &mmio_cfg));
-  auto view = mmio_cfg->get_view();
-  EXPECT_TRUE(view.is_ok());
-  auto fake_cfg = std::make_unique<FakeMmioConfig>(default_bdf(), std::move(view.value()));
-  // Create and initialize the fake device.
-  EXPECT_OK(Device::Create(parent, std::move(fake_cfg), &upstream(), &bus(), GetInspectNode(),
-                           /*has_acpi=*/false));
-  return bus().get_device(default_bdf());
-}
+using PciDeviceTestsCam = PciDeviceTests<false>;
+using PciDeviceTestsExtendedCam = PciDeviceTests<true>;
 
 extern "C" {
 // MockDevice does not cover adding composite devices within a driver, but
@@ -104,22 +98,25 @@ __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* nam
 
 // All tests below
 
-TEST_F(PciDeviceTests, CreationTest) {
+TEST_F(PciDeviceTestsExtendedCam, CreationTest) {
+  auto& ecam = bus().pciroot().ecam();
   // This test creates a device, goes through its init sequence, links it into
   // the toplogy, and then has it linger. It will be cleaned up by TearDown()
   // releasing all objects of upstream(). If creation succeeds here and no
   // asserts happen following the test it means the fakes are built properly
   // enough and the basic interface is fulfilled.
-  std::unique_ptr<Config> mmio_cfg;
-  memcpy(pciroot_proto().ecam().get(default_bdf()).config, kFakeQuadroDeviceConfig.data(),
-         kFakeQuadroDeviceConfig.max_size());
-  ASSERT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &mmio_cfg));
+  ecam.get_config_view(bdf()).WriteBuffer(0, kFakeQuadroDeviceConfig.data(),
+                                          kFakeQuadroDeviceConfig.max_size());
+  auto mmio_cfg = MmioConfig::Create(bdf(), ecam.mmio(), ecam.bus_start(),
+                                     ecam.bus_start() + ecam.bus_cnt(), ecam.is_extended());
+  ASSERT_OK(mmio_cfg.status_value());
   auto view = mmio_cfg->get_view();
   EXPECT_TRUE(view.is_ok());
   // We need a FakeConfig here because we need BAR probing to be handled properly for inspect to be
   // populated.
-  auto fake_cfg = std::make_unique<FakeMmioConfig>(default_bdf(), std::move(view.value()));
-  ASSERT_OK(Device::Create(parent(), std::move(fake_cfg), &upstream(), &bus(), GetInspectNode(),
+  auto fake_cfg = std::make_unique<FakeMmioConfig>(bdf(), std::move(view.value()));
+  ASSERT_OK(Device::Create(MockDevice::FakeRootParent().get(), std::move(fake_cfg), &upstream(),
+                           &bus(), GetInspectNode(),
                            /*has_acpi=*/false));
 
   reinterpret_cast<FakeAllocator*>(&upstream().mmio_regions())->FailNextAllocation(true);
@@ -127,56 +124,56 @@ TEST_F(PciDeviceTests, CreationTest) {
   ConfigureDownstreamDevices();
 
   // Verify the created device's BDF.
-  auto& dev = bus().get_device(default_bdf());
-  ASSERT_EQ(default_bdf().bus_id, dev.bus_id());
-  ASSERT_EQ(default_bdf().device_id, dev.dev_id());
-  ASSERT_EQ(default_bdf().function_id, dev.func_id());
+  auto& dev = bus().get_device(bdf());
+  ASSERT_EQ(bdf().bus_id, dev.bus_id());
+  ASSERT_EQ(bdf().device_id, dev.dev_id());
+  ASSERT_EQ(bdf().function_id, dev.func_id());
 
   // Did the device BARs get allocated (and re-allocated) as expected?
   ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
   // We primed the MMIO allocators to fail the first round for BAR 0 so it
   // should have a 5th inspect entry for the failed allocation.
   EXPECT_EQ(5u, hierarchy()
-                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "0"})
+                    .GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "0"})
                     ->node()
                     .properties()
                     .size());
   EXPECT_EQ(4u, hierarchy()
-                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "1"})
+                    .GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "1"})
                     ->node()
                     .properties()
                     .size());
   EXPECT_EQ(4u, hierarchy()
-                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "2"})
+                    .GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "2"})
                     ->node()
                     .properties()
                     .size());
   EXPECT_EQ(4u, hierarchy()
-                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "3"})
+                    .GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "3"})
                     ->node()
                     .properties()
                     .size());
   // There should be no BAR 4, so no node at this path.
   EXPECT_EQ(nullptr,
-            hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "4"}));
+            hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "4"}));
   EXPECT_EQ(4u, hierarchy()
-                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "5"})
+                    .GetByPath({name(), pci::Device::Inspect::kInspectHeaderBars, "5"})
                     ->node()
                     .properties()
                     .size());
 }
 
 // Test a normal capability chain
-TEST_F(PciDeviceTests, StdCapabilityTest) {
-  std::unique_ptr<Config> cfg;
-
+TEST_F(PciDeviceTestsCam, StdCapabilityTest) {
   // Copy the config dump into a device entry in the ecam.
-  memcpy(pciroot_proto().ecam().get(default_bdf()).config, kFakeVirtioInputDeviceConfig.data(),
-         kFakeVirtioInputDeviceConfig.max_size());
-  ASSERT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg));
-  ASSERT_OK(Device::Create(parent(), std::move(cfg), &upstream(), &bus(), GetInspectNode(),
+  auto& ecam = bus().pciroot().ecam();
+  ecam.get_config_view(bdf()).WriteBuffer(0, kFakeVirtioInputDeviceConfig.data(),
+                                          kFakeVirtioInputDeviceConfig.max_size());
+  auto cfg = ecam.CreateMmioConfig(bdf());
+  ASSERT_OK(Device::Create(MockDevice::FakeRootParent().get(), std::move(cfg), &upstream(), &bus(),
+                           GetInspectNode(),
                            /*has_acpi=*/false));
-  auto& dev = bus().get_device(default_bdf());
+  auto& dev = bus().get_device(bdf());
 
   // Ensure our faked Keyboard exists.
   ASSERT_EQ(0x1af4u, dev.vendor_id());
@@ -200,8 +197,8 @@ TEST_F(PciDeviceTests, StdCapabilityTest) {
 }
 
 // Test an extended capability chain
-TEST_F(PciDeviceTests, ExtendedCapabilityTest) {
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+TEST_F(PciDeviceTestsExtendedCam, ExtendedCapabilityTest) {
+  auto& dev = CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
                                kFakeQuadroDeviceConfig.max_size());
   ASSERT_EQ(false, HasNonfatalFailure());
 
@@ -230,9 +227,11 @@ TEST_F(PciDeviceTests, ExtendedCapabilityTest) {
 
 // This test checks for proper handling of capability pointers that are
 // invalid by pointing to inside the config header.
-TEST_F(PciDeviceTests, InvalidPtrCapabilityTest) {
-  auto& raw_cfg = pciroot_proto().ecam().get(default_bdf()).config;
-  auto& fake_dev = pciroot_proto().ecam().get(default_bdf()).device;
+TEST_F(PciDeviceTestsCam, InvalidPtrCapabilityTest) {
+  FakeBus bus(0, 2, true);
+  FakeEcam& ecam = bus.pciroot().ecam();
+  auto raw_cfg = bus.pciroot().ecam().get_config_view(bdf());
+  auto* fake_dev = bus.pciroot().ecam().get_device(bdf());
 
   // Two valid locations, followed by a third capability pointing at BAR 1.
   const uint8_t kCap1 = 0x80;
@@ -240,31 +239,31 @@ TEST_F(PciDeviceTests, InvalidPtrCapabilityTest) {
   const uint8_t kInvalidCap = 0x10;
 
   // Point to 0x80 as the first capability.
-  fake_dev.set_vendor_id(0x8086)
+  fake_dev->set_vendor_id(0x8086)
       .set_device_id(0x1234)
       .set_capabilities_list(1)
       .set_capabilities_ptr(kCap1);
-  raw_cfg[kCap1] = static_cast<uint8_t>(Capability::Id::kPciPowerManagement);
-  raw_cfg[kCap1 + 1] = kCap2;
-  raw_cfg[kCap2] = static_cast<uint8_t>(Capability::Id::kMsiX);
-  raw_cfg[kCap2 + 1] = kInvalidCap;
+  raw_cfg.Write(static_cast<uint8_t>(Capability::Id::kPciPowerManagement), kCap1);
+  raw_cfg.Write(kCap2, kCap1 + 1);
+  raw_cfg.Write(static_cast<uint8_t>(Capability::Id::kMsiX), kCap2);
+  raw_cfg.Write(kInvalidCap, kCap2 + 1);
 
-  std::unique_ptr<Config> cfg;
-  ASSERT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg));
-  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, Device::Create(parent(), std::move(cfg), &upstream(), &bus(),
-                                                GetInspectNode(), /*has_acpi=*/false));
+  auto cfg = MmioConfig::Create(bdf(), ecam.mmio(), ecam.bus_start(), 2, ecam.is_extended());
+  ASSERT_OK(cfg.status_value());
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            Device::Create(MockDevice::FakeRootParent().get(), std::move(cfg.value()), &upstream(),
+                           &bus, GetInspectNode(), /*has_acpi=*/false));
 
   // Ensure no device was added.
-  EXPECT_TRUE(bus().devices().is_empty());
+  EXPECT_TRUE(bus.devices().is_empty());
 }
 
 // This test checks for proper handling (ZX_ERR_BAD_STATE) upon
 // funding a pointer cycle while parsing capabilities.
-TEST_F(PciDeviceTests, PtrCycleCapabilityTest) {
-  // Boilerplate to get a device corresponding to the default_bdf().
-  std::unique_ptr<Config> cfg;
-  auto& raw_cfg = pciroot_proto().ecam().get(default_bdf()).config;
-  auto& fake_dev = pciroot_proto().ecam().get(default_bdf()).device;
+TEST_F(PciDeviceTestsCam, PtrCycleCapabilityTest) {
+  // Boilerplate to.get_device a corresponding to the bdf().
+  auto raw_cfg = bus().pciroot().ecam().get_config_view(bdf());
+  auto* fake_dev = bus().pciroot().ecam().get_device(bdf());
 
   // Two valid locations, followed by a third capability pointing at BAR 1.
   const uint8_t kCap1 = 0x80;
@@ -272,21 +271,22 @@ TEST_F(PciDeviceTests, PtrCycleCapabilityTest) {
   const uint8_t kCap3 = 0xA0;
 
   // Create a Cycle of Cap1 -> Cap2 -> Cap3 -> Cap1
-  fake_dev.set_vendor_id(0x8086)
+  fake_dev->set_vendor_id(0x8086)
       .set_device_id(0x1234)
       .set_capabilities_list(1)
       .set_capabilities_ptr(kCap1);
   auto cap_id = static_cast<uint8_t>(Capability::Id::kVendor);
-  raw_cfg[kCap1] = cap_id;
-  raw_cfg[kCap1 + 1] = kCap2;
-  raw_cfg[kCap2] = cap_id;
-  raw_cfg[kCap2 + 1] = kCap3;
-  raw_cfg[kCap3] = cap_id;
-  raw_cfg[kCap3 + 1] = kCap1;
+  raw_cfg.Write(cap_id, kCap1);
+  raw_cfg.Write(kCap2, kCap1 + 1);
+  raw_cfg.Write(cap_id, kCap2);
+  raw_cfg.Write(kCap3, kCap2 + 1);
+  raw_cfg.Write(cap_id, kCap3);
+  raw_cfg.Write(kCap1, kCap3 + 1);
 
-  ASSERT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg));
-  EXPECT_EQ(ZX_ERR_BAD_STATE, Device::Create(parent(), std::move(cfg), &upstream(), &bus(),
-                                             GetInspectNode(), /*has_acpi=*/false));
+  auto cfg = bus().pciroot().ecam().CreateMmioConfig(bdf());
+  EXPECT_EQ(ZX_ERR_BAD_STATE,
+            Device::Create(MockDevice::FakeRootParent().get(), std::move(cfg), &upstream(), &bus(),
+                           GetInspectNode(), /*has_acpi=*/false));
 
   // Ensure no device was added.
   EXPECT_TRUE(bus().devices().is_empty());
@@ -294,11 +294,10 @@ TEST_F(PciDeviceTests, PtrCycleCapabilityTest) {
 
 // Test that we properly bail out if we see multiple of a capability
 // type that only one should exist of in a system.
-TEST_F(PciDeviceTests, DuplicateFixedCapabilityTest) {
-  // Boilerplate to get a device corresponding to the default_bdf().
-  std::unique_ptr<Config> cfg;
-  auto& raw_cfg = pciroot_proto().ecam().get(default_bdf()).config;
-  auto& fake_dev = pciroot_proto().ecam().get(default_bdf()).device;
+TEST_F(PciDeviceTestsCam, DuplicateFixedCapabilityTest) {
+  // Boilerplate to.get_device a corresponding to the bdf().
+  auto raw_cfg = bus().pciroot().ecam().get_config_view(bdf());
+  auto* fake_dev = bus().pciroot().ecam().get_device(bdf());
 
   // Two valid locations, followed by a third capability pointing at BAR 1.
   const uint8_t kCap1 = 0x80;
@@ -306,22 +305,23 @@ TEST_F(PciDeviceTests, DuplicateFixedCapabilityTest) {
   const uint8_t kCap3 = 0xA0;
 
   // Create a device with three capabilities, two of which are kPciExpress
-  fake_dev.set_vendor_id(0x8086)
+  fake_dev->set_vendor_id(0x8086)
       .set_device_id(0x1234)
       .set_capabilities_list(1)
       .set_capabilities_ptr(kCap1);
   auto pcie_id = static_cast<uint8_t>(Capability::Id::kPciExpress);
   auto null_id = static_cast<uint8_t>(Capability::Id::kNull);
-  raw_cfg[kCap1] = pcie_id;
-  raw_cfg[kCap1 + 1] = kCap2;
-  raw_cfg[kCap2] = null_id;
-  raw_cfg[kCap2 + 1] = kCap3;
-  raw_cfg[kCap3] = pcie_id;
-  raw_cfg[kCap3 + 1] = 0;
+  raw_cfg.Write8(pcie_id, kCap1);
+  raw_cfg.Write8(kCap2, kCap1 + 1);
+  raw_cfg.Write8(null_id, kCap2);
+  raw_cfg.Write8(kCap3, kCap2 + 1);
+  raw_cfg.Write8(pcie_id, kCap3);
+  raw_cfg.Write8(0, kCap3 + 1);
 
-  ASSERT_OK(MmioConfig::Create(default_bdf(), &pciroot_proto().ecam().mmio(), 0, 1, &cfg));
-  EXPECT_EQ(ZX_ERR_BAD_STATE, Device::Create(parent(), std::move(cfg), &upstream(), &bus(),
-                                             GetInspectNode(), /*has_acpi=*/false));
+  auto cfg = bus().pciroot().ecam().CreateMmioConfig(bdf());
+  EXPECT_EQ(ZX_ERR_BAD_STATE,
+            Device::Create(MockDevice::FakeRootParent().get(), std::move(cfg), &upstream(), &bus(),
+                           GetInspectNode(), /*has_acpi=*/false));
 
   // Ensure no device was added.
   EXPECT_TRUE(bus().devices().is_empty());
@@ -329,8 +329,8 @@ TEST_F(PciDeviceTests, DuplicateFixedCapabilityTest) {
 
 // Ensure we parse MSI capabilities properly in the Quadro device.
 // lspci output: Capabilities: [68] MSI: Enable+ Count=1/4 Maskable- 64bit+
-TEST_F(PciDeviceTests, MsiCapabilityTest) {
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+TEST_F(PciDeviceTestsExtendedCam, MsiCapabilityTest) {
+  auto& dev = CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
                                kFakeQuadroDeviceConfig.max_size());
   ASSERT_EQ(false, HasNonfatalFailure());
   ASSERT_NE(nullptr, dev.capabilities().msi);
@@ -348,9 +348,10 @@ TEST_F(PciDeviceTests, MsiCapabilityTest) {
 }
 
 // Ensure we parse MSIX capabilities properly in the Virtio-input device.
-TEST_F(PciDeviceTests, MsixCapabilityTest) {
-  auto& dev = CreateTestDevice(parent(), kFakeVirtioInputDeviceConfig.data(),
-                               kFakeVirtioInputDeviceConfig.max_size());
+TEST_F(PciDeviceTestsExtendedCam, MsixCapabilityTest) {
+  auto& dev =
+      CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeVirtioInputDeviceConfig.data(),
+                       kFakeVirtioInputDeviceConfig.max_size());
   ASSERT_EQ(false, HasNonfatalFailure());
   ASSERT_NE(nullptr, dev.capabilities().msix);
 
@@ -368,15 +369,14 @@ TEST_F(PciDeviceTests, MsixCapabilityTest) {
   EXPECT_EQ(0u, ctrl.enable());
 }
 
-TEST_F(PciDeviceTests, InspectIrqMode) {
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+TEST_F(PciDeviceTestsExtendedCam, InspectIrqMode) {
+  auto& dev = CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
                                kFakeQuadroDeviceConfig.max_size());
   {
     const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacy;
     ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto* node =
-        hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
+    auto* node = hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts});
     ASSERT_NO_FATAL_FAILURE(CheckProperty(
         node->node(), Device::Inspect::kInspectIrqMode,
         inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
@@ -390,8 +390,7 @@ TEST_F(PciDeviceTests, InspectIrqMode) {
     const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacyNoack;
     ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto* node =
-        hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
+    auto* node = hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts});
     ASSERT_NO_FATAL_FAILURE(CheckProperty(
         node->node(), Device::Inspect::kInspectIrqMode,
         inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
@@ -400,8 +399,7 @@ TEST_F(PciDeviceTests, InspectIrqMode) {
     const auto mode = fuchsia_hardware_pci::InterruptMode::kMsi;
     ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto* node =
-        hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
+    auto* node = hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts});
     ASSERT_NO_FATAL_FAILURE(CheckProperty(
         node->node(), Device::Inspect::kInspectIrqMode,
         inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
@@ -411,18 +409,18 @@ TEST_F(PciDeviceTests, InspectIrqMode) {
     const auto mode = fuchsia_hardware_pci::InterruptMode::kMsiX;
     ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto* node =
-        hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
+    auto* node = hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts});
     ASSERT_NO_FATAL_FAILURE(CheckProperty(
         node->node(), Device::Inspect::kInspectIrqMode,
         inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
 }
 
-TEST_F(PciDeviceTests, InspectLegacy) {
+TEST_F(PciDeviceTestsExtendedCam, InspectLegacy) {
   // Signal and Ack the legacy IRQ once each to ensure add is happening.
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                               kFakeQuadroDeviceConfig.max_size());
+  pci::Device& dev =
+      CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
+                       kFakeQuadroDeviceConfig.max_size());
   const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacy;
   ASSERT_OK(dev.SetIrqMode(mode, 1));
   {
@@ -434,8 +432,7 @@ TEST_F(PciDeviceTests, InspectLegacy) {
   // Verify properties in the general case.
   {
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto& node =
-        hierarchy().GetByPath({kTestNodeName, Device::Inspect::kInspectHeaderInterrupts})->node();
+    auto& node = hierarchy().GetByPath({name(), Device::Inspect::kInspectHeaderInterrupts})->node();
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacyInterruptPin,
                                           inspect::StringPropertyValue("A")));
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacyInterruptLine,
@@ -450,18 +447,18 @@ TEST_F(PciDeviceTests, InspectLegacy) {
     const auto mode = fuchsia_hardware_pci::InterruptMode::kDisabled;
     ASSERT_OK(dev.SetIrqMode(mode, 0));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-    auto* node =
-        hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
+    auto* node = hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts});
     ASSERT_NO_FATAL_FAILURE(CheckProperty(
         node->node(), Device::Inspect::kInspectIrqMode,
         inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
 }
 
-TEST_F(PciDeviceTests, InspectMsi) {
+TEST_F(PciDeviceTestsExtendedCam, InspectMsi) {
   const uint32_t irq_cnt = 4;
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                               kFakeQuadroDeviceConfig.max_size());
+  pci::Device& dev =
+      CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
+                       kFakeQuadroDeviceConfig.max_size());
   const auto mode = fuchsia_hardware_pci::InterruptMode::kMsiX;
   ASSERT_OK(dev.SetIrqMode(mode, irq_cnt));
 
@@ -472,9 +469,8 @@ TEST_F(PciDeviceTests, InspectMsi) {
   }
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
-  auto& node = hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts})
-                   ->node();
+  auto& node =
+      hierarchy().GetByPath({name(), pci::Device::Inspect::kInspectHeaderInterrupts})->node();
   ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectMsiBaseVector,
                                         inspect::UintPropertyValue(info.base_irq_id)));
   ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectMsiAllocated,
@@ -483,10 +479,11 @@ TEST_F(PciDeviceTests, InspectMsi) {
 
 // Verify that power state transitions wait the necessary amount of time, and that they end up in
 // the correct state.
-TEST_F(PciDeviceTests, PowerStateTransitions) {
-  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                               kFakeQuadroDeviceConfig.max_size());
-  auto& cfg = *dev.config();
+TEST_F(PciDeviceTestsExtendedCam, PowerStateTransitions) {
+  pci::Device& dev =
+      CreateTestDevice(MockDevice::FakeRootParent().get(), kFakeQuadroDeviceConfig.data(),
+                       kFakeQuadroDeviceConfig.max_size());
+  pci::Config& cfg = *dev.config();
 
   auto power = PowerManagementCapability(*dev.config(), kFakeQuadroPowerManagementCapabilityOffset);
   auto test_recovery_delay = [&cfg, &power](

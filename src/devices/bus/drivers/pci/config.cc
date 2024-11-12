@@ -9,6 +9,8 @@
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 
+#include <optional>
+
 #include <pretty/hexdump.h>
 
 #include "src/devices/bus/drivers/pci/common.h"
@@ -16,16 +18,19 @@
 namespace pci {
 
 // MMIO Config Implementation
-zx_status_t MmioConfig::Create(pci_bdf_t bdf, fdf::MmioBuffer* ecam, uint8_t start_bus,
-                               uint8_t end_bus, std::unique_ptr<Config>* config) {
+zx::result<std::unique_ptr<Config>> MmioConfig::Create(pci_bdf_t bdf, const fdf::MmioBuffer& ecam,
+                                                       uint8_t start_bus, uint8_t end_bus,
+                                                       bool is_extended) {
   if (bdf.bus_id < start_bus || bdf.bus_id > end_bus || bdf.device_id >= PCI_MAX_DEVICES_PER_BUS ||
       bdf.function_id >= PCI_MAX_FUNCTIONS_PER_DEVICE) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  fdf::MmioView view = ecam->View(bdf_to_ecam_offset(bdf, start_bus), PCIE_EXTENDED_CONFIG_SIZE);
-  *config = std::unique_ptr<MmioConfig>(new MmioConfig(bdf, std::move(view)));
-  return ZX_OK;
+  zx_vaddr_t config_offset = GetConfigOffsetInCam(bdf, start_bus, /*is_extended=*/is_extended);
+  zx_vaddr_t config_size = (is_extended) ? PCIE_EXTENDED_CONFIG_SIZE : PCI_BASE_CONFIG_SIZE;
+
+  return zx::ok(
+      std::unique_ptr<MmioConfig>(new MmioConfig(bdf, ecam.View(config_offset, config_size))));
 }
 
 uint8_t MmioConfig::Read(const PciReg8 addr) const { return view_.Read<uint8_t>(addr.offset()); }
@@ -43,11 +48,10 @@ void MmioConfig::Write(PciReg32 addr, uint32_t val) const { view_.Write(val, add
 const char* MmioConfig::type() const { return "mmio"; }
 
 // Proxy Config Implementation
-zx_status_t ProxyConfig::Create(pci_bdf_t bdf, ddk::PcirootProtocolClient* proto,
-                                std::unique_ptr<Config>* config) {
+zx::result<std::unique_ptr<Config>> ProxyConfig::Create(pci_bdf_t bdf,
+                                                        ddk::PcirootProtocolClient* proto) {
   // Can't use std::make_unique because the constructor is private.
-  *config = std::unique_ptr<ProxyConfig>(new ProxyConfig(bdf, proto));
-  return ZX_OK;
+  return zx::ok(std::unique_ptr<ProxyConfig>(new ProxyConfig(bdf, proto)));
 }
 
 uint8_t ProxyConfig::Read(const PciReg8 addr) const {

@@ -10,7 +10,10 @@
 
 #include <hwreg/bitfields.h>
 
+#include "lib/mmio/mmio-buffer.h"
+#include "lib/mmio/mmio-view.h"
 #include "src/devices/bus/drivers/pci/common.h"
+#include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/lib/mmio/test-helper.h"
 
 struct IoBaseAddress {
@@ -105,8 +108,12 @@ struct FakePciType0Config {
   DEF_WRAPPED_FIELD(uint16_t, subsystem_id);
   DEF_WRAPPED_FIELD(uint32_t, expansion_rom_address);
   DEF_WRAPPED_FIELD(uint8_t, capabilities_ptr);
-  uint8_t reserved_0[3];
-  uint32_t reserved_1;
+
+ private:
+  [[maybe_unused]] uint8_t reserved_0[3];
+  [[maybe_unused]] uint32_t reserved_1;
+
+ public:
   DEF_WRAPPED_FIELD(uint8_t, interrupt_line);
   DEF_WRAPPED_FIELD(uint8_t, interrupt_pin);
   DEF_WRAPPED_FIELD(uint8_t, min_grant);
@@ -184,7 +191,11 @@ struct FakePciType1Config {
   DEF_WRAPPED_FIELD(uint16_t, io_base_upper);
   DEF_WRAPPED_FIELD(uint16_t, io_limit_upper);
   DEF_WRAPPED_FIELD(uint8_t, capabilities_ptr);
-  uint8_t reserved_0[3];
+
+ private:
+  [[maybe_unused]] uint8_t reserved_0[3];
+
+ public:
   DEF_WRAPPED_FIELD(uint32_t, expansion_rom_address);
   DEF_WRAPPED_FIELD(uint8_t, interrupt_line);
   DEF_WRAPPED_FIELD(uint8_t, interrupt_pin);
@@ -206,83 +217,68 @@ struct FakePciType1Config {
 static_assert(sizeof(FakePciType1Config) == 64, "Bad size for PciType1Config");
 #undef DEF_WRAPPED_FIELD
 
-union FakeDeviceConfig {
-  FakePciType0Config device;
-  FakePciType1Config bridge;
-  uint8_t config[PCI_BASE_CONFIG_SIZE];
-  uint8_t ext_config[PCI_EXT_CONFIG_SIZE];
-};
-static_assert(sizeof(FakeDeviceConfig) == 4096, "Bad size for FakeDeviceConfig");
-
 // FakeEcam represents a contiguous block of PCI devices covering the bus range
 // from |bus_start|:|bus_end|. This allows tests to create a virtual collection
 // of buses that look like a real contiguous ecam with valid devices to scan
 // and poke at by the PCI bus driver.
 class FakeEcam {
  public:
-  // Allow assign / move.
-  FakeEcam(FakeEcam&&) = default;
-  FakeEcam& operator=(FakeEcam&&) = default;
-  // Disallow copy.
-  FakeEcam(const FakeEcam&) = delete;
-  FakeEcam& operator=(const FakeEcam&) = delete;
-
-  FakeEcam(uint8_t bus_start = 0, uint8_t bus_end = 0)
+  FakeEcam(uint8_t bus_start, uint8_t bus_cnt, bool is_extended)
       : bus_start_(bus_start),
-        bus_end_(bus_end),
-        config_cnt_((bus_end - bus_start + 1) * PCI_MAX_FUNCTIONS_PER_BUS) {
-    const size_t bytes = sizeof(FakeDeviceConfig) * config_cnt_;
-    mmio_ = fdf_testing::CreateMmioBuffer(bytes, ZX_CACHE_POLICY_UNCACHED_DEVICE);
-    // Most access will be done via config objects using MmioViews, but the pointer is cast here
-    // so that we can reach in and fiddle with the raw config as necessary to modify and verify
-    // state in tests.
-    configs_ = static_cast<FakeDeviceConfig*>((void*)mmio_->get());
+        bus_cnt_(bus_cnt),
+        is_extended_(is_extended),
+        config_size_((is_extended) ? PCI_EXT_CONFIG_SIZE : PCI_BASE_CONFIG_SIZE),
+        mmio_(fdf_testing::CreateMmioBuffer(static_cast<size_t>(bus_cnt) *
+                                            PCI_MAX_FUNCTIONS_PER_BUS * config_size_)) {
     reset();
   }
 
-  fdf::MmioView EcamView() { return mmio_->View(0); }
-
-  // Provide ways to access individual devices in the ecam by BDF address.
-  FakeDeviceConfig& get(uint8_t bus_id, uint8_t dev_id, uint8_t func_id) {
-    ZX_ASSERT(bus_id >= bus_start_);
-    ZX_ASSERT(bus_id <= bus_end_);
-
-    size_t offset = bus_id * PCI_MAX_FUNCTIONS_PER_BUS;
-    offset += dev_id * PCI_MAX_FUNCTIONS_PER_DEVICE;
-    offset += func_id;
-    ZX_ASSERT(offset < config_cnt_);
-    return configs_[offset];
+  fdf::MmioView get_config_view(pci_bdf_t address) {
+    return mmio_.View(pci::GetConfigOffsetInCam(address, bus_start_, is_extended_), config_size_);
   }
 
-  FakeDeviceConfig& get(pci_bdf_t bdf) { return get(bdf.bus_id, bdf.device_id, bdf.function_id); }
-  zx::unowned_vmo vmo() { return mmio_->get_vmo(); }
+  FakePciType0Config* get_device(pci_bdf_t address) {
+    zx_vaddr_t offset = pci::GetConfigOffsetInCam(address, bus_start_, is_extended_);
+    return reinterpret_cast<FakePciType0Config*>(reinterpret_cast<uintptr_t>(mmio_.get()) + offset);
+  }
+
+  FakePciType1Config* get_bridge(pci_bdf_t address) {
+    zx_vaddr_t offset = pci::GetConfigOffsetInCam(address, bus_start_, is_extended_);
+    return reinterpret_cast<FakePciType1Config*>(reinterpret_cast<uintptr_t>(mmio_.get()) + offset);
+  }
+
+  fdf::MmioView mmio() { return mmio_.View(0); }
+  void reset() {
+    for (zx_off_t offset = 0; offset < mmio_.get_size(); offset += sizeof(uint64_t)) {
+      mmio_.Write64(0, offset);
+      // If we're aligned to the start of a new device then set the two u16 registers for vendor and
+      // device id to 0xFF since that tells PCI nothing is there.
+      if (offset % config_size_ == 0) {
+        mmio_.Write32(0xFFFFFFFF, offset);
+      }
+    }
+  }
 
   uint8_t bus_start() const { return bus_start_; }
-  uint8_t bus_end() const { return bus_end_; }
-  fdf::MmioBuffer& mmio() { return *mmio_; }
-  void reset() {
-    // Memset optimizations cause faults on uncached memory, so zero out
-    // the memory by hand.
-    assert(mmio_->get_size() % zx_system_get_page_size() == 0);
-    assert(mmio_->get_size() % sizeof(uint64_t) == 0);
-    assert(reinterpret_cast<uintptr_t>(mmio_->get()) % sizeof(uint64_t) == 0);
-    for (size_t i = 0; i < mmio_->get_size(); i += sizeof(uint64_t)) {
-      mmio_->Write<uint64_t>(0, i);
-    }
+  uint8_t bus_cnt() const { return bus_cnt_; }
+  uint8_t is_extended() const { return is_extended_; }
+  size_t config_size() const { return config_size_; }
+  std::unique_ptr<pci::Config> CreateMmioConfig(pci_bdf_t bdf) {
+    return std::move(
+        pci::MmioConfig::Create(bdf, mmio_, bus_start_, bus_start_ + bus_cnt_, is_extended_)
+            .value());
+  }
 
-    // Mark all vendor & device ids as invalid so that only the devices
-    // explicitly configured will be considered in a proper bus scan.
-    for (size_t i = 0; i < config_cnt_; i++) {
-      configs_[i].device.set_vendor_id(0xffff).set_device_id(0xffff);
-    }
+  zx_off_t GetConfigOffset(pci_bdf_t bdf) const {
+    return pci::GetConfigOffsetInCam(bdf, bus_start_, is_extended_);
   }
 
  private:
-  uint8_t bus_start_;
-  uint8_t bus_end_;
-  size_t config_cnt_;
-  std::optional<fdf::MmioBuffer> mmio_;
-  FakeDeviceConfig* configs_;
+  const uint8_t bus_start_;
+  const uint8_t bus_cnt_;
+  const bool is_extended_;
+  const size_t config_size_;
+  fdf::MmioBuffer mmio_;
 };
 
 #endif  // SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_FAKE_ECAM_H_

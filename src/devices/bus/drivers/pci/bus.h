@@ -104,7 +104,7 @@ class Bus : public PciBusType,
         ecam_(std::move(ecam)) {}
   ~Bus() override;
   // Map an ecam VMO for Bus and Config use.
-  static zx::result<fdf::MmioBuffer> MapEcam(zx::vmo cam_vmo);
+  static zx::result<fdf::MmioBuffer> MapConfigRegion(zx::vmo cam_vmo);
 
   zx_status_t Initialize() __TA_EXCLUDES(devices_lock_);
   // Bus Device Interface implementation
@@ -135,9 +135,9 @@ class Bus : public PciBusType,
 
  private:
   // Map an ecam VMO for Bus and Config use.
-  zx_status_t MapEcam();
+  zx_status_t MapConfigRegion();
   // Creates a Config object for accessing the config space of the device at |bdf|.
-  zx_status_t MakeConfig(pci_bdf_t bdf, std::unique_ptr<Config>* config);
+  zx::result<std::unique_ptr<Config>> MakeConfig(pci_bdf_t bdf);
   // Scan all buses downstream from the root within the start and end
   // bus values given to the Bus driver through Pciroot.
   zx_status_t ScanDownstream();
