@@ -8,6 +8,8 @@
 toc:
 - title: "Overview"
   path: /docs/development/tracing
+- title: "Use trace events"
+  path: /docs/development/tracing/trace_events.md
 - title: "Tutorial"
   section:
   - include: /docs/development/tracing/tutorial/_toc.yaml
