@@ -1473,6 +1473,12 @@ mod inner_signals {
             /// Object peer closed
             const OBJECT_PEER_CLOSED = Self::OBJECT_2.bits();
 
+            /// Socket write disabled
+            const SOCKET_WRITE_DISABLED = Self::OBJECT_5.bits();
+
+            /// Socket peer write disabled
+            const SOCKET_PEER_WRITE_DISABLED = Self::OBJECT_4.bits();
+
             /// Channel peer closed
             const CHANNEL_PEER_CLOSED = Self::OBJECT_PEER_CLOSED.bits();
         }
