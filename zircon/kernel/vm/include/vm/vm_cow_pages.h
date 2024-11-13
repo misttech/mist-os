@@ -1248,7 +1248,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
-  void MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) TA_REQ(lock());
+  void MergeContentWithChildLocked(VmCowPages* removed) TA_REQ(lock());
   void MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left)
       TA_REQ(lock());
 

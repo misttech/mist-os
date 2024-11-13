@@ -1341,14 +1341,14 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
 
   // Hidden vmos always have 0 or 2 children, but we can't be here with 0 children.
   DEBUG_ASSERT(children_list_len_ == 2);
-  bool removed_left = &left_child_locked() == removed;
-
-  DropChildLocked(removed);
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    const bool removed_left = &left_child_locked() == removed;
+    DropChildLocked(removed);
+    MergeContentWithChildUsingSplitsLocked(removed, removed_left);
+  }
 
   VmCowPages* child = &children_list_.front();
   DEBUG_ASSERT(child);
-
-  MergeContentWithChildLocked(removed, removed_left);
 
   // The child which removed itself and led to the invocation should have a reference
   // to us, in addition to child.parent_ which we are about to clear.
@@ -1442,13 +1442,8 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
-void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) {
-  canary_.Assert();
-
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    MergeContentWithChildUsingSplitsLocked(removed, removed_left);
-    return;
-  }
+void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed) {
+  DEBUG_ASSERT(!ENABLE_COW_SPLIT_BITS);
 }
 
 void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left) {
