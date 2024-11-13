@@ -525,6 +525,59 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateHierarchyLocked() const TA_REQ(lock());
   bool DebugValidateZeroIntervalsLocked() const TA_REQ(lock());
 
+  // Walks all the descendants in a preorder traversal. Stops if func returns anything other than
+  // ZX_OK.
+  template <typename T>
+  zx_status_t DebugForEachDescendant(T func) const TA_REQ(lock()) {
+    const VmCowPages* stop = parent_.get();
+    int depth = 0;
+    const VmCowPages* cur = this;
+    const VmCowPages* prev = nullptr;
+    while (cur != stop) {
+      AssertHeld(cur->lock_ref());
+      uint32_t children = cur->children_list_len_;
+      if (!prev || prev == cur->parent_.get()) {
+        // Visit cur
+        zx_status_t s = func(cur, static_cast<uint>(depth));
+        if (s != ZX_OK) {
+          return s;
+        }
+
+        if (!children) {
+          // no children; move to parent (or nullptr)
+          prev = cur;
+          cur = cur->parent_.get();
+          continue;
+        } else {
+          // move to first child
+          prev = cur;
+          cur = &cur->children_list_.front();
+          ++depth;
+          continue;
+        }
+      }
+      // At this point we know we came up from a child, not down from the parent.
+      DEBUG_ASSERT(prev && prev != cur->parent_.get());
+      // The children are linked together, so we can move from one child to the next.
+
+      auto iterator = cur->children_list_.make_iterator(*prev);
+      ++iterator;
+      if (iterator == cur->children_list_.end()) {
+        // no more children; move back to parent
+        prev = cur;
+        cur = cur->parent_.get();
+        --depth;
+        continue;
+      }
+
+      // descend to next child
+      prev = cur;
+      cur = &(*iterator);
+      DEBUG_ASSERT(cur);
+    }
+    return ZX_OK;
+  }
+
   // VMO_FRUGAL_VALIDATION
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 

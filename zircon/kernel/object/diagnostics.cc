@@ -725,6 +725,42 @@ void DumpProcessVmObjects(zx_koid_t id, pretty::SizeUnit format_unit) {
   PrintVmoDumpHeader(/* handles */ false);
 }
 
+void DumpVmObjectCowTree(zx_koid_t id) {
+  fbl::RefPtr<VmCowPages> cow_pages;
+  zx_status_t status = VmObject::ForEach([id, &cow_pages = cow_pages](const VmObject& vmo) {
+    if (vmo.user_id() == id) {
+      if (!vmo.is_paged()) {
+        printf("vmo %" PRIu64 " is not paged\n", id);
+        return ZX_ERR_STOP;
+      }
+      const auto& paged_vmo = static_cast<const VmObjectPaged&>(vmo);
+      cow_pages = paged_vmo.DebugGetCowPages();
+      if (!cow_pages) {
+        printf("vmo %" PRIu64 " is not fully initialized\n", id);
+      }
+      return ZX_ERR_STOP;
+    }
+    return ZX_OK;
+  });
+  if (status == ZX_OK) {
+    printf("vmo %" PRIu64 " not found\n", id);
+    return;
+  }
+  if (!cow_pages) {
+    return;
+  }
+  // Walk up to the root of the tree.
+  while (auto parent = cow_pages->DebugGetParent()) {
+    cow_pages = parent;
+  }
+  Guard<CriticalMutex> guard{cow_pages->lock()};
+  cow_pages->DebugForEachDescendant([](const VmCowPages* cur, uint depth) {
+    AssertHeld(cur->lock_ref());
+    cur->DumpLocked(depth, false);
+    return ZX_OK;
+  });
+}
+
 void KillProcess(zx_koid_t id) {
   // search the process list and send a kill if found
   auto pd = ProcessDispatcher::LookupProcessById(id);
@@ -1330,6 +1366,7 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     printf("                     : dump process/all/hidden VMOs\n");
     printf("                 -u? : fix all sizes to the named unit\n");
     printf("                       where ? is one of [BkMGTPE]\n");
+    printf("%s cow-tree <vmo>    : dump the copy-on-write tree for a vmo koid\n", argv[0].str);
     printf("%s kill <pid>        : kill process\n", argv[0].str);
     printf("%s asd  <pid>|kernel : dump process/kernel address space\n", argv[0].str);
     printf("%s htinfo            : handle table info\n", argv[0].str);
@@ -1435,6 +1472,10 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     } else {
       DumpProcessVmObjects(argv[2].u, format_unit);
     }
+  } else if (strcmp(argv[1].str, "cow-tree") == 0) {
+    if (argc < 3)
+      goto usage;
+    DumpVmObjectCowTree(argv[2].u);
   } else if (strcmp(argv[1].str, "kill") == 0) {
     if (argc < 3)
       goto usage;

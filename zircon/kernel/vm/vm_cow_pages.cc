@@ -7170,7 +7170,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   return ZX_OK;
 }
 
-bool VmCowPages::DebugValidateHierarchyLocked() const {
+bool VmCowPages::DebugValidateHierarchyLocked() const TA_REQ(lock()) {
   canary_.Assert();
 
   const VmCowPages* cur = this;
@@ -7188,48 +7188,17 @@ bool VmCowPages::DebugValidateHierarchyLocked() const {
   // Iterate whole hierarchy; the iteration order doesn't matter.  Since there are cases with
   // >2 children, in-order isn't well defined, so we choose pre-order, but post-order would also
   // be fine.
-  const VmCowPages* prev = nullptr;
-  cur = parent_most;
-  while (cur) {
-    uint32_t children = cur->children_list_len_;
-    if (!prev || prev == cur->parent_.get()) {
-      // Visit cur
-      if (!cur->DebugValidateBacklinksLocked()) {
-        dprintf(INFO, "cur: %p this: %p\n", cur, this);
-        return false;
-      }
-
-      if (!children) {
-        // no children; move to parent (or nullptr)
-        prev = cur;
-        cur = cur->parent_.get();
-        continue;
-      } else {
-        // move to first child
-        prev = cur;
-        cur = &cur->children_list_.front();
-        continue;
-      }
-    }
-    // At this point we know we came up from a child, not down from the parent.
-    DEBUG_ASSERT(prev && prev != cur->parent_.get());
-    // The children are linked together, so we can move from one child to the next.
-
-    auto iterator = cur->children_list_.make_iterator(*prev);
-    ++iterator;
-    if (iterator == cur->children_list_.end()) {
-      // no more children; move back to parent
-      prev = cur;
-      cur = cur->parent_.get();
-      continue;
-    }
-
-    // descend to next child
-    prev = cur;
-    cur = &(*iterator);
-    DEBUG_ASSERT(cur);
-  }
-  return true;
+  AssertHeld(parent_most->lock_ref());
+  zx_status_t status =
+      parent_most->DebugForEachDescendant([this](const VmCowPages* cur, int depth) {
+        AssertHeld(cur->lock_ref());
+        if (!cur->DebugValidateBacklinksLocked()) {
+          dprintf(INFO, "cur: %p this: %p\n", cur, this);
+          return ZX_ERR_BAD_STATE;
+        }
+        return ZX_OK;
+      });
+  return status == ZX_OK;
 }
 
 bool VmCowPages::DebugValidatePageSharingLocked() const {
