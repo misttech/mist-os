@@ -854,8 +854,8 @@ impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy 
             FhoConnectionBehavior::DirectConnector(dc) => {
                 dc.rcs_proxy_fdomain().await.map_err(Into::into)
             }
-            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory().await {
-                Ok(_p) => todo!("FDomain with the daemon is unsupported!"),
+            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory_fdomain().await {
+                Ok(p) => Ok(p),
                 Err(e) => {
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
                         let message = format!("Failed connecting to remote control proxy: {ffx_e}");

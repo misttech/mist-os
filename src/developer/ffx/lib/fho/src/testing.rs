@@ -6,6 +6,7 @@ use crate::subtool::{FfxTool, ToolCommand};
 use crate::FhoEnvironment;
 use argh::FromArgs;
 use async_trait::async_trait;
+use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
 use ffx_command::{FfxCommandLine, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
@@ -154,6 +155,10 @@ impl Injector for FakeInjector {
 
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
         (self.remote_factory_closure)().await
+    }
+
+    async fn remote_factory_fdomain(&self) -> anyhow::Result<FRemoteControlProxy> {
+        unimplemented!()
     }
 
     async fn target_factory(&self) -> anyhow::Result<TargetProxy> {

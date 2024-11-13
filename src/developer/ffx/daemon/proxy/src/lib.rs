@@ -7,6 +7,10 @@ use std::time::Duration;
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error, FfxError};
+use fdomain_client::fidl::DiscoverableProtocolMarker;
+use fdomain_fuchsia_developer_remotecontrol::{
+    RemoteControlMarker as FRemoteControlMarker, RemoteControlProxy as FRemoteControlProxy,
+};
 use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
@@ -18,8 +22,9 @@ use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetPro
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use timeout::timeout;
+use {fdomain_fuchsia_io as fio_fdomain, fidl_fuchsia_io as fio};
 
 /// The different ways to check the daemon's version against the local process' information
 #[derive(Clone, Debug)]
@@ -91,6 +96,7 @@ pub struct Injection {
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
     remote_once: ProxyState<RemoteControlProxy>,
+    fdomain: Mutex<Option<Arc<fdomain_client::Client>>>,
 }
 
 pub const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
@@ -115,6 +121,7 @@ impl Injection {
             target_spec,
             daemon_once: Default::default(),
             remote_once: Default::default(),
+            fdomain: Mutex::new(None),
         }
     }
 
@@ -291,6 +298,48 @@ impl Injector for Injection {
         }
 
         proxy
+    }
+
+    #[tracing::instrument]
+    async fn remote_factory_fdomain(&self) -> Result<FRemoteControlProxy> {
+        let fdomain = self.fdomain.lock().unwrap().clone();
+        let fdomain = if let Some(fdomain) = fdomain {
+            fdomain
+        } else {
+            let rcs = self.remote_factory().await?;
+            let toolbox = rcs::toolbox::open_toolbox(&rcs).await?;
+
+            let client = fdomain_local::local_client(move || {
+                let (client, server) = fidl::endpoints::create_endpoints();
+                let toolbox = Clone::clone(&toolbox);
+                fuchsia_async::Task::local(async move {
+                    let got = toolbox.open3(".", fio::Flags::PROTOCOL_DIRECTORY, &fio::Options::default(), server.into_channel());
+
+                    match got {
+                        Ok(_) => (),
+                        other => tracing::debug!(error = ?other, "Could not connect to toolbox via Overnet RCS"),
+                    }
+                })
+                .detach();
+                Ok(client)
+            });
+
+            let mut fdomain = self.fdomain.lock().unwrap();
+            fdomain.get_or_insert(client).clone()
+        };
+
+        let namespace = fdomain.namespace().await?;
+        let namespace =
+            fdomain_client::fidl::ClientEnd::<fio_fdomain::DirectoryMarker>::new(namespace)
+                .into_proxy()?;
+        let (proxy, server_end) = fdomain.create_proxy::<FRemoteControlMarker>().await?;
+        namespace.open3(
+            FRemoteControlMarker::PROTOCOL_NAME,
+            fio_fdomain::Flags::PROTOCOL_SERVICE,
+            &fio_fdomain::Options::default(),
+            server_end.into_channel(),
+        )?;
+        Ok(proxy)
     }
 
     async fn is_experiment(&self, key: &str) -> bool {
