@@ -34,7 +34,6 @@
                 "*ioctl*",
                 "*key_socket*",
                 "*keys*",
-                "*link*",
                 "*mac_admin*",
                 "*mkdir*",
                 "*mmap*",

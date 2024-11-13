@@ -379,32 +379,20 @@ fn may_unlink_or_rmdir(
     let parent_sid = fs_node_effective_sid(parent);
 
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
-
-    todo_check_permission!(
-        TODO("https://fxbug.dev/375590486", "Check remove_name permission."),
-        &permission_check,
-        current_sid,
-        parent_sid,
-        DirPermission::RemoveName
-    )?;
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::RemoveName)?;
 
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     match operation {
-        UnlinkKind::NonDirectory => todo_check_permission!(
-            TODO("https://fxbug.dev/375381156", "Check unlink permission."),
+        UnlinkKind::NonDirectory => check_permission(
             &permission_check,
             current_sid,
             file_sid,
-            CommonFilePermission::Unlink.for_class(file_class)
+            CommonFilePermission::Unlink.for_class(file_class),
         )?,
-        UnlinkKind::Directory => todo_check_permission!(
-            TODO("https://fxbug.dev/375381156", "Check rmdir permission."),
-            &permission_check,
-            current_sid,
-            file_sid,
-            DirPermission::RemoveDir
-        )?,
+        UnlinkKind::Directory => {
+            check_permission(&permission_check, current_sid, file_sid, DirPermission::RemoveDir)?
+        }
     }
     Ok(())
 }
