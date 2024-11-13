@@ -1715,8 +1715,9 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
             current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
-              banjo_display_config.layer_list[j].cfg.color.format);
-          if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
+              banjo_display_config.layer_list[j].cfg.color.color.format);
+          if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
+              format != fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
             current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;

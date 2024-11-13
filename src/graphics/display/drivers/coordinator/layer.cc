@@ -131,13 +131,6 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
     return;
   }
 
-  if (current_layer_.type == LAYER_TYPE_COLOR) {
-    memcpy(current_color_bytes_, pending_color_bytes_, sizeof(current_color_bytes_));
-    current_layer_.cfg.color.color_list = current_color_bytes_;
-    current_layer_.cfg.color.color_count = 4;
-    return;
-  }
-
   ZX_DEBUG_ASSERT_MSG(false, "CheckConfig() failed to bounce invalid layer type %" PRIu32,
                       current_layer_.type);
 }
@@ -152,8 +145,6 @@ void Layer::DiscardChanges() {
     pending_layer_ = current_layer_;
     config_change_ = false;
   }
-
-  memcpy(pending_color_bytes_, current_color_bytes_, sizeof(pending_color_bytes_));
 }
 
 bool Layer::CleanUpAllImages() {
@@ -276,15 +267,15 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
 }
 
 void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
-  // Increase the size of the static array when large color formats are introduced
-  static_assert(color.bytes.size() == sizeof(pending_color_bytes_));
-
   pending_layer_.type = LAYER_TYPE_COLOR;
   color_layer_t* color_layer = &pending_layer_.cfg.color;
 
+  // Increase the size of the static array when large color formats are introduced
+  static_assert(decltype(color.bytes)::size() == sizeof(color_layer->color.bytes));
+
   ZX_DEBUG_ASSERT(!color.format.IsUnknown());
-  color_layer->format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
-  std::memcpy(pending_color_bytes_, color.bytes.data(), sizeof(pending_color_bytes_));
+  color_layer->color.format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
+  std::memcpy(color_layer->color.bytes, color.bytes.data(), decltype(color.bytes)::size());
 
   pending_image_ = nullptr;
   config_change_ = true;

@@ -1002,9 +1002,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
       } else if (banjo_layer.type == LAYER_TYPE_COLOR) {
-        // There aren't any API constraints on valid colors.
-        banjo_layer.cfg.color.color_list = source_layer_node.layer->pending_color_bytes_;
-        banjo_layer.cfg.color.color_count = 4;
+        // All API constraints on colors are checked in SetColorConfig().
       } else {
         invalid = true;
       }

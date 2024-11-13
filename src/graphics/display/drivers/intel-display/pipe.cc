@@ -450,13 +450,20 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
                          banjo_display_config->layer_list[0].type == LAYER_TYPE_COLOR;
   if (has_color_layer) {
     const color_layer_t* layer = &banjo_display_config->layer_list[0].cfg.color;
-    const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->format);
-    ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
-    uint32_t color = *reinterpret_cast<const uint32_t*>(layer->color_list);
+    const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->color.format);
 
-    bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
-    bottom_color.set_g(encode_pipe_color_component(static_cast<uint8_t>(color >> 8)));
-    bottom_color.set_b(encode_pipe_color_component(static_cast<uint8_t>(color)));
+    if (format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer->color.bytes[2]));
+      bottom_color.set_g(encode_pipe_color_component(layer->color.bytes[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer->color.bytes[0]));
+    } else if (format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
+      bottom_color.set_r(encode_pipe_color_component(layer->color.bytes[0]));
+      bottom_color.set_g(encode_pipe_color_component(layer->color.bytes[1]));
+      bottom_color.set_b(encode_pipe_color_component(layer->color.bytes[2]));
+    } else {
+      // CheckConfig() was supposed to reject this format.
+      ZX_DEBUG_ASSERT(false);
+    }
     config_stamp_with_color_layer_ = config_stamp;
   } else {
     config_stamp_with_color_layer_ = display::kInvalidConfigStamp;

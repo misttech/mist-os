@@ -145,10 +145,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   uint64_t pending_image_config_gen_ = 0;
   uint64_t current_image_config_gen_ = 0;
 
-  // Storage for a color layer's color data bytes.
-  uint8_t pending_color_bytes_[8];
-  uint8_t current_color_bytes_[8];
-
   LayerNode pending_node_;
   LayerNode current_node_;
 

@@ -228,6 +228,12 @@ type RectU = struct {
     height uint32;
 };
 
+/// Equivalent to the ['fuchsia.hardware.display.types/Color'] FIDL type.
+type Color = struct {
+    format FuchsiaImages2PixelFormatEnumValue;
+    bytes array<uint8, 8>;
+};
+
 type PrimaryLayer = struct {
     /// The result of a successful ImportImage() call.
     image_handle uint64;
@@ -289,12 +295,8 @@ type PrimaryLayer = struct {
 };
 
 type ColorLayer = struct {
-    /// The format of `color` bytes.
-    format FuchsiaImages2PixelFormatEnumValue;
-
-    /// The color to use for the layer. The color is little-endian, and is
-    /// guaranteed to be of the exact size of one pixel in `format`.
-    color vector<uint8>:MAX;
+    /// The color to use for the layer.
+    color Color;
 };
 
 /// Types of layers.
