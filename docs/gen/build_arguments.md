@@ -200,11 +200,22 @@ To GN, this path _should_ be:
 
 But to pass it as a file to the Bazel build, we need to use the "label"
 syntax, which is going to be fixed up below.
-LINT.IfChange
+
+<!--
+
+// LINT.IfChange
+
+-->
 
 **Current value (from the default):** `false`
 
 From //build/assembly/sshd_config.gni:19
+
+<!--
+
+// LINT.ThenChange(//build/assembly/sshd_config.gni)
+
+-->
 
 ### avb_algorithm
 
@@ -725,24 +736,21 @@ From //build/info/info.gni:13
 
 ### build_info_product
 
-LINT.IfChange
-Product configuration of the current build
+Product configuration of the current build as set via `fx set`. Current value can be found via `fx args` or `args.gn` in current out directory.
 
-**Current value for `target_cpu = "arm64"`:** `"bringup"`
+<!--
 
-From //out/not-default/args.gn:6
+// LINT.IfChange
 
-**Overridden from the default:** `""`
-
-From //build/info/info.gni:10
-
-**Current value for `target_cpu = "x64"`:** `"bringup"`
-
-From //out/not-default/args.gn:6
-
-**Overridden from the default:** `""`
+-->
 
 From //build/info/info.gni:10
+
+<!--
+
+// LINT.ThenChange(//build/info/info.gni)
+
+-->
 
 ### build_info_version
 
@@ -1000,11 +1008,23 @@ From //build/config/clang/clang.gni:31
 
 The default clang toolchain provided by the prebuilt. This variable is
 additionally consumed by the Go toolchain.
-LINT.IfChange
+
+<!--
+
+// LINT.IfChange
+
+-->
 
 **Current value (from the default):** `"//prebuilt/third_party/clang/linux-x64/bin"`
 
 From //build/config/clang/clang.gni:14
+
+<!--
+
+// LINT.ThenChange(//build/config/clang/clang.gni)
+
+-->
+
 
 ### clang_tool_dir
 
@@ -1400,11 +1420,22 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:35
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR DEVELOPER USE ONLY
 TODO(https://fxbug.dev/42082693): Remove this when we have a solution for
 changing the netcfg configuration at runtime.
-LINT.IfChange
+
+<!--
+
+// LINT.IfChange
+
+-->
 
 **Current value (from the default):** `false`
 
 From //src/connectivity/policy/netcfg/delegated_network_provisioning.gni:10
+
+<!--
+
+// LINT.ThenChange(//src/connectivity/policy/netcfg/delegated_network_provisioning.gni)
+
+-->
 
 ### delivery_blob_type
 
@@ -8182,11 +8213,22 @@ From //build/config/BUILDCONFIG.gn:104
 
 Truncate the date in the build_info to midnight UTC, and replace the commit
 hash with one that's synthesized from that date.
-LINT.IfChange
+
+<!--
+
+// LINT.IfChange
+
+-->
 
 **Current value (from the default):** `false`
 
 From //build/info/BUILD.gn:13
+
+<!--
+
+// LINT.ThenChange(//build/info/BUILD.gn)
+
+-->
 
 ### tsan_default_options
 
@@ -8521,23 +8563,54 @@ From //build/config/features.gni:10
 
 If true, then a vbmeta image will be generated for provided ZBI
 and the paving script will pave vbmeta images to the target device.
-LINT.IfChange
+
+<!--
+
+// LINT.IfChange
+
+-->
+
+**Current value (from the default):** `false`
+
+From //build/images/vbmeta.gni:15
+
+<!--
+
+// LINT.ThenChange(//build/images/vbmeta.gni)
+
+-->
+
+<!--
+
+// LINT.IfChange
+
+-->
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:36
+From //boards/arm64.gni:37
 
-**Overridden from the default:** `false`
+<!--
 
-From //build/images/vbmeta.gni:15
+// LINT.ThenChange(//boards/arm64.gni)
 
-**Current value for `target_cpu = "x64"`:** `true`
+-->
 
-From //boards/x64.gni:52
+<!--
 
-**Overridden from the default:** `false`
+// LINT.IfChange
 
-From //build/images/vbmeta.gni:15
+-->
+
+**Default override for `target_cpu = "x64"`:** `true`
+
+From //boards/x64.gni:53
+
+<!--
+
+// LINT.ThenChange(//boards/x64.gni)
+
+-->
 
 ### use_vboot
 
