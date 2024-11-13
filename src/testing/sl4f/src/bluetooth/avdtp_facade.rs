@@ -51,14 +51,7 @@ impl AvdtpFacade {
     }
 
     /// Creates a Peer Manager Proxy
-    ///
-    /// # Arguments
-    /// * `initiator_delay`: A String representing the stream
-    /// initiator delay in milliseconds.
-    async fn create_avdtp_service_proxy(
-        &self,
-        initiator_delay: Option<String>,
-    ) -> Result<PeerManagerProxy, Error> {
+    async fn create_avdtp_service_proxy(&self) -> Result<PeerManagerProxy, Error> {
         let tag = "AvdtpFacade::create_avdtp_service_proxy";
         match self.inner.read().avdtp_service_proxy.clone() {
             Some(avdtp_service_proxy) => {
@@ -70,15 +63,6 @@ impl AvdtpFacade {
             }
             None => {
                 info!(tag = &with_line!(tag), "Launching A2DP and setting new Avdtp service proxy");
-
-                let mut options: Vec<String> = Vec::new();
-                match initiator_delay {
-                    Some(initiator_delay) => {
-                        options.push("--initiator-delay".to_string());
-                        options.push(initiator_delay.to_string());
-                    }
-                    None => {}
-                };
 
                 let avdtp_service_proxy = client::connect_to_protocol::<PeerManagerMarker>();
                 if let Err(err) = avdtp_service_proxy {
@@ -93,23 +77,14 @@ impl AvdtpFacade {
     }
 
     /// Initialize the Avdtp service and starts A2DP.
-    ///
-    /// # Arguments
-    /// * `initiator_delay`: A String representing the stream initiator delay
-    /// in milliseconds. This delay is used in our tests to determine the initiator
-    /// when connecting. The device to initiate first becomes the initiator.
-    pub async fn init_avdtp_service_proxy(
-        &self,
-        initiator_delay: Option<String>,
-    ) -> Result<(), Error> {
+    pub async fn init_avdtp_service_proxy(&self) -> Result<(), Error> {
         if *self.initialized.read() {
             return Ok(());
         }
         *self.initialized.write() = true;
 
         let tag = "AvdtpFacade::init_avdtp_service_proxy";
-        self.inner.write().avdtp_service_proxy =
-            Some(self.create_avdtp_service_proxy(initiator_delay).await?);
+        self.inner.write().avdtp_service_proxy = Some(self.create_avdtp_service_proxy().await?);
 
         let avdtp_svc = match &self.inner.read().avdtp_service_proxy {
             Some(p) => p.clone(),
