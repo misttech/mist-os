@@ -376,8 +376,7 @@ TEST(ClockTest, BanjoPreferredOverFidl) {
                   &clockimpl_fidl);
 
   const clock_impl_protocol_t clockimpl_banjo_proto{clockimpl_banjo.ops(), &clockimpl_banjo};
-  ClockImplProxy proxy(&clockimpl_banjo_proto,
-                       fdf::WireSyncClient(std::move(clockimpl_endpoints->client)));
+  ClockImplProxy proxy(&clockimpl_banjo_proto, std::move(clockimpl_endpoints->client));
   ClockDevice dut(nullptr, std::move(proxy), kTestClockId);
 
   auto clock_endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
@@ -423,7 +422,7 @@ TEST(ClockTest, FallBackToFidl) {
   fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(clockimpl_endpoints->server),
                   &clockimpl_fidl);
 
-  ClockImplProxy proxy({}, fdf::WireSyncClient(std::move(clockimpl_endpoints->client)));
+  ClockImplProxy proxy({}, std::move(clockimpl_endpoints->client));
   async_patterns::TestDispatcherBound<ClockDevice> dut(background_dispatcher, std::in_place,
                                                        nullptr, std::move(proxy), kTestClockId);
 

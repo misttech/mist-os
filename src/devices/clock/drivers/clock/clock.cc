@@ -115,27 +115,14 @@ zx_status_t ClockDevice::ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> se
 void ClockDevice::DdkRelease() { delete this; }
 
 zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
-  const ddk::ClockImplProtocolClient clock_banjo(parent);
-  if (clock_banjo.is_valid()) {
-    zxlogf(INFO, "Using Banjo clockimpl protocol");
-  }
-
   {
-    fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl;
-    if (!clock_banjo.is_valid()) {
-      zx::result clock_fidl_client =
-          DdkConnectRuntimeProtocol<fuchsia_hardware_clockimpl::Service::Device>(parent);
-      if (clock_fidl_client.is_ok()) {
-        zxlogf(INFO, "Failed to get Banjo clockimpl protocol, falling back to FIDL");
-        clock_fidl = fdf::WireSyncClient(std::move(*clock_fidl_client));
-      } else {
-        zxlogf(ERROR, "Failed to get Banjo or FIDL clockimpl protocol");
-        return ZX_ERR_NO_RESOURCES;
-      }
+    zx::result clock_impl = ClockImplProxy::Create(parent);
+    if (clock_impl.is_error()) {
+      return clock_impl.status_value();
     }
 
     // Process init metadata while we are still the exclusive owner of the clock client.
-    ClockInitDevice::Create(parent, {clock_banjo, std::move(clock_fidl)});
+    ClockInitDevice::Create(parent, clock_impl.value());
   }
 
   auto clock_ids = ddk::GetMetadataArray<clock_id_t>(parent, DEVICE_METADATA_CLOCK_IDS);
@@ -145,21 +132,15 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   for (auto clock : *clock_ids) {
-    fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl;
-    if (!clock_banjo.is_valid()) {
-      zx::result clock_fidl_client =
-          DdkConnectRuntimeProtocol<fuchsia_hardware_clockimpl::Service::Device>(parent);
-      ZX_ASSERT_MSG(clock_fidl_client.is_ok(), "Failed to get additional FIDL client: %s",
-                    clock_fidl_client.status_string());
-      clock_fidl = fdf::WireSyncClient(std::move(*clock_fidl_client));
+    zx::result clock_impl = ClockImplProxy::Create(parent);
+    if (clock_impl.is_error()) {
+      return clock_impl.status_value();
     }
-
-    ClockImplProxy clock_client(clock_banjo, std::move(clock_fidl));
 
     auto clock_id = clock.clock_id;
     fbl::AllocChecker ac;
-    std::unique_ptr<ClockDevice> dev(new (&ac)
-                                         ClockDevice(parent, std::move(clock_client), clock_id));
+    std::unique_ptr<ClockDevice> dev(
+        new (&ac) ClockDevice(parent, std::move(clock_impl.value()), clock_id));
     if (!ac.check()) {
       zxlogf(ERROR, "Failed to allocate clock device.");
       return ZX_ERR_NO_MEMORY;
@@ -288,6 +269,25 @@ zx_status_t ClockInitDevice::ConfigureClocks(
   }
 
   return ZX_OK;
+}
+
+zx::result<ClockImplProxy> ClockImplProxy::Create(zx_device_t* parent) {
+  const ddk::ClockImplProtocolClient clock_banjo(parent);
+  if (clock_banjo.is_valid()) {
+    zxlogf(DEBUG, "Using Banjo clockimpl protocol");
+    return zx::ok(ClockImplProxy{clock_banjo});
+  }
+
+  zx::result clock_fidl =
+      ddk::Device<void>::DdkConnectRuntimeProtocol<fuchsia_hardware_clockimpl::Service::Device>(
+          parent);
+  if (clock_fidl.is_ok()) {
+    zxlogf(DEBUG, "Failed to get Banjo clockimpl protocol, falling back to FIDL");
+    return zx::ok(ClockImplProxy{std::move(clock_fidl.value())});
+  }
+
+  zxlogf(ERROR, "Failed to get Banjo or FIDL clockimpl protocol");
+  return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
 zx_status_t ClockImplProxy::Enable(uint32_t id) const {

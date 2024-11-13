@@ -15,8 +15,15 @@
 
 class ClockImplProxy {
  public:
-  ClockImplProxy(const ddk::ClockImplProtocolClient& clock_banjo,
-                 fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
+  static zx::result<ClockImplProxy> Create(zx_device_t* parent);
+
+  explicit ClockImplProxy(ddk::ClockImplProtocolClient clock_banjo) : clock_banjo_(clock_banjo) {}
+
+  explicit ClockImplProxy(fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
+      : clock_fidl_(std::move(clock_fidl)) {}
+
+  ClockImplProxy(ddk::ClockImplProtocolClient clock_banjo,
+                 fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
       : clock_banjo_(clock_banjo), clock_fidl_(std::move(clock_fidl)) {}
 
   zx_status_t Enable(uint32_t id) const;
