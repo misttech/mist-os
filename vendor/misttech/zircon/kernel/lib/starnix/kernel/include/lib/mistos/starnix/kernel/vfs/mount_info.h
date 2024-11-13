@@ -14,9 +14,11 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+using starnix_uapi::MountFlags;
+
 class Mount;
 using MountHandle = fbl::RefPtr<Mount>;
-using MountFlags = starnix_uapi::MountFlags;
 
 /// Public representation of the mount options.
 struct MountInfo {

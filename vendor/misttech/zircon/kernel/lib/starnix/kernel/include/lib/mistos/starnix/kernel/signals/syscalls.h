@@ -16,6 +16,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 class CurrentTask;
 class ProcessSelector;
 struct WaitResult;

@@ -20,6 +20,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 struct HashableFsString : public fbl::SinglyLinkedListable<ktl::unique_ptr<HashableFsString>> {
   // Required to instantiate fbl::DefaultKeyedObjectTraits.
   FsString GetKey() const { return key; }

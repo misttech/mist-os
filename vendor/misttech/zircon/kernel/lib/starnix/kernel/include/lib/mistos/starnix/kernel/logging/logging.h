@@ -16,7 +16,7 @@ namespace starnix {
 
 // Call this when you get an error that should "never" happen, i.e. if it does that means the
 // kernel was updated to produce some other error after this match was written.
-Errno impossible_error(zx_status_t status);
+starnix_uapi::Errno impossible_error(zx_status_t status);
 
 void set_zx_name(fbl::RefPtr<VmObjectDispatcher> obj, const ktl::span<const uint8_t>& name);
 

@@ -18,7 +18,9 @@
 
 namespace starnix {
 
-Errno impossible_error(zx_status_t status) { PANIC("encountered impossible error: %d", status); }
+starnix_uapi::Errno impossible_error(zx_status_t status) {
+  PANIC("encountered impossible error: %d", status);
+}
 
 fbl::Vector<uint8_t> from_bytes_lossy(ktl::span<const uint8_t> name) {
   fbl::Vector<uint8_t> truncated_name;

@@ -15,6 +15,7 @@ namespace starnix {
 
 class Kernel;
 class FsContext;
+using starnix_uapi::Errno;
 
 struct Container {
   /// The `Kernel` object that is associated with the container.

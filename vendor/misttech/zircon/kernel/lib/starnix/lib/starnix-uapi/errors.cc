@@ -7,10 +7,8 @@
 
 #include <linux/errno.h>
 
-// There isn't really a mapping from zx::Status to Errno. The correct mapping is context-speific
-// but this converter is a reasonable first-approximation. The translation matches
-// fdio_status_to_errno. See https://fxbug.dev/42105838 for more context.
-// TODO: Replace clients with more context-specific mappings.
+namespace starnix_uapi {
+
 uint32_t from_status_like_fdio(zx_status_t status) {
   switch (status) {
     case ZX_ERR_NOT_FOUND:
@@ -91,3 +89,5 @@ fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err) {
   }
   return result;
 }
+
+}  // namespace starnix_uapi

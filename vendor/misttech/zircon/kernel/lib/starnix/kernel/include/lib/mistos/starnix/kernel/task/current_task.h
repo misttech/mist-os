@@ -38,6 +38,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 namespace testing {
 class AutoReleasableTask;
 }

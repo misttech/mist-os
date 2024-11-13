@@ -29,6 +29,7 @@ class DeviceOpen;
 class FileOps;
 class FsNode;
 
+using starnix_uapi::Errno;
 using starnix_uapi::OpenFlags;
 
 /// Interface for device operations.

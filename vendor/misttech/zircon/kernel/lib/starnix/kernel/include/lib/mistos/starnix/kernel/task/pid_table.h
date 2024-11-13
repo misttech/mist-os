@@ -22,6 +22,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 class ProcessGroup;
 class ThreadGroup;
 class Task;

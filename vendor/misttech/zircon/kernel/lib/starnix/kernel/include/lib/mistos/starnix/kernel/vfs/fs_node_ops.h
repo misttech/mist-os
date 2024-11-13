@@ -28,14 +28,16 @@
 
 namespace starnix {
 
+using starnix_uapi::DeviceType;
+using starnix_uapi::Errno;
+using starnix_uapi::FileMode;
+using starnix_uapi::FsCred;
+using starnix_uapi::OpenFlags;
+
+class CurrentTask;
 class FileOps;
 class FsNode;
-class CurrentTask;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
-using OpenFlags = starnix_uapi::OpenFlags;
-using FileMode = starnix_uapi::FileMode;
-using DeviceType = starnix_uapi::DeviceType;
-using FsCred = starnix_uapi::FsCred;
 class SymlinkTarget;
 
 enum class XattrOp : uint8_t {

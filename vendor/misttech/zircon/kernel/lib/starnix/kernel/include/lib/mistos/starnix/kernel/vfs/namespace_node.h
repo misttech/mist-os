@@ -20,6 +20,14 @@
 
 namespace starnix {
 
+using starnix_uapi::Access;
+using starnix_uapi::DeviceType;
+using starnix_uapi::Errno;
+using starnix_uapi::FileMode;
+using starnix_uapi::FsCred;
+using starnix_uapi::OpenFlags;
+using starnix_uapi::UnmountFlags;
+
 class CurrentTask;
 class DirEntry;
 class FileObject;
@@ -29,15 +37,9 @@ class FsNode;
 class LookupContext;
 class SymlinkTarget;
 
-using starnix_uapi::DeviceType;
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FileHandle = fbl::RefPtr<FileObject>;
-using starnix_uapi::FileMode;
-using starnix_uapi::FsCred;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
-using starnix_uapi::Access;
-using starnix_uapi::OpenFlags;
-using starnix_uapi::UnmountFlags;
 
 /// The path is reachable from the given root.
 struct Reachable {

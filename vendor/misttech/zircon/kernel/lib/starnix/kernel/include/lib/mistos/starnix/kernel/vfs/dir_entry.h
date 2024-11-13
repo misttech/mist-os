@@ -35,6 +35,7 @@ class FsNode;
 
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
+using starnix_uapi::Errno;
 
 struct DirEntryState {
   /// The parent DirEntry.

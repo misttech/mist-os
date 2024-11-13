@@ -15,6 +15,8 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+
 class FileSystem;
 class CurrentTask;
 class FsNode;
