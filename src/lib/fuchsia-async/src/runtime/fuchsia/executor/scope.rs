@@ -73,14 +73,25 @@ pub struct Scope {
 impl Scope {
     /// Create a new scope.
     ///
-    /// The returned scope is a child of the global scope.
+    /// The returned scope is a child of the current scope.
     ///
     /// # Panics
     ///
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn new() -> Scope {
-        EHandle::local().global_scope().new_child()
+        ScopeHandle::with_current(|handle| handle.new_child())
+    }
+
+    /// Get the scope of the current task, or the global scope if there is no task
+    /// being polled.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
+    pub fn current() -> ScopeHandle {
+        ScopeHandle::with_current(|handle| handle.clone())
     }
 
     /// Get the global scope of the executor.
@@ -716,6 +727,13 @@ impl Drop for ScopeInner {
 }
 
 impl ScopeHandle {
+    fn with_current<R>(f: impl FnOnce(&ScopeHandle) -> R) -> R {
+        super::common::Task::with_current(|task| match task {
+            Some(task) => f(&task.scope),
+            None => f(EHandle::local().global_scope()),
+        })
+    }
+
     fn lock(&self) -> ConditionGuard<'_, ScopeState> {
         self.inner.state.lock()
     }
@@ -1187,6 +1205,27 @@ mod tests {
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         assert_eq!(executor.run_until_stalled(&mut pin!(child.on_no_tasks())), Poll::Pending);
         child.detach();
+        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
+        remote.resolve();
+        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
+    }
+
+    #[test]
+    fn join_scope_blocks_until_task_spawned_from_nested_detached_scope_completes() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.global_scope().new_child();
+        let remote = RemoteControlFuture::new();
+        {
+            let remote = remote.clone();
+            scope.spawn(async move {
+                let child = Scope::new();
+                child.spawn(async move {
+                    Scope::current().spawn(remote.as_future());
+                });
+                child.detach();
+            });
+        }
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));

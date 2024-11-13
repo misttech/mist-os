@@ -12,7 +12,7 @@ use fuchsia_sync::Mutex;
 use zx::BootDuration;
 
 use std::any::Any;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering};
@@ -580,7 +580,10 @@ impl Executor {
         let task_waker = unsafe {
             Waker::from_raw(RawWaker::new(Arc::as_ptr(task) as *const (), &BORROWED_VTABLE))
         };
-        match task.future.try_poll(&mut Context::from_waker(&task_waker)) {
+        let poll_result = Task::set_current_with(&*task, || {
+            task.future.try_poll(&mut Context::from_waker(&task_waker))
+        });
+        match poll_result {
             AttemptPollResult::Yield => {
                 self.ready_tasks.push(task.clone());
                 false
@@ -761,6 +764,29 @@ impl Drop for Task {
             // provenance lands.
             Weak::from_raw(self);
         }
+    }
+}
+
+thread_local! {
+    static CURRENT_TASK: Cell<*const Task> = Cell::new(std::ptr::null());
+}
+
+impl Task {
+    pub(crate) fn with_current<R>(f: impl FnOnce(Option<&Task>) -> R) -> R {
+        CURRENT_TASK.with(|cur| {
+            let cur = cur.get();
+            let cur = unsafe { cur.as_ref() };
+            f(cur)
+        })
+    }
+
+    fn set_current_with<R>(task: &Task, f: impl FnOnce() -> R) -> R {
+        CURRENT_TASK.with(|cur| {
+            cur.set(task);
+            let result = f();
+            cur.set(std::ptr::null());
+            result
+        })
     }
 }
 
