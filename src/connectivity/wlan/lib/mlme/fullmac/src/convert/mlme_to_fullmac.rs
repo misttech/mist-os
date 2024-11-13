@@ -150,15 +150,6 @@ pub fn convert_disassociate_request(
         ..Default::default()
     }
 }
-pub fn convert_reset_request(
-    req: fidl_mlme::ResetRequest,
-) -> fidl_fullmac::WlanFullmacImplResetRequest {
-    fidl_fullmac::WlanFullmacImplResetRequest {
-        sta_address: Some(req.sta_address),
-        set_default_mib: Some(req.set_default_mib),
-        ..Default::default()
-    }
-}
 
 pub fn convert_start_bss_request(
     req: fidl_mlme::StartRequest,

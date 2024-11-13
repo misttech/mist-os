@@ -33,7 +33,6 @@ pub trait DeviceOps {
     fn assoc_resp(&self, resp: fidl_fullmac::WlanFullmacImplAssocRespRequest)
         -> anyhow::Result<()>;
     fn disassoc(&self, req: fidl_fullmac::WlanFullmacImplDisassocRequest) -> anyhow::Result<()>;
-    fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()>;
     fn start_bss(&self, req: fidl_fullmac::WlanFullmacImplStartBssRequest) -> anyhow::Result<()>;
     fn stop_bss(&self, req: fidl_fullmac::WlanFullmacImplStopBssRequest) -> anyhow::Result<()>;
     fn set_keys(
@@ -165,11 +164,6 @@ impl DeviceOps for FullmacDevice {
             .disassoc(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Disassoc")
     }
-    fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
-        self.fullmac_impl_sync_proxy
-            .reset(&req, zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on Reset")
-    }
     fn start_bss(&self, req: fidl_fullmac::WlanFullmacImplStartBssRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
             .start_bss(&req, zx::MonotonicInstant::INFINITE)
@@ -267,7 +261,6 @@ pub mod test_utils {
         DeauthReq { req: fidl_fullmac::WlanFullmacImplDeauthRequest },
         AssocResp { resp: fidl_fullmac::WlanFullmacImplAssocRespRequest },
         Disassoc { req: fidl_fullmac::WlanFullmacImplDisassocRequest },
-        Reset { req: fidl_fullmac::WlanFullmacImplResetRequest },
         StartBss { req: fidl_fullmac::WlanFullmacImplStartBssRequest },
         StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
@@ -475,10 +468,6 @@ pub mod test_utils {
             req: fidl_fullmac::WlanFullmacImplDisassocRequest,
         ) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::Disassoc { req });
-            Ok(())
-        }
-        fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::Reset { req });
             Ok(())
         }
         fn start_bss(

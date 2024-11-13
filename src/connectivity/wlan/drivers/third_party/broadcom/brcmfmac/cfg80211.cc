@@ -4267,21 +4267,6 @@ void brcmf_if_disassoc_req(net_device* ndev,
   }  // else notification will happen asynchronously
 }
 
-void brcmf_if_reset_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplResetRequest* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Reset request from SME.");
-  if (!req->has_sta_address() || !req->has_set_default_mib()) {
-    BRCMF_ERR("Reset req does not contain required fields sta addr: %d default mib: %d",
-              req->has_sta_address(), req->has_set_default_mib());
-    return;
-  }
-#if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->sta_address().data()));
-#endif /* !defined(NDEBUG) */
-
-  BRCMF_ERR("Unimplemented");
-}
-
 static void brcmf_if_start_conf(net_device* ndev,
                                 fuchsia_wlan_fullmac_wire::WlanStartResult result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);

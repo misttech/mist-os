@@ -95,7 +95,6 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void Deauth(DeauthRequestView request, DeauthCompleter::Sync& completer) override;
   void AssocResp(AssocRespRequestView request, AssocRespCompleter::Sync& completer) override;
   void Disassoc(DisassocRequestView request, DisassocCompleter::Sync& completer) override;
-  void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
   void StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) override;
   void StopBss(StopBssRequestView request, StopBssCompleter ::Sync& completer) override;
   void SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& completer) override;

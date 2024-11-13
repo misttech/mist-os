@@ -143,10 +143,6 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                 self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 self.device.disassoc(mlme_to_fullmac::convert_disassociate_request(req))?;
             }
-            Reset(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
-                self.device.reset(mlme_to_fullmac::convert_reset_request(req))?;
-            }
             Start(req) => {
                 self.device.start_bss(mlme_to_fullmac::convert_start_bss_request(req)?)?
             }
@@ -606,33 +602,6 @@ mod handle_mlme_request_tests {
         assert_eq!(
             driver_req.reason_code,
             Some(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc)
-        );
-    }
-
-    #[test]
-    fn test_reset_request() {
-        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        let fidl_req = wlan_sme::MlmeRequest::Reset(fidl_mlme::ResetRequest {
-            sta_address: [1u8; 6],
-            set_default_mib: true,
-        });
-
-        h.mlme.handle_mlme_request(fidl_req).unwrap();
-
-        assert_variant!(
-            h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
-        );
-
-        let driver_req =
-            assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Reset { req })) => req);
-        assert_eq!(
-            driver_req,
-            fidl_fullmac::WlanFullmacImplResetRequest {
-                sta_address: Some([1u8; 6]),
-                set_default_mib: Some(true),
-                ..Default::default()
-            }
         );
     }
 

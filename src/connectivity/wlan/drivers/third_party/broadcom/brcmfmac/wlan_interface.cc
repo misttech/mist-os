@@ -426,14 +426,6 @@ void WlanInterface::Disassoc(DisassocRequestView request, DisassocCompleter::Syn
   completer.Reply();
 }
 
-void WlanInterface::Reset(ResetRequestView request, ResetCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_reset_req(wdev_->netdev, request);
-  }
-  completer.Reply();
-}
-
 void WlanInterface::StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ != nullptr) {

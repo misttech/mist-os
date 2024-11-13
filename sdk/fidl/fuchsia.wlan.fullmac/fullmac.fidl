@@ -644,10 +644,6 @@ closed protocol WlanFullmacImpl {
         1: peer_sta_address ieee80211.MacAddr;
         2: reason_code ieee80211.ReasonCode;
     }) -> ();
-    strict Reset(table {
-        1: sta_address ieee80211.MacAddr;
-        2: set_default_mib bool;
-    }) -> ();
     strict StartBss(table {
         1: ssid ieee80211.CSsid;
         2: bss_type fuchsia.wlan.common.BssType;

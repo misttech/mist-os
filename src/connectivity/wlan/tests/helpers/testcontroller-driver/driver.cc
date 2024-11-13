@@ -277,7 +277,6 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
         ForwardResult<WlanFullmacImpl::AssocResp>(completer.ToAsync()));
   }
   void Disassoc(DisassocRequest& request, DisassocCompleter::Sync& completer) override {}
-  void Reset(ResetRequest& request, ResetCompleter::Sync& completer) override {}
   void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->StartBss(request).Then(

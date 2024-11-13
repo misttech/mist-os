@@ -17,7 +17,6 @@ pub enum FullmacRequest {
     Deauth(fidl_fullmac::WlanFullmacImplDeauthRequest),
     AssocResp(fidl_fullmac::WlanFullmacImplAssocRespRequest),
     Disassoc(fidl_fullmac::WlanFullmacImplDisassocRequest),
-    Reset(fidl_fullmac::WlanFullmacImplResetRequest),
     StartBss(fidl_fullmac::WlanFullmacImplStartBssRequest),
     StopBss(fidl_fullmac::WlanFullmacImplStopBssRequest),
     SetKeys(fidl_fullmac::WlanFullmacImplSetKeysRequest),
@@ -95,9 +94,6 @@ impl RecordedRequestStream {
             }
             WlanFullmacImpl_Request::Disassoc { payload, .. } => {
                 self.history.push(FullmacRequest::Disassoc(payload.clone()))
-            }
-            WlanFullmacImpl_Request::Reset { payload, .. } => {
-                self.history.push(FullmacRequest::Reset(payload.clone()))
             }
             WlanFullmacImpl_Request::StartBss { payload, .. } => {
                 self.history.push(FullmacRequest::StartBss(payload.clone()))
