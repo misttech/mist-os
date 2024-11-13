@@ -31,9 +31,7 @@ class TestPmmNode {
 
   void IncrementFreePages(uint64_t num_pages) { free_pages_ += num_pages; }
 
-  Evictor::EvictionTarget GetOneShotEvictionTarget() const {
-    return evictor_.DebugGetOneShotEvictionTarget();
-  }
+  Evictor::EvictionTarget GetEvictionTarget() const { return evictor_.DebugGetEvictionTarget(); }
 
   uint64_t FreePages() const { return free_pages_; }
 
@@ -77,9 +75,9 @@ static bool evictor_set_target_test() {
           (rand() % 2) ? Evictor::EvictionLevel::IncludeNewest : Evictor::EvictionLevel::OnlyOldest,
   };
 
-  node.evictor()->SetOneShotEvictionTarget(expected);
+  node.evictor()->SetEvictionTarget(expected);
 
-  auto actual = node.GetOneShotEvictionTarget();
+  auto actual = node.GetEvictionTarget();
 
   ASSERT_EQ(actual.pending, expected.pending);
   ASSERT_EQ(actual.free_pages_target, expected.free_pages_target);
@@ -106,7 +104,7 @@ static bool evictor_combine_targets_test() {
         .min_pages_to_free = static_cast<uint64_t>(rand() % 1000),
         .level = Evictor::EvictionLevel::IncludeNewest,
     };
-    node.evictor()->CombineOneShotEvictionTarget(target);
+    node.evictor()->CombineEvictionTarget(target);
   }
 
   Evictor::EvictionTarget expected = {};
@@ -117,7 +115,7 @@ static bool evictor_combine_targets_test() {
     expected.free_pages_target = ktl::max(expected.free_pages_target, target.free_pages_target);
   }
 
-  auto actual = node.GetOneShotEvictionTarget();
+  auto actual = node.GetEvictionTarget();
 
   ASSERT_EQ(actual.pending, expected.pending);
   ASSERT_EQ(actual.free_pages_target, expected.free_pages_target);
@@ -145,8 +143,8 @@ static bool evictor_pager_backed_test() {
   uint64_t free_count = node.FreePages();
   EXPECT_EQ(free_count, 0u);
 
-  node.evictor()->SetOneShotEvictionTarget(target);
-  auto counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  auto counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages were evicted.
   EXPECT_EQ(counts.discardable, 0u);
@@ -166,8 +164,8 @@ static bool evictor_pager_backed_test() {
       .level = Evictor::EvictionLevel::IncludeNewest,
   };
 
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages were evicted.
   EXPECT_EQ(counts.discardable, 0u);
@@ -199,8 +197,8 @@ static bool evictor_discardable_test() {
   uint64_t free_count = node.FreePages();
   EXPECT_EQ(free_count, 0u);
 
-  node.evictor()->SetOneShotEvictionTarget(target);
-  auto counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  auto counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No pager backed pages were evicted.
   EXPECT_EQ(counts.pager_backed, 0u);
@@ -225,8 +223,8 @@ static bool evictor_discardable_test() {
       .level = Evictor::EvictionLevel::IncludeNewest,
   };
 
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No pager backed pages were evicted.
   EXPECT_EQ(counts.pager_backed, 0u);
@@ -264,8 +262,8 @@ static bool evictor_free_target_test() {
   uint64_t free_count = node.FreePages();
   EXPECT_EQ(free_count, 0u);
 
-  node.evictor()->SetOneShotEvictionTarget(target);
-  auto counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  auto counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages were evicted.
   EXPECT_EQ(counts.discardable, 0u);
@@ -278,8 +276,8 @@ static bool evictor_free_target_test() {
   EXPECT_GE(free_count, target.min_pages_to_free);
 
   // Evict again with the same target.
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No new pages should have been evicted, as the free target was already met with the previous
   // round of eviction, and no minimum pages were requested to be evicted.
@@ -291,8 +289,8 @@ static bool evictor_free_target_test() {
   uint64_t delta_pages = 10;
   target.free_pages_target += delta_pages;
   target.min_pages_to_free = 0;
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages evicted.
   EXPECT_EQ(counts.discardable, 0u);
@@ -306,8 +304,8 @@ static bool evictor_free_target_test() {
   // Evict again with a higher free memory target and also a min pages target.
   target.free_pages_target += delta_pages;
   target.min_pages_to_free = delta_pages;
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages evicted.
   EXPECT_EQ(counts.discardable, 0u);
@@ -320,8 +318,8 @@ static bool evictor_free_target_test() {
 
   // Evict again with the same free target, but request a min number of pages to be freed.
   target.min_pages_to_free = 2;
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
+  node.evictor()->SetEvictionTarget(target);
+  counts = node.evictor()->EvictFromPreloadedTarget();
 
   // No discardable pages evicted.
   EXPECT_EQ(counts.discardable, 0u);

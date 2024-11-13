@@ -200,13 +200,13 @@ int scanner_request_thread(void*) {
     if (op & kScannerOpReclaimAll) {
       op &= ~kScannerOpReclaimAll;
       reclaim_all = true;
-      pmm_evictor()->SetOneShotEvictionTarget(Evictor::EvictionTarget{
+      pmm_evictor()->SetEvictionTarget(Evictor::EvictionTarget{
           .pending = true,
           .free_pages_target = UINT64_MAX,
           .level = Evictor::EvictionLevel::IncludeNewest,
           .print_counts = print,
       });
-      pmm_evictor()->EvictOneShotFromPreloadedTarget();
+      pmm_evictor()->EvictFromPreloadedTarget();
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
       scanner_wait_for_accessed_scan(current_time(), true);
@@ -486,7 +486,7 @@ static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
       eviction_level = Evictor::EvictionLevel::OnlyOldest;
     }
     const uint64_t bytes = argv[2].u * MB;
-    pmm_evictor()->EvictOneShotAsynchronous(bytes, 0, eviction_level, Evictor::Output::Print);
+    pmm_evictor()->EvictAsynchronous(bytes, 0, eviction_level, Evictor::Output::Print);
   } else if (!strcmp(argv[1].str, "pt_reclaim")) {
     if (argc < 3) {
       goto usage;

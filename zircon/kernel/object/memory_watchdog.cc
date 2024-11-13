@@ -169,9 +169,8 @@ void MemoryWatchdog::EvictionTrigger() {
     // the WorkerThread knows it should bump the evictor when memory states change.
     continuous_eviction_active_ = true;
   }
-  pmm_evictor()->EvictOneShotAsynchronous(min_free_target_, free_mem_target_,
-                                          Evictor::EvictionLevel::OnlyOldest,
-                                          Evictor::Output::Print);
+  pmm_evictor()->EvictAsynchronous(min_free_target_, free_mem_target_,
+                                   Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
 }
 
 // Helper called by the memory pressure thread when OOM state is entered.
@@ -227,9 +226,9 @@ void MemoryWatchdog::WorkerThread() {
       // Keep trying to perform eviction for as long as we are evicting non-zero pages and we remain
       // in the out of memory state.
       while (mem_event_idx_ == PressureLevel::kOutOfMemory) {
-        uint64_t evicted_pages = pmm_evictor()->EvictOneShotSynchronous(
-            MB * 10, Evictor::EvictionLevel::IncludeNewest, Evictor::Output::Print,
-            Evictor::TriggerReason::OOM);
+        uint64_t evicted_pages =
+            pmm_evictor()->EvictSynchronous(MB * 10, Evictor::EvictionLevel::IncludeNewest,
+                                            Evictor::Output::Print, Evictor::TriggerReason::OOM);
         if (evicted_pages == 0) {
           printf("memory-pressure: found no pages to evict\n");
           break;
@@ -372,8 +371,8 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
     // See the documentation on EvictOneShotAsynchronous for how eviction requests combine, and why
     // we can repeatedly perform this request correctly.
     if (continuous_eviction_active_) {
-      pmm_evictor()->EvictOneShotAsynchronous(
-          0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
+      pmm_evictor()->EvictAsynchronous(0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest,
+                                       Evictor::Output::Print);
     }
     // In the case where we raced with additional pmm actions keep looping unless the deadline was
     // reached.

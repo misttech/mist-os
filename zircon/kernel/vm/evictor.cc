@@ -168,36 +168,35 @@ void Evictor::DisableEviction() {
   }
 }
 
-Evictor::EvictionTarget Evictor::DebugGetOneShotEvictionTarget() const {
+Evictor::EvictionTarget Evictor::DebugGetEvictionTarget() const {
   Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  return one_shot_eviction_target_;
+  return eviction_target_;
 }
 
-void Evictor::SetOneShotEvictionTarget(EvictionTarget target) {
+void Evictor::SetEvictionTarget(EvictionTarget target) {
   Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  one_shot_eviction_target_ = target;
+  eviction_target_ = target;
 }
 
-void Evictor::CombineOneShotEvictionTarget(EvictionTarget target) {
+void Evictor::CombineEvictionTarget(EvictionTarget target) {
   Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  one_shot_eviction_target_.pending = one_shot_eviction_target_.pending || target.pending;
-  one_shot_eviction_target_.level = ktl::max(one_shot_eviction_target_.level, target.level);
-  CheckedIncrement(&one_shot_eviction_target_.min_pages_to_free, target.min_pages_to_free);
-  one_shot_eviction_target_.free_pages_target =
-      ktl::max(one_shot_eviction_target_.free_pages_target, target.free_pages_target);
-  one_shot_eviction_target_.print_counts =
-      one_shot_eviction_target_.print_counts || target.print_counts;
+  eviction_target_.pending = eviction_target_.pending || target.pending;
+  eviction_target_.level = ktl::max(eviction_target_.level, target.level);
+  CheckedIncrement(&eviction_target_.min_pages_to_free, target.min_pages_to_free);
+  eviction_target_.free_pages_target =
+      ktl::max(eviction_target_.free_pages_target, target.free_pages_target);
+  eviction_target_.print_counts = eviction_target_.print_counts || target.print_counts;
 }
 
-Evictor::EvictedPageCounts Evictor::EvictOneShotFromPreloadedTarget() {
+Evictor::EvictedPageCounts Evictor::EvictFromPreloadedTarget() {
   EvictedPageCounts total_evicted_counts = {};
 
   // Create a local copy of the eviction target to operate against.
   EvictionTarget target;
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-    target = one_shot_eviction_target_;
-    one_shot_eviction_target_ = {};
+    target = eviction_target_;
+    eviction_target_ = {};
   }
   if (!target.pending) {
     return total_evicted_counts;
@@ -232,12 +231,12 @@ Evictor::EvictedPageCounts Evictor::EvictOneShotFromPreloadedTarget() {
   return total_evicted_counts;
 }
 
-uint64_t Evictor::EvictOneShotSynchronous(uint64_t min_mem_to_free, EvictionLevel eviction_level,
-                                          Output output, TriggerReason reason) {
+uint64_t Evictor::EvictSynchronous(uint64_t min_mem_to_free, EvictionLevel eviction_level,
+                                   Output output, TriggerReason reason) {
   if (!IsEvictionEnabled()) {
     return 0;
   }
-  SetOneShotEvictionTarget(EvictionTarget{
+  SetEvictionTarget(EvictionTarget{
       .pending = true,
       // No target free pages to get to. Evict based only on the min pages requested to evict.
       .free_pages_target = 0,
@@ -248,17 +247,16 @@ uint64_t Evictor::EvictOneShotSynchronous(uint64_t min_mem_to_free, EvictionLeve
       .oom_trigger = (reason == TriggerReason::OOM),
   });
 
-  auto evicted_counts = EvictOneShotFromPreloadedTarget();
+  auto evicted_counts = EvictFromPreloadedTarget();
   return evicted_counts.pager_backed + evicted_counts.discardable + evicted_counts.compressed;
 }
 
-void Evictor::EvictOneShotAsynchronous(uint64_t min_mem_to_free, uint64_t free_mem_target,
-                                       Evictor::EvictionLevel eviction_level,
-                                       Evictor::Output output) {
+void Evictor::EvictAsynchronous(uint64_t min_mem_to_free, uint64_t free_mem_target,
+                                Evictor::EvictionLevel eviction_level, Evictor::Output output) {
   if (!IsEvictionEnabled()) {
     return;
   }
-  CombineOneShotEvictionTarget(Evictor::EvictionTarget{
+  CombineEvictionTarget(Evictor::EvictionTarget{
       .pending = true,
       .free_pages_target = free_mem_target / PAGE_SIZE,
       .min_pages_to_free = min_mem_to_free / PAGE_SIZE,
@@ -358,9 +356,9 @@ int Evictor::EvictionThreadLoop() {
       break;
     }
 
-    // Process a one-shot target if there is one. This is a no-op and no pages are evicted if no
-    // one-shot target is pending.
-    EvictOneShotFromPreloadedTarget();
+    // Process an eviction target if there is one. This is a no-op and no pages are evicted if no
+    // target is pending.
+    EvictFromPreloadedTarget();
   }
   return 0;
 }

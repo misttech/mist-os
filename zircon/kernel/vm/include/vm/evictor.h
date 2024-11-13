@@ -95,37 +95,36 @@ class Evictor {
   // to this and EnableEviction.
   void DisableEviction();
 
-  // Set |one_shot_eviction_target_| to the specified |target|. The previous values are overridden.
-  void SetOneShotEvictionTarget(EvictionTarget target);
+  // Set |eviction_target_| to the specified |target|. The previous values are overridden.
+  void SetEvictionTarget(EvictionTarget target);
 
-  // Combine the specified |target| with the pre-existing |one_shot_eviction_target_|.
-  void CombineOneShotEvictionTarget(EvictionTarget target);
+  // Combine the specified |target| with the pre-existing |eviction_target_|.
+  void CombineEvictionTarget(EvictionTarget target);
 
-  // Perform a one-shot eviction based on the current values of |one_shot_eviction_target_|. The
-  // expectation is that the user will have set the target before calling this function with either
-  // SetOneShotEvictionTarget() or CombineOneShotEvictionTarget(). This may acquire arbitrary vmo
-  // and aspace locks.
-  EvictedPageCounts EvictOneShotFromPreloadedTarget();
+  // Perform eviction based on the current values of |eviction_target_|. The expectation is that the
+  // user will have set the target before calling this function with either SetEvictionTarget() or
+  // CombineEvictionTarget(). This may acquire arbitrary vmo and aspace locks.
+  EvictedPageCounts EvictFromPreloadedTarget();
 
   // Performs a synchronous request to evict |min_mem_to_free| (in bytes). The return value is the
   // number of pages evicted. The |eviction_level| is a rough control that maps to how old a page
   // needs to be for being considered for eviction. This may acquire arbitrary vmo and aspace locks.
-  uint64_t EvictOneShotSynchronous(uint64_t min_mem_to_free,
-                                   EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
-                                   Output output = Output::NoPrint,
-                                   TriggerReason reason = TriggerReason::Other);
+  uint64_t EvictSynchronous(uint64_t min_mem_to_free,
+                            EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
+                            Output output = Output::NoPrint,
+                            TriggerReason reason = TriggerReason::Other);
 
   // Reclaim memory until free memory equals the |free_mem_target| (in bytes) and at least
   // |min_mem_to_free| (in bytes) has been reclaimed. Reclamation will happen asynchronously on the
   // eviction thread and this function returns immediately. Once the target is reached, or there is
   // no more memory that can be reclaimed, this process will stop and the free memory target will be
   // cleared. The |eviction_level| is a rough control on how hard to try and evict. Multiple calls
-  // to EvictOneShotAsynchronous will cause all the targets to get merged by adding together
+  // to EvictAsynchronous will cause all the targets to get merged by adding together
   // |min_mem_to_free|, taking the max of |free_mem_target| and the highest or most aggressive of
   // any |eviction_level|.
-  void EvictOneShotAsynchronous(uint64_t min_mem_to_free, uint64_t free_mem_target,
-                                EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
-                                Output output = Output::NoPrint);
+  void EvictAsynchronous(uint64_t min_mem_to_free, uint64_t free_mem_target,
+                         EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
+                         Output output = Output::NoPrint);
 
   // Whether any eviction can occur.
   bool IsEvictionEnabled() const;
@@ -153,14 +152,15 @@ class Evictor {
   Evictor(ReclaimFunction reclaim_function, FreePagesFunction free_pages_function);
 
   // Helpers for testing.
-  EvictionTarget DebugGetOneShotEvictionTarget() const;
+  EvictionTarget DebugGetEvictionTarget() const;
 
   friend class vm_unittest::TestPmmNode;
 
   // Evict until |min_pages_to_evict| have been evicted and there are at least |free_pages_target|
   // free pages on the system. Note that the eviction operation here is one-shot, i.e. as soon as
   // the targets are met, eviction will stop and the function will return. Returns the number of
-  // discardable and pager-backed pages evicted. This may acquire arbitrary vmo and aspace locks.
+  // discardable and pager-backed pages evicted and pages compressed. This may acquire arbitrary vmo
+  // and aspace locks.
   EvictedPageCounts EvictUntilTargetsMet(uint64_t min_pages_to_evict, uint64_t free_pages_target,
                                          EvictionLevel level) TA_EXCL(lock_);
 
@@ -188,7 +188,7 @@ class Evictor {
                                                          EvictionLevel eviction_level) const;
 
   // Target for eviction.
-  EvictionTarget one_shot_eviction_target_ TA_GUARDED(lock_) = {};
+  EvictionTarget eviction_target_ TA_GUARDED(lock_) = {};
 
   // Event that enforces only one eviction attempt to be active at any time. This prevents us from
   // overshooting the free memory targets required by various simultaneous eviction requests.
