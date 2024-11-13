@@ -5,7 +5,6 @@
 use crate::logs::error::LogsError;
 use crate::logs::repository::LogsRepository;
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
-use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
@@ -15,36 +14,23 @@ pub struct LogSettingsServer {
     /// The repository holding the logs.
     logs_repo: Arc<LogsRepository>,
 
-    /// Sender which is used to close the stream of Log connections after ingestion of logsink
-    /// completes.
-    task_sender: mpsc::UnboundedSender<fasync::Task<()>>,
-
-    /// Task draining the receiver for the `task_sender`s.
-    _drain_listeners_task: fasync::Task<()>,
+    /// Scope holding all of the server Tasks.
+    scope: fasync::ScopeHandle,
 }
 
 impl LogSettingsServer {
-    pub fn new(logs_repo: Arc<LogsRepository>) -> Self {
-        let (task_sender, rcv) = mpsc::unbounded();
-        Self {
-            logs_repo,
-            task_sender,
-            _drain_listeners_task: fasync::Task::spawn(async move {
-                rcv.for_each_concurrent(None, |rx| rx).await;
-            }),
-        }
+    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::ScopeHandle) -> Self {
+        Self { logs_repo, scope }
     }
 
     /// Spawn a task to handle requests from components reading the shared log.
     pub fn spawn(&self, stream: fdiagnostics::LogSettingsRequestStream) {
         let logs_repo = Arc::clone(&self.logs_repo);
-        if let Err(e) = self.task_sender.unbounded_send(fasync::Task::spawn(async move {
+        self.scope.spawn(async move {
             if let Err(e) = Self::handle_requests(logs_repo, stream).await {
                 warn!("error handling Log requests: {}", e);
             }
-        })) {
-            warn!("Couldn't queue listener task: {:?}", e);
-        }
+        });
     }
 
     pub async fn handle_requests(

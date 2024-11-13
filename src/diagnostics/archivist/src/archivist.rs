@@ -72,8 +72,8 @@ pub struct Archivist {
     /// The server handling fuchsia.inspect.InspectSink
     inspect_sink_server: Arc<InspectSinkServer>,
 
-    /// The server handling fuchsia.diagnostics.LogSettings
-    log_settings_server: Arc<LogSettingsServer>,
+    /// Top level scope.
+    top_level_scope: fasync::Scope,
 }
 
 impl Archivist {
@@ -83,6 +83,7 @@ impl Archivist {
     pub async fn new(config: Config) -> Self {
         // Initialize the pipelines that the archivist will expose.
         let pipelines = Self::init_pipelines(&config);
+        let top_level_scope = fasync::Scope::new();
 
         // Initialize the core event router
         let mut event_router =
@@ -125,7 +126,6 @@ impl Archivist {
         ));
 
         let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
-        let log_settings_server = Arc::new(LogSettingsServer::new(Arc::clone(&logs_repo)));
 
         // Initialize the external event providers containing incoming diagnostics directories and
         // log sink connections.
@@ -175,7 +175,6 @@ impl Archivist {
             accessor_server,
             log_server,
             inspect_sink_server,
-            log_settings_server,
             event_router,
             _serial_task: serial_task,
             stop_recv: None,
@@ -185,6 +184,7 @@ impl Archivist {
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
+            top_level_scope,
         }
     }
 
@@ -376,7 +376,12 @@ impl Archivist {
         });
 
         // Server fuchsia.diagnostics.LogSettings
-        let log_settings_server = Arc::clone(&self.log_settings_server);
+        let log_settings_server = LogSettingsServer::new(
+            Arc::clone(&self.logs_repository),
+            // Don't create this in the servers scope. We don't care about this protocol for
+            // shutdown purposes.
+            self.top_level_scope.to_handle(),
+        );
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.diagnostics.LogSettings connection");
             log_settings_server.spawn(stream);
