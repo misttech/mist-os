@@ -18,6 +18,7 @@ cc_test_executable("display-test") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/testing/client-utils",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
