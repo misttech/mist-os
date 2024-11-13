@@ -42,43 +42,77 @@ source_set("cpp") {
   ]
 }
 
-test("unittests") {
-  output_name = "display-api-types-cpp-tests"
-  sources = [
-    "alpha-mode-test.cc",
-    "buffer-collection-id-test.cc",
-    "buffer-id-test.cc",
-    "config-stamp-test.cc",
-    "display-id-test.cc",
-    "display-timing-test.cc",
-    "driver-buffer-collection-id-test.cc",
-    "driver-buffer-id-test.cc",
-    "driver-capture-image-id-test.cc",
-    "driver-image-id-test.cc",
-    "driver-layer-id-test.cc",
-    "event-id-test.cc",
-    "image-buffer-usage-test.cc",
-    "image-id-test.cc",
-    "image-metadata-test.cc",
-    "image-tiling-type-test.cc",
-    "layer-id-test.cc",
-    "rectangle-test.cc",
-    "transform-test.cc",
-    "vsync-ack-cookie-test.cc",
-  ]
-  deps = [
+test_sources = [
+  "alpha-mode-test.cc",
+  "buffer-collection-id-test.cc",
+  "buffer-id-test.cc",
+  "config-stamp-test.cc",
+  "display-id-test.cc",
+  "display-timing-test.cc",
+  "driver-buffer-collection-id-test.cc",
+  "driver-buffer-id-test.cc",
+  "driver-capture-image-id-test.cc",
+  "driver-image-id-test.cc",
+  "driver-layer-id-test.cc",
+  "event-id-test.cc",
+  "image-buffer-usage-test.cc",
+  "image-id-test.cc",
+  "image-metadata-test.cc",
+  "image-tiling-type-test.cc",
+  "layer-id-test.cc",
+  "rectangle-test.cc",
+  "transform-test.cc",
+  "vsync-ack-cookie-test.cc",
+]
+
+group("test-deps") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = [
     ":cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
   ]
-  public_deps = [ "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp" ]
+}
+
+test("unittests") {
+  sources = test_sources
+  output_name = "display-api-types-cpp-tests"
+  deps = [ ":test-deps" ]
+  visibility = [ ":*" ]
+}
+
+test("unittests-cxx17") {
+  sources = test_sources
+  output_name = "display-api-types-cpp17-tests"
+  deps = [ ":test-deps" ]
+  visibility = [ ":*" ]
+
+  # Remove the C++ language specifier.
+  configs -= [ "//build/config:language" ]
+  configs += [ ":cxx17" ]
+}
+
+config("cxx17") {
+  visibility = [ ":*" ]
+  cflags_cc = [ "-std=c++17" ]
 }
 
 fuchsia_unittest_package("unittests-package") {
-  package_name = "display-api-types-cpp"
+  package_name = "display-api-types-cpp-tests"
   deps = [ ":unittests" ]
+}
+
+fuchsia_unittest_package("unittests-cxx17-package") {
+  package_name = "display-api-types-cpp17-tests"
+  deps = [ ":unittests-cxx17" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":unittests-package" ]
+  deps = [
+    ":unittests-cxx17-package",
+    ":unittests-package",
+  ]
 }
