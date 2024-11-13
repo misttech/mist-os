@@ -6,7 +6,8 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
-    MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
+    MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PagetableEvictionPolicy,
+    PlatformKernelConfig, ZeroPageScanCount,
 };
 use assembly_util::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
@@ -133,6 +134,35 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 "'kernel.halt-on-panic' can only be enabled in 'eng' builds"
             );
             builder.kernel_arg("kernel.halt-on-panic=true".to_owned())
+        }
+
+        if let Some(page_scanner) = &kernel_config.page_scanner {
+            match page_scanner.page_table_eviction_policy {
+                PagetableEvictionPolicy::Never => {
+                    builder.platform_bundle("kernel_page_table_eviction_never")
+                }
+                PagetableEvictionPolicy::OnRequest => {
+                    builder.platform_bundle("kernel_page_table_eviction_on_request")
+                }
+                PagetableEvictionPolicy::Always => {}
+            }
+
+            if page_scanner.disable_at_boot {
+                builder.kernel_arg("kernel.page-scanner.start-at-boot=false".to_owned());
+            }
+
+            if page_scanner.disable_eviction {
+                builder.kernel_arg("kernel.page-scanner.enable-eviction=false".to_owned());
+            }
+
+            let scan_count: u64 = match page_scanner.zero_page_scans_per_second {
+                ZeroPageScanCount::Default => 20000,
+                ZeroPageScanCount::NoScans => 0,
+                ZeroPageScanCount::PerSecond(x) => x,
+            };
+
+            let arg = format!("kernel.page-scanner.zero-page-scans-per-second={}", scan_count);
+            builder.kernel_arg(arg);
         }
 
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {

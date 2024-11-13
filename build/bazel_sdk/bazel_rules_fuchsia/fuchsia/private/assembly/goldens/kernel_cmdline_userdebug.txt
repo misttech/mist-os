@@ -13,6 +13,8 @@
 ?kernel.oom.evict-continuous=true
 ?kernel.page-scanner.lru-action=compress_only
 ?kernel.page-scanner.min-aging-interval-ms=0
+?kernel.page-scanner.page-table-eviction-policy=never
+?kernel.page-scanner.page-table-eviction-policy=on_request
 ?kernel.ppb.borrow-in-supplypages=true
 ?kernel.ppb.borrow-on-mru=true
 ?kernel.ppb.loan=true
