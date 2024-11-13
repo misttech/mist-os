@@ -999,14 +999,13 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusUnbootable) {
                                fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
 }
 
-// This one is mostly a compile-time test to trigger a breakage if any new enum variants are added,
-// so that we can be sure to add them to the paver as well.
+// This function is just a compile-time check to trigger a breakage if any new enum variants are
+// added, so that we can be sure to add them to the paver as well.
 //
-// If this test starts breaking:
+// If this function starts failing to compile:
 // 1. Update this switch statements to include the new enum variants.
 // 2. Add a unittest below to verify the libabr -> paver variant translation.
-TEST_F(PaverServiceSkipBlockTest, UnbootableReasonEnums) {
-  AbrUnbootableReason abr_reason = kAbrUnbootableReasonNone;
+[[maybe_unused]] void UnbootableReasonEnums(AbrUnbootableReason abr_reason) {
   switch (abr_reason) {
     case kAbrUnbootableReasonNone:
       break;
