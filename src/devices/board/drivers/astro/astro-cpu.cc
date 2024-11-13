@@ -79,14 +79,14 @@ const std::vector<fdf::BindRule> kPowerRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
                             bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN,
-                            bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE),
+                            bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
 };
 
 const std::vector<fdf::NodeProperty> kPowerProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
                       bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN,
-                      bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE),
+                      bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
 };
 
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{

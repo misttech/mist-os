@@ -305,11 +305,6 @@
 			opp-microvolt = <0xde698>;
 		};
 
-		opp-2108000000 {
-			opp-hz = <0x00 0x7da58700>;
-			opp-microvolt = <0xe82d8>;
-		};
-
 		opp-2208000000 {
 			opp-hz = <0x00 0x839b6800>;
 			opp-microvolt = <0xf6d38>;

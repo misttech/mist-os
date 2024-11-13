@@ -108,10 +108,11 @@
 			opp-hz = <0 2016000000>;
 			opp-microvolt = <911000>;
 		};
-		opp-2108000000 {
-			opp-hz = <0 2108000000>;
-			opp-microvolt = <951000>;
-		};
+		// TODO(b/376586778): This opps doesn't seem stable at the moment, investiage why.
+		// opp-2108000000 {
+		// 	opp-hz = <0 2108000000>;
+		// 	opp-microvolt = <951000>;
+		// };
 		opp-2208000000 {
 			opp-hz = <0 2208000000>;
 			opp-microvolt = <1011000>;

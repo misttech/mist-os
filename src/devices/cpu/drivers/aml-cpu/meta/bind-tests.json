@@ -6,7 +6,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.power.POWER_DOMAIN": "fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_LITTLE",
+                    "fuchsia.power.POWER_DOMAIN": "fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_BIG",
                     "fuchsia.hardware.power.Service": "fuchsia.hardware.power.Service.ZirconTransport"
                 }
             }
@@ -80,7 +80,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.power.POWER_DOMAIN": "fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_BIG",
+                    "fuchsia.power.POWER_DOMAIN": "fuchsia.amlogic.platform.POWER_DOMAIN.ARM_CORE_LITTLE",
                     "fuchsia.hardware.power.Service": "fuchsia.hardware.power.Service.ZirconTransport"
                 }
             }

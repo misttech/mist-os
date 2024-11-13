@@ -45,7 +45,7 @@ constexpr voltage_pwm_period_ns_t kS905d2PwmPeriodNs = 1250;
 
 zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fuchsia_hardware_power::DomainMetadata domain_metadata = {
-      {.domains = {{{{.id = {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_LITTLE}}}}}}};
+      {.domains = {{{{.id = {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG}}}}}}};
 
   const fit::result encoded_metadata = fidl::Persist(domain_metadata);
   if (!encoded_metadata.is_ok()) {

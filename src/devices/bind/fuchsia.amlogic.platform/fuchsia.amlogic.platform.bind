@@ -90,8 +90,8 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
 };
 
 extend uint fuchsia.power.POWER_DOMAIN {
-  ARM_CORE_LITTLE = 0,
-  ARM_CORE_BIG = 1,
+  ARM_CORE_BIG = 0,
+  ARM_CORE_LITTLE = 1,
  };
 
 enum PWM_ID {
