@@ -19,8 +19,8 @@
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/driver-utils/post-task.h"
 #include "src/lib/testing/predicates/status.h"
 

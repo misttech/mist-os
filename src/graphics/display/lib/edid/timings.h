@@ -9,7 +9,7 @@
 
 #include <cinttypes>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace edid::internal {
 

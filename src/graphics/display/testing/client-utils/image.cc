@@ -29,9 +29,9 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/testing/client-utils/utils.h"
 
 static constexpr uint32_t kRenderPeriod = 120;

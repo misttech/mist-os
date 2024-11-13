@@ -20,7 +20,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/string_buffer.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/eisa_vid_lut.h"
 #include "src/graphics/display/lib/edid/timings.h"
 

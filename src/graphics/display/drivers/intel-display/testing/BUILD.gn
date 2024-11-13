@@ -18,7 +18,7 @@ source_set("mock-allocator") {
   public_deps = [
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",

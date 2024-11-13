@@ -63,7 +63,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bus/lib/virtio:virtio-dfv2",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/lib/virtio:virtio-spec",
     "//src/lib/fxl",
     "//zircon/system/ulib/image-format",

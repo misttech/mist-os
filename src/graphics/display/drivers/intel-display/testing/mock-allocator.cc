@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 
 namespace intel_display {
 

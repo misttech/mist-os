@@ -24,7 +24,7 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace goldfish {

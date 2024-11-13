@@ -15,7 +15,7 @@ source_set("software-compositor") {
 
   public_deps = [
     "//sdk/lib/stdcompat",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/zx",
   ]
 }

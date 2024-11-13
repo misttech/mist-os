@@ -23,7 +23,7 @@
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 
 namespace display {
 

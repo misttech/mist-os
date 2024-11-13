@@ -27,9 +27,9 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 #define USE_GTEST

@@ -9,7 +9,7 @@
 #include <cinttypes>
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 namespace amlogic_display {
 

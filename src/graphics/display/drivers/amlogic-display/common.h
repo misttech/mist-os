@@ -7,7 +7,7 @@
 
 #include <hwreg/mmio.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 // Sets the bit field [field_begin_bit .. field_begin_bit + field_size_bits - 1]
 // of the `reg_value` to the 32-bit `field_value`.

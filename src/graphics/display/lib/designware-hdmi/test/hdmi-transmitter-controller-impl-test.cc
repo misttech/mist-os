@@ -10,7 +10,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
 // The MMIO register addresses here are from the Synopsis DesignWare Cores HDMI
 // Transmitter Controller Databook, which is distributed by Synopsis.

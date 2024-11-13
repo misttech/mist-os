@@ -20,9 +20,9 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhdt = fuchsia_hardware_display_types;

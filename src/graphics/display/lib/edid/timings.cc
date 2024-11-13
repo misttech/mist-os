@@ -9,7 +9,7 @@
 #include <array>
 #include <cstddef>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/cta-timing.h"
 #include "src/graphics/display/lib/edid/dmt-timing.h"
 

@@ -19,7 +19,7 @@
 #include "src/graphics/display/drivers/intel-display/display-device.h"
 #include "src/graphics/display/drivers/intel-display/dpcd.h"
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 
 namespace intel_display {
 

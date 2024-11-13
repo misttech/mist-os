@@ -9,9 +9,9 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/lib/api-types-cpp/alpha-mode.h"
-#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
-#include "src/graphics/display/lib/api-types-cpp/transform.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
+#include "src/graphics/display/lib/api-types/cpp/transform.h"
 #include "src/graphics/display/testing/software-compositor/pixel.h"
 
 namespace software_compositor {

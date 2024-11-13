@@ -12,9 +12,9 @@
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 
-#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
-#include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 
 // Indicies into event and event_ids
 #define WAIT_EVENT 0

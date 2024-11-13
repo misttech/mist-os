@@ -12,7 +12,7 @@
 
 #include <atomic>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
 namespace display {
 

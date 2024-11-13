@@ -32,7 +32,7 @@ source_set("fake-lib") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

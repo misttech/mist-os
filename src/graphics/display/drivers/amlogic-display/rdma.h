@@ -27,7 +27,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
 namespace amlogic_display {
 

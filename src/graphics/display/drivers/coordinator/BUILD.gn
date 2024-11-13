@@ -88,7 +88,7 @@ source_set("shared") {
     "//sdk/lib/zbi-format",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
-    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/driver-utils",
     "//src/graphics/display/lib/edid",

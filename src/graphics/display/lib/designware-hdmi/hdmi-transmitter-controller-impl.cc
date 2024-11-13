@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
 #include "src/graphics/display/lib/designware-hdmi/regs.h"
 

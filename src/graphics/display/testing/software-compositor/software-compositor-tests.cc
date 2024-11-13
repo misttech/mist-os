@@ -11,7 +11,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/display/testing/software-compositor/pixel.h"
 #include "src/graphics/display/testing/software-compositor/software-compositor.h"
 

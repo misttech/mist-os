@@ -20,7 +20,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
-#include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/event-id.h"
 
 namespace display {
 
