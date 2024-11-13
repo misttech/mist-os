@@ -7,7 +7,6 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogListenerSafeMarker, LogListenerSafeProxy, LogMessage,
 };
-use fuchsia_async::Task;
 use futures::prelude::*;
 use logmessage_measure_tape::Measurable as _;
 use std::sync::Arc;
@@ -75,17 +74,13 @@ impl Listener {
         })
     }
 
-    pub fn spawn(
-        self,
-        logs: impl Stream<Item = Arc<LogsData>> + Send + Unpin + 'static,
-        call_done: bool,
-    ) -> Task<()> {
-        Task::spawn(async move { self.run(logs, call_done).await })
-    }
-
     /// Send messages to the listener. First eagerly collects any backlog and sends it out in
     /// batches before waiting for wakeups.
-    async fn run(mut self, mut logs: impl Stream<Item = Arc<LogsData>> + Unpin, call_done: bool) {
+    pub async fn run(
+        mut self,
+        mut logs: impl Stream<Item = Arc<LogsData>> + Unpin,
+        call_done: bool,
+    ) {
         debug!("Backfilling from cursor until pending.");
         let mut backlog = vec![];
         futures::future::poll_fn(|cx| {

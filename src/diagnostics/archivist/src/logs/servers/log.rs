@@ -7,8 +7,6 @@ use crate::logs::listener::Listener;
 use crate::logs::repository::LogsRepository;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::StreamMode;
-use fuchsia_sync::Mutex;
-use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
@@ -18,53 +16,24 @@ pub struct LogServer {
     /// The repository holding the logs.
     logs_repo: Arc<LogsRepository>,
 
-    /// Sender which is used to close the stream of Log connections after ingestion of logsink
-    /// completes.
-    task_sender: Arc<Mutex<mpsc::UnboundedSender<fasync::Task<()>>>>,
-
-    /// Task draining the receiver for the `task_sender`s.
-    drain_listeners_task: Mutex<Option<fasync::Task<()>>>,
+    /// Scope in which we spawn all of the server tasks.
+    scope: fasync::ScopeHandle,
 }
 
 impl LogServer {
-    pub fn new(logs_repo: Arc<LogsRepository>) -> Self {
-        let (task_sender, rcv) = mpsc::unbounded();
-        Self {
-            logs_repo,
-            task_sender: Arc::new(Mutex::new(task_sender)),
-            drain_listeners_task: Mutex::new(Some(fasync::Task::spawn(async move {
-                rcv.for_each_concurrent(None, |rx| rx).await;
-            }))),
-        }
+    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::ScopeHandle) -> Self {
+        Self { logs_repo, scope }
     }
 
     /// Spawn a task to handle requests from components reading the shared log.
     pub fn spawn(&self, stream: flogger::LogRequestStream) {
         let logs_repo = Arc::clone(&self.logs_repo);
-        let sender = Arc::clone(&self.task_sender);
-        if let Err(e) = self.task_sender.lock().unbounded_send(fasync::Task::spawn(async move {
-            if let Err(e) = Self::handle_requests(logs_repo, stream, sender).await {
+        let scope = self.scope.clone();
+        self.scope.spawn(async move {
+            if let Err(e) = Self::handle_requests(logs_repo, stream, scope).await {
                 warn!("error handling Log requests: {}", e);
             }
-        })) {
-            warn!("Couldn't queue listener task: {:?}", e);
-        }
-    }
-
-    /// Instructs the server to stop accepting new connections.
-    pub fn stop(&self) {
-        self.task_sender.lock().disconnect();
-    }
-
-    /// Instructs the server to finish handling all connections and return when they have finished
-    /// draining logs.
-    pub async fn wait_for_servers_to_complete(&self) {
-        let task = self
-            .drain_listeners_task
-            .lock()
-            .take()
-            .expect("The accessor server task is only awaited for once");
-        task.await;
+        });
     }
 
     /// Handle requests to `fuchsia.logger.Log`. All request types read the
@@ -72,7 +41,7 @@ impl LogServer {
     async fn handle_requests(
         logs_repo: Arc<LogsRepository>,
         mut stream: flogger::LogRequestStream,
-        sender: Arc<Mutex<mpsc::UnboundedSender<fasync::Task<()>>>>,
+        scope: fasync::ScopeHandle,
     ) -> Result<(), LogsError> {
         let connection_id = logs_repo.new_interest_connection();
         while let Some(request) = stream.next().await {
@@ -105,7 +74,7 @@ impl LogServer {
                 logs_repo.update_logs_interest(connection_id, s);
             }
 
-            sender.lock().unbounded_send(listener.spawn(logs, dump_logs)).ok();
+            scope.spawn(listener.run(logs, dump_logs));
         }
         logs_repo.finish_interest_connection(connection_id);
         Ok(())

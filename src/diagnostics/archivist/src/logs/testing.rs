@@ -38,6 +38,7 @@ pub struct TestHarness {
     pending_streams: Vec<Weak<()>>,
     /// LogSinks to retain for inspect attribution tests
     sinks: Option<Vec<LogSinkProxy>>,
+    _scope: fasync::Scope,
 }
 
 pub fn create_log_sink_requested_event(
@@ -66,7 +67,7 @@ pub fn create_log_sink_requested_event(
 
 impl Default for TestHarness {
     fn default() -> Self {
-        Self::make(false)
+        Self::new(false)
     }
 }
 
@@ -75,13 +76,14 @@ impl TestHarness {
     /// useful for testing inspect hierarchies for attribution.
     // TODO(https://fxbug.dev/42131398) this will be made unnecessary by historical retention of component stats
     pub fn with_retained_sinks() -> Self {
-        Self::make(true)
+        Self::new(true)
     }
 
-    fn make(hold_sinks: bool) -> Self {
+    fn new(hold_sinks: bool) -> Self {
+        let scope = fasync::Scope::new();
         let inspector = Inspector::default();
         let log_manager = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-        let log_server = LogServer::new(Arc::clone(&log_manager));
+        let log_server = LogServer::new(Arc::clone(&log_manager), scope.to_handle());
 
         let (log_proxy, log_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
@@ -94,6 +96,7 @@ impl TestHarness {
             log_proxy,
             pending_streams: vec![],
             sinks: if hold_sinks { Some(vec![]) } else { None },
+            _scope: scope,
         }
     }
 
@@ -398,10 +401,11 @@ where
 pub async fn debuglog_test(
     expected: impl IntoIterator<Item = LogMessage>,
     debug_log: TestDebugLog,
+    scope: fasync::ScopeHandle,
 ) -> Inspector {
     let inspector = Inspector::default();
     let lm = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-    let log_server = LogServer::new(Arc::clone(&lm));
+    let log_server = LogServer::new(Arc::clone(&lm), scope);
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
     log_server.spawn(log_stream);
     lm.drain_debuglog(debug_log);

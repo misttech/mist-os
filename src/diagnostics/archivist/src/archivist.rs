@@ -132,7 +132,8 @@ impl Archivist {
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
         ));
 
-        let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
+        let log_server =
+            Arc::new(LogServer::new(Arc::clone(&logs_repo), servers_scope.to_handle()));
 
         // Initialize the external event providers containing incoming diagnostics directories and
         // log sink connections.
@@ -299,7 +300,6 @@ impl Archivist {
         });
 
         let accessor_server = Arc::clone(&self.accessor_server);
-        let log_server = Arc::clone(&self.log_server);
         let logs_repo = Arc::clone(&self.logs_repository);
         let servers_scope_handle = self.servers_scope.to_handle();
         let servers_scope = self.servers_scope;
@@ -307,14 +307,12 @@ impl Archivist {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
             accessor_server.wait_for_servers_to_complete().await;
-            log_server.wait_for_servers_to_complete().await;
             debug!("Log listeners and batch iterators stopped.");
             servers_scope.join().await;
         };
 
         let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
-        let log_server = self.log_server;
         let accessor_server = self.accessor_server;
         let logs_repo = Arc::clone(&self.logs_repository);
         let incoming_events_scope = self.incoming_events_scope;
@@ -324,7 +322,6 @@ impl Archivist {
                 terminate_handle.terminate().await;
                 incoming_events_scope.cancel().await;
                 servers_scope_handle.close();
-                log_server.stop();
                 accessor_server.stop();
                 logs_repo.stop_accepting_new_log_sinks();
                 abort_handle.abort()

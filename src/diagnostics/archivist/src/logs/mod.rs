@@ -24,7 +24,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use diagnostics_log_encoding::{Argument, Record, Severity};
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
-
+    use fuchsia_async as fasync;
     use moniker::ExtendedMoniker;
     use std::sync::Arc;
 
@@ -615,7 +615,8 @@ mod tests {
             },
         ];
 
-        let klog_stats_tree = debuglog_test(expected_logs, klog_reader).await;
+        let scope = fasync::Scope::new();
+        let klog_stats_tree = debuglog_test(expected_logs, klog_reader, scope.to_handle()).await;
         assert_data_tree!(
             klog_stats_tree,
             root: contains {
