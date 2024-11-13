@@ -165,10 +165,11 @@ class PciAllocator {
 // PciRootAllocators are an implementation of PciAllocator designed
 // to use the Pciroot protocol for allocation, fulfilling the requirements
 // for a PciRoot to implement the UpstreamNode interface.
-class PciRootAllocator : public PciAllocator {
+class PciRootAllocator final : public PciAllocator {
  public:
   PciRootAllocator(ddk::PcirootProtocolClient proto, pci_address_space_t type, bool low)
       : PciAllocator(type), pciroot_(proto), low_(low) {}
+  ~PciRootAllocator() final = default;
   zx::result<std::unique_ptr<PciAllocation>> Allocate(std::optional<zx_paddr_t> base,
                                                       size_t size) final;
 
@@ -184,8 +185,9 @@ class PciRootAllocator : public PciAllocator {
 // objects to implement the UpstreamNode interface by using regions that they
 // are provided by nodes further upstream. They hand out PciRegionAllocations
 // which will release allocations back upstream if they go out of scope.
-class PciRegionAllocator : public PciAllocator {
+class PciRegionAllocator final : public PciAllocator {
  public:
+  ~PciRegionAllocator() final = default;
   zx::result<std::unique_ptr<PciAllocation>> Allocate(std::optional<zx_paddr_t> base,
                                                       size_t size) override;
   zx_status_t SetParentAllocation(std::unique_ptr<PciAllocation> alloc) override;
