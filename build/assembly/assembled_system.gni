@@ -49,9 +49,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   testonly (optional)
 #     [bool] Usual GN meanings.
 #
-#   check_production_tag (default: false)
-#      [bool] Whether to check there is no non_production_tag dependencies.
-#
 # Product Assembly parameters:
 #
 #   board_config_label (required if board_config is not used)
@@ -627,11 +624,6 @@ template("assembled_system") {
     # Build the images using the Image Assembler.
     #
 
-    check_production_tag = false
-    if (defined(invoker.check_production_tag)) {
-      check_production_tag = invoker.check_production_tag
-    }
-
     # Create the AIB for a custom kernel zbi, if one was provided.
     if (defined(labels.custom_kernel_aib)) {
       kernel_assembly_input_bundle(labels.custom_kernel_aib) {
@@ -1062,10 +1054,6 @@ template("assembled_system") {
             ]
           }
         }
-      }
-
-      if (check_production_tag) {
-        assert_no_deps = [ "//build/validate:non_production_tag" ]
       }
     }
 
