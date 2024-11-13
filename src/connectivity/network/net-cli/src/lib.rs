@@ -874,7 +874,6 @@ async fn do_if_config_set(
             "if config set expects property value pairs and thus an even number of arguments"
         )));
     }
-    let mut temporary_address_enabled = None;
     let config = options.iter().tuples().try_fold(
         finterfaces_admin::Configuration::default(),
         |mut config, (property, value)| {
@@ -891,7 +890,6 @@ async fn do_if_config_set(
                         .slaac
                         .get_or_insert(Default::default())
                         .temporary_address = Some(enabled);
-                    temporary_address_enabled = Some(enabled);
                 }
                 unknown_property => {
                     return Err(user_facing_error(format!(
