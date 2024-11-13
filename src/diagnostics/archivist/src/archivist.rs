@@ -130,6 +130,7 @@ impl Archivist {
             Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
+            servers_scope.to_handle(),
         ));
 
         let log_server =
@@ -299,21 +300,18 @@ impl Archivist {
             drain_events_fut.await;
         });
 
-        let accessor_server = Arc::clone(&self.accessor_server);
         let logs_repo = Arc::clone(&self.logs_repository);
         let servers_scope_handle = self.servers_scope.to_handle();
         let servers_scope = self.servers_scope;
         let all_msg = async {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
-            accessor_server.wait_for_servers_to_complete().await;
-            debug!("Log listeners and batch iterators stopped.");
             servers_scope.join().await;
+            debug!("All servers stopped.");
         };
 
         let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
-        let accessor_server = self.accessor_server;
         let logs_repo = Arc::clone(&self.logs_repository);
         let incoming_events_scope = self.incoming_events_scope;
         let stop_fut = match self.stop_recv {
@@ -322,7 +320,6 @@ impl Archivist {
                 terminate_handle.terminate().await;
                 incoming_events_scope.cancel().await;
                 servers_scope_handle.close();
-                accessor_server.stop();
                 logs_repo.stop_accepting_new_log_sinks();
                 abort_handle.abort()
             }
