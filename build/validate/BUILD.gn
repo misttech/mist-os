@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 # Add this tag to deps of non_production GN labels (packages/configs).
-# If check_production_eligibility = true, including such GN labels will cause
-# build to fail.
+# This dependency is disallowed in Assembly Input Bundles (AIBs) for _user images.
 group("non_production_tag") {
 }
 

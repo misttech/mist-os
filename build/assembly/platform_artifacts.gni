@@ -10,6 +10,10 @@ import("//build/python/python_action.gni")
 #
 # Arguments
 #
+#   check_production_eligibility (optional)
+#     [boolean] Whether to check that the inputs to these platform artifacts are suitable for
+#     production builds.
+#
 #   deps (optional)
 #     [list] Deps to metadata walk to find the platform artifacts which will
 #     be copied into the output directory.
@@ -26,6 +30,10 @@ template("platform_artifacts") {
     platform_artifacts = "${target_name}.platform_artifacts"
     bazel_inputs = "${target_name}.bazel_inputs"
   }
+
+  _check_production_eligibility =
+      defined(invoker.check_production_eligibility) &&
+      invoker.check_production_eligibility
 
   generated_file(labels.aib_list) {
     forward_variables_from(invoker,
@@ -84,6 +92,10 @@ template("platform_artifacts") {
       ":${labels.bazel_inputs}",
       ":${labels.platform_artifacts}",
     ]
+
+    if (_check_production_eligibility) {
+      assert_no_deps = [ "//build/validate:non_production_tag" ]
+    }
 
     metadata = {
       package_barrier = []

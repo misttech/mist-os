@@ -87,6 +87,7 @@ platform_artifacts("userdebug") {
 
 platform_artifacts("user") {
   deps = user_platform_aib_labels
+  check_production_eligibility = true
 }
 
 ########
