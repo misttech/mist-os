@@ -75,10 +75,11 @@ impl Archivist {
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
     pub async fn new(config: Config, request_stream: LifecycleRequestStream) -> Self {
-        // Initialize the pipelines that the archivist will expose.
-        let pipelines = Self::init_pipelines(&config);
         let top_level_scope = fasync::Scope::new();
         let servers_scope = top_level_scope.new_child();
+
+        // Initialize the pipelines that the archivist will expose.
+        let pipelines = Self::init_pipelines(&config);
 
         // Initialize the core event router
         let mut event_router =
@@ -98,6 +99,7 @@ impl Archivist {
             config.logs_max_cached_original_bytes,
             initial_interests,
             component::inspector().root(),
+            top_level_scope.new_child(),
         );
         if !config.allow_serial_logs.is_empty() {
             let write_logs_to_serial =
@@ -316,7 +318,7 @@ impl Archivist {
             info!("archivist: Entering core loop.");
         }
 
-        // Combine all futures into a main future.
+        // Combine all three futures into a main future.
         future::join(abortable_fut, stop_fut).map(|_| Ok(())).await
     }
 

@@ -21,7 +21,7 @@ use fidl_fuchsia_logger::{
 };
 use fuchsia_async::Task;
 use fuchsia_sync::Mutex;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::prelude::*;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
@@ -209,22 +209,21 @@ impl LogsArtifactsContainer {
     pub fn handle_log_sink(
         self: &Arc<Self>,
         stream: LogSinkRequestStream,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
     ) {
         {
             let mut guard = self.state.lock();
             guard.num_active_channels += 1;
             guard.is_initializing = false;
         }
-        let task = Task::spawn(Arc::clone(self).actually_handle_log_sink(stream, sender.clone()));
-        sender.unbounded_send(task).expect("channel is live for whole program");
+        scope.spawn(Arc::clone(self).actually_handle_log_sink(stream, scope.clone()));
     }
 
     /// This function does not return until the channel is closed.
     async fn actually_handle_log_sink(
         self: Arc<Self>,
         mut stream: LogSinkRequestStream,
-        sender: mpsc::UnboundedSender<Task<()>>,
+        scope: fasync::ScopeHandle,
     ) {
         let hanging_get_sender = Arc::new(Mutex::new(None));
 
@@ -237,8 +236,7 @@ impl LogsArtifactsContainer {
                 let socket = fasync::Socket::from_socket($socket);
                 let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
                 self.state.lock().num_active_sockets += 1;
-                let task = Task::spawn(self.clone().drain_messages(log_stream));
-                sender.unbounded_send(task).expect("channel alive for whole program");
+                scope.spawn(self.clone().drain_messages(log_stream));
             }};
         }
 
@@ -623,12 +621,12 @@ mod tests {
     use fuchsia_async::MonotonicDuration;
     use fuchsia_inspect as inspect;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::channel::mpsc::UnboundedReceiver;
     use moniker::ExtendedMoniker;
 
     fn initialize_container(
         severity: Option<Severity>,
-    ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
+        scope: fasync::ScopeHandle,
+    ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy) {
         let identity = Arc::new(ComponentIdentity::new(
             ExtendedMoniker::parse_str("/foo/bar").unwrap(),
             "fuchsia-pkg://test",
@@ -648,17 +646,17 @@ mod tests {
             None,
         ));
         // Connect out LogSink under test and take its events channel.
-        let (sender, _recv) = mpsc::unbounded();
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().expect("create log sink");
-        container.handle_log_sink(stream, sender);
-        (container, proxy, _recv)
+        container.handle_log_sink(stream, scope);
+        (container, proxy)
     }
 
     #[fuchsia::test]
     async fn update_interest() {
         // Sync path test (initial interest)
-        let (container, log_sink, _sender) = initialize_container(None);
+        let scope = fasync::Scope::new();
+        let (container, log_sink) = initialize_container(None, scope.to_handle());
         // Get initial interest
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         {
@@ -715,14 +713,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn initial_interest() {
-        let (_container, log_sink, _sender) = initialize_container(Some(Severity::Info));
+        let scope = fasync::Scope::new();
+        let (_container, log_sink) = initialize_container(Some(Severity::Info), scope.to_handle());
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, Some(Severity::Info));
     }
 
     #[fuchsia::test]
     async fn interest_serverity_semantics() {
-        let (container, log_sink, _sender) = initialize_container(None);
+        let scope = fasync::Scope::new();
+        let (container, log_sink) = initialize_container(None, scope.to_handle());
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, None);
         // Set some interest.

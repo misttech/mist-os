@@ -792,7 +792,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
+        let log_repo =
+            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = ArchiveAccessorServer::new(
@@ -854,7 +855,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
+        let log_repo =
+            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = Arc::new(ArchiveAccessorServer::new(
@@ -999,7 +1001,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
+        let log_repo =
+            LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
         let inspect_repo =
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], scope.new_child()));
         let server = ArchiveAccessorServer::new(

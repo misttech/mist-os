@@ -293,7 +293,7 @@ mod tests {
     #[fuchsia::test]
     async fn writes_ingested_logs() {
         let serial_config = SerialConfig::new(vec!["bootstrap/**", "/core/foo"], vec!["foo"]);
-        let repo = LogsRepository::default();
+        let repo = LogsRepository::for_test(fasync::Scope::new());
 
         let bootstrap_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
             ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
