@@ -819,9 +819,6 @@ impl Realm {
         let child_name: LongName =
             format!("read-only-directory-{}", string_id).parse().expect("should be valid name");
 
-        let mut child_path = self.realm_path.clone();
-        child_path.push(child_name.to_string());
-
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![(
                 runner::LOCAL_COMPONENT_ID_KEY.to_string(),
