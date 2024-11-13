@@ -11,8 +11,6 @@ pub trait FastbootInterface: std::fmt::Debug + Fastboot {}
 
 #[async_trait(?Send)]
 pub trait Fastboot {
-    async fn prepare(&mut self, listener: Sender<RebootEvent>) -> Result<(), FastbootError>;
-
     async fn get_var(&mut self, name: &str) -> Result<String, FastbootError>;
 
     async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<(), FastbootError>;
