@@ -143,6 +143,7 @@ grpc_so("grpc++") {
     ":grpc++_repeated2",
     ":grpc++_repeated3",
     ":grpc++_repeated4",
+    "//build/validate:non_production_tag",
   ]
   public_deps = [ ":grpc++_h" ]
 }
