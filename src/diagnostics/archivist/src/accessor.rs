@@ -817,7 +817,8 @@ mod tests {
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
         let server =
             ArchiveAccessorServer::new(inspect_repo, log_repo, 4, BatchRetrievalTimeout::max());
         server.spawn_server(pipeline, stream);
@@ -872,7 +873,8 @@ mod tests {
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
         let server = Arc::new(ArchiveAccessorServer::new(
             inspect_repo,
             log_repo,
@@ -1014,7 +1016,8 @@ mod tests {
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
         let server =
             ArchiveAccessorServer::new(inspect_repo, log_repo, 4, BatchRetrievalTimeout::max());
         server.spawn_server(pipeline, stream);

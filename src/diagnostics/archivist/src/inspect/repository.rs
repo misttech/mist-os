@@ -12,7 +12,7 @@ use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_diagnostics::Selector;
 use flyweights::FlyStr;
 use fuchsia_sync::{RwLock, RwLockWriteGuard};
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
@@ -24,26 +24,15 @@ static INSPECT_ESCROW_NAME: zx::Name = zx::Name::new_lossy("InspectEscrowedVmo")
 pub struct InspectRepository {
     inner: RwLock<InspectRepositoryInner>,
     pipelines: Vec<Weak<Pipeline>>,
-}
-
-impl Default for InspectRepository {
-    fn default() -> Self {
-        Self::new(vec![])
-    }
+    scope: fasync::Scope,
 }
 
 impl InspectRepository {
-    pub fn new(pipelines: Vec<Weak<Pipeline>>) -> InspectRepository {
-        let (snd, rcv) = mpsc::unbounded();
+    pub fn new(pipelines: Vec<Weak<Pipeline>>, scope: fasync::Scope) -> InspectRepository {
         Self {
             pipelines,
-            inner: RwLock::new(InspectRepositoryInner {
-                diagnostics_containers: HashMap::new(),
-                inspect_handle_closed_snd: snd,
-                _inspect_handle_closed_drain: fasync::Task::spawn(async move {
-                    rcv.for_each_concurrent(None, |rx| rx).await
-                }),
-            }),
+            scope,
+            inner: RwLock::new(InspectRepositoryInner { diagnostics_containers: HashMap::new() }),
         }
     }
 
@@ -74,7 +63,7 @@ impl InspectRepository {
             return;
         };
 
-        let _ = guard.inspect_handle_closed_snd.unbounded_send(spawn_on_closed_task(
+        self.scope.spawn(handle_on_closed(
             Arc::clone(&identity),
             Arc::downgrade(self),
             on_closed_fut,
@@ -146,36 +135,35 @@ impl InspectRepository {
     }
 }
 
-fn spawn_on_closed_task<E, F>(
+async fn handle_on_closed<E, F>(
     identity: Arc<ComponentIdentity>,
     repo: Weak<InspectRepository>,
     on_closed_fut: F,
-) -> fasync::Task<()>
-where
+) where
     F: Future<Output = Result<zx::Koid, E>> + Send + 'static,
 {
-    fasync::Task::spawn(async move {
-        if let Ok(koid_to_remove) = on_closed_fut.await {
-            if let Some(this) = repo.upgrade() {
-                // Hold the lock while we remove and update pipelines.
-                let mut guard = this.inner.write();
+    let Ok(koid_to_remove) = on_closed_fut.await else {
+        return;
+    };
+    let Some(this) = repo.upgrade() else {
+        return;
+    };
+    // Hold the lock while we remove and update pipelines.
+    let mut guard = this.inner.write();
 
-                if let Some(container) = guard.diagnostics_containers.get_mut(&identity) {
-                    if container.remove_handle(koid_to_remove).1 != 0 {
-                        return;
-                    }
-                }
-
-                guard.diagnostics_containers.remove(&identity);
-
-                for pipeline_weak in &this.pipelines {
-                    if let Some(pipeline) = pipeline_weak.upgrade() {
-                        pipeline.remove_component(&identity.moniker);
-                    }
-                }
-            }
+    if let Some(container) = guard.diagnostics_containers.get_mut(&identity) {
+        if container.remove_handle(koid_to_remove).1 != 0 {
+            return;
         }
-    })
+    }
+
+    guard.diagnostics_containers.remove(&identity);
+
+    for pipeline_weak in &this.pipelines {
+        if let Some(pipeline) = pipeline_weak.upgrade() {
+            pipeline.remove_component(&identity.moniker);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,12 +209,6 @@ impl InspectRepository {
 struct InspectRepositoryInner {
     /// All the diagnostics directories that we are tracking.
     diagnostics_containers: HashMap<Arc<ComponentIdentity>, InspectArtifactsContainer>,
-
-    /// Tasks waiting for PEER_CLOSED signals on diagnostics directories are sent here.
-    inspect_handle_closed_snd: mpsc::UnboundedSender<fasync::Task<()>>,
-
-    /// Task draining all diagnostics directory PEER_CLOSED signal futures.
-    _inspect_handle_closed_drain: fasync::Task<()>,
 }
 
 impl InspectRepositoryInner {
@@ -314,7 +296,7 @@ mod tests {
     #[fuchsia::test]
     fn inspect_repo_disallows_duplicated_handles() {
         let _exec = fuchsia_async::LocalExecutor::new();
-        let inspect_repo = Arc::new(InspectRepository::default());
+        let inspect_repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
@@ -336,7 +318,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn repo_removes_entries_when_inspect_is_disconnected() {
-        let data_repo = Arc::new(InspectRepository::default());
+        let data_repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
@@ -355,7 +337,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn related_handle_closes_when_repo_handle_is_removed() {
-        let repo = Arc::new(InspectRepository::default());
+        let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let identity = Arc::new(ComponentIdentity::unknown());
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
@@ -374,7 +356,8 @@ mod tests {
         let selector = selectors::parse_selector::<FastError>(r#"a/b/foo:root"#).unwrap();
         let static_selectors_opt = Some(vec![selector]);
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
-        let data_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let data_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker.clone(), TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
@@ -399,7 +382,7 @@ mod tests {
     #[fuchsia::test]
     fn data_repo_filters_inspect_by_selectors() {
         let _exec = fuchsia_async::LocalExecutor::new();
-        let data_repo = Arc::new(InspectRepository::default());
+        let data_repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
@@ -462,7 +445,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn repo_removes_escrowed_data_on_token_peer_closed() {
-        let repo = Arc::new(InspectRepository::default());
+        let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
@@ -494,7 +477,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn repo_overwrites_tree_on_escrow() {
-        let repo = Arc::new(InspectRepository::default());
+        let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
@@ -530,7 +513,7 @@ mod tests {
     #[fuchsia::test]
     fn repo_fetch_escrow_removes_data() {
         let _exec = fuchsia_async::LocalExecutor::new();
-        let repo = Arc::new(InspectRepository::default());
+        let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
@@ -570,7 +553,7 @@ mod tests {
     #[fuchsia::test]
     fn repo_fetch_escrow_with_tree_returns_data_keeps_tree() {
         let _exec = fuchsia_async::LocalExecutor::new();
-        let repo = Arc::new(InspectRepository::default());
+        let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 

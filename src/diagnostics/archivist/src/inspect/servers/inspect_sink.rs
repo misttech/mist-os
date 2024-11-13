@@ -188,7 +188,7 @@ mod tests {
         /// for each input ComponentIdentity.
         fn new(identity: Vec<Arc<ComponentIdentity>>) -> Self {
             let mut proxy_pairs = vec![];
-            let repo = Arc::new(InspectRepository::default());
+            let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
             let scope = fasync::Scope::new();
             let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo), scope.to_handle()));
             for id in identity.into_iter() {

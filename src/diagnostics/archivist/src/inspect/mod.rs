@@ -430,7 +430,8 @@ mod tests {
         }
 
         let pipeline = Arc::new(Pipeline::for_test(None));
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
 
         for (component, handles) in clients {
             let moniker = ExtendedMoniker::parse_str(&component).unwrap();
@@ -495,7 +496,8 @@ mod tests {
         let static_selectors_opt = Some(vec![child_1_1_selector, child_2_selector]);
 
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
-        let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
+        let inspect_repo =
+            Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
 
         // The moniker here is made up since the selector is a glob
         // selector, so any path would match.

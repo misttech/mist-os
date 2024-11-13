@@ -116,8 +116,10 @@ impl Archivist {
         } else {
             None
         };
-        let inspect_repo =
-            Arc::new(InspectRepository::new(pipelines.iter().map(Arc::downgrade).collect()));
+        let inspect_repo = Arc::new(InspectRepository::new(
+            pipelines.iter().map(Arc::downgrade).collect(),
+            top_level_scope.new_child(),
+        ));
 
         let inspect_sink_server =
             Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), servers_scope.to_handle()));
