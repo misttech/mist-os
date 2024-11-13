@@ -1130,10 +1130,11 @@ class VmPageList final {
       return ZX_OK;
     }
 
-    // Handle scenario where start_offset begins not aligned to a node.
-    if (cur->offset() < start_offset) {
-      zx_status_t status = cur->template ForEveryPageInRange<PTR_TYPE, F>(
-          per_page_func, start_offset, ktl::min(end_offset, cur->end_offset()), self->list_skew_);
+    while (cur && cur->offset() < end_offset) {
+      uint64_t start = ktl::max(start_offset, cur->offset());
+      uint64_t end = ktl::min(cur->end_offset(), end_offset);
+      zx_status_t status = cur->template ForEveryPageInRange<PTR_TYPE, F>(per_page_func, start, end,
+                                                                          self->list_skew_);
       auto prev = cur++;
       if constexpr (NODE_CHECK == NodeCheck::CleanupEmpty) {
         if (prev->IsEmpty()) {
@@ -1147,40 +1148,7 @@ class VmPageList final {
         return status;
       }
     }
-    // Iterate through all full nodes contained in the range.
-    while (cur && cur->end_offset() < end_offset) {
-      DEBUG_ASSERT(start_offset <= cur->offset());
-      zx_status_t status = cur->template ForEveryPage<PTR_TYPE, F>(per_page_func, self->list_skew_);
-      auto prev = cur++;
-      if constexpr (NODE_CHECK == NodeCheck::CleanupEmpty) {
-        if (prev->IsEmpty()) {
-          self->list_.erase(prev);
-        }
-      }
-      if (unlikely(status != ZX_ERR_NEXT)) {
-        if (status == ZX_ERR_STOP) {
-          return ZX_OK;
-        }
-        return status;
-      }
-    }
-    // Handle scenario where the end_offset is not aligned to the end of a node.
-    if (cur && cur->offset() < end_offset) {
-      DEBUG_ASSERT(cur->end_offset() >= end_offset);
-      zx_status_t status = cur->template ForEveryPageInRange<PTR_TYPE, F>(
-          per_page_func, cur->offset(), end_offset, self->list_skew_);
-      if constexpr (NODE_CHECK == NodeCheck::CleanupEmpty) {
-        if (cur->IsEmpty()) {
-          self->list_.erase(cur);
-        }
-      }
-      if (unlikely(status != ZX_ERR_NEXT)) {
-        if (status == ZX_ERR_STOP) {
-          return ZX_OK;
-        }
-        return status;
-      }
-    }
+
     return ZX_OK;
   }
 
