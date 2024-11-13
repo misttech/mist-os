@@ -15,7 +15,7 @@ async fn watch_dir_existing() {
     let harness = TestHarness::new().await;
 
     let entries = vec![file("foo", b"test".to_vec())];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let mut watcher = Watcher::new(&dir).await.expect("making watcher");
     assert_eq!(
@@ -39,7 +39,7 @@ async fn watch_dir_added_removed() {
         return;
     }
 
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let mut watcher = Watcher::new(&dir).await.expect("making watcher");
     assert_eq!(
@@ -87,7 +87,7 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
         return;
     }
 
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let mut watcher = Watcher::new(&dir).await.expect("making watcher");
     assert_eq!(
@@ -137,7 +137,7 @@ async fn watch_dir_rename() {
         return;
     }
 
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let mut watcher = Watcher::new(&dir).await.expect("making watcher");
     assert_eq!(

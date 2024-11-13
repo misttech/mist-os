@@ -11,9 +11,11 @@ async fn get_token_with_sufficient_rights() {
     if !harness.config.supports_get_token {
         return;
     }
-
-    for dir_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    // TODO(https://fxbug.dev/346585458): This should only require the MODIFY_DIRECTORY right
+    // however the C++ VFS incorrectly checks for WRITE_BYTES instead.
+    for dir_flags in harness
+        .dir_rights
+        .combinations_containing(fio::Rights::WRITE_BYTES | fio::Rights::MODIFY_DIRECTORY)
     {
         let dir = harness.get_directory(vec![], dir_flags);
         let (status, _handle) = dir.get_token().await.expect("get_token failed");
@@ -28,8 +30,12 @@ async fn get_token_with_insufficient_rights() {
     if !harness.config.supports_get_token {
         return;
     }
-
-    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+    // TODO(https://fxbug.dev/346585458): This should only require the MODIFY_DIRECTORY right
+    // however the C++ VFS incorrectly checks for WRITE_BYTES instead.
+    for dir_flags in harness
+        .dir_rights
+        .combinations_without(fio::Rights::WRITE_BYTES | fio::Rights::MODIFY_DIRECTORY)
+    {
         let dir = harness.get_directory(vec![], dir_flags);
         let (status, _handle) = dir.get_token().await.expect("get_token failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::BAD_HANDLE);

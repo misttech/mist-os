@@ -20,7 +20,7 @@ async fn link_with_sufficient_rights() {
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
         let dest_dir = open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
@@ -50,7 +50,7 @@ async fn link_with_insufficient_rights() {
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
         let dest_dir = open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;

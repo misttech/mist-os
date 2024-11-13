@@ -9,7 +9,7 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn directory_query() {
     let harness = TestHarness::new().await;
-    let dir = harness.get_directory(vec![], fio::OpenFlags::empty());
+    let dir = harness.get_directory(vec![], fio::Flags::empty());
 
     {
         let dir = open_node::<fio::DirectoryMarker>(
@@ -35,7 +35,7 @@ async fn file_query() {
     let harness = TestHarness::new().await;
 
     let entries = vec![file(TEST_FILE, vec![])];
-    let dir = harness.get_directory(entries, fio::OpenFlags::empty());
+    let dir = harness.get_directory(entries, fio::Flags::empty());
     {
         let file = open_node::<fio::FileMarker>(
             &dir,

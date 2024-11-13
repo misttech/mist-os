@@ -92,27 +92,27 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                 };
                 responder.send(&config)?;
             }
-            TestHarnessRequest::GetDirectory {
-                root,
+            TestHarnessRequest::CreateDirectory {
+                contents,
                 flags,
-                directory_request,
+                object_request,
                 control_handle: _,
             } => {
                 let dir = simple();
-                for entry in root.entries {
+                for entry in contents {
                     if let Some(entry) = entry {
                         add_entry(*entry, &dir)?;
                     }
                 }
-
-                dir.open(
-                    ExecutionScope::new(),
+                let mut object_request = vfs::ObjectRequest::new3(
                     flags,
-                    Path::dot(),
-                    directory_request.into_channel().into(),
+                    &Default::default(),
+                    object_request.into_channel(),
                 );
+                dir.open3(ExecutionScope::new(), Path::dot(), flags, &mut object_request)
+                    .expect("failed to open directory");
             }
-            TestHarnessRequest::GetServiceDir { responder } => {
+            TestHarnessRequest::OpenServiceDirectory { responder } => {
                 const FLAGS: fio::Flags = fio::PERM_READABLE;
                 let svc_dir = simple();
                 let service = vfs::service::host(run_echo_server);

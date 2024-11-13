@@ -14,7 +14,7 @@ async fn file_read_with_sufficient_rights() {
         harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
     {
         let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let _data: Vec<u8> = file
@@ -32,7 +32,7 @@ async fn file_read_with_insufficient_rights() {
 
     for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES) {
         let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result = file.read(0).await.expect("read failed").map_err(zx::Status::from_raw);
@@ -49,7 +49,7 @@ async fn file_read_with_max_transfer() {
     {
         let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
         let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
@@ -73,7 +73,7 @@ async fn file_read_over_max_transfer() {
     {
         let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
         let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
@@ -94,7 +94,7 @@ async fn file_read_at_with_sufficient_rights() {
         harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
     {
         let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let _: Vec<u8> = file
@@ -112,7 +112,7 @@ async fn file_read_at_with_insufficient_rights() {
 
     for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES) {
         let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result =
@@ -130,7 +130,7 @@ async fn file_read_at_with_max_transfer() {
     {
         let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
         let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
@@ -154,7 +154,7 @@ async fn file_read_at_over_max_transfer() {
     {
         let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
         let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
@@ -175,7 +175,7 @@ async fn file_read_in_subdirectory() {
         harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
     {
         let entries = vec![directory("subdir", vec![file("testing.txt", vec![])])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, file_flags, "subdir/testing.txt").await;
         let _data: Vec<u8> = file

@@ -87,20 +87,21 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
     completer.Reply(config);
   }
 
-  void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
+  void CreateDirectory(CreateDirectoryRequest& request,
+                       CreateDirectoryCompleter::Sync& completer) final {
     // Create a unique directory within the root of minfs for each request and populate it with the
     // requested contents.
     auto directory = CreateUniqueDirectory();
-    PopulateDirectory(request.root().entries(), *directory);
-    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
-    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
-    zx_status_t status = runner_->ServeDeprecated(
-        std::move(directory), request.directory_request().TakeChannel(), *options);
+    PopulateDirectory(request.contents(), *directory);
+    zx_status_t status = runner_->Serve(std::move(directory),
+                                        request.object_request().TakeChannel(), request.flags());
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve test directory: %s",
                   zx_status_get_string(status));
   }
 
-  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final { ZX_PANIC("Not supported."); }
+  void OpenServiceDirectory(OpenServiceDirectoryCompleter::Sync& completer) final {
+    ZX_PANIC("Not supported.");
+  }
 
   // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void PopulateDirectory(const std::vector<fidl::Box<fio_test::DirectoryEntry>>& entries,
@@ -161,6 +162,8 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
     ZX_ASSERT_MSG(vnode.is_ok(), "Failed to create a unique directory: %s", vnode.status_string());
     auto directory = fbl::RefPtr<Directory>::Downcast(*std::move(vnode));
     ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
+    // The directory was opened when it was created.
+    directory->Close();
     return directory;
   }
 
@@ -168,7 +171,7 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
   async::Loop vfs_loop_;
   std::unique_ptr<Runner> runner_;
 
-  // Used to create a new unique directory within minfs for every call to |GetDirectory|.
+  // Used to create a new unique directory within minfs for every call to |CreateDirectory|.
   uint32_t directory_count_ = 0;
   fidl::ClientEnd<fio::Directory> root_client_;
 };

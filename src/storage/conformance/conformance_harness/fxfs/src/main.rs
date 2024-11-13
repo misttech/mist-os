@@ -88,10 +88,10 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                     supports_services: false,
                 })?;
             }
-            TestHarnessRequest::GetDirectory {
-                root,
+            TestHarnessRequest::CreateDirectory {
+                contents,
                 flags,
-                directory_request,
+                object_request,
                 control_handle: _,
             } => {
                 let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -104,19 +104,14 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                 .unwrap();
                 add_entries(
                     fuchsia_fs::directory::clone_no_describe(&dir, None).expect("clone failed"),
-                    root.entries,
+                    contents,
                 )
                 .await
                 .expect("add_entries failed");
-                dir.open(
-                    flags,
-                    fio::ModeType::empty(),
-                    ".",
-                    directory_request.into_channel().into(),
-                )
-                .unwrap();
+                dir.open3(".", flags, &Default::default(), object_request.into_channel().into())
+                    .unwrap();
             }
-            TestHarnessRequest::GetServiceDir { responder: _ } => {
+            TestHarnessRequest::OpenServiceDirectory { responder: _ } => {
                 panic!("fxfs does not support service directories")
             }
         };

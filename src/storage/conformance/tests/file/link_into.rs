@@ -22,7 +22,7 @@ impl Fixture {
         }
 
         let entries = vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
         let file = open_file_with_flags(&dir, rights, TEST_FILE).await;
 

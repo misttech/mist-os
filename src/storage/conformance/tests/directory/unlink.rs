@@ -19,7 +19,7 @@ async fn unlink_file_with_sufficient_rights() {
         .combinations_containing_deprecated(fio::Rights::READ_BYTES | fio::Rights::WRITE_BYTES)
     {
         let entries = vec![directory("src", vec![file("file.txt", contents.to_vec())])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
 
         let file = open_node::<fio::FileMarker>(
@@ -60,7 +60,7 @@ async fn unlink_file_with_insufficient_rights() {
 
     for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let entries = vec![directory("src", vec![file("file.txt", contents.to_vec())])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
 
         assert_eq!(
@@ -87,7 +87,7 @@ async fn unlink_directory_with_sufficient_rights() {
     for dir_flags in harness.dir_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
     {
         let entries = vec![directory("src", vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&dir, dir_flags, ".").await;
 
@@ -107,7 +107,7 @@ async fn unlink_directory_with_insufficient_rights() {
 
     for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let entries = vec![directory("src", vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&dir, dir_flags, ".").await;
 
@@ -130,7 +130,7 @@ async fn unlink_must_be_directory() {
     }
 
     let entries = vec![directory("dir", vec![]), file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let must_be_directory = fio::UnlinkOptions {
         flags: Some(fio::UnlinkFlags::MUST_BE_DIRECTORY),

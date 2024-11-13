@@ -15,7 +15,7 @@ async fn create_directory_with_create_if_absent_flag() {
         return;
     }
 
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let mnt_dir = open_dir_with_flags(
         &dir,
@@ -54,7 +54,7 @@ async fn create_file_with_sufficient_rights() {
     }
 
     for flags in harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES) {
-        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
         // Create a new file inside `dir` with a connection that only has the rights in `flags`.
         {
             let dir = open_dir_with_flags(&dir, flags, ".").await;
@@ -73,7 +73,7 @@ async fn create_file_with_insufficient_rights() {
     }
 
     for flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
-        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
         // Try to create a new file inside `dir` with a connection that lacks writable rights.
         {
             let dir = open_dir_with_flags(&dir, flags, ".").await;
@@ -96,8 +96,7 @@ async fn create_directory() {
         return;
     }
 
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_sufficient_rights = dir
@@ -149,8 +148,7 @@ async fn create_directory_with_insufficient_rights() {
         return;
     }
 
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_insufficient_rights = dir
@@ -187,8 +185,7 @@ async fn create_directory_with_create_attributes() {
         return;
     }
 
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
@@ -245,10 +242,8 @@ async fn open_directory_with_never_create_and_create_attributes() {
         return;
     }
 
-    let dir = harness.get_directory(
-        vec![directory("dir", vec![])],
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![directory("dir", vec![])], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Only open an existing object, never create a new object.
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;
@@ -278,8 +273,7 @@ async fn create_file() {
         return;
     }
 
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_sufficient_rights = dir
@@ -311,8 +305,7 @@ async fn create_file_with_insufficient_rights_open3() {
         return;
     }
 
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_insufficient_rights = dir
@@ -346,8 +339,7 @@ async fn create_file_with_create_attributes() {
     {
         return;
     }
-    let dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
@@ -404,10 +396,8 @@ async fn open_file_with_never_create_and_create_attributes() {
         return;
     }
 
-    let dir = harness.get_directory(
-        vec![file(TEST_FILE, vec![])],
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    );
+    let dir = harness
+        .get_directory(vec![file(TEST_FILE, vec![])], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Only open an existing object, never create a new object.
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;

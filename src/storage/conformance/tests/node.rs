@@ -10,7 +10,7 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let (_proxy, on_representation) = dir
         .open3_node_repr::<fio::NodeMarker>(
@@ -39,7 +39,7 @@ async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
 
     let entries = vec![file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let (_proxy, representation) = dir
         .open3_node_repr::<fio::NodeMarker>(
@@ -77,7 +77,7 @@ async fn test_open_node_on_file() {
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let proxy =
         dir.open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None).await.unwrap();
@@ -112,7 +112,7 @@ async fn test_set_attr_and_set_flags_on_node() {
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     let proxy = dir
         .open3_node::<fio::NodeMarker>(
@@ -135,7 +135,7 @@ async fn test_node_clone() {
 #[fuchsia::test]
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags_deprecated());
+    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let (_proxy, representation) = dir
         .open3_node_repr::<fio::NodeMarker>(

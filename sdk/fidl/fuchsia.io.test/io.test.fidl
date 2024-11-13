@@ -67,28 +67,18 @@ type HarnessConfig = struct {
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
 type Directory = resource struct {
-    /// Name not required for root directory.
     name string:fuchsia.io.MAX_NAME_LENGTH;
-
-    /// Nullable to sidestep recursion rules. Don't actually supply nulls.
     entries vector<DirectoryEntry:optional>:MAX;
 };
 
 /// Remote directory which forwards FIDL requests from the server to the specified directory.
 type RemoteDirectory = resource struct {
-    /// Name not required for root directory.
     name string:fuchsia.io.MAX_NAME_LENGTH;
-
-    /// Remote client to forward Directory requests to.
     remote_client client_end:fuchsia.io.Directory;
 };
 
-/// File object which supports reading and writing.
-///
-/// As the conformance tests verify W^X enforcement, attempting to open a File with RIGHT_EXECUTABLE
-/// should fail with ACCESS_DENIED.
-///
-/// If executable files are required, use ExecutableFile instead.
+/// File object which supports reading and writing. Use [`ExecutableFile`] if execute rights are
+/// required.
 type File = struct {
     name string:fuchsia.io.MAX_NAME_LENGTH;
     contents vector<uint8>:MAX;
@@ -99,9 +89,6 @@ type File = struct {
 ///
 /// Enabled via the `supports_executable_file` configuration option. `ExecutableFile` objects should
 /// support fuchsia.io/File.GetBackingMemory.
-///
-/// As the conformance tests verify W^X enforcement, opening an ExecutableFile with RIGHT_WRITABLE
-/// should fail with ACCESS_DENIED. If writable files are required, use File instead.
 type ExecutableFile = struct {
     name string:fuchsia.io.MAX_NAME_LENGTH;
 };
@@ -120,23 +107,17 @@ closed protocol TestHarness {
         config HarnessConfig;
     });
 
-    /// Serves a directory with the given contents.
-    ///
-    /// `root` describes the initial layout of the filesystem that will be
-    /// used for the test case. The root directory that is served (returned via
-    /// `directory_request`) will have the equivalent contents, served with the
-    /// given `flags`.
-    // TODO(https://fxbug.dev/324081103): Transition `flags` from `OpenFlags` to `Flags`.
-    strict GetDirectory(resource struct {
-        root Directory;
-        flags fuchsia.io.OpenFlags;
-        directory_request server_end:fuchsia.io.Directory;
+    /// Creates a directory with the given `contents` and opens it with the specified `flags`.
+    strict CreateDirectory(resource struct {
+        contents vector<DirectoryEntry:optional>:MAX;
+        flags fuchsia.io.Flags;
+        object_request server_end:fuchsia.io.Directory;
     });
 
     /// Serves a service directory that contains a fuchsia.test.placeholders/Echo instance.
     /// The test harness must have `supports_services` reported in it's config to use this method,
     /// and the service instance should match the discoverable protocol name.
-    strict GetServiceDir() -> (resource struct {
-        svc_dir client_end:fuchsia.io.Directory;
+    strict OpenServiceDirectory() -> (resource struct {
+        object_request client_end:fuchsia.io.Directory;
     });
 };

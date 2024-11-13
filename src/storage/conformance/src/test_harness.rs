@@ -62,23 +62,22 @@ impl TestHarness {
     pub fn get_directory(
         &self,
         entries: Vec<io_test::DirectoryEntry>,
-        flags: fio::OpenFlags,
+        flags: fio::Flags,
     ) -> fio::DirectoryProxy {
-        let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
+        let contents: Vec<Option<Box<io_test::DirectoryEntry>>> =
             entries.into_iter().map(|e| Some(Box::new(e))).collect();
-        let directory = io_test::Directory { name: "/".to_string(), entries };
         let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("Cannot create proxy");
         self.proxy
-            .get_directory(directory, flags, server)
+            .create_directory(contents, flags, server)
             .expect("Cannot get directory from test harness");
         client
     }
 
     /// Helper function which gets service directory from the harness as a [`fio::DirectoryProxy`].
     /// Requires that the harness supports service directories, otherwise will panic.
-    pub async fn get_service_dir(&self) -> fio::DirectoryProxy {
+    pub async fn open_service_directory(&self) -> fio::DirectoryProxy {
         assert!(self.config.supports_services);
-        let client_end = self.proxy.get_service_dir().await.unwrap();
+        let client_end = self.proxy.open_service_directory().await.unwrap();
         client_end.into_proxy().unwrap()
     }
 

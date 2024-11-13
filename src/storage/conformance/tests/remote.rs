@@ -17,13 +17,11 @@ async fn open_remote_directory_test() {
     }
 
     let remote_name = "remote_directory";
-    let remote_dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let remote_dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Create a directory with the remote directory inside of it.
     let entries = vec![remote_directory(remote_name, remote_dir)];
-    let dir = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     open_node::<fio::DirectoryMarker>(
         &dir,
@@ -44,12 +42,11 @@ async fn open_remote_file_test() {
 
     let remote_name = "remote_directory";
     let remote_entries = vec![file(TEST_FILE, vec![])];
-    let remote_dir = harness.get_directory(remote_entries, fio::OpenFlags::RIGHT_READABLE);
+    let remote_dir = harness.get_directory(remote_entries, fio::PERM_READABLE);
 
     // Create a directory with the remote directory inside of it.
     let entries = vec![remote_directory(remote_name, remote_dir)];
-    let dir = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Test opening file by opening the remote directory first and then opening the file.
     let remote_dir_proxy = open_node::<fio::DirectoryMarker>(
@@ -93,18 +90,13 @@ async fn open_remote_directory_right_escalation_test() {
     let mount_point = "mount_point";
 
     // Use the test harness to serve a directory with RWX permissions.
-    let remote_proxy = harness.get_directory(
-        vec![],
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-    );
+    let remote_proxy = harness
+        .get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE);
 
     // Mount the remote directory through root, and ensure that the connection only has RW
     // RW permissions (which is thus a sub-set of the permissions the remote_proxy has).
     let entries = vec![remote_directory(mount_point, remote_proxy)];
-    let root_proxy = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let root_proxy = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Create a new proxy/server for opening the remote node through dir_proxy.
     // Here we pass the POSIX flag, which should only expand to the maximum set of
@@ -136,13 +128,11 @@ async fn open3_remote_directory_test() {
         return;
     }
     let remote_name = "remote_directory";
-    let remote_dir = harness
-        .get_directory(vec![], fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let remote_dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Create a directory with the remote directory inside of it.
     let entries = vec![remote_directory(remote_name, remote_dir)];
-    let dir = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     dir.open3_node::<fio::DirectoryMarker>(
         remote_name,
@@ -164,12 +154,11 @@ async fn open3_remote_file_test() {
 
     let remote_name = "remote_directory";
     let remote_entries = vec![file(TEST_FILE, vec![])];
-    let remote_dir = harness.get_directory(remote_entries, fio::OpenFlags::RIGHT_READABLE);
+    let remote_dir = harness.get_directory(remote_entries, fio::PERM_READABLE);
 
     // Create a directory with the remote directory inside of it.
     let entries = vec![remote_directory(remote_name, remote_dir)];
-    let dir = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Test opening file by opening the remote directory first and then opening the file.
     let remote_dir_proxy = dir
@@ -221,18 +210,13 @@ async fn open3_remote_directory_right_escalation_test() {
     let mount_point = "mount_point";
 
     // Use the test harness to serve a directory with RWX permissions.
-    let remote_proxy = harness.get_directory(
-        vec![],
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-    );
+    let remote_proxy = harness
+        .get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE);
 
     // Mount the remote directory through root, and ensure that the connection only has RW
     // RW permissions (which is thus a sub-set of the permissions the remote_proxy has).
     let entries = vec![remote_directory(mount_point, remote_proxy)];
-    let root_proxy = harness
-        .get_directory(entries, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+    let root_proxy = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Open the remote with read rights as required, but write/execute as optional.
     let proxy = root_proxy
