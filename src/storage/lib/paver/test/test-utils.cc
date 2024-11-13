@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/zbi-format/partition.h>
 #include <lib/zx/vmo.h>
@@ -111,7 +112,8 @@ void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
   ASSERT_OK(block_client->Read(vmo, blk_cnt, blk_offset, 0));
 }
 
-void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
+void SkipBlockDevice::Create(fbl::unique_fd devfs_root,
+                             fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                              std::unique_ptr<SkipBlockDevice>* device) {
   fzl::VmoMapper mapper;
   zx::vmo vmo;
@@ -124,7 +126,7 @@ void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
   ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &nand_info.vmo));
 
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl;
-  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(&ctl));
+  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(std::move(devfs_root), &ctl));
   std::optional<ramdevice_client::RamNand> ram_nand;
   ASSERT_OK(ctl->CreateRamNand(std::move(nand_info), &ram_nand));
 

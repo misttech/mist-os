@@ -14,6 +14,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/channel.h>
 #include <zircon/hw/gpt.h>
@@ -93,11 +94,16 @@ class SkipBlockDevice {
 
   ~SkipBlockDevice() = default;
 
-  SkipBlockDevice(std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl,
+  SkipBlockDevice(driver_integration_test::IsolatedDevmgr devmgr,
+                  std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl,
                   ramdevice_client::RamNand ram_nand, fzl::VmoMapper mapper)
-      : ctl_(std::move(ctl)), ram_nand_(std::move(ram_nand)), mapper_(std::move(mapper)) {}
+      : devmgr_(std::move(devmgr)),
+        ctl_(std::move(ctl)),
+        ram_nand_(std::move(ram_nand)),
+        mapper_(std::move(mapper)) {}
 
  private:
+  driver_integration_test::IsolatedDevmgr devmgr_;
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl_;
   ramdevice_client::RamNand ram_nand_;
   fzl::VmoMapper mapper_;
@@ -131,13 +137,16 @@ void SkipBlockDevice::Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
   CreateBadBlockMap(mapper.start());
   ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &nand_info.vmo));
 
+  driver_integration_test::IsolatedDevmgr::Args args;
+  driver_integration_test::IsolatedDevmgr devmgr;
+  ASSERT_OK(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr));
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl;
-  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(&ctl));
+  ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(devmgr.devfs_root().duplicate(), &ctl));
   std::optional<ramdevice_client::RamNand> ram_nand;
   ASSERT_OK(ctl->CreateRamNand(std::move(nand_info), &ram_nand));
-  ASSERT_OK(
-      device_watcher::RecursiveWaitForFile(ctl->devfs_root().get(), "sys/platform").status_value());
-  device->emplace(std::move(ctl), *std::move(ram_nand), std::move(mapper));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform")
+                .status_value());
+  device->emplace(std::move(devmgr), std::move(ctl), *std::move(ram_nand), std::move(mapper));
 }
 
 void CreatePayload(size_t size, zx::vmo* out, uint8_t data = 0x4a) {

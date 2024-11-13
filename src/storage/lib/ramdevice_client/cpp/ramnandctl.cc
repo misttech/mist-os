@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -25,29 +26,16 @@
 namespace ramdevice_client_test {
 
 __EXPORT
-zx_status_t RamNandCtl::Create(std::unique_ptr<RamNandCtl>* out) {
-  driver_integration_test::IsolatedDevmgr::Args args;
-  args.disable_block_watcher = true;
-  // TODO(surajmalhotra): Remove creation of isolated devmgr from this lib so that caller can choose
-  // their creation parameters.
-  args.board_name = "astro";
-
-  driver_integration_test::IsolatedDevmgr devmgr;
-  if (zx_status_t status = driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr);
-      status != ZX_OK) {
-    fprintf(stderr, "Could not create ram_nand_ctl device: %s\n", zx_status_get_string(status));
-    return status;
-  }
-
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
-                                                            "sys/platform/00:00:2e/nand-ctl");
+zx_status_t RamNandCtl::Create(fbl::unique_fd devfs_root, std::unique_ptr<RamNandCtl>* out) {
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root.get(), "sys/platform/00:00:2e/nand-ctl");
   if (channel.is_error()) {
     fprintf(stderr, "ram_nand_ctl device failed enumerated: %s\n", channel.status_string());
     return channel.status_value();
   }
   fidl::ClientEnd<fuchsia_hardware_nand::RamNandCtl> client_end(std::move(channel.value()));
 
-  *out = std::unique_ptr<RamNandCtl>(new RamNandCtl(std::move(devmgr), std::move(client_end)));
+  *out = std::unique_ptr<RamNandCtl>(new RamNandCtl(std::move(devfs_root), std::move(client_end)));
   return ZX_OK;
 }
 
@@ -73,7 +61,7 @@ zx_status_t RamNandCtl::CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo c
 
   std::string controller_path = std::string(path.c_str()) + "/device_controller";
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(devfs_root().get(), controller_path.c_str());
+      device_watcher::RecursiveWaitForFile(devfs_root_.get(), controller_path.c_str());
   if (channel.is_error()) {
     fprintf(stderr, "Could not open ram_nand device (%s): %s\n", path.c_str(),
             channel.status_string());
@@ -83,16 +71,6 @@ zx_status_t RamNandCtl::CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo c
 
   *out = ramdevice_client::RamNand(std::move(client_end));
   return ZX_OK;
-}
-
-__EXPORT
-zx_status_t RamNandCtl::CreateWithRamNand(fuchsia_hardware_nand::wire::RamNandInfo config,
-                                          std::optional<ramdevice_client::RamNand>* out) {
-  std::unique_ptr<RamNandCtl> ctl;
-  if (zx_status_t status = RamNandCtl::Create(&ctl); status != ZX_OK) {
-    return status;
-  }
-  return ctl->CreateRamNand(std::move(config), out);
 }
 
 }  // namespace ramdevice_client_test

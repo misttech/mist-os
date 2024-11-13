@@ -23,8 +23,15 @@ void FtlTestObserver::OnProgramStart() {
 }
 
 void FtlTestObserver::CreateDevice() {
+  driver_integration_test::IsolatedDevmgr::Args args;
+  if (zx_status_t status = driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr_);
+      status != ZX_OK) {
+    printf("Unable to create devmgr: %s\n", zx_status_get_string(status));
+    return;
+  }
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ctl;
-  zx_status_t status = ramdevice_client_test::RamNandCtl::Create(&ctl);
+  zx_status_t status =
+      ramdevice_client_test::RamNandCtl::Create(devmgr_.devfs_root().duplicate(), &ctl);
   if (status != ZX_OK) {
     printf("Unable to create ram-nand-ctl\n");
     return;

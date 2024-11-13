@@ -22,6 +22,7 @@ source_set("test-utils") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/zbi-format",
     "//zircon/system/ulib/zx",
   ]
@@ -148,6 +149,7 @@ executable("paversvc_test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//src/devices/lib/amlogic",
     "//src/firmware/lib/abr",
     "//src/storage/gpt",

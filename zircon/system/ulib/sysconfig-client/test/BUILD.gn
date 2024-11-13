@@ -14,6 +14,7 @@ test("sysconfig-sync-client-test") {
   sources = [ "sync-client-test.cc" ]
   include_dirs = [ ".." ]
   deps = [
+    "///src/devices/testing/driver-integration-test-shim",
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_testing",
     "//sdk/lib/async-default",

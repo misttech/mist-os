@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver-integration-test/fixture.h>
+
 #include <fbl/unique_fd.h>
 #include <ramdevice-client-test/ramnandctl.h>
 #include <zxtest/zxtest.h>
@@ -26,6 +28,7 @@ class FtlTestObserver {
 
   const fbl::unique_fd& devfs_root() { return ram_nand_ctl_->devfs_root(); }
 
+  driver_integration_test::IsolatedDevmgr devmgr_;
   std::unique_ptr<ramdevice_client_test::RamNandCtl> ram_nand_ctl_;
   std::optional<ramdevice_client::RamNand> ram_nand_;
   bool ok_ = false;

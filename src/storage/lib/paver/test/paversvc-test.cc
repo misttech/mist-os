@@ -18,6 +18,8 @@
 #include <lib/cksum.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/string_view.h>
@@ -396,8 +398,11 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
  protected:
   void SpawnIsolatedDevmgr(fuchsia_hardware_nand::wire::RamNandInfo nand_info) {
     ASSERT_EQ(device_.get(), nullptr);
-    ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(std::move(nand_info), &device_));
-    StartPaver(device_->devfs_root(), std::move(svc_dir_));
+    IsolatedDevmgr::Args args;
+    IsolatedDevmgr::Create(&args, &devmgr_);
+    ASSERT_NO_FATAL_FAILURE(
+        SkipBlockDevice::Create(devmgr_.devfs_root().duplicate(), std::move(nand_info), &device_));
+    StartPaver(devmgr_.devfs_root().duplicate(), std::move(svc_dir_));
     SetBoardName("astro");
   }
 
@@ -537,6 +542,7 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   fidl::WireSyncClient<fuchsia_paver::DataSink> data_sink_;
   fidl::WireSyncClient<fuchsia_paver::Sysconfig> sysconfig_;
 
+  IsolatedDevmgr devmgr_;
   std::unique_ptr<SkipBlockDevice> device_;
   fidl::ClientEnd<fuchsia_hardware_block::Block> fvm_client_;
 };

@@ -79,6 +79,7 @@ test("ftl-integration") {
   ]
   include_dirs = [ "//src/devices/block/drivers/ftl" ]
   deps = [
+    "///src/devices/testing/driver-integration-test-shim",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/fdio",

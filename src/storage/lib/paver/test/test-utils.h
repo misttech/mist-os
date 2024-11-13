@@ -131,7 +131,7 @@ class BlockDevice {
 
 class SkipBlockDevice {
  public:
-  static void Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
+  static void Create(fbl::unique_fd devfs_root, fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                      std::unique_ptr<SkipBlockDevice>* device);
 
   fbl::unique_fd devfs_root() { return ctl_->devfs_root().duplicate(); }
@@ -156,9 +156,7 @@ class SkipBlockDevice {
 // DevicePartitioner which is an abstract class.
 class FakeDevicePartitioner : public paver::DevicePartitioner {
  public:
-  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override {
-    ZX_ASSERT(false);
-  }
+  zx::result<std::unique_ptr<abr::Client>> CreateAbrClient() const override { ZX_ASSERT(false); }
 
   const paver::BlockDevices& Devices() const override { ZX_ASSERT(false); }
 
