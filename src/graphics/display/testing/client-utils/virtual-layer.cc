@@ -321,7 +321,17 @@ void PrimaryLayer::SendLayout(const fidl::WireSyncClient<fhd::Coordinator>& dc) 
   }
 }
 
-bool PrimaryLayer::WaitForReady() { return Wait(SIGNAL_EVENT); }
+bool PrimaryLayer::ReadyToRender(display::ConfigStamp latest_vsync_stamp) {
+  if (!layer_flipping_) {
+    // We don't render when `layer_flipping_` is false, so it's OK to answer true.
+    return true;
+  }
+  // If this is the first time the image has been used, it's ready to render into.  Otherwise,
+  // it's only ready to render into if it has already been replaced by a subsequent config showing
+  // the other image.
+  return image_config_stamps_[alt_image_].value == 0 ||
+         latest_vsync_stamp.value() > image_config_stamps_[alt_image_].value;
+}
 
 void PrimaryLayer::Render(int32_t frame_num) {
   if (!layer_flipping_) {
@@ -348,33 +358,11 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
     const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
-    const fhd::wire::EventId fidl_signal_event_id =
-        display::ToFidlEventId(image.event_ids[SIGNAL_EVENT]);
-    auto result =
-        dc->SetLayerImage(fidl_layer_id, fidl_image_id, fidl_wait_event_id, fidl_signal_event_id);
+    auto result = dc->SetLayerImage(fidl_layer_id, fidl_image_id, fidl_wait_event_id,
+                                    fhd::wire::EventId{.value = 0});
 
     ZX_ASSERT(result.ok());
   }
-}
-
-bool PrimaryLayer::Wait(uint32_t idx) {
-  zx_time_t deadline = zx_deadline_after(ZX_MSEC(100));
-  for (auto& layer : layers_) {
-    uint32_t observed;
-    if (!layer.active) {
-      continue;
-    }
-    auto& event = layer.import_info[alt_image_].events[idx];
-    zx_status_t res;
-    if ((res = event.wait_one(ZX_EVENT_SIGNALED, zx::time(deadline), &observed)) == ZX_OK) {
-      if (layer_flipping_) {
-        event.signal(ZX_EVENT_SIGNALED, 0);
-      }
-    } else {
-      return false;
-    }
-  }
-  return true;
 }
 
 ColorLayer::ColorLayer(Display* display) : VirtualLayer(display) {}

@@ -147,6 +147,8 @@ enum TestBundle {
   BUNDLE_COUNT,
 };
 
+static constexpr const char* testbundle_names[] = {"SIMPLE", "FLIP", "INTEL", "BUNDLE3", "BLANK"};
+
 enum Platforms {
   INTEL_PLATFORM = 0,
   AMLOGIC_PLATFORM,
@@ -279,48 +281,47 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
   return true;
 }
 
-std::optional<fhdt::wire::ConfigStamp> apply_config() {
-  auto result = dc->CheckConfig(false);
-  if (!result.ok()) {
-    printf("Failed to make check call: %s\n", result.FormatDescription().c_str());
-    return std::nullopt;
+zx_status_t apply_config(fhdt::wire::ConfigStamp stamp) {
+  auto check_result = dc->CheckConfig(false);
+  if (!check_result.ok()) {
+    printf("Failed to make check call: %s\n", check_result.FormatDescription().c_str());
+    return check_result.error().status();
   }
 
-  if (result.value().res != fhdt::wire::ConfigResult::kOk) {
-    printf("Config not valid (%d)\n", static_cast<uint32_t>(result.value().res));
-    for (const auto& op : result.value().ops) {
+  if (check_result.value().res != fhdt::wire::ConfigResult::kOk) {
+    printf("Config not valid (%d)\n", static_cast<uint32_t>(check_result.value().res));
+    for (const auto& op : check_result.value().ops) {
       printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
              op.layer_id.value, static_cast<uint8_t>(op.opcode));
     }
-    return std::nullopt;
+    return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!dc->ApplyConfig().ok()) {
+  fidl::Arena arena;
+  auto builder = fhd::wire::CoordinatorApplyConfig3Request::Builder(arena);
+  builder.stamp(stamp);
+  auto apply_result = dc->ApplyConfig3(builder.Build());
+  if (!apply_result.ok()) {
     printf("Apply failed\n");
-    return std::nullopt;
+    return apply_result.error().status();
   }
 
-  auto config_stamp_result = dc->GetLatestAppliedConfigStamp();
-  if (!config_stamp_result.ok()) {
-    printf("GetLatestAppliedConfigStamp failed\n");
-    return std::nullopt;
-  }
-
-  return config_stamp_result.value().stamp;
+  return ZX_OK;
 }
 
 zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
                            fhdt::wire::ConfigStamp expected_stamp) {
   zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
   if (status != ZX_OK) {
-    printf("Failed to run coordinator listener loop: %s", zx_status_get_string(status));
+    printf("wait_for_vsync(): Failed to run coordinator listener loop: %s",
+           zx_status_get_string(status));
     return status;
   }
   if (!g_coordinator_listener.has_ownership()) {
     return ZX_ERR_NEXT;
   }
   if (g_coordinator_listener.displays().empty()) {
-    printf("Display disconnected\n");
+    printf("wait_for_vsync(): Display disconnected\n");
     return ZX_ERR_STOP;
   }
 
@@ -753,6 +754,8 @@ int main(int argc, const char* argv[]) {
 
   platform = GetPlatform();
 
+  // Select a "test bundle" based on the platform.  This bundle is a configuration flag which
+  // controls the initialization of various test objects.
   TestBundle testbundle;
   switch (platform) {
     case INTEL_PLATFORM:
@@ -1005,6 +1008,8 @@ int main(int argc, const char* argv[]) {
   std::optional<int32_t> max_apply_configs(num_frames);
 
   fbl::AllocChecker ac;
+
+  printf("Using TestBundle: %s\n", testbundle_names[testbundle]);
   if (testbundle == INTEL) {
     // Intel only supports 90/270 rotation for Y-tiled images, so enable it for testing.
     constexpr fuchsia_images2::wire::PixelFormatModifier kIntelYTilingModifier =
@@ -1162,6 +1167,8 @@ int main(int argc, const char* argv[]) {
   if (capture) {
     printf("Capturing every frame. Verification is %s\n", verify_capture ? "enabled" : "disabled");
   }
+
+  fhdt::wire::ConfigStamp last_applied_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
   bool capture_result = true;
   for (int i = 0; !num_frames || i < num_frames; i++) {
     for (auto& layer : layers) {
@@ -1169,7 +1176,25 @@ int main(int argc, const char* argv[]) {
       // so we won't necessarily need to wait.
       layer->StepLayout(i);
 
-      if (!layer->WaitForReady()) {
+      // Wait for previous config to be applied before deciding whether images are OK for rendering.
+      if (last_applied_stamp.value > 0) {
+        while (true) {
+          zx_status_t vsync_status = wait_for_vsync(coordinator_listener_loop, last_applied_stamp);
+
+          if (vsync_status == ZX_OK) {
+            ZX_ASSERT(g_coordinator_listener.latest_config_stamp() ==
+                      display::ToConfigStamp(last_applied_stamp));
+            break;
+          } else if (vsync_status == ZX_ERR_NEXT) {
+            zx::nanosleep(zx::deadline_after(zx::msec(100)));
+            continue;
+          } else {
+            ZX_PANIC("Failed to wait for Vsync: %s", zx_status_get_string(vsync_status));
+          }
+        }
+      }
+
+      if (!layer->ReadyToRender(display::ToConfigStamp(last_applied_stamp))) {
         printf("Buffer failed to become free\n");
         return -1;
       }
@@ -1188,14 +1213,12 @@ int main(int argc, const char* argv[]) {
     // in order to observe any tearing effects
     zx_nanosleep(zx_deadline_after(ZX_MSEC(delay)));
 
-    fhdt::wire::ConfigStamp expected_stamp = {.value = fhdt::wire::kInvalidConfigStampValue};
     if (!max_apply_configs || i < max_apply_configs) {
       for (uint32_t cpv = 0; cpv < configs_per_vsync; cpv++) {
-        auto maybe_expected_stamp = apply_config();
-        if (!maybe_expected_stamp.has_value()) {
+        last_applied_stamp.value++;
+        if (zx_status_t status; (status = apply_config(last_applied_stamp)) != ZX_OK) {
+          printf("apply_config() failed with status: %s\n", zx_status_get_string(status));
           return -1;
-        } else {
-          expected_stamp = *maybe_expected_stamp;
         }
       }
     }
@@ -1205,8 +1228,8 @@ int main(int argc, const char* argv[]) {
     }
 
     zx_status_t status = ZX_OK;
-    while (layers.size() != 0 &&
-           (status = wait_for_vsync(coordinator_listener_loop, expected_stamp)) == ZX_ERR_NEXT) {
+    while (layers.size() != 0 && (status = wait_for_vsync(coordinator_listener_loop,
+                                                          last_applied_stamp)) == ZX_ERR_NEXT) {
     }
     ZX_ASSERT(status == ZX_OK);
     if (capture) {

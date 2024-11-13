@@ -13,6 +13,7 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
@@ -21,7 +22,7 @@
 
 namespace display_test {
 
-typedef struct custom_layer {
+struct custom_layer_t {
   display::LayerId id;
   bool active;
 
@@ -31,12 +32,12 @@ typedef struct custom_layer {
   fuchsia_math::wire::RectU dest;
 
   image_import_t import_info[2];
-} custom_layer_t;
+};
 
 // A layer whose output can appear on multiple displays.
 class VirtualLayer {
  public:
-  typedef fuchsia_hardware_display::Coordinator Coordinator;
+  using Coordinator = fuchsia_hardware_display::Coordinator;
 
   explicit VirtualLayer(Display* display);
   explicit VirtualLayer(const fbl::Vector<Display>& displays, bool tiled = true);
@@ -49,8 +50,9 @@ class VirtualLayer {
   // Steps the local layout state to frame_num.
   virtual void StepLayout(int32_t frame_num) = 0;
 
-  // Waits for the display coordinator to be done with the previous version of this frame.
-  virtual bool WaitForReady() = 0;
+  // Returns true iff the latest image on the layer should be rendered on the display, given that
+  // the latest vsync stamp received from the display is `latest_vsync_stamp`.
+  virtual bool ReadyToRender(display::ConfigStamp latest_vsync_stamp) = 0;
 
   // Sets the current layout to the display coordinator.
   virtual void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) = 0;
@@ -149,7 +151,7 @@ class PrimaryLayer : public VirtualLayer {
 
   bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
   void StepLayout(int32_t frame_num) override;
-  bool WaitForReady() override;
+  bool ReadyToRender(display::ConfigStamp latest_vsync_stamp) override;
   void SendLayout(const fidl::WireSyncClient<Coordinator>& channel) override;
   void Render(int32_t frame_num) override;
 
@@ -167,7 +169,6 @@ class PrimaryLayer : public VirtualLayer {
 
  private:
   void SetLayerPositions(const fidl::WireSyncClient<Coordinator>& dc);
-  bool Wait(uint32_t idx);
   void InitImageDimens();
 
   uint32_t image_width_ = 0;
@@ -197,6 +198,9 @@ class PrimaryLayer : public VirtualLayer {
 
   bool alt_image_ = false;
   Image* images_[2];
+  fuchsia_hardware_display_types::wire::ConfigStamp image_config_stamps_[2] = {
+      {.value = fuchsia_hardware_display_types::wire::kInvalidConfigStampValue},
+      {.value = fuchsia_hardware_display_types::wire::kInvalidConfigStampValue}};
 };
 
 class ColorLayer : public VirtualLayer {
@@ -208,7 +212,7 @@ class ColorLayer : public VirtualLayer {
 
   void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) override {}
   void StepLayout(int32_t frame_num) override {}
-  bool WaitForReady() override { return true; }
+  bool ReadyToRender(display::ConfigStamp latest_vsync_stamp) override { return true; }
   void Render(int32_t frame_num) override {}
   void* GetCurrentImageBuf() override { return nullptr; }
   size_t GetCurrentImageSize() override { return 0; }
