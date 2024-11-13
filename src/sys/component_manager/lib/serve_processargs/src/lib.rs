@@ -642,8 +642,8 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
 
         // Test that the flags are passed correctly.
-        let flags_for_abc = fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
-        fdio::open_at_deprecated(&dir, "abc", flags_for_abc, server_end).unwrap();
+        let flags_for_abc = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
+        fdio::open_at(&dir, "abc", flags_for_abc, server_end).unwrap();
 
         // Capability is opened with "." and a `server_end`.
         let (relative_path, server_end) = exec.run_singlethreaded(&mut receiver.recv()).unwrap();
@@ -655,7 +655,7 @@ mod tests {
         let request = exec.run_singlethreaded(&mut stream.try_next()).unwrap().unwrap();
         assert_matches!(
             &request,
-            fio::DirectoryRequest::Open { flags, path, .. }
+            fio::DirectoryRequest::Open3 { path, flags, .. }
             if path == "abc" && *flags == flags_for_abc
         );
 
