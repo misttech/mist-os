@@ -19,6 +19,7 @@ use starnix_uapi::{errno, error, NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RE
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
 bitflags! {
@@ -706,6 +707,14 @@ impl DirEntry {
                 // However, other errors are fatal.
                 Err(e) => return Err(e),
             }
+
+            security::check_fs_node_rename_access(
+                current_task,
+                &old_parent.node,
+                &renamed.node,
+                &new_parent.node,
+                maybe_replaced.as_ref().map(|dir_entry| dir_entry.node.deref().as_ref()),
+            )?;
 
             // We've found all the errors that we know how to find. Ask the
             // file system to actually execute the rename operation. Once the

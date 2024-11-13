@@ -476,6 +476,67 @@ pub(super) fn check_fs_node_rmdir_access(
     may_unlink_or_rmdir(security_server, current_task, parent, child, UnlinkKind::Directory)
 }
 
+/// Validates that `current_task` has the permissions to move `moving_node`.
+pub(super) fn check_fs_node_rename_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    old_parent: &FsNode,
+    moving_node: &FsNode,
+    new_parent: &FsNode,
+    replaced_node: Option<&FsNode>,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let old_parent_sid = fs_node_effective_sid(old_parent);
+
+    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::Search)?;
+    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::RemoveName)?;
+
+    let file_sid = fs_node_effective_sid(moving_node);
+    let file_class = file_class_from_file_mode(moving_node.info().mode)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Rename.for_class(file_class),
+    )?;
+
+    let new_parent_sid = fs_node_effective_sid(new_parent);
+    check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::AddName)?;
+
+    // If a file already exists with the new name, then verify that the existing file can be
+    // removed.
+    if let Some(replaced_node) = replaced_node {
+        let replaced_node_class = file_class_from_file_mode(replaced_node.info().mode)?;
+        may_unlink_or_rmdir(
+            security_server,
+            current_task,
+            new_parent,
+            replaced_node,
+            if replaced_node_class == FileClass::Dir {
+                UnlinkKind::Directory
+            } else {
+                UnlinkKind::NonDirectory
+            },
+        )?;
+    }
+
+    if !std::ptr::eq(old_parent, new_parent) {
+        // If the parent nodes are the same directory, we have already verified the search
+        // permission during the `old_parent_sid` verification.
+        check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::Search)?;
+
+        // If the file is a directory and its parent directory is being changed by the rename,
+        // we additionally check for the reparent permission. Note that the `reparent` permission is
+        // only defined for directories.
+        if file_class == FileClass::Dir {
+            check_permission(&permission_check, current_sid, file_sid, DirPermission::Reparent)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub(super) fn check_fs_node_setxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,

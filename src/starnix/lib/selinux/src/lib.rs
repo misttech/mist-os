@@ -331,6 +331,8 @@ common_permission_enum! {
         RelabelFrom("relabelfrom"),
         /// Permission checked against the new label when updating a file's security label.
         RelabelTo("relabelto"),
+        /// Permission to rename a file.
+        Rename("rename"),
         /// Permission to modify attributes, including uid, gid and extended attributes.
         SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
@@ -384,6 +386,8 @@ class_permission_enum! {
         RemoveDir("rmdir"),
         /// Permission to remove an entry from a directory.
         RemoveName("remove_name"),
+        /// Permission to change parent directory.
+        Reparent("reparent"),
         /// Search access to the directory.
         Search("search"),
         // keep-sorted end

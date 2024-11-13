@@ -299,6 +299,28 @@ pub fn check_fs_node_rmdir_access(
     })
 }
 
+/// Checks whether the `current_task` can rename the file or directory `moving_node`.
+/// If the rename replaces an existing node, `replaced_node` must contain a reference to the
+/// existing node.
+pub fn check_fs_node_rename_access(
+    current_task: &CurrentTask,
+    old_parent: &FsNode,
+    moving_node: &FsNode,
+    new_parent: &FsNode,
+    replaced_node: Option<&FsNode>,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_rename_access(
+            security_server,
+            current_task,
+            old_parent,
+            moving_node,
+            new_parent,
+            replaced_node,
+        )
+    })
+}
+
 /// Returns the security state for a new file object created by `current_task`.
 /// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
