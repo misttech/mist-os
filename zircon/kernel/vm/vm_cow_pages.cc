@@ -721,7 +721,7 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
     };
 
     zx_status_t status = ZX_OK;
-    if (cur->is_parent_hidden_locked()) {
+    if (cur->is_parent_hidden_locked() && start_in_cur < cur->parent_limit_) {
       // We know the parent is hidden here, so we may need to walk up into it if it's accessible
       // from any empty offset within the range.
       //
