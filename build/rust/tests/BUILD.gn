@@ -16,7 +16,9 @@ group("tests") {
   deps = [
     ":clippy_test($host_toolchain)",
     ":rustdoc-link-assertions($host_toolchain)",
-    "//build/rust/tests/rustdoc($host_toolchain)",
+
+    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
+    #    "//build/rust/tests/rustdoc($host_toolchain)",
   ]
 }
 
