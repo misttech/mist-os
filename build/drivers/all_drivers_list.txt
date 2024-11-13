@@ -13,6 +13,8 @@
 //examples/drivers/transport/banjo/v2:parent_driver
 //examples/drivers/transport/driver/v1:child_driver
 //examples/drivers/transport/driver/v1:parent_driver
+//examples/drivers/transport/zircon/rust/child:driver
+//examples/drivers/transport/zircon/rust/parent:driver
 //examples/drivers/transport/zircon/v1:child_driver
 //examples/drivers/transport/zircon/v1:parent_driver
 //examples/drivers/transport/zircon/v2:child_driver

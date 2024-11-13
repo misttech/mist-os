@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{Incoming, Node};
+use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
 use namespace::Namespace;
+use tracing::error;
 use zx::Status;
 
 use fdf::DispatcherRef;
@@ -37,6 +39,28 @@ impl DriverContext {
         let node_client = self.start_args.node.take().ok_or(Status::INVALID_ARGS)?;
         // TODO(https://fxbug.dev/319159026): when this is infallible the expect can be removed.
         Ok(Node::from(node_client.into_proxy().expect("into_proxy failed")))
+    }
+
+    /// Serves the given [`ServiceFs`] on the node's outgoing directory. This can only be called
+    /// once, and after this the [`DriverStartArgs::outgoing_dir`] member will be [`None`].
+    ///
+    /// Logs an error and returns [`Status::INVALID_ARGS`] if the outgoing directory server end is
+    /// not present in the start arguments, or [`Status::INTERNAL`] if serving the connection
+    /// failed.
+    pub fn serve_outgoing<O: ServiceObjTrait>(
+        &mut self,
+        outgoing_fs: &mut ServiceFs<O>,
+    ) -> Result<(), Status> {
+        let Some(outgoing_dir) = self.start_args.outgoing_dir.take() else {
+            error!("Tried to serve on outgoing directory but it wasn't available");
+            return Err(Status::INVALID_ARGS);
+        };
+        outgoing_fs.serve_connection(outgoing_dir).map_err(|err| {
+            error!("Failed to serve outgoing directory: {err}");
+            Status::INTERNAL
+        })?;
+
+        Ok(())
     }
 
     pub(crate) fn new(

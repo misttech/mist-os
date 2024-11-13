@@ -23,6 +23,9 @@ group("hermetic_tests") {
     # TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
     # ":zircon-test-package-v1",
     "banjo/v2/tests:child-driver-hermetic-test-pkg",
+    "zircon/rust:realm-test-pkg",
+    "zircon/rust/child:hermetic-test-pkg",
+    "zircon/rust/parent:hermetic-test-pkg",
     "zircon/v2/tests:child-driver-hermetic-test-pkg",
   ]
 }

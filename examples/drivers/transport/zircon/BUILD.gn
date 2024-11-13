@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 group("zircon") {
   deps = [
+    "rust:pkg",
     "v1:child_component",
     "v1:parent_component",
     "v2:pkg",
