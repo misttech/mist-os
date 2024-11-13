@@ -81,13 +81,17 @@ pub async fn handle_fullmac_startup(
 ) -> (fidl_fullmac::WlanFullmacImplIfcProxy, fidl_sme::GenericSmeProxy) {
     let (usme_bootstrap_proxy, usme_bootstrap_server) =
         create_proxy::<fidl_sme::UsmeBootstrapMarker>()
-            .expect("Could not craete usme_bootstrap proxy");
+            .expect("Could not create usme_bootstrap proxy");
 
     let fullmac_ifc_proxy = assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Start { ifc, responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Init { payload, responder })) => {
             responder
-                .send(Ok(usme_bootstrap_server.into_channel()))
-                .expect("Failed to respond to Start");
+                .send(Ok(fidl_fullmac::WlanFullmacImplInitResponse {
+                    sme_channel: Some(usme_bootstrap_server.into_channel()),
+                    ..Default::default()
+                }))
+                .expect("Failed to respond to Init");
+            let ifc = payload.ifc.expect("Init response missing ifc");
             ifc.into_proxy().expect("Could not turn fullmac_ifc_channel into proxy")
         }
     );

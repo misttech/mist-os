@@ -532,11 +532,29 @@ closed protocol WlanFullmacImplIfcBanjo {
 @discoverable
 closed protocol WlanFullmacImpl {
 
-    // Lifecycle operations
-    strict Start(resource struct {
-        ifc client_end:WlanFullmacImplIfc;
-    }) -> (resource struct {
-        sme_channel zx.Handle:CHANNEL;
+    /// Initialize the FullMAC driver. This is the first request that the platform will make to the
+    /// FullMAC driver.
+    ///
+    /// On initialization, MLME provides the client end to the WlanFullmacImplIfc protocol. The
+    /// driver must return the SME server end channel, which is used internally by the platform.
+    /// Typically, the SME server end channel is given to the FullMAC driver by
+    /// fuchsia.wlan.phyimpl/WlanPhyImpl.CreateIface.
+    ///
+    /// If `Init` completes successfully, the platform will begin making other WlanFullmacImpl
+    /// requests to the FullMAC driver, and the FullMAC driver is free to make WlanFullmacImplIfc
+    /// requests to the platform. The platform may continue making WlanFullmacImpl requests until
+    /// the WlanFullmacImpl server unbinds.
+    ///
+    /// Common errors include:
+    ///   - `ZX_ERR_ALREADY_BOUND`: `Init` was already called on this FullMAC driver.
+    strict Init(resource table {
+        /// The WlanFullmacImplifc client end.
+        /// Required.
+        1: ifc client_end:WlanFullmacImplIfc;
+    }) -> (resource table {
+        /// The SME server end channel.
+        /// Required.
+        1: sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
 
     // State operation

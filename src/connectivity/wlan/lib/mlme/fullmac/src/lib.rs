@@ -270,7 +270,7 @@ async fn start<D: DeviceOps + Send + 'static>(
             .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
 
     let usme_bootstrap_protocol_channel =
-        device.start(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
+        device.init(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
 
     let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
         usme_bootstrap_protocol_channel,

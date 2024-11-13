@@ -14,7 +14,7 @@ use {
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(
+    fn init(
         &mut self,
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status>;
@@ -70,17 +70,24 @@ impl FullmacDevice {
 }
 
 impl DeviceOps for FullmacDevice {
-    fn start(
+    fn init(
         &mut self,
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status> {
-        self.fullmac_impl_sync_proxy
-            .start(fullmac_ifc_client_end, zx::MonotonicInstant::INFINITE)
+        let req = fidl_fullmac::WlanFullmacImplInitRequest {
+            ifc: Some(fullmac_ifc_client_end),
+            ..Default::default()
+        };
+        let resp = self
+            .fullmac_impl_sync_proxy
+            .init(req, zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 tracing::error!("FIDL error on Start: {}", e);
                 zx::Status::INTERNAL
             })?
-            .map_err(|e| zx::Status::from_raw(e))
+            .map_err(|e| zx::Status::from_raw(e))?;
+
+        resp.sme_channel.ok_or(zx::Status::INVALID_ARGS)
     }
 
     fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
@@ -323,7 +330,7 @@ pub mod test_utils {
 
     impl FakeFullmacDevice {
         pub fn new() -> (Self, mpsc::UnboundedReceiver<DriverCall>) {
-            // Create a channel for SME requests, to be surfaced by start().
+            // Create a channel for SME requests, to be surfaced by init().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
                 fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
 
@@ -378,7 +385,7 @@ pub mod test_utils {
     }
 
     impl DeviceOps for FakeFullmacDevice {
-        fn start(
+        fn init(
             &mut self,
             fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
         ) -> Result<fidl::Channel, zx::Status> {

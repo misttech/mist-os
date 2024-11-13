@@ -86,7 +86,10 @@ zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFull
 
   create_binding_completion.Wait();
 
-  auto result = client.buffer(test_arena_)->Start(std::move(endpoints->client));
+  auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitRequest::Builder(test_arena_)
+                 .ifc(std::move(endpoints->client))
+                 .Build();
+  auto result = client.buffer(test_arena_)->Init(req);
   if (!result.ok()) {
     BRCMF_ERR("Failed to start wlanfullmac interface: %s", result.FormatDescription().c_str());
     return result.status();
@@ -101,9 +104,9 @@ zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFull
   client_ = std::move(client);
 
   // Verify that the channel passed back from start() is the same one we gave to create_iface()
-  if (result->value()->sme_channel.get() != ch_mlme_) {
+  if (result->value()->sme_channel().get() != ch_mlme_) {
     BRCMF_ERR("Channels don't match, sme_channel: %zu, ch_mlme_: %zu",
-              result->value()->sme_channel.get(), ch_mlme_);
+              result.value()->sme_channel().get(), ch_mlme_);
     return ZX_ERR_INTERNAL;
   }
 

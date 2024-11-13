@@ -289,28 +289,39 @@ zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, uint8_t* cc_code) {
 
 zx_status_t WlanInterface::ClearCountry(brcmf_pub* drvr) { return brcmf_clear_country(drvr); }
 
-void WlanInterface::Start(StartRequestView request, StartCompleter::Sync& completer) {
+void WlanInterface::Init(InitRequestView request, InitCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ == nullptr) {
-    BRCMF_ERR("Failed to start interface: wdev_ not found.");
+    BRCMF_ERR("Failed to initialize interface: wdev_ not found.");
     completer.ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  if (!request->has_ifc()) {
+    BRCMF_ERR("Failed to initialize interface: request missing ifc");
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   {
     std::lock_guard<std::shared_mutex> guard(wdev_->netdev->if_proto_lock);
     wdev_->netdev->if_proto =
-        fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
+        fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc()));
   }
 
-  zx::channel out_mlme_channel;
-  zx_status_t status = brcmf_if_start(wdev_->netdev, (zx_handle_t*)&out_mlme_channel);
+  zx::channel out_sme_channel;
+  zx_status_t status = brcmf_if_start(wdev_->netdev, (zx_handle_t*)&out_sme_channel);
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to start interface: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
-  completer.ReplySuccess(std::move(out_mlme_channel));
+
+  fidl::Arena arena;
+  auto response = fuchsia_wlan_fullmac::wire::WlanFullmacImplInitResponse::Builder(arena)
+                      .sme_channel(std::move(out_sme_channel))
+                      .Build();
+  completer.ReplySuccess(response);
 }
 
 void WlanInterface::Query(QueryCompleter::Sync& completer) {

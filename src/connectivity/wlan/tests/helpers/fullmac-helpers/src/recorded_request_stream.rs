@@ -33,7 +33,7 @@ pub enum FullmacRequest {
 
     // Note: WlanFullmacImpl::Start has a channel as an argument, but we don't keep the channel
     // here.
-    Start,
+    Init,
 }
 
 /// A wrapper around WlanFullmacImpl_RequestStream that records each handled request in its
@@ -135,7 +135,7 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::OnLinkStateChanged { online, .. } => {
                 self.history.push(FullmacRequest::OnLinkStateChanged(*online))
             }
-            WlanFullmacImpl_Request::Start { .. } => self.history.push(FullmacRequest::Start),
+            WlanFullmacImpl_Request::Init { .. } => self.history.push(FullmacRequest::Init),
 
             _ => panic!("Unrecognized Fullmac request {:?}", request),
         }

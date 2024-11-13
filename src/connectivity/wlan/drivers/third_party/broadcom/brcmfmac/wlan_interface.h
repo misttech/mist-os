@@ -81,7 +81,7 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   static zx_status_t ClearCountry(brcmf_pub* drvr);
 
   // WlanFullmacImpl implementations, dispatching FIDL requests from higher layers.
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void Init(InitRequestView request, InitCompleter::Sync& completer) override;
   void Query(QueryCompleter::Sync& completer) override;
   void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override;
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override;
