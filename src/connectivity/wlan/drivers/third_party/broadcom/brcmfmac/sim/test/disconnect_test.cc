@@ -240,10 +240,10 @@ TEST_F(SimTest, DeauthFromSmeWhileNotConnectedResultsInDeauthConf) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  const auto& deauth_confirm = client_ifc.stats_.deauth_results.front();
-  ASSERT_TRUE(client_ifc.stats_.deauth_results.front().has_peer_sta_address());
-  ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());
-  ASSERT_BYTES_EQ(deauth_confirm.peer_sta_address().data(), kApBssid.byte, ETH_ALEN);
+  const auto& deauth_conf = client_ifc.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  ASSERT_EQ(ETH_ALEN, deauth_conf.peer_sta_address()->size());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
@@ -293,10 +293,10 @@ TEST_F(SimTest, SmeDeauthThenConnectThenFwDisassoc) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  const auto& deauth_confirm = client_ifc.stats_.deauth_results.front();
-  ASSERT_TRUE(client_ifc.stats_.deauth_results.front().has_peer_sta_address());
-  ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());
-  ASSERT_BYTES_EQ(deauth_confirm.peer_sta_address().data(), kApBssid.byte, ETH_ALEN);
+  const auto& deauth_conf = client_ifc.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  ASSERT_EQ(ETH_ALEN, deauth_conf.peer_sta_address()->size());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // Verify that we got the disassociation indication, not a confirmation or anything else
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);

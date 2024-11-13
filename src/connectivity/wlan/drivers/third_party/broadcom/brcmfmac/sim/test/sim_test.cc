@@ -204,15 +204,13 @@ void SimInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& c
 }
 
 void SimInterface::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
-  if (request->has_peer_sta_address()) {
-    builder.peer_sta_address(request->peer_sta_address());
-    const auto& peer_sta_address = request->peer_sta_address().data();
-    if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
+  const auto deauth_conf = fidl::ToNatural(*request);
+  if (deauth_conf.peer_sta_address().has_value()) {
+    if (memcmp(assoc_ctx_.bssid.byte, deauth_conf.peer_sta_address()->data(), ETH_ALEN) == 0) {
       assoc_ctx_.state = AssocContext::kNone;
     }
   }
-  stats_.deauth_results.emplace_back(builder.Build());
+  stats_.deauth_results.emplace_back(deauth_conf);
   completer.Reply();
 }
 

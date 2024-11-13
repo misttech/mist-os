@@ -279,11 +279,10 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthForTargetInterruptsRoam) {
 
   // Also verify that we got only the right disconnect.
   ASSERT_EQ(client_ifc_.stats_.deauth_results.size(), 1U);
-  wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest& deauth_confirm =
-      client_ifc_.stats_.deauth_results.front();
-  ASSERT_TRUE(client_ifc_.stats_.deauth_results.front().has_peer_sta_address());
-  ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());
-  ASSERT_BYTES_EQ(deauth_confirm.peer_sta_address().data(), kAp1Bssid.byte, ETH_ALEN);
+  const auto& deauth_conf = client_ifc_.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  ASSERT_EQ(ETH_ALEN, deauth_conf.peer_sta_address()->size());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kAp1Bssid.byte, ETH_ALEN);
 
   EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
@@ -394,8 +393,8 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthInterruptsRoam) {
   // Also verify that we got only the right disconnect.
   ASSERT_EQ(client_ifc_.stats_.deauth_results.size(), 1U);
   const auto& deauth_conf = client_ifc_.stats_.deauth_results.front();
-  ASSERT_TRUE(deauth_conf.has_peer_sta_address());
-  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address().data(), kAp0Bssid.byte, ETH_ALEN);
+  ASSERT_TRUE(deauth_conf.peer_sta_address().has_value());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address()->data(), kAp0Bssid.byte, ETH_ALEN);
 
   EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
