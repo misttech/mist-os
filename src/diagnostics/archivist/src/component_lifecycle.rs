@@ -24,11 +24,12 @@ pub fn take_lifecycle_request_stream() -> LifecycleRequestStream {
 /// archivist .
 pub(crate) fn serve(
     mut request_stream: LifecycleRequestStream,
-) -> (fasync::Task<()>, oneshot::Receiver<()>) {
+    scope: &fasync::Scope,
+) -> oneshot::Receiver<()> {
     let (stop_sender, stop_recv) = oneshot::channel();
     let mut stop_sender = Some(stop_sender);
 
-    let task = fasync::Task::spawn(async move {
+    scope.spawn(async move {
         debug!("Awaiting request to close");
         while let Some(Ok(LifecycleRequest::Stop { .. })) = request_stream.next().await {
             debug!("Initiating shutdown.");
@@ -39,5 +40,5 @@ pub(crate) fn serve(
             }
         }
     });
-    (task, stop_recv)
+    stop_recv
 }

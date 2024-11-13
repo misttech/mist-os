@@ -42,15 +42,6 @@ pub struct Archivist {
     /// Receive stop signal to kill this archivist.
     stop_recv: Option<oneshot::Receiver<()>>,
 
-    /// Listens for lifecycle requests, to handle Stop requests.
-    lifecycle_task: Option<fasync::Task<()>>,
-
-    /// Tasks that drains klog.
-    _drain_klog_task: Option<fasync::Task<()>>,
-
-    /// Task writing logs to serial.
-    _serial_task: Option<fasync::Task<()>>,
-
     /// The diagnostics pipelines that have been installed.
     pipelines: Vec<Arc<Pipeline>>,
 
@@ -108,14 +99,12 @@ impl Archivist {
             initial_interests,
             component::inspector().root(),
         );
-        let serial_task = if !config.allow_serial_logs.is_empty() {
-            Some(fasync::Task::spawn(
+        if !config.allow_serial_logs.is_empty() {
+            let write_logs_to_serial =
                 SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
-                    .write_logs(Arc::clone(&logs_repo), SerialSink),
-            ))
-        } else {
-            None
-        };
+                    .write_logs(Arc::clone(&logs_repo), SerialSink);
+            top_level_scope.spawn(write_logs_to_serial);
+        }
         let inspect_repo = Arc::new(InspectRepository::new(
             pipelines.iter().map(Arc::downgrade).collect(),
             top_level_scope.new_child(),
@@ -184,11 +173,8 @@ impl Archivist {
             accessor_server,
             log_server,
             event_router,
-            _serial_task: serial_task,
             _inspect_sink_server: inspect_sink_server,
             stop_recv: None,
-            lifecycle_task: None,
-            _drain_klog_task: None,
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
@@ -202,9 +188,8 @@ impl Archivist {
     /// Archivist to stop ingesting new data and drain current data to clients.
     pub fn set_lifecycle_request_stream(&mut self, request_stream: LifecycleRequestStream) {
         debug!("Lifecycle listener initialized.");
-        let (t, r) = component_lifecycle::serve(request_stream);
-        self.lifecycle_task = Some(t);
-        self.stop_recv = Some(r);
+        let stop_receiver = component_lifecycle::serve(request_stream, &self.top_level_scope);
+        self.stop_recv = Some(stop_receiver);
     }
 
     fn init_pipelines(config: &Config) -> Vec<Arc<Pipeline>> {
@@ -296,9 +281,7 @@ impl Archivist {
             .start()
             // panic: can only panic if we didn't register event producers and consumers correctly.
             .expect("Failed to start event router");
-        let _event_routing_task = fasync::Task::spawn(async move {
-            drain_events_fut.await;
-        });
+        self.top_level_scope.spawn(drain_events_fut);
 
         let logs_repo = Arc::clone(&self.logs_repository);
         let servers_scope_handle = self.servers_scope.to_handle();
@@ -326,10 +309,6 @@ impl Archivist {
             .left_future(),
             None => future::ready(()).right_future(),
         };
-
-        // Ensure logs repo remains alive since it holds BudgetManager which
-        // should remain alive.
-        let _logs_repo = self.logs_repository;
 
         if is_embedded {
             debug!("Entering core loop.");
