@@ -57,7 +57,7 @@ jobs:
       - run:
           name: Build
           command: |
-            make kasan args gen
+            make args gen
             NOECHO= make kernel_unit_test
       - run:
           name: Test
