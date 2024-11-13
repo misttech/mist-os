@@ -55,6 +55,10 @@ expect_includes("starnix_test_with_expectations") {
   includes = [ "starnix_test_with_expectations.shard.cml" ]
 }
 
+expect_includes("starnix_benchmark") {
+  includes = [ "starnix_benchmark.shard.cml" ]
+}
+
 if (host_os == "linux" && host_cpu == "x64") {
   starnix_host_test_component("fdio-test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"

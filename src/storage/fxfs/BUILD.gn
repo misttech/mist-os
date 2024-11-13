@@ -330,6 +330,7 @@ group("tests") {
     ":fxfs-tests",
     ":fxfs_component",
     ":lib_test($host_toolchain)",
+    "//src/storage/fxfs/test-fxfs:test-fxfs-package",
     "//src/storage/fxfs/tools:tests",
     "//src/storage/fxfs/trace:tests",
     "//src/storage/fxfs/unicode:tests",

@@ -32,6 +32,12 @@ import("//src/starnix/kernel/starnix.gni")
 #   generated_expectations (optional)
 #     A `generated_expectations_file` target that generates expectations for this test.
 #     Type: GN label string
+#   is_starnix_benchmark (optional)
+#     Set to true if this test is a benchmark. If so, adds the shard
+#     src/starnix/tests:starnix_benchmark instead of src/starnix/tests:starnix_test.
+#     Note that benchmarks use the global fxfs instance to get more realistic performance results
+#     while non-benchmarks use a test-fxfs component for faster iteration in development.
+#     Type: bool
 #
 #   The remaining parameters are forwarded to the fuchsia_component template.
 template("starnix_toolchain_test_component") {
@@ -65,7 +71,12 @@ template("starnix_toolchain_test_component") {
   }
 
   target(target_type, target_name) {
-    forward_variables_from(invoker, "*", [ "test_label" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "is_starnix_benchmark",
+                             "test_label",
+                           ])
 
     testonly = true
     check_references = false
@@ -84,6 +95,9 @@ template("starnix_toolchain_test_component") {
         expectations = "expectations/${target_name}.json5"
       }
       deps += [ "//src/starnix/tests:starnix_test_with_expectations" ]
+    } else if (defined(invoker.is_starnix_benchmark) &&
+               invoker.is_starnix_benchmark) {
+      deps += [ "//src/starnix/tests:starnix_benchmark" ]
     } else {
       deps += [ "//src/starnix/tests:starnix_test" ]
     }
