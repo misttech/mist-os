@@ -9,7 +9,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::BufRead;
 
-pub fn fix<R: BufRead>(lints: &mut R, filter: &[String], dryrun: bool) -> Result<(), Error> {
+pub fn fix<R: BufRead>(
+    lints: &mut R,
+    filter: &[String],
+    rustfix_filter: Filter,
+    dryrun: bool,
+) -> Result<(), Error> {
     let mut all_lints = String::new();
     lints.read_to_string(&mut all_lints)?;
     let categories = crate::lint::get_categories();
@@ -23,11 +28,8 @@ pub fn fix<R: BufRead>(lints: &mut R, filter: &[String], dryrun: bool) -> Result
         }
     }
 
-    let suggestions = rustfix::get_suggestions_from_json(
-        &all_lints,
-        &filter_lints,
-        Filter::MachineApplicableOnly,
-    )?;
+    let suggestions =
+        rustfix::get_suggestions_from_json(&all_lints, &filter_lints, rustfix_filter)?;
     if suggestions.is_empty() {
         return Err(anyhow!("Couldn't find any fixable occurances of those lints"));
     }
