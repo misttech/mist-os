@@ -59,6 +59,12 @@ where
         self.machine_writer.machine_or(value, or)
     }
 
+    /// If this object is outputting machine output, print the item's machine
+    /// representation to stdout. Otherwise, `write!` the display item given.
+    pub fn machine_or_write<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
+        self.machine_writer.machine_or_write(value, or)
+    }
+
     /// If this object is outputting machine output, prints the item's machine
     /// representation to stdout. Otherwise, call the closure with the object
     /// and print the result.
@@ -219,6 +225,26 @@ mod test {
         writer.machine_or(&"hello again", "but what if").unwrap();
         writer.machine_or_else(&"hello forever", || "but what if else").unwrap();
         assert_eq!(test_buffers.into_stdout_str(), "hello\nbut what if\nbut what if else\n");
+    }
+
+    #[test]
+    fn test_item_for_test_as_machine_write() {
+        let test_buffers = TestBuffers::default();
+        let mut writer: VerifiedMachineWriter<&str> =
+            VerifiedMachineWriter::new_test(Some(Format::Json), &test_buffers);
+        writer.item(&"hello").unwrap();
+        writer.machine_or_write(&"hello again", "but what if").unwrap();
+        assert_eq!(test_buffers.into_stdout_str(), "\"hello\"\n\"hello again\"\n");
+    }
+
+    #[test]
+    fn test_item_for_test_as_not_machine_write() {
+        let test_buffers = TestBuffers::default();
+        let mut writer: VerifiedMachineWriter<&str> =
+            VerifiedMachineWriter::new_test(None, &test_buffers);
+        writer.item(&"hello").unwrap();
+        writer.machine_or_write(&"hello again", "but what if").unwrap();
+        assert_eq!(test_buffers.into_stdout_str(), "hello\nbut what if");
     }
 
     #[test]

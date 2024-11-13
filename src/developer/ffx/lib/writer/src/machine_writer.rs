@@ -85,6 +85,16 @@ where
         Ok(())
     }
 
+    /// If this object is outputting machine output, print the item's machine
+    /// representation to stdout. Otherwise, `write!` the display item given.
+    pub fn machine_or_write<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
+        match self.format {
+            Some(format) => format_output(format, &mut self.simple_writer, value)?,
+            None => write!(self, "{or}")?,
+        }
+        Ok(())
+    }
+
     /// If this object is outputting machine output, prints the item's machine
     /// representation to stdout. Otherwise, call the closure with the object
     /// and print the result.
