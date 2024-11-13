@@ -82,12 +82,6 @@ pub trait FSConfig: Send + Sync + 'static {
     /// Returns the options specifying how to run this filesystem.
     fn options(&self) -> Options<'_>;
 
-    /// Returns a handle for the crypt service (if any).
-    fn crypt_client(&self) -> Option<zx::Channel> {
-        // By default, filesystems don't need a crypt service.
-        None
-    }
-
     /// Whether the filesystem supports multiple volumes.
     fn is_multi_volume(&self) -> bool {
         false
@@ -290,8 +284,6 @@ pub type CryptClientFn = Arc<dyn Fn() -> zx::Channel + Send + Sync>;
 /// Fxfs Filesystem Configuration
 #[derive(Clone)]
 pub struct Fxfs {
-    // This is only used by fsck.
-    pub crypt_client_fn: Option<CryptClientFn>,
     // Start Options
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
@@ -302,7 +294,6 @@ pub struct Fxfs {
 impl Default for Fxfs {
     fn default() -> Self {
         Self {
-            crypt_client_fn: None,
             readonly: false,
             fsck_after_every_transaction: false,
             component_type: Default::default(),
@@ -312,10 +303,6 @@ impl Default for Fxfs {
 }
 
 impl Fxfs {
-    pub fn with_crypt_client(crypt_client_fn: CryptClientFn) -> Self {
-        Fxfs { crypt_client_fn: Some(crypt_client_fn), ..Default::default() }
-    }
-
     /// Manages a block device using the default configuration.
     pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
         filesystem::Filesystem::new(block_device, Self::default())
@@ -349,10 +336,6 @@ impl FSConfig for Fxfs {
             },
             component_type: self.component_type.clone(),
         }
-    }
-
-    fn crypt_client(&self) -> Option<zx::Channel> {
-        self.crypt_client_fn.as_ref().map(|f| f())
     }
 
     fn is_multi_volume(&self) -> bool {

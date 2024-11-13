@@ -10,12 +10,8 @@ mod instance_actor;
 use argh::FromArgs;
 use diagnostics_log::Severity;
 use environment::FsEnvironment;
-use fidl::endpoints::Proxy;
-use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::{F2fs, Fxfs, Minfs};
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
-use std::sync::Arc;
 use stress_test::run_test;
 
 #[derive(Clone, Debug, FromArgs)]
@@ -77,45 +73,7 @@ async fn test() {
 
     match args.target_filesystem.as_str() {
         "fxfs" => {
-            let crypt_management_service = connect_to_protocol::<CryptManagementMarker>()
-                .expect("Failed to connect to the crypt management service");
-            let mut key = [0; 32];
-            zx::cprng_draw(&mut key);
-            let wrapping_key_id_0 = [0; 16];
-            let mut wrapping_key_id_1 = [0; 16];
-            wrapping_key_id_1[0] = 1;
-            crypt_management_service
-                .add_wrapping_key(&wrapping_key_id_0, &key)
-                .await
-                .expect("FIDL failed")
-                .expect("add_wrapping_key failed");
-            zx::cprng_draw(&mut key);
-            crypt_management_service
-                .add_wrapping_key(&wrapping_key_id_1, &key)
-                .await
-                .expect("FIDL failed")
-                .expect("add_wrapping_key failed");
-            crypt_management_service
-                .set_active_key(KeyPurpose::Data, &wrapping_key_id_0)
-                .await
-                .expect("FIDL failed")
-                .expect("set_active_key failed");
-            crypt_management_service
-                .set_active_key(KeyPurpose::Metadata, &wrapping_key_id_1)
-                .await
-                .expect("FIDL failed")
-                .expect("set_active_key failed");
-            let env = FsEnvironment::new(
-                Fxfs::with_crypt_client(Arc::new(|| {
-                    connect_to_protocol::<CryptMarker>()
-                        .expect("Failed to connect to crypt service")
-                        .into_channel()
-                        .expect("Unable to get channel")
-                        .into()
-                })),
-                args,
-            )
-            .await;
+            let env = FsEnvironment::new(Fxfs::default(), args).await;
             run_test(env).await;
         }
         "minfs" => {

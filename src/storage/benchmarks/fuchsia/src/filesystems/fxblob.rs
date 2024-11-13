@@ -34,6 +34,7 @@ impl FilesystemConfig for Fxblob {
         let fxblob = FsManagementFilesystemInstance::new(
             fs_management::Fxfs::default(),
             block_device,
+            None,
             /*as_blob=*/ true,
         )
         .await;

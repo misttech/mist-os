@@ -4,12 +4,15 @@
 
 use async_trait::async_trait;
 use delivery_blob::{CompressionMode, Type1Blob};
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fxfs::CryptMarker;
 use fidl_fuchsia_io as fio;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::FSConfig;
 use fuchsia_merkle::Hash;
 use std::path::Path;
+use std::sync::Arc;
 use storage_benchmarks::block_device::BlockDevice;
 use storage_benchmarks::{CacheClearableFilesystem, Filesystem};
 
@@ -68,8 +71,11 @@ enum FsType {
     MultiVolume(ServingMultiVolumeFilesystem),
 }
 
+pub type CryptClientFn = Arc<dyn Fn() -> ClientEnd<CryptMarker> + Send + Sync>;
+
 pub struct FsManagementFilesystemInstance {
     fs: fs_management::filesystem::Filesystem,
+    crypt_client_fn: Option<CryptClientFn>,
     serving_filesystem: Option<FsType>,
     as_blob: bool,
     // Keep the underlying block device alive for as long as we are using the filesystem.
@@ -80,6 +86,7 @@ impl FsManagementFilesystemInstance {
     pub async fn new<FSC: FSConfig>(
         config: FSC,
         block_device: Box<dyn BlockDevice>,
+        crypt_client_fn: Option<CryptClientFn>,
         as_blob: bool,
     ) -> Self {
         let mut fs =
@@ -93,7 +100,7 @@ impl FsManagementFilesystemInstance {
                     "default",
                     CreateOptions::default(),
                     MountOptions {
-                        crypt: fs.config().crypt_client().map(|c| c.into()),
+                        crypt: crypt_client_fn.as_ref().map(|f| f()),
                         as_blob: Some(as_blob),
                         ..MountOptions::default()
                     },
@@ -109,6 +116,7 @@ impl FsManagementFilesystemInstance {
         };
         Self {
             fs,
+            crypt_client_fn,
             serving_filesystem: Some(serving_filesystem),
             _block_device: block_device,
             as_blob,
@@ -173,7 +181,7 @@ impl CacheClearableFilesystem for FsManagementFilesystemInstance {
                     .open_volume(
                         "default",
                         MountOptions {
-                            crypt: self.fs.config().crypt_client().map(|c| c.into()),
+                            crypt: self.crypt_client_fn.as_ref().map(|f| f()),
                             as_blob: Some(self.as_blob),
                             ..MountOptions::default()
                         },
