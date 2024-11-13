@@ -171,10 +171,10 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
     const std::string& realm_arg,
     fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller,
     fidl::SyncClient<fuchsia_sys2::RealmQuery> realm_query) {
-  size_t separator_position = realm_arg.rfind(':');
-  if (separator_position == std::string::npos) {
+  size_t separator_position = realm_arg.rfind('/');
+  if (separator_position == std::string::npos || separator_position == 0) {
     return fit::error(
-        debug::Status("Realm parameter must take the form <realm>:<test collection>"));
+        debug::Status("Realm parameter must take the form <realm>/<test collection>"));
   }
 
   std::string realm_moniker = realm_arg.substr(0, separator_position);

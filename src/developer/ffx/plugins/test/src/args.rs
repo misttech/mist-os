@@ -40,7 +40,7 @@ Run a test suite:
     $ ffx test run fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm
 
 Run a test suite in system realm:
-    $ ffx test run --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm
+    $ ffx test run --realm /core/testing/system-tests fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm
 
 Run a test suite and pass arguments to the suite:
     $ ffx test run fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm -- arg1 arg2

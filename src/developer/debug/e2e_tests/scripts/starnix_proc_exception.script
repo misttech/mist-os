@@ -11,7 +11,7 @@
 [zxdb] attach starnix_proc_exception
 Waiting for process matching "starnix_proc_exception".
 
-[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/starnix_proc_exception.cm
+[zxdb] run-test --realm /core/testing/system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/starnix_proc_exception.cm
 Attached Process 1 state=Running koid=?? name=data/bin/starnix_proc_exception component=starnix_kernel.cm
 
 🛑 software_break(uint64_t) • backtrace-request.h:??

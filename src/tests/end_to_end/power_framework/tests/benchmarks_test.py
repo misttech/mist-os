@@ -39,7 +39,7 @@ class PowerBenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
                 "fuchsia-pkg://fuchsia.com/power-framework-bench-integration-tests#meta/integration.cm",
                 ffx_test_args=[
                     "--realm",
-                    "/core/testing:system-tests",
+                    "/core/testing/system-tests",
                     "--test-filter",
                     "*test_topologytestdaemon_toggle",
                 ],

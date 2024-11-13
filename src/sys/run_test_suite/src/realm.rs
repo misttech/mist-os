@@ -33,7 +33,7 @@ pub enum RealmError {
     #[error(transparent)]
     Validation(#[from] RealmValidationError),
 
-    #[error("Invalid realm, it should contain test collection: /realm:collection")]
+    #[error("Invalid realm, it should contain test collection: /realm/collection")]
     InvalidRealmStr,
 
     #[error("cannot resolve provided realm: {0:?}")]
@@ -151,12 +151,30 @@ pub async fn parse_provided_realm(
     realm_query: &fsys::RealmQueryProxy,
     realm_str: &str,
 ) -> Result<Realm, RealmError> {
-    let (moniker, test_collection) = match realm_str.rsplit_once(':') {
+    let (mut moniker, mut test_collection) = match realm_str.rsplit_once('/') {
         Some(s) => s,
         None => {
             return Err(RealmError::InvalidRealmStr);
         }
     };
+    // Support old way of parsing realm.
+    if test_collection.contains(":") {
+        (moniker, test_collection) = match realm_str.rsplit_once(':') {
+            Some(s) => {
+                println!(
+                    "You are using old realm format. Please switch to standard realm moniker format: '{}/{}'",
+                    moniker, test_collection
+                );
+                s
+            }
+            None => {
+                return Err(RealmError::InvalidRealmStr);
+            }
+        };
+    }
+    if moniker == "" {
+        return Err(RealmError::InvalidRealmStr);
+    }
     let moniker = Moniker::try_from(moniker)?;
 
     component_debug::lifecycle::resolve_instance(&lifecycle_controller, &moniker)
@@ -195,12 +213,12 @@ mod test {
         let realm_query =
             fuchsia_component::client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
         let realm =
-            parse_provided_realm(&lifecycle_controller, &realm_query, "/test_realm:echo_test_coll")
+            parse_provided_realm(&lifecycle_controller, &realm_query, "/test_realm/echo_test_coll")
                 .await
                 .unwrap();
 
         assert_eq!(realm.test_collection, "echo_test_coll");
-        assert_eq!(realm.realm_str, "/test_realm:echo_test_coll");
+        assert_eq!(realm.realm_str, "/test_realm/echo_test_coll");
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
         // LogSink & InspectSink are offered to all children
@@ -217,13 +235,13 @@ mod test {
         let realm = parse_provided_realm(
             &lifecycle_controller,
             &realm_query,
-            "/test_realm:hermetic_test_coll",
+            "/test_realm/hermetic_test_coll",
         )
         .await
         .unwrap();
 
         assert_eq!(realm.test_collection, "hermetic_test_coll");
-        assert_eq!(realm.realm_str, "/test_realm:hermetic_test_coll");
+        assert_eq!(realm.realm_str, "/test_realm/hermetic_test_coll");
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
         // LogSink & InspectSink are offered to all children.
@@ -248,7 +266,7 @@ mod test {
             parse_provided_realm(
                 &lifecycle_controller,
                 &realm_query,
-                "/nonexistent_realm:test_coll"
+                "/nonexistent_realm/test_coll"
             )
             .await,
             Err(RealmError::InstanceNotResolved(_))
@@ -260,7 +278,7 @@ mod test {
         );
 
         assert_matches!(
-            parse_provided_realm(&lifecycle_controller, &realm_query, "/test_realm:invalid_col")
+            parse_provided_realm(&lifecycle_controller, &realm_query, "/test_realm/invalid_col")
                 .await,
             Err(RealmError::Validation(RealmValidationError::TestCollectionNotFound(_)))
         );
@@ -269,7 +287,7 @@ mod test {
             parse_provided_realm(
                 &lifecycle_controller,
                 &realm_query,
-                "/test_realm:no_capability_requested_event"
+                "/test_realm/no_capability_requested_event"
             )
             .await,
             Err(RealmError::Validation(RealmValidationError::CapabilityRequested))
@@ -279,7 +297,7 @@ mod test {
             parse_provided_realm(
                 &lifecycle_controller,
                 &realm_query,
-                "/no_realm_protocol_realm:hermetic_test_coll"
+                "/no_realm_protocol_realm/hermetic_test_coll"
             )
             .await,
             Err(RealmError::Validation(RealmValidationError::RealmProtocol))

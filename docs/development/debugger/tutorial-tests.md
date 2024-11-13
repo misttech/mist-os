@@ -150,7 +150,7 @@ the `fx test` command with `zxdb`.
   <...fx test startup...>
 
   Starting: fuchsia-pkg://fuchsia.com/debug_agent_unit_tests#meta/debug_agent_unit_tests.cm (NOT HERMETIC)
-  Command: fx ffx test run --realm /core/testing:system-tests --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/debug_agent_unit_tests?hash=3f6d97801bb147034a344e3fe1bb69291a7b690b9d3d075246ddcba59397ac12#meta/debug_agent_unit_tests.cm
+  Command: fx ffx test run --realm /core/testing/system-tests --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/debug_agent_unit_tests?hash=3f6d97801bb147034a344e3fe1bb69291a7b690b9d3d075246ddcba59397ac12#meta/debug_agent_unit_tests.cm
 
   Status: [duration: 30.9s]  [tasks: 3 running, 15/19 complete]
     Running 2 tests                      [                                                                                                     ]           0.0%
@@ -697,7 +697,7 @@ the `fx test` command with `zxdb`.
   Running 1 test
 
   Starting: fuchsia-pkg://fuchsia.com/debug_agent_unit_tests#meta/debug_agent_unit_tests.cm (NOT HERMETIC)
-  Command: fx ffx test run --realm /core/testing:system-tests --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/debug_agent_unit_tests?hash=399ff8d9871a6f0d53557c3d7c233cad645061016d44a7855dcea2c7b8af8101#meta/debug_agent_unit_tests.cm
+  Command: fx ffx test run --realm /core/testing/system-tests --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/debug_agent_unit_tests?hash=399ff8d9871a6f0d53557c3d7c233cad645061016d44a7855dcea2c7b8af8101#meta/debug_agent_unit_tests.cm
   Deleting 1 files at /tmp/tmp8m56ht95: ffx_logs/ffx.log
   To keep these files, set --ffx-output-directory.
 

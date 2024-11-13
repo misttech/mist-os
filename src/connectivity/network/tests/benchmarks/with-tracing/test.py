@@ -67,7 +67,7 @@ class NetstackBenchmarksWithTracingTest(fuchsia_base_test.FuchsiaBaseTest):
             f"fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm",
             ffx_test_args=[
                 "--realm",
-                "/core/testing:system-tests",
+                "/core/testing/system-tests",
                 "--output-directory",
                 self.test_case_path,
             ],

@@ -28,7 +28,7 @@ class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
         ):
             self.device.ffx.run_test_component(
                 "fuchsia-pkg://fuchsia.com/fuchsia_microbenchmarks#meta/fuchsia_microbenchmarks.cm",
-                ffx_test_args=["--realm", "/core/testing:system-tests"],
+                ffx_test_args=["--realm", "/core/testing/system-tests"],
                 test_component_args=[
                     "-p",
                     "--quiet",

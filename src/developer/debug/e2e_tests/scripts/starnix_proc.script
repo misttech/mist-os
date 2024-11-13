@@ -13,7 +13,7 @@ Waiting for process matching "starnix_proc".
 [zxdb] b starnix_proc.cc:9
 Created Breakpoint 1 @ starnix_proc.cc:9
 
-[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/starnix_proc.cm
+[zxdb] run-test --realm /core/testing/system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/starnix_proc.cm
 Attached Process 1 state=Running koid=?? name=data/bin/starnix_proc component=starnix_kernel.cm
 🛑 on bp 1 main() • starnix_proc.cc:9
 

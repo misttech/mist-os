@@ -49,8 +49,8 @@ Register your moniker in our [build rules][test_type_map]:
 
 ```gn
 _type_moniker_map = {
-  system = "/core/testing:system-tests"
-  test_arch = "/core/testing:test-arch-tests"
+  system = "/core/testing/system-tests"
+  test_arch = "/core/testing/test-arch-tests"
   ...
   <new_type> = "/path/to/test/realm/moniker"
 }

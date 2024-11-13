@@ -23,8 +23,8 @@ use test_output_directory::testing::{
 use test_output_directory::{self as directory};
 use test_util::assert_geq;
 
-const PROVIDED_HERMETIC_REALM: &str = "/provided_test_realm:hermetic_test_coll";
-const PROVIDED_ECHO_REALM: &str = "/provided_test_realm:echo_test_coll";
+const PROVIDED_HERMETIC_REALM: &str = "/provided_test_realm/hermetic_test_coll";
+const PROVIDED_ECHO_REALM: &str = "/provided_test_realm/echo_test_coll";
 
 /// split and sort output as output can come in any order.
 /// `output` is of type vec<u8> and `expected_output` is a string.
