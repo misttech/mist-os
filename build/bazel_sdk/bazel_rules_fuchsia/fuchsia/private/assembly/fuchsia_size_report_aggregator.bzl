@@ -5,6 +5,7 @@
 """Rule for aggregating size reports."""
 
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_size_report_aggregator_impl(ctx):
     size_budgets = ",".join([
@@ -57,6 +58,7 @@ def _fuchsia_size_report_aggregator_impl(ctx):
         inputs = ctx.files.size_reports,
         executable = ctx.executable._size_report_merger,
         arguments = _merge_arguments,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     deps = [size_budgets_file, size_report_file, verbose_output_file]
