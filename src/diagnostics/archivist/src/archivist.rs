@@ -51,9 +51,6 @@ pub struct Archivist {
     /// Task writing logs to serial.
     _serial_task: Option<fasync::Task<()>>,
 
-    /// Tasks receiving external events from component manager.
-    incoming_external_event_producers: Vec<fasync::Task<()>>,
-
     /// The diagnostics pipelines that have been installed.
     pipelines: Vec<Arc<Pipeline>>,
 
@@ -75,6 +72,9 @@ pub struct Archivist {
     /// Top level scope.
     top_level_scope: fasync::Scope,
 
+    /// Tasks receiving external events from component manager.
+    incoming_events_scope: fasync::Scope,
+
     /// All tasks for FIDL servers that ingest data into the Archivist must run in this scope.
     servers_scope: fasync::Scope,
 }
@@ -92,8 +92,8 @@ impl Archivist {
         // Initialize the core event router
         let mut event_router =
             EventRouter::new(component::inspector().root().create_child("events"));
-        let incoming_external_event_producers =
-            Self::initialize_external_event_sources(&mut event_router).await;
+        let incoming_events_scope = top_level_scope.new_child();
+        Self::initialize_external_event_sources(&mut event_router, &incoming_events_scope).await;
 
         let initial_interests =
             config.component_initial_interests.into_iter().filter_map(|interest| {
@@ -185,12 +185,12 @@ impl Archivist {
             stop_recv: None,
             lifecycle_task: None,
             _drain_klog_task: None,
-            incoming_external_event_producers,
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
             top_level_scope,
             servers_scope,
+            incoming_events_scope,
         }
     }
 
@@ -230,8 +230,8 @@ impl Archivist {
 
     pub async fn initialize_external_event_sources(
         event_router: &mut EventRouter,
-    ) -> Vec<fasync::Task<()>> {
-        let mut incoming_external_event_producers = vec![];
+        scope: &fasync::Scope,
+    ) {
         match EventSource::new("/events/log_sink_requested_event_stream").await {
             Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
             Ok(mut event_source) => {
@@ -239,10 +239,10 @@ impl Archivist {
                     producer: &mut event_source,
                     events: vec![EventType::LogSinkRequested],
                 });
-                incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                scope.spawn(async move {
                     // This should never exit.
                     let _ = event_source.spawn().await;
-                }));
+                });
             }
         }
 
@@ -255,14 +255,12 @@ impl Archivist {
                     producer: &mut event_source,
                     events: vec![EventType::InspectSinkRequested],
                 });
-                incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                scope.spawn(async move {
                     // This should never exit.
                     let _ = event_source.spawn().await;
-                }));
+                });
             }
         }
-
-        incoming_external_event_producers
     }
 
     fn add_host_before_last_dot(input: &str) -> String {
@@ -316,13 +314,13 @@ impl Archivist {
 
         let log_server = self.log_server;
         let accessor_server = self.accessor_server;
-        let incoming_external_event_producers = self.incoming_external_event_producers;
         let logs_repo = Arc::clone(&self.logs_repository);
+        let incoming_events_scope = self.incoming_events_scope;
         let stop_fut = match self.stop_recv {
             Some(stop_recv) => async move {
                 stop_recv.into_future().await.ok();
                 terminate_handle.terminate().await;
-                std::mem::drop(incoming_external_event_producers);
+                incoming_events_scope.cancel().await;
                 servers_scope_handle.close();
                 log_server.stop();
                 accessor_server.stop();
