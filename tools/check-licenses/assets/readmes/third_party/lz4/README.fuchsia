@@ -1,8 +1,5 @@
 Name: LZ4 - Extremely fast compression
 
-License File: LICENSE
- -> License File Format: Single License
-
 License File: lib/LICENSE
  -> License File Format: Single License
  -> License Classifications: BSD-2-Clause, Copyright
