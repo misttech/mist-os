@@ -53,7 +53,7 @@ impl SystemController {
                     let root = self
                         .top_instance
                         .upgrade()
-                        .ok_or(format_err!("model is dropped"))?
+                        .ok_or_else(|| format_err!("model is dropped"))?
                         .root()
                         .clone();
 

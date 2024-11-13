@@ -56,7 +56,7 @@ pub async fn initialize_ga4_metrics_service(
     let metrics_state = MetricsState::from_config(
         &metrics_dir,
         app_name,
-        build_version.unwrap_or(UNKNOWN_VERSION.into()),
+        build_version.unwrap_or_else(|| UNKNOWN_VERSION.into()),
         sdk_version,
         "deprecated".to_string(),
         ga4_product_code,

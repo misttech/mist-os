@@ -868,7 +868,7 @@ impl<'a, W: io::Write> CBackend<'a, W> {
                 protocol_def = self.codegen_protocol_def2(name, &data.methods, ir)?,
             ),
             ProtocolType::Callback => {
-                let m = data.methods.get(0).ok_or(anyhow!("callback has no methods"))?;
+                let m = data.methods.get(0).ok_or_else(|| anyhow!("callback has no methods"))?;
                 let (out_params, return_param) = get_out_params(name, &m, ir)?;
                 let in_params = get_in_params(&m, false, ir)?;
 

@@ -74,7 +74,7 @@ pub struct TargetHandle {
 
 impl Display for TargetHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = self.node_name.clone().unwrap_or("".to_string());
+        let name = self.node_name.clone().unwrap_or_else(|| "".to_string());
         write!(f, "Node: \"{}\" in state: {}", name, self.state)
     }
 }
@@ -151,7 +151,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
     type Error = anyhow::Error;
 
     fn try_from(info: ffx::TargetInfo) -> Result<Self, Self::Error> {
-        let addresses = info.addresses.ok_or(anyhow!("Addresses are populated"))?;
+        let addresses = info.addresses.ok_or_else(|| anyhow!("Addresses are populated"))?;
         // Get the TargetAddrs
         let mut addrs: Vec<_> = addresses.into_iter().map(TargetAddr::from).collect();
         // Sorting them this way put ipv6 above ipv4
@@ -164,7 +164,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
         let state = match info.fastboot_interface {
             None => TargetState::Product(addrs),
             Some(iface) => {
-                let serial_number = info.serial_number.unwrap_or("".to_string());
+                let serial_number = info.serial_number.unwrap_or_else(|| "".to_string());
                 let connection_state = match iface {
                     ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
                     ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),

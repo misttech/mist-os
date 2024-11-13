@@ -68,7 +68,7 @@ pub fn sys_uname(
             log_error!("FIDL error getting build info: {e}");
             errno!(EIO)
         })?;
-        Ok(buildinfo.version.unwrap_or("starnix".to_string()))
+        Ok(buildinfo.version.unwrap_or_else(|| "starnix".to_string()))
     })?;
 
     init_array(&mut result.version, version.as_bytes());

@@ -202,14 +202,14 @@ impl RegisterTool {
                     "Error while registering repository {repo_name} with {target}: {err}\n\
                                     Ensure that a target is running and connected with:\n\
                                     $ ffx target list",
-                    target = target_spec.clone().unwrap_or("None".to_string())
+                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
                 )
             }
             Err(RepositoryError::ServerNotRunning) => {
                 return_bug!(
                     "Failed to register repository {repo_name} with {target} {reason:#}",
                     reason = pkg::config::determine_why_repository_server_is_not_running().await,
-                    target = target_spec.clone().unwrap_or("None".to_string())
+                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
                 )
             }
             Err(err @ RepositoryError::ConflictingRegistration) => {
@@ -223,7 +223,7 @@ impl RegisterTool {
             }
             Err(err) => {
                 return_bug!("Unexpected error. Failed to register repository {repo_name} with {target}: {err}",
-                target=target_spec.clone().unwrap_or("None".to_string()))
+                target=target_spec.clone().unwrap_or_else(|| "None".to_string()))
             }
         }
     }

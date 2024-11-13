@@ -12,7 +12,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub fn global_symbol_index_path() -> Result<String> {
-    Ok(pathbuf_to_string(home::home_dir().ok_or(anyhow!("cannot find home directory"))?)?
+    Ok(pathbuf_to_string(home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?)?
         + "/.fuchsia/debug/symbol-index.json")
 }
 
@@ -33,7 +33,7 @@ pub async fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
     let global_symbol_index = global_symbol_index_path()?;
 
     // Note: This clobbers the existing global symbol-index if it is invalid.
-    let mut index = SymbolIndex::load(&global_symbol_index).unwrap_or(SymbolIndex::new());
+    let mut index = SymbolIndex::load(&global_symbol_index).unwrap_or_else(|_| SymbolIndex::new());
     if !index.includes.contains(&symbol_index_path) {
         index.includes.push(symbol_index_path);
         index.save(&global_symbol_index)?;
@@ -213,7 +213,7 @@ fn glob(path: String) -> Vec<String> {
                     })
                     .collect()
             })
-            .unwrap_or(vec![path])
+            .unwrap_or_else(|_| vec![path])
     } else {
         vec![path]
     }

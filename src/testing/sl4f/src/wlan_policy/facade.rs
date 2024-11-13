@@ -128,7 +128,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         // Policy will send results back through this iterator
         let (iter, server) =
@@ -171,7 +171,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         let network_id = fidl_policy::NetworkIdentifier { ssid: target_ssid, type_ };
         let response = controller
@@ -209,7 +209,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
         info!(
             tag = &with_line!("WlanPolicyFacade::remove_network"),
             "Removing network: ({}{:?})",
@@ -235,7 +235,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         // Remove each saved network individually.
         let saved_networks = self.get_saved_networks().await?;
@@ -255,7 +255,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         let req_status = controller.start_client_connections().await?;
         if fidl_policy::RequestStatus::Acknowledged == req_status {
@@ -280,7 +280,7 @@ impl WlanPolicyFacade {
         let mut update_listener = if listener.is_none() {
             Self::init_listener()
         } else {
-            listener.ok_or(format_err!("failed to set update listener of facade"))
+            listener.ok_or_else(|| format_err!("failed to set update listener of facade"))
         }?;
 
         if let Some(update_request) = update_listener.try_next().await? {
@@ -306,7 +306,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         let req_status = controller.stop_client_connections().await?;
         if fidl_policy::RequestStatus::Acknowledged == req_status {
@@ -333,7 +333,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         let network_id = fidl_policy::NetworkIdentifier { ssid: target_ssid.clone(), type_: type_ };
 
@@ -360,7 +360,7 @@ impl WlanPolicyFacade {
         let controller = controller_guard
             .inner
             .as_ref()
-            .ok_or(format_err!("client controller has not been initialized"))?;
+            .ok_or_else(|| format_err!("client controller has not been initialized"))?;
 
         // Policy will send configs back through this iterator
         let (iter, server) =

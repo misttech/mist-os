@@ -377,7 +377,7 @@ pub async fn configure_launcher(
         .to_path_buf()
         .join(&config_args.bin_path)
         .to_str()
-        .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
+        .ok_or_else(|| LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
         .as_bytes()
         .to_vec();
     let mut all_args = vec![bin_arg];

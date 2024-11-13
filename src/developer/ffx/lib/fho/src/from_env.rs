@@ -185,7 +185,8 @@ impl FhoEnvironment {
             }
 
             // Build the path to the new log file.
-            let dir: PathBuf = self.context.get(ffx_config::logging::LOG_DIR).unwrap_or(".".into());
+            let dir: PathBuf =
+                self.context.get(ffx_config::logging::LOG_DIR).unwrap_or_else(|_| ".".into());
             let mut log_file = dir.join(basename);
             log_file.set_extension("log");
 

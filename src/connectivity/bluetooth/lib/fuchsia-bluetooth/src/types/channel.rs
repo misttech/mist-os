@@ -193,7 +193,8 @@ impl Channel {
                 }
                 _ => {}
             };
-            let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
+            let proxy =
+                proxy.ok_or_else(|| Error::profile("l2cap parameter changing not supported"))?;
             let parameters = fidl_bt::ChannelParameters {
                 flush_timeout: duration.clone().map(zx::MonotonicDuration::into_nanos),
                 ..Default::default()

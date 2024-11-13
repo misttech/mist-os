@@ -21,14 +21,14 @@ pub async fn destroy_cmd<W: std::io::Write>(
 
     let parent = moniker
         .parent()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let leaf = moniker
         .leaf()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let child_name = leaf.name();
     let collection = leaf
         .collection()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
 
     destroy_instance_in_collection(&lifecycle_controller, &parent, collection, child_name)
         .await

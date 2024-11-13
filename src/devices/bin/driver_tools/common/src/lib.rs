@@ -12,7 +12,7 @@ impl Device {
     /// Gets the full moniker name of the device.
     pub fn get_moniker(&self) -> Result<&str> {
         let moniker = self.0.moniker.as_ref();
-        Ok(moniker.ok_or(format_err!("Missing moniker"))?)
+        Ok(moniker.ok_or_else(|| format_err!("Missing moniker"))?)
     }
 
     /// Gets the full identifying path name of the device.

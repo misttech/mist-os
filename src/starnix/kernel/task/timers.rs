@@ -81,11 +81,13 @@ impl TimerTable {
                 timer_id,
                 timeline,
                 wakeup_type,
-                signal_event.unwrap_or(SignalEvent::new(
-                    SignalEventValue(timer_id as u64),
-                    SIGALRM,
-                    SignalEventNotify::Signal,
-                )),
+                signal_event.unwrap_or_else(|| {
+                    SignalEvent::new(
+                        SignalEventValue(timer_id as u64),
+                        SIGALRM,
+                        SignalEventNotify::Signal,
+                    )
+                }),
             )?,
         );
 

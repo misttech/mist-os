@@ -25,7 +25,7 @@ impl Args {
 }
 
 fn usage() -> String {
-    let arg0 = std::env::args().next().unwrap_or("inspect_rust_codelab_client".to_string());
+    let arg0 = std::env::args().next().unwrap_or_else(|| "inspect_rust_codelab_client".to_string());
     format!(
         "Usage: {:?} <string> [string...]
   string: Strings provided on the command line to reverse",

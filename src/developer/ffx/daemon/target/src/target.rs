@@ -471,7 +471,7 @@ impl Target {
             t.nodename.take(),
             t.serial.take(),
             t.addresses.drain(..).collect(),
-            t.fastboot_interface.ok_or(anyhow!("No fastboot mode?"))?,
+            t.fastboot_interface.ok_or_else(|| anyhow!("No fastboot mode?"))?,
         ))
     }
 
@@ -727,7 +727,7 @@ impl Target {
     }
 
     pub fn nodename_str(&self) -> String {
-        self.nodename().unwrap_or("<unknown>".to_owned())
+        self.nodename().unwrap_or_else(|| "<unknown>".to_owned())
     }
 
     pub fn boot_timestamp_nanos(&self) -> Option<u64> {
@@ -1265,7 +1265,7 @@ impl Target {
                 bail!("RCS connection issue")
             }
         }
-        self.rcs().ok_or(anyhow!("rcs dropped after event fired")).map(|r| r.proxy)
+        self.rcs().ok_or_else(|| anyhow!("rcs dropped after event fired")).map(|r| r.proxy)
     }
 
     pub async fn is_fastboot_tcp(&self) -> Result<bool> {

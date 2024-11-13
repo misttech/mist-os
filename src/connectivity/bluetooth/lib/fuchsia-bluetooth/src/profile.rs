@@ -91,17 +91,17 @@ pub fn find_profile_descriptors(
     let attr = attributes
         .iter()
         .find(|a| a.id == Some(ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST))
-        .ok_or(Error::profile("missing profile descriptor"))?;
+        .ok_or_else(|| Error::profile("missing profile descriptor"))?;
 
     let Some(fidl_bredr::DataElement::Sequence(profiles)) = &attr.element else {
         return Err(Error::profile("attribute element is invalidly formatted"));
     };
     let mut result = Vec::new();
     for elem in profiles {
-        let elem = elem.as_ref().ok_or(Error::profile("null DataElement in sequence"))?;
+        let elem = elem.as_ref().ok_or_else(|| Error::profile("null DataElement in sequence"))?;
         result.push(
             elem_to_profile_descriptor(&*elem)
-                .ok_or(Error::profile("couldn't convert to a ProfileDescriptor"))?,
+                .ok_or_else(|| Error::profile("couldn't convert to a ProfileDescriptor"))?,
         );
     }
     if result.is_empty() {

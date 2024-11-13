@@ -223,7 +223,7 @@ impl ZbiBuilder {
         output_path: impl AsRef<Utf8Path>,
     ) -> Result<Vec<String>> {
         // Ensure a kernel is supplied.
-        let kernel = &self.kernel.as_ref().ok_or(anyhow!("No kernel image supplied"))?;
+        let kernel = &self.kernel.as_ref().ok_or_else(|| anyhow!("No kernel image supplied"))?;
 
         let mut args: Vec<String> = Vec::new();
 

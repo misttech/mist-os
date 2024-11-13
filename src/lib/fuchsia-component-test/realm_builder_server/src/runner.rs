@@ -122,7 +122,7 @@ impl Runner {
                     let program = start_info
                         .program
                         .clone()
-                        .ok_or(format_err!("`program` is missing from `StartInfo`."))?;
+                        .ok_or_else(|| format_err!("`program` is missing from `StartInfo`."))?;
                     if start_info.ns.is_none() {
                         return Err(format_err!("Namespace is missing from `StartInfo`."));
                     }
@@ -158,10 +158,9 @@ impl Runner {
         let local_component_proxies_guard = self.local_component_proxies.lock().await;
         let local_component_control_handle_or_runner_proxy = local_component_proxies_guard
             .get(&local_component_id)
-            .ok_or(format_err!(
-                "Received non-existent local component \"{}\".",
-                local_component_id
-            ))?
+            .ok_or_else(|| {
+                format_err!("Received non-existent local component \"{}\".", local_component_id)
+            })?
             .clone();
 
         match local_component_control_handle_or_runner_proxy {
@@ -192,10 +191,12 @@ impl Runner {
 /// Extracts either the value for the `local_component_id` key from the provided
 /// dictionary. It is an error for anything else to be present in the dictionary.
 fn extract_local_component_id<'a>(dict: fdata::Dictionary) -> Result<LocalComponentId, Error> {
-    let entries = dict.entries.ok_or(format_err!("program section is empty"))?;
+    let entries = dict.entries.ok_or_else(|| format_err!("program section is empty"))?;
     for entry in entries.into_iter() {
-        let entry_value =
-            entry.value.map(|box_| *box_).ok_or(format_err!("program section is missing value"))?;
+        let entry_value = entry
+            .value
+            .map(|box_| *box_)
+            .ok_or_else(|| format_err!("program section is missing value"))?;
         match (entry.key.as_str(), entry_value) {
             (LOCAL_COMPONENT_ID_KEY, fdata::DictionaryValue::Str(s)) => {
                 return Ok(LocalComponentId(s.clone()))

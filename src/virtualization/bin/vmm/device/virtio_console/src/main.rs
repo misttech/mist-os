@@ -18,9 +18,9 @@ async fn run_virtio_console(
     let (start_info, socket, responder) = virtio_console_fidl
         .try_next()
         .await?
-        .ok_or(anyhow!("Unexpected end of stream"))?
+        .ok_or_else(|| anyhow!("Unexpected end of stream"))?
         .into_start()
-        .ok_or(anyhow!("Expected Start message"))?;
+        .ok_or_else(|| anyhow!("Expected Start message"))?;
 
     // Prepare the device builder from the start info. The device builder has been initialized
     // with any provided traps and notification sources.

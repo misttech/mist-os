@@ -43,7 +43,7 @@ impl NodeInfoPrinter for Device {
         writeln!(
             writer,
             "     \"{}\" [label=\"{}\"]",
-            self.0.id.as_ref().ok_or(format_err!("Node missing id"))?,
+            self.0.id.as_ref().ok_or_else(|| format_err!("Node missing id"))?,
             self.extract_name()?,
         )?;
         Ok(())
@@ -53,8 +53,8 @@ impl NodeInfoPrinter for Device {
         writeln!(
             writer,
             "     \"{}\" -> \"{}\"",
-            self.0.id.as_ref().ok_or(format_err!("Node missing id"))?,
-            child.id.as_ref().ok_or(format_err!("Child node missing id"))?
+            self.0.id.as_ref().ok_or_else(|| format_err!("Node missing id"))?,
+            child.id.as_ref().ok_or_else(|| format_err!("Child node missing id"))?
         )?;
         Ok(())
     }

@@ -211,7 +211,7 @@ impl EventFiller {
             .header
             .as_ref()
             .map(|header| format!("{:?}", header.event_type))
-            .unwrap_or("unknown".to_string());
+            .unwrap_or_else(|| "unknown".to_string());
         let measure_tape = event.measure();
         self.bytes_used += measure_tape.num_bytes;
         self.handles_used += measure_tape.num_handles;

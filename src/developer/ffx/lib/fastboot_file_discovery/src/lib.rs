@@ -284,7 +284,7 @@ where
     F: FastbootEventHandler,
 {
     loop {
-        let event = receiver.next().await.ok_or(anyhow!("no event"));
+        let event = receiver.next().await.ok_or_else(|| anyhow!("no event"));
         tracing::trace!("Event loop received event: {:#?}", event);
         handler.handle_event(event).await;
     }

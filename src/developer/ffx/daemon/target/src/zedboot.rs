@@ -151,7 +151,7 @@ async fn recv_loop(sock: Arc<UdpSocket>, e: events::Queue<DaemonEvent>) {
                 tracing::trace!(
                     "zedboot packet from {} ({}) on {}",
                     addr,
-                    info.nodename.clone().unwrap_or("<unknown>".to_string()),
+                    info.nodename.clone().unwrap_or_else(|| "<unknown>".to_string()),
                     sock.local_addr().unwrap()
                 );
                 e.push(DaemonEvent::WireTraffic(WireTrafficType::Zedboot(info))).unwrap_or_else(

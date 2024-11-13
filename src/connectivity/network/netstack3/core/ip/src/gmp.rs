@@ -1025,7 +1025,7 @@ where
     core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp }| {
         let ReportReceivedActions { stop_timer } = groups
             .get_mut(&group_addr)
-            .ok_or(CC::not_a_member_err(*group_addr))
+            .ok_or_else(|| CC::not_a_member_err(*group_addr))
             .map(|a| a.as_mut().report_received())?;
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
@@ -1062,7 +1062,7 @@ where
                 }
                 QueryTarget::Specified(group_addr) => either::Either::Right(core::iter::once((
                     group_addr,
-                    groups.get_mut(&group_addr).ok_or(CC::not_a_member_err(*group_addr))?,
+                    groups.get_mut(&group_addr).ok_or_else(|| CC::not_a_member_err(*group_addr))?,
                 ))),
             };
 

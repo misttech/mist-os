@@ -304,7 +304,7 @@ impl<'a> RequestHandler<'a> {
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
-                let id = BindingId::new(id).ok_or(DeviceNotFoundError.into_errno())?;
+                let id = BindingId::new(id).ok_or_else(|| DeviceNotFoundError.into_errno())?;
                 Some(id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?)
             }
         };

@@ -69,7 +69,7 @@ pub async fn list(
                 driver_to_devices
                     .entry(driver.to_string())
                     .and_modify(|v| v.push(device_name.to_string()))
-                    .or_insert(vec![device_name.to_string()]);
+                    .or_insert_with(|| vec![device_name.to_string()]);
             }
         }
         let driver_to_devices = driver_to_devices;

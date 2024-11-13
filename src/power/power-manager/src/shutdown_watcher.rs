@@ -77,7 +77,8 @@ impl<'a, 'b> ShutdownWatcherBuilder<'a, 'b> {
 
     pub fn build(self) -> Result<Rc<ShutdownWatcher>, Error> {
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let node = Rc::new(ShutdownWatcher {
             reboot_watchers: Rc::new(RefCell::new(HashMap::new())),

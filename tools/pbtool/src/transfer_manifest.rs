@@ -114,7 +114,7 @@ impl GenerateTransferManifest {
                 name: diff_utf8_paths(manifest_path, &canonical_product_bundle_path)
                     .context("rebasing virtual device manifest path")?,
             });
-            let manifest_dir = manifest_path.parent().unwrap_or("".into());
+            let manifest_dir = manifest_path.parent().unwrap_or_else(|| "".into());
             let manifest = VirtualDeviceManifest::from_path(&product_bundle.virtual_devices_path)
                 .context("manifest from_path")?;
             for path in manifest.device_paths.values() {

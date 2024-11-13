@@ -34,7 +34,7 @@ impl DeviceFacade {
             .get_device_name()
             .await?
             .map_err(|e| format_err!("failed to obtain device name: {:?}", e));
-        let device_name = name.unwrap_or(DEFAULT_DEVICE_NAME.to_string());
+        let device_name = name.unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
         Ok(device_name)
     }
 
@@ -49,7 +49,7 @@ impl DeviceFacade {
             ),
         };
         let buildinfo = proxy.get_build_info().await?;
-        let product = buildinfo.product_config.unwrap_or("unknown".to_string());
+        let product = buildinfo.product_config.unwrap_or_else(|| "unknown".to_string());
         Ok(product)
     }
 
@@ -64,7 +64,7 @@ impl DeviceFacade {
             ),
         };
         let buildinfo = proxy.get_build_info().await?;
-        let device_name = buildinfo.version.unwrap_or("unknown".to_string());
+        let device_name = buildinfo.version.unwrap_or_else(|| "unknown".to_string());
         Ok(device_name)
     }
 }

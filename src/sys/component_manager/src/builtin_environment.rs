@@ -207,7 +207,7 @@ impl BuiltinEnvironmentBuilder {
         let runtime_config = self
             .runtime_config
             .as_ref()
-            .ok_or(format_err!("Runtime config should be set to create utc clock."))?;
+            .ok_or_else(|| format_err!("Runtime config should be set to create utc clock."))?;
         self.utc_clock = if runtime_config.maintain_utc_clock {
             Some(Arc::new(create_utc_clock(&bootfs).await.context("failed to create UTC clock")?))
         } else {
@@ -222,7 +222,7 @@ impl BuiltinEnvironmentBuilder {
         let runtime_config = self
             .runtime_config
             .as_ref()
-            .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
+            .ok_or_else(|| format_err!("Runtime config should be set to add builtin runner."))?;
 
         let top_instance = self.top_instance.clone().unwrap();
 
@@ -269,7 +269,7 @@ impl BuiltinEnvironmentBuilder {
     pub async fn build(mut self) -> Result<BuiltinEnvironment, Error> {
         let runtime_config = self
             .runtime_config
-            .ok_or(format_err!("Runtime config is required for BuiltinEnvironment."))?;
+            .ok_or_else(|| format_err!("Runtime config is required for BuiltinEnvironment."))?;
 
         let system_resource_handle =
             take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
@@ -386,7 +386,8 @@ impl BuiltinEnvironmentBuilder {
             boot_resolvers,
             realm_builder_resolver,
             self.utc_clock,
-            self.inspector.unwrap_or(component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
+            self.inspector
+                .unwrap_or_else(|| component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
             self.crash_records,
             capability_passthrough,
         )

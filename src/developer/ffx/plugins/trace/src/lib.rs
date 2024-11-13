@@ -73,7 +73,7 @@ impl From<ProviderInfo> for TraceProviderInfo {
         Self {
             id: info.id,
             pid: info.pid,
-            name: info.name.as_ref().cloned().unwrap_or("unknown".to_string()),
+            name: info.name.as_ref().cloned().unwrap_or_else(|| "unknown".to_string()),
         }
     }
 }
@@ -256,7 +256,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
             provider_specific_categories
                 .entry(provider_name)
                 .and_modify(|categories| categories.push(category.to_string()))
-                .or_insert(vec![category.to_string()]);
+                .or_insert_with(|| vec![category.to_string()]);
         } else {
             umbrella_categories.push(category.clone());
         }
@@ -570,14 +570,14 @@ pub async fn trace(
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
-                None => target_spec.unwrap_or("".to_owned()),
+                None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
             stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
-                let outfile = opts.outfile.unwrap_or(trace_file.clone());
+                let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
                 symbolize_trace_file(trace_file, outfile.clone(), &context)?;
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
@@ -630,13 +630,13 @@ async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
                 "  - Output file: {}",
                 trace
                     .output_file
-                    .ok_or(anyhow!("Trace status response contained no output file"))?,
+                    .ok_or_else(|| anyhow!("Trace status response contained no output file"))?,
             ))?;
             if let Some(duration) = trace.duration {
                 writer.line(format!("  - Duration:  {} seconds", duration))?;
                 writer.line(format!(
                     "  - Remaining: {} seconds",
-                    trace.remaining_runtime.ok_or(anyhow!(
+                    trace.remaining_runtime.ok_or_else(|| anyhow!(
                         "Malformed status. Contained duration but not remaining runtime"
                     ))?
                 ))?;
@@ -717,7 +717,10 @@ https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
         }
         RecordingError::RecordingAlreadyStarted => {
             // TODO(85098): Also return file info (which output file is being written to).
-            format!("Trace already started for target {}", target_spec.unwrap_or("".to_owned()))
+            format!(
+                "Trace already started for target {}",
+                target_spec.unwrap_or_else(|| "".to_owned())
+            )
         }
         RecordingError::DuplicateTraceFile => {
             // TODO(85098): Also return target info.

@@ -41,7 +41,7 @@ fn parse_service_definition(
     let primary_protocol = definition.protocol_descriptor_list.clone();
     if is_rfcomm_protocol(&primary_protocol) {
         let _channel_number = server_channel_from_protocol(&primary_protocol)
-            .ok_or(format_err!("Invalid RFCOMM descriptor"))?;
+            .ok_or_else(|| format_err!("Invalid RFCOMM descriptor"))?;
     }
 
     // Convert (potential) additional PSMs into local Psm type.

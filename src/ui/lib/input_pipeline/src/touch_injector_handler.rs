@@ -89,7 +89,7 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 fuchsia_trace::flow_end!(
                     c"input",
                     c"report-to-event",
-                    trace_id.unwrap_or(0.into())
+                    trace_id.unwrap_or_else(|| 0.into())
                 );
                 // Create a new injector if this is the first time seeing device_id.
                 if let Err(e) = self.ensure_injector_registered(&touch_device_descriptor).await {

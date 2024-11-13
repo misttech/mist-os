@@ -236,7 +236,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         let logical_cpu_numbers = ok_or_default_err!(self.logical_cpu_numbers)?;
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
         let inspect =
             InspectData::new(inspect_root, format!("CpuControlHandler (perf_rank: {})", perf_rank));
 

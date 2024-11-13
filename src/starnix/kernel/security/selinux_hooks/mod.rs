@@ -112,7 +112,7 @@ where
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
-                                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+                                .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
                         ),
                         _ => {
                             // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
@@ -157,7 +157,7 @@ where
                     sub_path.as_slice().into(),
                     Some(class_id),
                 )
-                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
+                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled))
         }
     };
 
@@ -687,7 +687,8 @@ where
 
     // If the operation succeeded then update the label cached on the file node.
     if result.is_ok() {
-        let effective_new_sid = new_sid.unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+        let effective_new_sid =
+            new_sid.unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
         set_cached_sid(fs_node, effective_new_sid);
     }
 

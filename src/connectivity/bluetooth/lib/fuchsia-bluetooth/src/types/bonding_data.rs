@@ -300,11 +300,14 @@ impl TryFrom<sys::BondingData> for BondingData {
         };
 
         Ok(BondingData {
-            identifier: fidl.identifier.ok_or(Error::missing("BondingData identifier"))?.into(),
-            address: fidl.address.ok_or(Error::missing("BondingData address"))?.into(),
+            identifier: fidl
+                .identifier
+                .ok_or_else(|| Error::missing("BondingData identifier"))?
+                .into(),
+            address: fidl.address.ok_or_else(|| Error::missing("BondingData address"))?.into(),
             local_address: fidl
                 .local_address
-                .ok_or(Error::missing("BondingData local address"))?
+                .ok_or_else(|| Error::missing("BondingData local address"))?
                 .into(),
             name: fidl.name,
             data,

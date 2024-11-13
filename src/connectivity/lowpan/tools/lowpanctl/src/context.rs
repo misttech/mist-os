@@ -49,7 +49,7 @@ impl LowpanCtlContext {
 
         Ok(LowpanCtlContext {
             lookup,
-            device_name: args.device_name.clone().unwrap_or("lowpan0".to_string()),
+            device_name: args.device_name.clone().unwrap_or_else(|| "lowpan0".to_string()),
         })
     }
 

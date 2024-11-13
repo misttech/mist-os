@@ -133,10 +133,12 @@ impl AsyncRead for UdpNetworkInterface {
                             format!("Could not send emtpy fastboot packet to device: {}", e),
                         )
                     })?;
-                let packet = Packet::parse(&out_buf[..sz]).ok_or(std::io::Error::new(
-                    ErrorKind::Other,
-                    format!("Could not parse response packet"),
-                ))?;
+                let packet = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
+                    std::io::Error::new(
+                        ErrorKind::Other,
+                        format!("Could not parse response packet"),
+                    )
+                })?;
                 let mut buf_inner = Vec::new();
                 match packet.packet_type() {
                     Ok(PacketType::Fastboot) => {
@@ -202,10 +204,12 @@ impl AsyncWrite for UdpNetworkInterface {
                             format!("Could not send emtpy fastboot packet to device: {}", e),
                         )
                     })?;
-                    let response = Packet::parse(&out_buf[..sz]).ok_or(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Could not parse response packet"),
-                    ))?;
+                    let response = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
+                        std::io::Error::new(
+                            ErrorKind::Other,
+                            format!("Could not parse response packet"),
+                        )
+                    })?;
                     match response.packet_type() {
                         Ok(PacketType::Fastboot) => (),
                         _ => {
@@ -261,7 +265,8 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     let (buf, sz) = send_to_device(&make_query_packet(), &socket)
         .await
         .map_err(|e| anyhow!("Sending error: {}", e))?;
-    let packet = Packet::parse(&buf[..sz]).ok_or(anyhow!("Could not parse response packet."))?;
+    let packet =
+        Packet::parse(&buf[..sz]).ok_or_else(|| anyhow!("Could not parse response packet."))?;
     let sequence = match packet.packet_type() {
         Ok(PacketType::Query) => BigEndian::read_u16(&packet.data),
         _ => bail!("Unexpected response to query packet"),
@@ -269,7 +274,8 @@ pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     let (buf, sz) = send_to_device(&make_init_packet(sequence), &socket)
         .await
         .map_err(|e| anyhow!("Sending error: {}", e))?;
-    let packet = Packet::parse(&buf[..sz]).ok_or(anyhow!("Could not parse response packet."))?;
+    let packet =
+        Packet::parse(&buf[..sz]).ok_or_else(|| anyhow!("Could not parse response packet."))?;
     let (version, max) = match packet.packet_type() {
         Ok(PacketType::Init) => {
             (BigEndian::read_u16(&packet.data[..2]), BigEndian::read_u16(&packet.data[2..4]))

@@ -421,7 +421,7 @@ impl TouchBinding {
                     Err(e) => return Err(format_err!("get_feature_report failed: {}", e)),
                 };
                 let mut touch =
-                    report.touch.unwrap_or(fidl_input_report::TouchFeatureReport::default());
+                    report.touch.unwrap_or_else(fidl_input_report::TouchFeatureReport::default);
                 touch.input_mode = match enable {
                             true => Some(fidl_input_report::TouchConfigurationInputMode::WindowsPrecisionTouchpadCollection),
                             false => Some(fidl_input_report::TouchConfigurationInputMode::MouseCollection),

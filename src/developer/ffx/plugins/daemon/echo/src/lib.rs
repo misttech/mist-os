@@ -46,7 +46,7 @@ impl FfxMain for EchoTool {
 }
 
 async fn echo_impl(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<String> {
-    let echo_text = cmd.text.unwrap_or("Ffx".to_string());
+    let echo_text = cmd.text.unwrap_or_else(|| "Ffx".to_string());
     match echo_proxy.echo_string(&echo_text).await {
         Ok(r) => Ok(format!("SUCCESS: received {r:?}")),
         Err(e) => return_bug!("ERROR: {e:?}"),

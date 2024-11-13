@@ -68,7 +68,7 @@ pub async fn register(
                     writeln!(
                         writer,
                         "Node '{}':\nDriver '{:#?}'\nComposite Specs '{:#?}'",
-                        info.node_name.unwrap_or("<NA>".to_string()),
+                        info.node_name.unwrap_or_else(|| "<NA>".to_string()),
                         info.driver_url,
                         info.composite_parents,
                     )?;

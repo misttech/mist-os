@@ -156,10 +156,12 @@ fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String
                     .find(|&r| r.runner.is_some())
                     .and_then(|ru| ru.runner.as_ref().map(|s| s.as_str().to_owned()))
             })
-            .or(document
-                .program
-                .as_ref()
-                .and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))),
+            .or_else(|| {
+                document
+                    .program
+                    .as_ref()
+                    .and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))
+            }),
         #[cfg(fuchsia_api_level_at_least = "HEAD")]
         ComponentManifest::Cm(decl) => decl
             .uses
@@ -168,7 +170,9 @@ fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String
                 cm_rust::UseDecl::Runner(r) => Some(r.source_name.to_string()),
                 _ => None,
             })
-            .or(decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))),
+            .or_else(|| {
+                decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))
+            }),
         #[cfg(fuchsia_api_level_less_than = "HEAD")]
         ComponentManifest::Cm(decl) => {
             decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))

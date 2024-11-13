@@ -1016,7 +1016,8 @@ impl RealmBuilder {
             )
             .map_err(Error::FailedToOpenPkgDir)?,
         };
-        let collection_name = params.collection_name.unwrap_or(DEFAULT_COLLECTION_NAME.into());
+        let collection_name =
+            params.collection_name.unwrap_or_else(|| DEFAULT_COLLECTION_NAME.into());
         let realm_name = params.realm_name.unwrap_or_else(|| {
             let id: u64 = rand::thread_rng().gen();
             format!("auto-{:x}", id)
@@ -1230,7 +1231,7 @@ impl RealmBuilder {
                     let capability = DirectoryDecl {
                         name: decl.target_name.clone(),
                         source_path: Some(source_path),
-                        rights: decl.rights.unwrap_or(fio::Operations::default()),
+                        rights: decl.rights.unwrap_or_else(fio::Operations::default),
                     };
                     Some(CapabilityDecl::Directory(
                         capability,

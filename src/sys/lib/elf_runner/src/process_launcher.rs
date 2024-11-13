@@ -256,8 +256,10 @@ struct LogInfo {
 }
 
 fn log_launcher_error(err: &LauncherError, op: &str, job: Arc<zx::Job>, name: String) {
-    let job_koid =
-        job.get_koid().map(|j| j.raw_koid().to_string()).unwrap_or("<unknown>".to_string());
+    let job_koid = job
+        .get_koid()
+        .map(|j| j.raw_koid().to_string())
+        .unwrap_or_else(|_| "<unknown>".to_string());
     let LogInfo { style, job_info, message } = describe_error(err, job.as_handle_ref().cast());
 
     // Repeat ourselves slightly here because tracing does not support runtime levels in macros.

@@ -39,7 +39,7 @@ impl DigitalAudioInterface {
         }
         let (dai_connect_proxy, dai_connect_server) =
             fidl::endpoints::create_proxy::<DaiConnectorMarker>()?;
-        let path = self.path.to_str().ok_or(format_err!("invalid DAI path"))?;
+        let path = self.path.to_str().ok_or_else(|| format_err!("invalid DAI path"))?;
         fdio::service_connect(path, dai_connect_server.into_channel())?;
 
         let (ours, theirs) = fidl::endpoints::create_proxy::<DaiMarker>()?;
@@ -50,7 +50,7 @@ impl DigitalAudioInterface {
     }
 
     fn get_proxy(&self) -> Result<&DaiProxy, Error> {
-        self.proxy.as_ref().ok_or(format_err!("Proxy not connected"))
+        self.proxy.as_ref().ok_or_else(|| format_err!("Proxy not connected"))
     }
 
     /// Get the properties of the DAI.

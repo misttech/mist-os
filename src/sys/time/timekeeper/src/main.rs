@@ -536,7 +536,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 .await
                 .context("(timekeeper will ignore this error and just turn the integration off)")
                 .map_err(|e| error!("power management integration: {:#}", e))
-                .unwrap_or(fasync::Task::local(async {}))
+                .unwrap_or_else(|_| fasync::Task::local(async {}))
                 .await;
         }
     });

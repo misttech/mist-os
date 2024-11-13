@@ -104,12 +104,13 @@ impl RemotePortNegotiationParams {
     /// Otherwise, it's a negotiation request for port values. Returns the negotiated
     /// port values.
     pub fn response(&self) -> Self {
-        let port_values = self.port_values.clone().map_or(PortValues::default(), |mut values| {
-            // This implementation unanimously accepts the port values given by
-            // the remote peer.
-            values.set_mask(PORT_VALUES_UNANIMOUS_ACCEPT_MASK);
-            values
-        });
+        let port_values =
+            self.port_values.clone().map_or_else(PortValues::default, |mut values| {
+                // This implementation unanimously accepts the port values given by
+                // the remote peer.
+                values.set_mask(PORT_VALUES_UNANIMOUS_ACCEPT_MASK);
+                values
+            });
         Self { dlci: self.dlci, port_values: Some(port_values) }
     }
 }

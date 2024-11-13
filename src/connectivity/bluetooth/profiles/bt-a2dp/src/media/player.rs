@@ -145,7 +145,8 @@ impl AudioConsumerSink {
     fn send_frame(&mut self, frame: &[u8], flags: u32) -> Result<(), Error> {
         trace::duration!(c"bt-a2dp-sink", c"Media:PacketSent");
 
-        let buffer_index = self.copy_to_buffer(frame).ok_or(format_err!("No free buffers"))?;
+        let buffer_index =
+            self.copy_to_buffer(frame).ok_or_else(|| format_err!("No free buffers"))?;
 
         self.tx_count += 1;
         trace::flow_begin!(c"stream-sink", c"SendPacket", self.tx_count.into());
@@ -448,7 +449,8 @@ impl Player {
                 }
                 &MediaCodecType::AUDIO_AAC => {
                     let element = AudioMuxElement::try_from_bytes(&payload[offset..])?;
-                    let frame = element.get_payload(0).ok_or(format_err!("Payload not found"))?;
+                    let frame =
+                        element.get_payload(0).ok_or_else(|| format_err!("Payload not found"))?;
                     if let Err(e) = self.audio_sink.write_all(frame).await {
                         info!("Failed to write packet to sink: {:?}", e);
                     }

@@ -88,7 +88,7 @@ impl Config {
                 };
             }
 
-            let dest = file.dest.unwrap_or(file.path.clone());
+            let dest = file.dest.unwrap_or_else(|| file.path.clone());
             match file_path_map.get(&file.path) {
                 Some(old_dest) => {
                     tracing::warn!(

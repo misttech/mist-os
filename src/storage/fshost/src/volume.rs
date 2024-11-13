@@ -47,7 +47,7 @@ pub async fn resize_volume(volume_proxy: &VolumeProxy, target_bytes: u64) -> Res
     let (status, volume_manager_info, _volume_info) =
         volume_proxy.get_volume_info().await.context("Transport error on get_volume_info")?;
     zx::Status::ok(status).context("get_volume_info failed")?;
-    let manager = volume_manager_info.ok_or(anyhow!("Expected volume manager info"))?;
+    let manager = volume_manager_info.ok_or_else(|| anyhow!("Expected volume manager info"))?;
     let slice_size = manager.slice_size;
 
     // Note we add one here to include the 0th slice that we cannot shrink away.
@@ -92,8 +92,10 @@ pub async fn set_partition_max_bytes(
         return Ok(());
     }
 
-    let index =
-        device.topological_path().rfind("/fvm").ok_or(anyhow!("fvm is not in the device path"))?;
+    let index = device
+        .topological_path()
+        .rfind("/fvm")
+        .ok_or_else(|| anyhow!("fvm is not in the device path"))?;
     // The 4 is from the 4 characters in "/fvm"
     let fvm_path = &device.topological_path()[..index + 4];
 
@@ -101,7 +103,7 @@ pub async fn set_partition_max_bytes(
         .context("Failed to connect to fvm volume manager")?;
     let (status, info) = fvm_proxy.get_info().await.context("Transport error in get_info call")?;
     zx::Status::ok(status).context("get_info call failed")?;
-    let info = info.ok_or(anyhow!("Expected info"))?;
+    let info = info.ok_or_else(|| anyhow!("Expected info"))?;
     let slice_size = info.slice_size;
     let max_slice_count = (max_byte_size + slice_size - 1) / slice_size;
     let instance_guid =

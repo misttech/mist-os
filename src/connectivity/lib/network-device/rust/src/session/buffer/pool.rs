@@ -253,7 +253,7 @@ impl Pool {
             let mut tail = descs.last();
             let mut tail_ref = self
                 .descriptors
-                .borrow_mut(tail.as_mut().unwrap_or(free_list.head.as_mut().unwrap()));
+                .borrow_mut(tail.as_mut().unwrap_or_else(|| free_list.head.as_mut().unwrap()));
             tail_ref.set_nxt(old_head);
         };
 

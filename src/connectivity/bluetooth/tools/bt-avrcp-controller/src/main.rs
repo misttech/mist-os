@@ -90,11 +90,13 @@ async fn get_folder_items_with_attrs<'a>(
                 let mut attributes = vec![];
                 for a in attrs {
                     let raw_attr = a.parse::<u32>()?;
-                    attributes.push(MediaAttributeId::from_primitive(raw_attr).ok_or(
-                        format_err!(
+                    attributes.push(MediaAttributeId::from_primitive(raw_attr).ok_or_else(
+                        || {
+                            format_err!(
                             "Invalid MediaAttributeId value: {:?}. Valid value range is [1 - 8]",
                             raw_attr,
-                        ),
+                        )
+                        },
                     )?);
                 }
                 AttributeRequestOption::AttributeList(attributes)

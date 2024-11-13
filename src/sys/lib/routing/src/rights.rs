@@ -110,7 +110,7 @@ impl<'de> Deserialize<'de> for Rights {
     {
         let bits: u64 = Deserialize::deserialize(deserializer)?;
         let rights = fio::Operations::from_bits(bits)
-            .ok_or(serde::de::Error::custom("invalid value for fuchsia.io/Operations"))?;
+            .ok_or_else(|| serde::de::Error::custom("invalid value for fuchsia.io/Operations"))?;
         Ok(Self(rights))
     }
 }

@@ -505,7 +505,7 @@ impl Calls {
                 let idx = self
                     .oldest_by_state(IncomingWaiting)
                     .or_else(|| self.oldest_by_state(OngoingHeld))
-                    .ok_or(CallError::None(vec![IncomingWaiting, OngoingHeld]))?
+                    .ok_or_else(|| CallError::None(vec![IncomingWaiting, OngoingHeld]))?
                     .0;
 
                 self.request_active(idx, true)?;
@@ -516,7 +516,7 @@ impl Calls {
                 let idx = self
                     .oldest_by_state(IncomingWaiting)
                     .or_else(|| self.oldest_by_state(OngoingHeld))
-                    .ok_or(CallError::None(vec![IncomingWaiting, OngoingHeld]))?
+                    .ok_or_else(|| CallError::None(vec![IncomingWaiting, OngoingHeld]))?
                     .0;
 
                 self.request_active(idx, false)?;

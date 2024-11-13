@@ -1174,7 +1174,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
             });
         let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
-            .unwrap_or(WindowSize::MAX.into());
+            .unwrap_or_else(|_| WindowSize::MAX.into());
         // We can only send the minimum of the open window and the bytes that
         // are available, additionally, if in zero window probe mode, allow at
         // least one byte past the limit to be sent.

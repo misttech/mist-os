@@ -26,36 +26,44 @@ impl GetNeighborTableCommand {
             let mac_address = format!("{:^16}", get_hex_string(&item.mac_address.unwrap().octets));
             let short_address = format!(
                 "{:^10}",
-                item.short_address.map(|x| format!("0x{:04X}", x)).unwrap_or("".to_string())
+                item.short_address
+                    .map(|x| format!("0x{:04X}", x))
+                    .unwrap_or_else(|| "".to_string())
             );
 
             let age = format!(
                 "{:^8}",
                 item.age
                     .map(|x| format!("{}s", zx::MonotonicDuration::from_nanos(x).into_seconds()))
-                    .unwrap_or("".to_string())
+                    .unwrap_or_else(|| "".to_string())
             );
-            let is_child =
-                format!("{:^7}", item.is_child.map(|x| x.to_string()).unwrap_or("".to_string()));
+            let is_child = format!(
+                "{:^7}",
+                item.is_child.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
+            );
             let link_frame_cnt = format!(
                 "{:^12}",
-                item.link_frame_count.map(|x| x.to_string()).unwrap_or("".to_string())
+                item.link_frame_count.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
             );
             let mgmt_frame_cnt = format!(
                 "{:^12}",
-                item.mgmt_frame_count.map(|x| x.to_string()).unwrap_or("".to_string())
+                item.mgmt_frame_count.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
             );
             let last_rssi_in = format!(
                 "{:^12}",
-                item.last_rssi_in.map(|x| x.to_string()).unwrap_or("".to_string())
+                item.last_rssi_in.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
             );
-            let avg_rssi_in =
-                format!("{:^8}", item.avg_rssi_in.map(|x| x.to_string()).unwrap_or("".to_string()));
-            let lqi_in =
-                format!("{:^6}", item.lqi_in.map(|x| x.to_string()).unwrap_or("".to_string()));
+            let avg_rssi_in = format!(
+                "{:^8}",
+                item.avg_rssi_in.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
+            );
+            let lqi_in = format!(
+                "{:^6}",
+                item.lqi_in.map(|x| x.to_string()).unwrap_or_else(|| "".to_string())
+            );
             let mode = format!(
                 "{:^5}",
-                item.thread_mode.map(|x| format!("0x{:02X}", x)).unwrap_or("".to_string())
+                item.thread_mode.map(|x| format!("0x{:02X}", x)).unwrap_or_else(|| "".to_string())
             );
 
             println!("+------------------+------------+----------+---------+--------------+--------------+--------------+----------+--------+-------+");

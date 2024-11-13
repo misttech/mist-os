@@ -120,7 +120,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Locate the "object_r" role.
         let cached_object_r_role = parsed_policy
             .role_by_name("object_r")
-            .ok_or(anyhow::anyhow!("missing 'object_r' role"))?
+            .ok_or_else(|| anyhow::anyhow!("missing 'object_r' role"))?
             .id();
 
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
@@ -244,16 +244,18 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     Some((low_level, high_level)) => (low_level, high_level),
                     None => match class_defaults.range() {
                         ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
-                        ClassDefaultRange::SourceHigh => {
-                            (source.high_level().unwrap_or(source.low_level()).clone(), None)
-                        }
+                        ClassDefaultRange::SourceHigh => (
+                            source.high_level().unwrap_or_else(|| source.low_level()).clone(),
+                            None,
+                        ),
                         ClassDefaultRange::SourceLowHigh => {
                             (source.low_level().clone(), source.high_level().map(Clone::clone))
                         }
                         ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
-                        ClassDefaultRange::TargetHigh => {
-                            (target.high_level().unwrap_or(target.low_level()).clone(), None)
-                        }
+                        ClassDefaultRange::TargetHigh => (
+                            target.high_level().unwrap_or_else(|| target.low_level()).clone(),
+                            None,
+                        ),
                         ClassDefaultRange::TargetLowHigh => {
                             (target.low_level().clone(), target.high_level().map(Clone::clone))
                         }

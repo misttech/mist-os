@@ -88,7 +88,7 @@ impl<'a, 'b> SystemPowerModeHandlerBuilder<'a, 'b> {
         let config_path = data
             .config
             .map(|c| c.system_power_mode_config_path)
-            .unwrap_or(Self::SYSTEM_POWER_MODE_CONFIG_PATH.to_string());
+            .unwrap_or_else(|| Self::SYSTEM_POWER_MODE_CONFIG_PATH.to_string());
 
         // Read the system power mode config file from `config_path`
         let system_power_mode_config = SystemPowerModeConfig::read(&Path::new(&config_path)).ok();
@@ -129,7 +129,7 @@ impl<'a, 'b> SystemPowerModeHandlerBuilder<'a, 'b> {
         // override for tests.
         let inspect_root = self
             .inspect_root
-            .unwrap_or(inspect::component::inspector().root())
+            .unwrap_or_else(|| inspect::component::inspector().root())
             .create_child("SystemPowerModeHandler");
 
         // Create the `ClientStates` to manage states for all clients

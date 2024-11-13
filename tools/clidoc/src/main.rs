@@ -242,7 +242,7 @@ fn run(opt: Opt) -> Result<()> {
 
     write_toc(
         output_path,
-        opt.toc_prefix.unwrap_or(PathBuf::from("/reference/tools/sdk")),
+        opt.toc_prefix.unwrap_or_else(|| PathBuf::from("/reference/tools/sdk")),
         command_summary,
     )?;
 

@@ -237,7 +237,7 @@ impl Instance {
             XmlEvent::StartElement { ref name, .. } => {
                 // Needs a better way to compare namespace and element.
                 let ns = name.namespace.clone();
-                if name.local_name != "g" && ns.unwrap_or("".to_string()) != "xliff" {
+                if name.local_name != "g" && ns.unwrap_or_else(|| "".to_string()) != "xliff" {
                     return Err(anyhow!("unexpected StartElement({:?})", &e));
                 }
                 // xliff:g is starting
@@ -286,7 +286,7 @@ impl Instance {
             }
             XmlEvent::EndElement { ref name, .. } => {
                 let ns = name.namespace.clone();
-                if name.local_name != "g" && ns.unwrap_or("".to_string()) != "xliff" {
+                if name.local_name != "g" && ns.unwrap_or_else(|| "".to_string()) != "xliff" {
                     return Err(anyhow!("expected EndElement(xliff:g), got: {:?}", &e));
                 }
                 self.state = State::String { name: token_name, text };

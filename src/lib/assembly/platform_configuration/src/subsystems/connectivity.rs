@@ -101,9 +101,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            let config_src = connectivity_config.network.netcfg_config_path.clone().unwrap_or(
-                FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json")),
-            );
+            let config_src =
+                connectivity_config.network.netcfg_config_path.clone().unwrap_or_else(|| {
+                    FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json"))
+                });
             let config_dir = builder
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
                 .directory("netcfg-config");

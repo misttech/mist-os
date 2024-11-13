@@ -631,13 +631,13 @@ fn parse_integration_manifest(
                 let name = &attributes
                     .iter()
                     .find(|&a| a.name.local_name == "name")
-                    .ok_or(anyhow!("no name attribute"))?
+                    .ok_or_else(|| anyhow!("no name attribute"))?
                     .value;
 
                 let path = &attributes
                     .iter()
                     .find(|&a| a.name.local_name == "path")
-                    .ok_or(anyhow!("no path attribute"))?
+                    .ok_or_else(|| anyhow!("no path attribute"))?
                     .value
                     .trim_end_matches("/src");
 

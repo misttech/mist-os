@@ -184,7 +184,7 @@ impl RfcommState {
         let _ = self
             .active_sessions
             .entry(id)
-            .or_insert(RfcommSession::new(id))
+            .or_insert_with(|| RfcommSession::new(id))
             .new_rfcomm_channel(server_channel, channel);
     }
 }
@@ -290,7 +290,7 @@ impl RfcommManager {
                         .map(|p| ProtocolDescriptor::try_from(p))
                         .collect::<Result<Vec<_>, _>>()?;
                     let server_channel = server_channel_from_protocol(&protocol)
-                        .ok_or(format_err!("Not RFCOMM protocol"))?;
+                        .ok_or_else(|| format_err!("Not RFCOMM protocol"))?;
 
                     // Spawn a processing task to handle read & writes over this RFCOMM channel.
                     state.lock().new_rfcomm_channel(id, server_channel, channel);
@@ -304,7 +304,7 @@ impl RfcommManager {
                         .map(|p| ProtocolDescriptor::try_from(p))
                         .collect::<Result<Vec<_>, _>>()?;
                     let server_channel = server_channel_from_protocol(&protocol)
-                        .ok_or(format_err!("Not RFCOMM protocol"))?;
+                        .ok_or_else(|| format_err!("Not RFCOMM protocol"))?;
                     info!("Found SPP service for {} with server channel: {:?}", id, server_channel);
                 }
                 Err(e) => warn!("Error in ProfileClient results: {:?}", e),

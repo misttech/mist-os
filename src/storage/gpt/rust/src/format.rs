@@ -120,7 +120,7 @@ impl Header {
             .num_parts
             .checked_mul(self.part_size)
             .and_then(|v| v.checked_next_multiple_of(block_size as u32))
-            .ok_or(anyhow!("Partition table size overflow"))?
+            .ok_or_else(|| anyhow!("Partition table size overflow"))?
             as u64)
             / block_size;
         ensure!(partition_table_blocks < block_count, "Invalid partition table size");

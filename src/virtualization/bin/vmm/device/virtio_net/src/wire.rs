@@ -53,7 +53,7 @@ impl TryFrom<u8> for GsoType {
 
     fn try_from(n: u8) -> Result<Self, Self::Error> {
         <Self as num_traits::FromPrimitive>::from_u8(n)
-            .ok_or(anyhow!("Unrecognized GsoType: {}", n))
+            .ok_or_else(|| anyhow!("Unrecognized GsoType: {}", n))
     }
 }
 

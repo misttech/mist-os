@@ -198,7 +198,7 @@ impl BlobDirectory {
     pub(crate) async fn lookup_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
         // For simplify lookup logic, we re-use `open_blob` just decrement the open count before
         // returning the node handle.
-        self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound.into()).map(|blob| {
+        self.open_blob(&hash.into()).await?.ok_or_else(|| FxfsError::NotFound.into()).map(|blob| {
             let node = blob.take();
             node.clone().open_count_sub_one();
             node

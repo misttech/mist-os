@@ -71,7 +71,7 @@ impl TryFrom<ConfigValue> for Value {
     type Error = ConfigError;
 
     fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
-        value.0.ok_or(anyhow!("no value").into())
+        value.0.ok_or_else(|| anyhow!("no value").into())
     }
 }
 
@@ -94,7 +94,7 @@ impl TryFrom<ConfigValue> for String {
         value
             .0
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .ok_or(anyhow!("no configuration String value found").into())
+            .ok_or_else(|| anyhow!("no configuration String value found").into())
     }
 }
 
@@ -125,7 +125,7 @@ impl TryFrom<ConfigValue> for usize {
                     }
                 })
             })
-            .ok_or(anyhow!("no configuration usize value found").into())
+            .ok_or_else(|| anyhow!("no configuration usize value found").into())
     }
 }
 
@@ -140,7 +140,7 @@ impl TryFrom<ConfigValue> for u64 {
             .and_then(|v| {
                 v.as_u64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
             })
-            .ok_or(anyhow!("no configuration Number value found").into())
+            .ok_or_else(|| anyhow!("no configuration Number value found").into())
     }
 }
 
@@ -168,7 +168,7 @@ impl TryFrom<ConfigValue> for u16 {
                 v.as_u64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
             })
             .and_then(|v| u16::try_from(v).ok())
-            .ok_or(anyhow!("no configuration Number value found").into())
+            .ok_or_else(|| anyhow!("no configuration Number value found").into())
     }
 }
 
@@ -183,7 +183,7 @@ impl TryFrom<ConfigValue> for i64 {
             .and_then(|v| {
                 v.as_i64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
             })
-            .ok_or(anyhow!("no configuration Number value found").into())
+            .ok_or_else(|| anyhow!("no configuration Number value found").into())
     }
 }
 
@@ -198,7 +198,7 @@ impl TryFrom<ConfigValue> for bool {
             .and_then(|v| {
                 v.as_bool().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
             })
-            .ok_or(anyhow!("no configuration Boolean value found").into())
+            .ok_or_else(|| anyhow!("no configuration Boolean value found").into())
     }
 }
 
@@ -223,7 +223,7 @@ impl TryFrom<ConfigValue> for PathBuf {
         value
             .0
             .and_then(|v| v.as_str().map(|s| PathBuf::from(s.to_string())))
-            .ok_or(anyhow!("no configuration value found").into())
+            .ok_or_else(|| anyhow!("no configuration value found").into())
     }
 }
 
@@ -267,7 +267,7 @@ impl<T: TryFrom<ConfigValue>> TryFrom<ConfigValue> for Vec<T> {
                 }
                 None => ConfigValue(Some(val)).try_into().map(|x| vec![x]).ok(),
             })
-            .ok_or(anyhow!("no configuration value found").into())
+            .ok_or_else(|| anyhow!("no configuration value found").into())
     }
 }
 
@@ -282,7 +282,7 @@ impl TryFrom<ConfigValue> for f64 {
             .and_then(|v| {
                 v.as_f64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
             })
-            .ok_or(anyhow!("no configuration Number value found").into())
+            .ok_or_else(|| anyhow!("no configuration Number value found").into())
     }
 }
 

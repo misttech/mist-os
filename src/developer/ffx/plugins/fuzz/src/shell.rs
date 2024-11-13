@@ -167,7 +167,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     async fn execute_any(&self, args: FuzzShellCommand) -> Result<NextAction> {
         match args.command {
             FuzzShellSubcommand::List(ListSubcommand { json_file, pattern }) => {
-                let tests_json = json_file.or(self.tests_json.clone());
+                let tests_json = json_file.or_else(|| self.tests_json.clone());
                 let mut urls =
                     get_fuzzer_urls(&tests_json).context("failed to get URLs to list")?;
                 if urls.is_empty() {
@@ -278,7 +278,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
                 self.writer.println(format!("Detached."));
             }
             FuzzShellSubcommand::Stop(StopSubcommand { url, .. }) => {
-                let url = url.unwrap_or(fuzzer.url().to_string());
+                let url = url.unwrap_or_else(|| fuzzer.url().to_string());
                 self.stop(&url).await.context("failed to stop fuzzer")?;
             }
             FuzzShellSubcommand::Exit(ExitShellSubcommand {}) => {

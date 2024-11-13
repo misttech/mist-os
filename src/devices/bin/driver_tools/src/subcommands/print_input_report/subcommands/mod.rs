@@ -23,7 +23,7 @@ fn connect_to_input_device(
         .as_ref()
         .as_os_str()
         .to_str()
-        .ok_or(anyhow::anyhow!("Failed to get device path string"))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to get device path string"))?;
     dev.open(fio::OpenFlags::empty(), fio::ModeType::empty(), device_path, server)
         .context("Failed to open device file")?;
     Ok(fir::InputDeviceProxy::new(proxy.into_channel().unwrap()))

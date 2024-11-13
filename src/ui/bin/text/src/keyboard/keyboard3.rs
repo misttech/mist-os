@@ -255,12 +255,12 @@ impl KeyboardService {
         view_ref_ids
             .iter()
             .map(|i| {
-                let view_ref = store.view_refs.remove(i).ok_or(format_err!(
-                    "Unable to cleanup after client disconnecting: view_ref lost."
-                ))?;
-                store.subscribers.remove(&view_ref).ok_or(format_err!(
-                    "Unable to cleanup after client disconnecting: subscriber lost."
-                ))?;
+                let view_ref = store.view_refs.remove(i).ok_or_else(|| {
+                    format_err!("Unable to cleanup after client disconnecting: view_ref lost.")
+                })?;
+                store.subscribers.remove(&view_ref).ok_or_else(|| {
+                    format_err!("Unable to cleanup after client disconnecting: subscriber lost.")
+                })?;
                 Ok(())
             })
             .collect::<Result<(), Error>>()?;

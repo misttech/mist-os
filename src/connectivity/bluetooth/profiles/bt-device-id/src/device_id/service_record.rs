@@ -63,13 +63,13 @@ impl TryFrom<&di::DeviceReleaseNumber> for Version {
 
     fn try_from(src: &di::DeviceReleaseNumber) -> Result<Version, Self::Error> {
         let mut version = Version(0);
-        let major = src.major.ok_or(Error::from(src))?;
+        let major = src.major.ok_or_else(|| Error::from(src))?;
         version.set_major(major);
 
-        let minor = src.minor.filter(|&v| v < 16).ok_or(Error::from(src))?;
+        let minor = src.minor.filter(|&v| v < 16).ok_or_else(|| Error::from(src))?;
         version.set_minor(minor);
 
-        let subminor = src.subminor.filter(|&v| v < 16).ok_or(Error::from(src))?;
+        let subminor = src.subminor.filter(|&v| v < 16).ok_or_else(|| Error::from(src))?;
         version.set_subminor(subminor);
 
         Ok(version)
@@ -144,9 +144,10 @@ impl TryFrom<&di::DeviceIdentificationRecord> for DIRecord {
     type Error = Error;
 
     fn try_from(src: &di::DeviceIdentificationRecord) -> Result<DIRecord, Self::Error> {
-        let vendor_id = src.vendor_id.clone().ok_or(Error::from(src))?;
-        let product_id = src.product_id.ok_or(Error::from(src))?;
-        let version = src.version.as_ref().map(Version::try_from).ok_or(Error::from(src))??;
+        let vendor_id = src.vendor_id.clone().ok_or_else(|| Error::from(src))?;
+        let product_id = src.product_id.ok_or_else(|| Error::from(src))?;
+        let version =
+            src.version.as_ref().map(Version::try_from).ok_or_else(|| Error::from(src))??;
         let primary = src.primary.unwrap_or(false);
         let service_description = src.service_description.clone();
 

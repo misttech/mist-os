@@ -438,7 +438,7 @@ fn supported_rates_for_band(
     band: fidl_common::WlanBand,
 ) -> Result<Vec<u8>, Error> {
     let rates = band_cap_for_band(&query_response, band)
-        .ok_or(format_err!("no capabilities found for band {:?}", band))?
+        .ok_or_else(|| format_err!("no capabilities found for band {:?}", band))?
         .basic_rates()
         .map(From::from)
         .ok_or_else(|| format_err!("no basic rates found for band capabilities"))?;

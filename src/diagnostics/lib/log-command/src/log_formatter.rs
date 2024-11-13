@@ -309,7 +309,7 @@ where
     }
     fn get_boot_timestamp(&self) -> Timestamp {
         debug_assert!(self.boot_ts_nanos.is_some());
-        self.boot_ts_nanos.unwrap_or(Timestamp::from_nanos(0))
+        self.boot_ts_nanos.unwrap_or_else(|| Timestamp::from_nanos(0))
     }
 }
 

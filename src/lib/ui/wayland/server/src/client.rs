@@ -32,7 +32,7 @@ impl ClientChannel {
                     .borrow_mut()
                     .next()
                     .await
-                    .ok_or(anyhow!("Error receiving message."))?;
+                    .ok_or_else(|| anyhow!("Error receiving message."))?;
                 *buffer = buf;
                 Ok(())
             }

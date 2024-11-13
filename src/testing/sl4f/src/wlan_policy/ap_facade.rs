@@ -197,7 +197,7 @@ impl WlanApPolicyFacade {
         let mut update_listener = if listener.is_none() {
             Self::init_listener()
         } else {
-            listener.ok_or(format_err!("failed to set update listener of facade"))
+            listener.ok_or_else(|| format_err!("failed to set update listener of facade"))
         }?;
 
         if let Some(update_request) = update_listener.try_next().await? {

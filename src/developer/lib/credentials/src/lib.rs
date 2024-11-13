@@ -143,12 +143,12 @@ fn load_from_home_data() -> Result<Credentials> {
 
 fn data_base_path() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         Ok(home)
     } else {
         env::var("XDG_DATA_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)

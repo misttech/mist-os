@@ -101,7 +101,7 @@ impl Arguments {
              --maintain-utc-clock             Create and vend a UTC kernel clock through a\n\
              built-in implementation of fuchsia.time.Maintenance.\n\
              Should only be used with the root component_manager.\n",
-            std::env::args().next().unwrap_or("component_manager".to_string())
+            std::env::args().next().unwrap_or_else(|| "component_manager".to_string())
         )
     }
 }

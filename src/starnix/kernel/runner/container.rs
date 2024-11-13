@@ -597,7 +597,7 @@ async fn create_container(
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
         Arc::downgrade(&kernel),
-        config.component_instance.take().ok_or(Error::msg("No component instance"))?,
+        config.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
 
     Ok(Container {
@@ -751,7 +751,7 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
     };
     u64::from_str_radix(string, 10)
         .map_err(|_| anyhow!("Invalid block size {string}"))
-        .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
+        .and_then(|val| multiplier.checked_mul(val).ok_or_else(|| anyhow!("Block size overflow")))
 }
 
 fn create_remote_block_device_from_spec<'a>(

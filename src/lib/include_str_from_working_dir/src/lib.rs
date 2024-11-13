@@ -54,7 +54,7 @@ pub fn include_str_from_working_dir_env(input: proc_macro::TokenStream) -> proc_
 }
 
 fn read_file(path: &str) -> Result<TokenStream> {
-    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or(".".to_string());
+    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or_else(|_| ".".to_string());
     let contents = fs::read_to_string(Path::new(&build_dir).join(path)).map_err(|err| {
         Error::new(Span::call_site(), format!("Unable to read file {path:?}: {err:?}"))
     })?;

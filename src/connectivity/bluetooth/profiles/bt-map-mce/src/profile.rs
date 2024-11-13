@@ -162,7 +162,7 @@ impl MasConfig {
                 match &a.element {
                     DataElement::Str(bytes) => String::from_utf8(bytes.to_vec())
                         .ok()
-                        .or(Some(FALLBACK_MAS_SERVICE_NAME.to_string())),
+                        .or_else(|| Some(FALLBACK_MAS_SERVICE_NAME.to_string())),
                     _ => Some(FALLBACK_MAS_SERVICE_NAME.to_string()),
                 }
             })

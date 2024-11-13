@@ -106,7 +106,7 @@ impl Clients {
         let client = inner
             .channel_receivers
             .get(&server_channel)
-            .ok_or(format_err!("{server_channel:?} not registered"))?;
+            .ok_or_else(|| format_err!("{server_channel:?} not registered"))?;
         // Build the RFCOMM protocol descriptor and relay the channel.
         let protocol: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(server_channel).iter().map(Into::into).collect();

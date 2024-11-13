@@ -145,7 +145,7 @@ impl MockPeer {
             .service_mgr
             .write()
             .register_service(service_records)
-            .ok_or(format_err!("Registration of services failed"))?;
+            .ok_or_else(|| format_err!("Registration of services failed"))?;
         let service_event_stream = proxy.take_event_stream();
 
         if let Some(s) = self.services.insert(registration_handle, proxy) {
@@ -190,12 +190,12 @@ impl MockPeer {
             .service_mgr
             .read()
             .psm_registered(psm)
-            .ok_or(format_err!("PSM {:?} not registered", psm))?;
+            .ok_or_else(|| format_err!("PSM {:?} not registered", psm))?;
         let proxy = self
             .services
             .get(&reg_handle)
             .and_then(|p| p.upgrade())
-            .ok_or(format_err!("Connection receiver doesn't exist"))?;
+            .ok_or_else(|| format_err!("Connection receiver doesn't exist"))?;
 
         // Build the L2CAP descriptor and notify the receiver.
         let protocol = build_l2cap_descriptor(psm);

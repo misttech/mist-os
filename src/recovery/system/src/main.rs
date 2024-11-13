@@ -1249,8 +1249,9 @@ async fn check_fdr_enabled() -> Result<bool, Error> {
 /// Return the recovery body based on whether or not factory reset is restricted.
 fn get_recovery_body(fdr_enabled: bool) -> Option<String> {
     if fdr_enabled {
-        let instructions = std::fs::read_to_string(INSTRUCTIONS_TEXT_PATH)
-            .unwrap_or(String::from("Press and hold both volume buttons to reset this device."));
+        let instructions = std::fs::read_to_string(INSTRUCTIONS_TEXT_PATH).unwrap_or_else(|_| {
+            String::from("Press and hold both volume buttons to reset this device.")
+        });
         Some(instructions)
     } else {
         None

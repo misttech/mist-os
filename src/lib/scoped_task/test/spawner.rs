@@ -100,7 +100,7 @@ fn main() {
 }
 
 fn spawn_sleeper(opts: Options) -> anyhow::Result<Box<dyn Any>> {
-    let bin = env::args().next().ok_or(format_err!("couldn't get binary name"))?;
+    let bin = env::args().next().ok_or_else(|| format_err!("couldn't get binary name"))?;
     let bin = CString::new(bin).unwrap();
     let args: [&CStr; 2] = [&bin, c"--sleep"];
 

@@ -110,7 +110,7 @@ pub(crate) async fn serve(
                         let result = devices
                             .get_device_by_name(&name)
                             .map(|d| d.bindings_id().id.get())
-                            .ok_or(zx::Status::NOT_FOUND.into_raw());
+                            .ok_or_else(|| zx::Status::NOT_FOUND.into_raw());
                         result
                     };
                     responder.send(response).unwrap_or_log("failed to respond");
@@ -203,8 +203,10 @@ fn get_interface_flags(
     name: &str,
 ) -> Result<psocket::InterfaceFlags, zx::sys::zx_status_t> {
     let bindings_ctx = ctx.bindings_ctx();
-    let device =
-        bindings_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+    let device = bindings_ctx
+        .devices
+        .get_device_by_name(name)
+        .ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?;
     Ok(flags_for_device(&device.external_state()))
 }
 

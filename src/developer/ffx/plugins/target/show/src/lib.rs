@@ -120,7 +120,7 @@ async fn gather_target_show(
     let info = last_reboot_info_proxy.get().await?;
 
     Ok(TargetData {
-        name: name.unwrap_or("".into()),
+        name: name.unwrap_or_else(|| "".into()),
         ssh_address,
         compatibility_state,
         compatibility_message,

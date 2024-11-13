@@ -102,7 +102,7 @@ impl CommsBackend<UnixStream> for QemuSocket {
 
             // Connect to the indicated socket. If the path has no filename component, the connect call
             // will fail and the error will be returned to the caller along with the invalid path.
-            let console = absolute_socket_path.file_name().unwrap_or(OsStr::new(""));
+            let console = absolute_socket_path.file_name().unwrap_or_else(|| OsStr::new(""));
             let result = UnixStream::connect(console);
 
             // Reset the working directory before dealing with the result of the connect() call. This

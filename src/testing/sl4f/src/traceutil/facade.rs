@@ -43,8 +43,9 @@ impl TraceutilFacade {
     /// returned in a field called |data|. If there is more data to read, then a field
     /// |next_offset| will be returned that indicates where it left off.
     pub async fn get_trace_file(&self, args: Value) -> Result<Value, Error> {
-        let path = args.get("path").ok_or(format_err!("GetTraceFile failed, no path"))?;
-        let path = path.as_str().ok_or(format_err!("GetTraceFile failed, path not string"))?;
+        let path = args.get("path").ok_or_else(|| format_err!("GetTraceFile failed, no path"))?;
+        let path =
+            path.as_str().ok_or_else(|| format_err!("GetTraceFile failed, path not string"))?;
         let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0);
 
         let mut file = File::open(path)?;

@@ -186,7 +186,7 @@ impl EmulatorEngine for QemuEngine {
         let emulator_binary = if let Some(exe_name) = cli_name {
             // Realistically, the file is always in a directory, so the empty path is a reasonable
             // fallback since it will "never" happen
-            let mut p = PathBuf::from(qemu_x64_path.parent().unwrap_or(Path::new("")));
+            let mut p = PathBuf::from(qemu_x64_path.parent().unwrap_or_else(|| Path::new("")));
             p.push(exe_name);
             p
         } else {

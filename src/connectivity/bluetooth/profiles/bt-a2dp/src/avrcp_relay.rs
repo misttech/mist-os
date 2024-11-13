@@ -391,8 +391,9 @@ async fn update_status(
 ) -> Result<(), Error> {
     let avrcp_status =
         controller.get_play_status().await?.or_else(|e| Err(format_err!("AVRCP error: {e:?}")))?;
-    let playback_status =
-        avrcp_status.playback_status.ok_or(format_err!("PlayStatus must have playback status"))?;
+    let playback_status = avrcp_status
+        .playback_status
+        .ok_or_else(|| format_err!("PlayStatus must have playback status"))?;
     status.set_state_from_avrcp(playback_status);
     status.duration =
         avrcp_status.song_length.map(|m| zx::MonotonicDuration::from_millis(m as i64).into_nanos());

@@ -880,7 +880,7 @@ pub fn playground_semantic_compare(this: &Value, other: &Value) -> Option<Orderi
             .zip(b.iter())
             .map(|(a, b)| playground_semantic_compare(a, b))
             .find(|x| *x != Some(Ordering::Equal))
-            .unwrap_or(PartialOrd::partial_cmp(&a.len(), &b.len())),
+            .unwrap_or_else(|| PartialOrd::partial_cmp(&a.len(), &b.len())),
         (a, b) => {
             if let (Some(a), Some(b)) = (try_promote(a), try_promote(b)) {
                 PartialOrd::partial_cmp(&a, &b)

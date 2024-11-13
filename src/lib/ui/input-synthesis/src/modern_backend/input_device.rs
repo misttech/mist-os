@@ -201,7 +201,7 @@ impl InputDevice {
             let reader_server_end = input_reports_reader_server_end_stream
                 .next()
                 .await
-                .ok_or(format_err!("stream ended without a call to GetInputReportsReader"))?
+                .ok_or_else(|| format_err!("stream ended without a call to GetInputReportsReader"))?
                 .context("handling InputDeviceRequest")?;
             InputReportsReader {
                 request_stream: reader_server_end
@@ -357,7 +357,7 @@ impl InputDevice {
             .iter()
             .map(|&usage| {
                 Key::from_primitive(usage)
-                    .ok_or(anyhow::anyhow!("could not convert to input::Key: {}", &usage))
+                    .ok_or_else(|| anyhow::anyhow!("could not convert to input::Key: {}", &usage))
             })
             .collect()
     }

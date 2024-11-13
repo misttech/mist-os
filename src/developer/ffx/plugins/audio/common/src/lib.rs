@@ -173,7 +173,7 @@ pub mod tests {
         let callback = |req| match req {
             fac::PlayerRequest::Play { payload, responder } => {
                 let data_socket =
-                    payload.wav_source.ok_or(anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_source.ok_or_else(|| anyhow!("Socket argument missing.")).unwrap();
 
                 let mut socket = fidl::AsyncSocket::from_socket(data_socket);
                 let mut wav_file = vec![0u8; 11];
@@ -200,7 +200,7 @@ pub mod tests {
         let callback = |req| match req {
             fac::RecorderRequest::Record { payload, responder } => {
                 let wav_socket =
-                    payload.wav_data.ok_or(anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_data.ok_or_else(|| anyhow!("Socket argument missing.")).unwrap();
 
                 fuchsia_async::Task::local(async move {
                     let mut socket = fidl::AsyncSocket::from_socket(wav_socket);

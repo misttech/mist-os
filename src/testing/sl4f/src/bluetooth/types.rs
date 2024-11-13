@@ -1031,7 +1031,8 @@ impl TryInto<AdvertisingParameters> for FacadeArg {
             None => None,
         };
 
-        let conn_raw = self.value.get("connectable").ok_or(format_err!("Connectable missing"))?;
+        let conn_raw =
+            self.value.get("connectable").ok_or_else(|| format_err!("Connectable missing"))?;
 
         let connectable: bool = conn_raw.as_bool().unwrap_or(false);
 
@@ -1058,7 +1059,8 @@ impl TryInto<AdvertisingParameters> for FacadeArg {
 impl TryInto<Filter> for FacadeArg {
     type Error = Error;
     fn try_into(self) -> Result<Filter, Self::Error> {
-        let value = self.value.get("filter").ok_or(format_err!("Scan filter missing."))?.clone();
+        let value =
+            self.value.get("filter").ok_or_else(|| format_err!("Scan filter missing."))?.clone();
         let name = value["name_substring"].as_str().map(String::from);
         // For now, no scan profile, so default to empty Filter
         Ok(Filter { name, ..Default::default() })

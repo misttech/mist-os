@@ -175,7 +175,7 @@ pub async fn load_driver(
     let component: cm_rust::ComponentDecl = component.fidl_into_native();
 
     let bind_path = get_rules_string_value(&component, "bind")
-        .ok_or(anyhow!("{}: Missing bind path", component_url))?;
+        .ok_or_else(|| anyhow!("{}: Missing bind path", component_url))?;
     let bind = package_dir.read_file(&bind_path).await.with_context(|| {
         format!("{}: Failed to read bind file '{}'", component_url.as_str(), bind_path)
     })?;

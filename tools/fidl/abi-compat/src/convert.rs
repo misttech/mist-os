@@ -529,7 +529,7 @@ pub fn convert_protocol<'a>(
             discoverable
                 .get_argument(name)
                 .map(|c| c.value().to_string())
-                .unwrap_or(default.to_string())
+                .unwrap_or_else(|| default.to_string())
         };
         let scopes = |name: &str| {
             let locs: Vec<String> = attr_or(name, "platform,external")

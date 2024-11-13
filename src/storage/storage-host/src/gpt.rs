@@ -200,7 +200,7 @@ impl Inner {
                     ..info
                         .start_block
                         .checked_add(info.num_blocks)
-                        .ok_or(anyhow!("Overflow in partition range"))?,
+                        .ok_or_else(|| anyhow!("Overflow in partition range"))?,
             ));
             let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
             self.partitions_dir.add_entry(

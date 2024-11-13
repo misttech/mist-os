@@ -203,9 +203,11 @@ impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {
                 match command {
                     DeviceWatcherRequest::WatchDevices { responder } => {
                         let mut locked_device_list =
-                            last_device_list.try_lock().ok_or(format_err!(
-                                "No more than 1 outstanding call to watch_devices is allowed"
-                            ))?;
+                            last_device_list.try_lock().ok_or_else(|| {
+                                format_err!(
+                                    "No more than 1 outstanding call to watch_devices is allowed"
+                                )
+                            })?;
 
                         if locked_device_list.is_none() {
                             // This is the first call to WatchDevices,

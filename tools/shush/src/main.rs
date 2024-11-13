@@ -162,7 +162,7 @@ impl Allow {
     }
 
     pub fn rollout_path(&self) -> &Path {
-        self.rollout.as_deref().unwrap_or(Path::new(DEFAULT_ROLLOUT_PATH))
+        self.rollout.as_deref().unwrap_or_else(|| Path::new(DEFAULT_ROLLOUT_PATH))
     }
 }
 
@@ -177,7 +177,7 @@ struct Rollout {
 
 impl Rollout {
     pub fn rollout_path(&self) -> &Path {
-        self.rollout.as_deref().unwrap_or(Path::new(DEFAULT_ROLLOUT_PATH))
+        self.rollout.as_deref().unwrap_or_else(|| Path::new(DEFAULT_ROLLOUT_PATH))
     }
 }
 

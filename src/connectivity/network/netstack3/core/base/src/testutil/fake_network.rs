@@ -192,7 +192,7 @@ where
             // If `max` returns `None`, it means that we were called with no
             // contexts. That's kind of silly, but whatever - arbitrarily
             // choose the current time as the epoch.
-            .unwrap_or(FakeInstant::default());
+            .unwrap_or_else(FakeInstant::default);
 
         assert!(
             !contexts

@@ -197,7 +197,7 @@ where
             warn!("Unfulfilled request {:?}", &TypefaceRequestFormatter(&request));
         }
 
-        let typeface_response = typeface_response.unwrap_or(fonts::TypefaceResponse::default());
+        let typeface_response = typeface_response.unwrap_or_else(fonts::TypefaceResponse::default);
 
         debug!("Response: {:?}", &TypefaceResponseFormatter(&typeface_response));
 
@@ -261,8 +261,8 @@ where
     fn get_family_info(&self, family_name: fonts::FamilyName) -> fonts::FontFamilyInfo {
         let family_name = UniCase::new(family_name.name);
         let family = self.match_family(&family_name);
-        family.map_or(
-            fonts::FontFamilyInfo::default(),
+        family.map_or_else(
+            fonts::FontFamilyInfo::default,
             |FontFamilyMatch { family, overrides: _ }| fonts::FontFamilyInfo {
                 name: Some(fonts::FamilyName { name: family.name.clone() }),
                 styles: Some(family.faces.get_styles().collect()),

@@ -202,7 +202,7 @@ impl TestPilotArgs {
         let mut s = Self {
             test_config: cmd.fuchsia_test_configuration,
             test_bin_path: cmd.fuchsia_test_bin_path,
-            path: env.var(ENV_PATH).unwrap_or("".into()),
+            path: env.var(ENV_PATH).unwrap_or_else(|_| "".into()),
             timeout_seconds: parse_optional_var!(env, ENV_TIMEOUT_SECONDS, parse_u32)?,
             sdk_tools_path: parse_optional_var!(env, ENV_SDK_TOOL_PATH, dir_parse_path)?,
             resource_path: parse_optional_var!(env, ENV_RESOURCE_PATH, dir_parse_path)?,

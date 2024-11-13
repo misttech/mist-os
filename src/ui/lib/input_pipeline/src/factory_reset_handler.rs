@@ -164,7 +164,7 @@ impl FactoryResetHandler {
             while let Some(request_result) = stream.next().await {
                 let watcher = request_result?
                     .into_watch()
-                    .ok_or(anyhow!("Failed to get FactoryResetCoundown Watcher"))?;
+                    .ok_or_else(|| anyhow!("Failed to get FactoryResetCoundown Watcher"))?;
                 subscriber.register(watcher)?;
             }
 

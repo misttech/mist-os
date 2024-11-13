@@ -83,7 +83,7 @@ async fn main() -> Result<(), Error> {
 
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
-        acceptor.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+        acceptor.next().await.ok_or_else(|| format_err!("Failed to get incoming connection"))??;
     let (mut data_stream, client_end, con) = make_con()?;
     responder.send(Some(con))?;
 
@@ -94,8 +94,10 @@ async fn main() -> Result<(), Error> {
         .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
 
     // Get next connection
-    let AcceptorRequest::Accept { addr: _, responder } =
-        acceptor2.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+    let AcceptorRequest::Accept { addr: _, responder } = acceptor2
+        .next()
+        .await
+        .ok_or_else(|| format_err!("Failed to get incoming connection"))??;
     let (mut data_stream, _client_end, con) = make_con()?;
     responder.send(Some(con))?;
     // Send data until the peer closes
@@ -112,8 +114,10 @@ async fn main() -> Result<(), Error> {
 
     // Get next connection
     {
-        let AcceptorRequest::Accept { addr: _, responder } =
-            acceptor3.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
+        let AcceptorRequest::Accept { addr: _, responder } = acceptor3
+            .next()
+            .await
+            .ok_or_else(|| format_err!("Failed to get incoming connection"))??;
         let (mut data_stream, _client_end, con) = make_con()?;
         responder.send(Some(con))?;
         // Read some data then suddenly close the connection.

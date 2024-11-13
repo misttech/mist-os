@@ -100,7 +100,7 @@ fn build_copyright(node: parser::ParseNode) -> AstResult<String> {
 
 fn build_description(node: parser::ParseNode) -> AstResult<Description> {
     if let parser::ParseElement::Description { summary } = node.element {
-        Ok(Description { summary, description: node.body.unwrap_or("".to_owned()) })
+        Ok(Description { summary, description: node.body.unwrap_or_else(|| "".to_owned()) })
     } else {
         Err("Invalid node".to_owned())
     }

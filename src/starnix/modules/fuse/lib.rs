@@ -155,7 +155,7 @@ impl FileOps for DevFuse {
                         id = new_id;
                         entry = connection.registered_passthrough.entry(id);
                     }
-                    entry.or_insert(Arc::downgrade(&fd));
+                    entry.or_insert_with(|| Arc::downgrade(&fd));
                     connection.last_passthrough_id = id;
                     id
                 };

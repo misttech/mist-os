@@ -291,15 +291,22 @@ impl SystemActivityGovernorControl {
         self: &Rc<Self>,
         sag_state: fctrl::SystemActivityGovernorState,
     ) -> fctrl::StateSetResult {
-        let required_execution_state_level = sag_state
-            .execution_state_level
-            .unwrap_or(self.current_state.lock().await.execution_state_level.unwrap());
-        let required_application_activity_level = sag_state
-            .application_activity_level
-            .unwrap_or(self.current_state.lock().await.application_activity_level.unwrap());
-        let required_wake_handling_level = sag_state
-            .wake_handling_level
-            .unwrap_or(self.current_state.lock().await.wake_handling_level.unwrap());
+        let required_execution_state_level = if let Some(r) = sag_state.execution_state_level {
+            r
+        } else {
+            self.current_state.lock().await.execution_state_level.unwrap()
+        };
+        let required_application_activity_level =
+            if let Some(r) = sag_state.application_activity_level {
+                r
+            } else {
+                self.current_state.lock().await.application_activity_level.unwrap()
+            };
+        let required_wake_handling_level = if let Some(r) = sag_state.wake_handling_level {
+            r
+        } else {
+            self.current_state.lock().await.wake_handling_level.unwrap()
+        };
         self.required_state
             .lock()
             .await

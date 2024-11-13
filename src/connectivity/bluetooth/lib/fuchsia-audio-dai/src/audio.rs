@@ -39,7 +39,9 @@ impl DaiAudioDevice {
         let pcm_formats = dai.ring_buffer_formats().await?;
         Ok(Self {
             dai: Arc::new(dai),
-            is_input: props.is_input.ok_or(format_err!("DAI did not provide required is_input"))?,
+            is_input: props
+                .is_input
+                .ok_or_else(|| format_err!("DAI did not provide required is_input"))?,
             configured_formats: None,
             dai_formats,
             pcm_formats,
@@ -71,7 +73,7 @@ impl DaiAudioDevice {
             return Err(format_err!("Attempted to start a DAI that is still running"));
         }
         let (dai_format, pcm_format) =
-            self.configured_formats.clone().ok_or(format_err!("formats not configured"))?;
+            self.configured_formats.clone().ok_or_else(|| format_err!("formats not configured"))?;
         let (client, request_stream) =
             fidl::endpoints::create_request_stream::<StreamConfigMarker>()?;
         self.config_stream_task =

@@ -218,8 +218,8 @@ impl AvrcpService {
             .iter()
             .map(|proto| fuchsia_bluetooth::profile::ProtocolDescriptor::try_from(proto))
             .collect::<Result<Vec<_>, _>>()?;
-        let psm =
-            psm_from_protocol(&protocol).ok_or(format_err!("AVRCP Service with no L2CAP PSM"))?;
+        let psm = psm_from_protocol(&protocol)
+            .ok_or_else(|| format_err!("AVRCP Service with no L2CAP PSM"))?;
 
         for attr in attributes {
             match attr.id {

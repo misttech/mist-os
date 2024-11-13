@@ -56,7 +56,7 @@ fn get_interface_id(
                  state: _,
              }| if name == want_name { Some(id.get()) } else { None },
         )
-        .ok_or(anyhow::format_err!("failed to find {}", want_name))
+        .ok_or_else(|| anyhow::format_err!("failed to find {}", want_name))
 }
 
 fn get_interface_control(

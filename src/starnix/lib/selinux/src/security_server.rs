@@ -155,8 +155,10 @@ impl SecurityServer {
         security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
-        let active_policy =
-            locked_state.active_policy.as_mut().ok_or(anyhow::anyhow!("no policy loaded"))?;
+        let active_policy = locked_state
+            .active_policy
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("no policy loaded"))?;
         let context = active_policy
             .parsed
             .parse_security_context(security_context)
@@ -331,7 +333,7 @@ impl SecurityServer {
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
                     def_sid: def_sid_from_mount_option
-                        .unwrap_or(SecurityId::initial(InitialSid::File)),
+                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                     root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
                 },
             }

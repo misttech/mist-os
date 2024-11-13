@@ -38,7 +38,8 @@ async fn list_devices(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Resu
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+        let filename =
+            filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
@@ -323,7 +324,8 @@ async fn list_tree(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+        let filename =
+            filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;

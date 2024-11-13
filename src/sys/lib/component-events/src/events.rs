@@ -147,11 +147,12 @@ impl TryFrom<fcomponent::EventHeader> for EventHeader {
     type Error = anyhow::Error;
 
     fn try_from(header: fcomponent::EventHeader) -> Result<Self, Self::Error> {
-        let event_type = header.event_type.ok_or(format_err!("No event type"))?;
-        let component_url = header.component_url.ok_or(format_err!("No component url"))?;
-        let moniker = header.moniker.ok_or(format_err!("No moniker"))?;
-        let timestamp =
-            header.timestamp.ok_or(format_err!("Missing timestamp from the Event object"))?;
+        let event_type = header.event_type.ok_or_else(|| format_err!("No event type"))?;
+        let component_url = header.component_url.ok_or_else(|| format_err!("No component url"))?;
+        let moniker = header.moniker.ok_or_else(|| format_err!("No moniker"))?;
+        let timestamp = header
+            .timestamp
+            .ok_or_else(|| format_err!("Missing timestamp from the Event object"))?;
         Ok(EventHeader { event_type, component_url, moniker, timestamp })
     }
 }

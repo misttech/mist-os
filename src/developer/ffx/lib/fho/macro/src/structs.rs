@@ -190,7 +190,7 @@ fn extract_command_field<'a>(
     let command_field_idx = fields
         .iter()
         .position(|f| matches!(f, NamedFieldTy::Command(_)))
-        .ok_or(ParseError::CommandRequired(Span::call_site()))?;
+        .ok_or_else(|| ParseError::CommandRequired(Span::call_site()))?;
     let NamedFieldTy::Command(f) = fields.remove(command_field_idx) else { unreachable!() };
     Ok(f)
 }

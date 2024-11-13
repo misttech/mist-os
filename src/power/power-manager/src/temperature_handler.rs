@@ -115,7 +115,8 @@ impl<'a> TemperatureHandlerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         Ok(Rc::new(TemperatureHandler {
             init_done: AsyncEvent::new(),
@@ -227,7 +228,7 @@ impl TemperatureHandler {
             .borrow()
             .driver_proxy
             .as_ref()
-            .ok_or(format_err!("Missing driver_proxy"))
+            .ok_or_else(|| format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .clone();
 

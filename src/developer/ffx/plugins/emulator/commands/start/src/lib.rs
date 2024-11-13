@@ -189,8 +189,9 @@ impl<T: EngineOperations> EmuStartTool<T> {
             &self.engine_operations.get_emu_instances(),
         )
         .await?;
-        let engine_type = EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
-            .context("Reading engine type from ffx config.")?;
+        let engine_type =
+            EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
+                .context("Reading engine type from ffx config.")?;
 
         // Get the staged instance, if any
         let mut existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
@@ -489,7 +490,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             return Ok((true, engine));
         } else {
             let engine_type =
-                EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
+                EngineType::from_str(&self.cmd.engine().unwrap_or_else(|_| "femu".to_string()))
                     .context("Reading engine type from ffx config.")?;
             engine = self.engine_operations.new_engine(&new_config, engine_type).await?;
             let config = engine.emu_config_mut();

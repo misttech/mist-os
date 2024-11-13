@@ -142,7 +142,8 @@ impl<'a, 'b> SystemShutdownHandlerBuilder<'a, 'b> {
 
     pub fn build(self) -> Result<Rc<SystemShutdownHandler>, Error> {
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         // Connect to the Component Manager's SystemController service if a proxy wasn't specified
         let component_mgr_proxy = if let Some(proxy) = self.component_mgr_proxy {

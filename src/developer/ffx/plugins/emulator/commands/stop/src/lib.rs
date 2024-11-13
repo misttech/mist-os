@@ -89,7 +89,7 @@ impl EmuStopTool {
                 // early.
                 return_user_error!(engine.err().unwrap());
             }
-            let name = some_name.unwrap_or("<unspecified>".to_string());
+            let name = some_name.unwrap_or_else(|| "<unspecified>".to_string());
             match engine {
                 Err(e) => {
                     let message = format!(

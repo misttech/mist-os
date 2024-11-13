@@ -128,7 +128,7 @@ impl RssiVelocity {
     }
 
     pub fn new_from_list(rssi_samples: &Vec<f64>) -> Result<Self, anyhow::Error> {
-        let last = rssi_samples.last().ok_or(format_err!("empty list"))?;
+        let last = rssi_samples.last().ok_or_else(|| format_err!("empty list"))?;
         match calculate_raw_velocity(rssi_samples.to_vec()) {
             Ok(velocity) => Ok(Self { curr_velocity: velocity, prev_rssi: *last }),
             Err(e) => Err(e),

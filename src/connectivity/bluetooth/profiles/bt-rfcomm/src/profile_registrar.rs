@@ -216,7 +216,7 @@ impl ProfileRegistrar {
             .iter()
             .map(|p| ProtocolDescriptor::try_from(p))
             .collect::<Result<Vec<_>, _>>()?;
-        match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
+        match psm_from_protocol(&local).ok_or_else(|| format_err!("No PSM provided"))? {
             Psm::RFCOMM => self.rfcomm_server.new_l2cap_connection(peer_id, channel.try_into()?),
             psm => {
                 match self.registered_services.iter().find(|(_, client)| client.contains_psm(psm)) {

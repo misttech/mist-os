@@ -774,7 +774,7 @@ where
             let Self(bv, std::marker::PhantomData) = self;
             let mut b = bv
                 .take_front(buf.len())
-                .ok_or(std::io::Error::from(std::io::ErrorKind::OutOfMemory))?;
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::OutOfMemory))?;
             b.as_mut().copy_from_slice(buf);
             Ok(b.len())
         }

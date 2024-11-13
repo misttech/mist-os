@@ -153,7 +153,8 @@ impl<'a> PlatformMetricsBuilder<'a> {
         });
 
         let inspect_platform_metrics = {
-            let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+            let inspect_root =
+                self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
             let platform_metrics_node = inspect_root.create_child("platform_metrics");
             let historical_max_cpu_temperature =
                 HistoricalMaxCpuTemperature::new(&platform_metrics_node);

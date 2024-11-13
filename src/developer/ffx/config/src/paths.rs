@@ -103,12 +103,12 @@ impl EnvironmentContext {
 
 fn get_runtime_base() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         Ok(home)
     } else {
         var("XDG_RUNTIME_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)
@@ -133,13 +133,13 @@ fn get_runtime_base_path() -> Result<PathBuf> {
 
 fn get_cache_base() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         home.push("Caches");
         Ok(home)
     } else {
         var("XDG_CACHE_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)
@@ -158,13 +158,13 @@ fn get_cache_base_path() -> Result<PathBuf> {
 
 fn get_config_base() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         home.push("Preferences");
         Ok(home)
     } else {
         var("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)
@@ -199,12 +199,12 @@ fn default_env_path() -> Result<PathBuf> {
 
 fn get_data_base() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         Ok(home)
     } else {
         var("XDG_DATA_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)
@@ -214,12 +214,12 @@ fn get_data_base() -> Result<PathBuf> {
 
 fn get_state_base() -> Result<PathBuf> {
     if cfg!(target_os = "macos") {
-        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
         home.push("Library");
         Ok(home)
     } else {
         var("XDG_STATE_HOME").map(PathBuf::from).or_else(|_| {
-            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            let mut home = home::home_dir().ok_or_else(|| anyhow!("cannot find home directory"))?;
             home.push(".local");
             home.push("share");
             Ok(home)

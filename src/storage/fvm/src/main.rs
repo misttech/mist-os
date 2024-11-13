@@ -78,7 +78,7 @@ impl Header {
         self.pslice_count
             .checked_mul(std::mem::size_of::<SliceEntry>() as u64)
             .and_then(|n| n.checked_next_multiple_of(BLOCK_SIZE))
-            .ok_or(anyhow!("Bad pslice_count"))
+            .ok_or_else(|| anyhow!("Bad pslice_count"))
             .map(|n| n as usize)
     }
 
@@ -1595,7 +1595,7 @@ async fn main() -> Result<(), Error> {
     component
         .serve(
             fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
-                .ok_or(anyhow!("Missing startup handle"))
+                .ok_or_else(|| anyhow!("Missing startup handle"))
                 .unwrap()
                 .into(),
         )

@@ -92,10 +92,10 @@ pub fn read_and_update_state_internal<P: AsRef<Path>>(path: P) -> State {
         .map(|s| {
             serde_json::from_str(s)
                 .map_err(|e| error!("while deserializing: {:?}: {:?}", path, e))
-                .unwrap_or(Default::default())
+                .unwrap_or_else(|_| Default::default())
         })
         .map_err(|e| debug!("while reading: {:?}", e))
-        .unwrap_or(Default::default());
+        .unwrap_or_else(|_| Default::default());
     debug!("read persistent state: {:?}", &state);
 
     // Change the reboot limit.

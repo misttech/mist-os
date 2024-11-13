@@ -27,7 +27,8 @@ pub async fn wait_for_device_with<T>(
     let stream = stream.try_filter_map(|filename| {
         let predicate = &predicate;
         async move {
-            let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
+            let filename =
+                filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
             let controller_filename = filename.to_owned() + "/device_controller";
 
             let (controller_proxy, server_end) =
@@ -67,7 +68,7 @@ pub async fn wait_for_device_with<T>(
     });
     futures::pin_mut!(stream);
     let item = stream.try_next().await?;
-    item.ok_or(format_err!("stream ended prematurely"))
+    item.ok_or_else(|| format_err!("stream ended prematurely"))
 }
 
 /// Returns a stream that contains the paths of any existing files and
@@ -121,7 +122,8 @@ where
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
     loop {
-        let component = components.next().ok_or(format_err!("cannot wait for empty path"))?;
+        let component =
+            components.next().ok_or_else(|| format_err!("cannot wait for empty path"))?;
         let file = match component {
             std::path::Component::Normal(file) => file,
             // Per fuchsia.io/Directory.Open[0]:

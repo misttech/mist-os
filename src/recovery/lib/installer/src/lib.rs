@@ -155,9 +155,9 @@ where
     F: Send + Sync + Fn(String),
 {
     let install_target =
-        installation_paths.install_target.ok_or(anyhow!("No installation target?"))?;
+        installation_paths.install_target.ok_or_else(|| anyhow!("No installation target?"))?;
     let install_source =
-        installation_paths.install_source.ok_or(anyhow!("No installation source?"))?;
+        installation_paths.install_source.ok_or_else(|| anyhow!("No installation source?"))?;
     let bootloader_type = installation_paths.bootloader_type.unwrap();
 
     let (paver, data_sink) =

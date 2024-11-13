@@ -226,7 +226,7 @@ impl DaemonProtocolProvider for Daemon {
         let target = self.get_rcs_ready_target(target_identifier).await?;
         let rcs = target
             .rcs()
-            .ok_or(anyhow!("rcs disconnected after event fired"))
+            .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
         let (server, client) = fidl::Channel::create();
 
@@ -269,7 +269,7 @@ impl DaemonProtocolProvider for Daemon {
         // Ensure auto-connect has at least started.
         let mut rcs = target
             .rcs()
-            .ok_or(anyhow!("rcs disconnected after event fired"))
+            .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
         let (proxy, remote) = fidl::endpoints::create_proxy::<RemoteControlMarker>()?;
         rcs.copy_to_channel(remote.into_channel())?;
@@ -399,8 +399,10 @@ impl Daemon {
         let buildid = context.daemon_version_string()?;
         let version_info = build_info();
         let commit_hash = version_info.commit_hash.as_deref().unwrap_or("<unknown>");
-        let commit_timestamp =
-            version_info.commit_timestamp.map(|t| t.to_string()).unwrap_or("<unknown>".to_owned());
+        let commit_timestamp = version_info
+            .commit_timestamp
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned());
         let build_version = version_info.build_version.as_deref().unwrap_or("<unknown>");
 
         tracing::info!(
@@ -429,11 +431,11 @@ impl Daemon {
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
         if matches!(target.get_connection_state(), TargetConnectionState::Fastboot(_)) {
-            let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
+            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
             bail!("Attempting to open RCS on a fastboot target: {}", nodename);
         }
         if matches!(target.get_connection_state(), TargetConnectionState::Zedboot(_)) {
-            let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
+            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
         let Some(overnet_node) = self.overnet_node.as_ref() else {

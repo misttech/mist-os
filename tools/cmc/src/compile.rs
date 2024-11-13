@@ -37,10 +37,9 @@ pub(crate) fn compile(
         ))),
     }?;
     util::ensure_directory_exists(&output)?;
-    let output_parent = output.parent().ok_or(Error::invalid_args(format!(
-        "Output file {:?} does not have a parent directory.",
-        output
-    )))?;
+    let output_parent = output.parent().ok_or_else(|| {
+        Error::invalid_args(format!("Output file {:?} does not have a parent directory.", output))
+    })?;
 
     let mut document = util::read_cml(&file)?;
     let includes = include::transitive_includes(&file, &includepath, &includeroot)?;

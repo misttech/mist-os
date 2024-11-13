@@ -229,9 +229,9 @@ impl FromStr for InterfaceMatcher {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (property, value) = s
-            .split_once(":")
-            .ok_or(anyhow!("expected $property:$value where property is one of id, name, class"))?;
+        let (property, value) = s.split_once(":").ok_or_else(|| {
+            anyhow!("expected $property:$value where property is one of id, name, class")
+        })?;
         match property {
             "id" => {
                 let id = value.parse::<NonZeroU64>()?;
@@ -304,9 +304,9 @@ impl FromStr for AddressMatcherType {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (property, value) = s
-            .split_once(":")
-            .ok_or(anyhow!("expected $property:$value where property is one of subnet, range"))?;
+        let (property, value) = s.split_once(":").ok_or_else(|| {
+            anyhow!("expected $property:$value where property is one of subnet, range")
+        })?;
         match property {
             "subnet" => {
                 let subnet: fnet::Subnet = value.parse::<fnet_ext::Subnet>()?.into();
@@ -314,9 +314,11 @@ impl FromStr for AddressMatcherType {
                 Ok(Self::Subnet(subnet))
             }
             "range" => {
-                let (start, end) = value.split_once("..=").ok_or(anyhow!(
+                let (start, end) = value.split_once("..=").ok_or_else(|| {
+                    anyhow!(
                     "expected inclusive address range to be specified in the form $start..=$end"
-                ))?;
+                )
+                })?;
                 let start: fnet::IpAddress = start.parse::<fnet_ext::IpAddress>()?.into();
                 let end: fnet::IpAddress = end.parse::<fnet_ext::IpAddress>()?.into();
                 let range = fnet_filter::AddressRange { start, end }.try_into()?;
@@ -369,9 +371,9 @@ impl FromStr for PortMatcher {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (invert, s) = s.strip_prefix("!").map(|s| (true, s)).unwrap_or((false, s));
-        let (start, end) = s.split_once("..=").ok_or(anyhow!(
-            "expected inclusive port range to be specified in the form $start..=$end"
-        ))?;
+        let (start, end) = s.split_once("..=").ok_or_else(|| {
+            anyhow!("expected inclusive port range to be specified in the form $start..=$end")
+        })?;
         let start = start.parse::<u16>()?;
         let end = end.parse::<u16>()?;
         let matcher = fnet_filter_ext::PortMatcher::new(start, end, invert)?;

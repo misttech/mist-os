@@ -123,7 +123,7 @@ fn codegen_responses<W: io::Write>(
                 if let Definition::Response { name, type_name, is_extension, arguments } =
                     definition
                 {
-                    let type_name = type_name.clone().unwrap_or(to_initial_capital(name));
+                    let type_name = type_name.clone().unwrap_or_else(|| to_initial_capital(name));
                     codegen_match_branch(
                         sink,
                         indent,
@@ -266,7 +266,7 @@ fn codegen_extract_primitive<W: io::Write>(
             write_indented!(
                 sink,
                 indent,
-                "let {} = super::types::{}::from_i64({}_int).ok_or(DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
+                "let {} = super::types::{}::from_i64({}_int).ok_or_else(|| DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
                 dst_name,
                 type_name,
                 src_name
@@ -381,7 +381,7 @@ fn codegen_extract_possibly_option<W: io::Write>(
             write_indented!(
                 sink,
                 indent,
-                "let {} = {}.ok_or(DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
+                "let {} = {}.ok_or_else(|| DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
                 unwrapped_src_name,
                 src_name
             )?;
@@ -488,7 +488,7 @@ fn codegen_arguments_extraction<W: io::Write>(
                 let mut i = 0;
                 for arg_vec in arg_vec_vec {
                     write_indented!(sink, indent,
-                        "let arg_vec = arg_vec_vec.get({}).ok_or(DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
+                        "let arg_vec = arg_vec_vec.get({}).ok_or_else(|| DeserializeErrorCause::UnknownArguments(arguments.clone()))?;\n",
                          i
                     )?;
                     codegen_argument_vec_extraction(sink, indent, arg_vec)?;

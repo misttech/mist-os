@@ -142,7 +142,7 @@ async fn load_metadata(
     let partition_table_size = (header.num_parts * header.part_size) as usize;
     let partition_table_size_rounded = partition_table_size
         .checked_next_multiple_of(bs)
-        .ok_or(anyhow!("Overflow when rounding up partition table size "))?;
+        .ok_or_else(|| anyhow!("Overflow when rounding up partition table size "))?;
     let mut partition_table = BTreeMap::new();
     if header.num_parts > 0 {
         let mut partition_table_blocks = vec![0u8; partition_table_size_rounded];

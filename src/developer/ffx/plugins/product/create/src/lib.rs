@@ -73,12 +73,12 @@ pub async fn pb_create_with_sdk_version(
             if cmd.tuf_keys.is_none() {
                 anyhow::bail!("TUF keys must be provided to build an update package");
             }
-            let version = cmd.update_package_version_file.ok_or(anyhow::anyhow!(
-                "A version file must be provided to build an update package"
-            ))?;
-            let epoch = cmd
-                .update_package_epoch
-                .ok_or(anyhow::anyhow!("A epoch must be provided to build an update package"))?;
+            let version = cmd.update_package_version_file.ok_or_else(|| {
+                anyhow::anyhow!("A version file must be provided to build an update package")
+            })?;
+            let epoch = cmd.update_package_epoch.ok_or_else(|| {
+                anyhow::anyhow!("A epoch must be provided to build an update package")
+            })?;
             Some((version, epoch))
         } else {
             None

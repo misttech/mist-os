@@ -145,21 +145,21 @@ fn lookup_zbi_hash_in_images_json(
     let images_json_hash = update_package
         .contents
         .get(&PathBuf::from(IMAGES_JSON_PATH))
-        .or(update_package.contents.get(&PathBuf::from(IMAGES_JSON_ORIG_PATH)))
-        .ok_or(anyhow!("Update package contains no images manifest entry"))?;
+        .or_else(|| update_package.contents.get(&PathBuf::from(IMAGES_JSON_ORIG_PATH)))
+        .ok_or_else(|| anyhow!("Update package contains no images manifest entry"))?;
     let images_json_contents = artifact_reader
         .read_bytes(&Path::new(&images_json_hash.to_string()))
         .context("Failed to open images manifest blob designated in update package")?;
     let image_packages_manifest = parse_image_packages_json(images_json_contents.as_slice())
         .context("Failed to parse images manifest in update package")?;
     let metadata = if recovery {
-        image_packages_manifest
-            .recovery()
-            .ok_or(anyhow!("Update package images manifest contains no recovery boot slot images"))
+        image_packages_manifest.recovery().ok_or_else(|| {
+            anyhow!("Update package images manifest contains no recovery boot slot images")
+        })
     } else {
-        image_packages_manifest
-            .fuchsia()
-            .ok_or(anyhow!("Update package images manifest contains no fuchsia boot slot images"))
+        image_packages_manifest.fuchsia().ok_or_else(|| {
+            anyhow!("Update package images manifest contains no fuchsia boot slot images")
+        })
     }?;
 
     let images_component_url = metadata.zbi().url();
@@ -176,11 +176,13 @@ fn lookup_zbi_hash_in_images_json(
         })?;
 
     let zbi_path = PathBuf::from(images_component_url.resource());
-    images_package.contents.get(&zbi_path).map(Hash::clone).ok_or(anyhow!(
-        "Update package images package contains no {} zbi entry {:?}",
-        if recovery { "recovery" } else { "fuchsia" },
-        zbi_path
-    ))
+    images_package.contents.get(&zbi_path).map(Hash::clone).ok_or_else(|| {
+        anyhow!(
+            "Update package images package contains no {} zbi entry {:?}",
+            if recovery { "recovery" } else { "fuchsia" },
+            zbi_path
+        )
+    })
 }
 
 #[cfg(test)]

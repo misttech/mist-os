@@ -97,9 +97,9 @@ impl TryFrom<fpower::BatteryInfo> for BatteryInfo {
 
         // Per the `fidl_fuchsia_power_battery` documentation, if `level_status` is known, then the
         // level percentage will also be provided.
-        let level = src
-            .level_percent
-            .ok_or(BatteryClientError::info(format_err!("Missing battery level percentage")))?;
+        let level = src.level_percent.ok_or_else(|| {
+            BatteryClientError::info(format_err!("Missing battery level percentage"))
+        })?;
         if level < MIN_BATTERY_LEVEL as f32 || level > MAX_BATTERY_LEVEL as f32 {
             return Err(BatteryClientError::info(format_err!(
                 "Invalid battery level percentage: {:?}",

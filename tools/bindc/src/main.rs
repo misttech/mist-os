@@ -207,7 +207,8 @@ fn handle_command(command: Command) -> Result<(), Error> {
         Command::Debug { options, device_file } => {
             let includes = handle_includes(options.include, options.include_file)?;
             let includes = includes.iter().map(read_file).collect::<Result<Vec<String>, _>>()?;
-            let input = options.input.ok_or(anyhow!("The debug command requires an input."))?;
+            let input =
+                options.input.ok_or_else(|| anyhow!("The debug command requires an input."))?;
             let rules = read_file(&input)?;
             let bind_rules =
                 compiler::compile_bind(&rules, &includes, options.lint, false, false, false)?;
@@ -222,7 +223,8 @@ fn handle_command(command: Command) -> Result<(), Error> {
             Ok(())
         }
         Command::Test { options, test_spec } => {
-            let input = options.input.ok_or(anyhow!("The test command requires an input."))?;
+            let input =
+                options.input.ok_or_else(|| anyhow!("The test command requires an input."))?;
             let rules = read_file(&input)?;
             let includes = handle_includes(options.include, options.include_file)?;
             let includes = includes.iter().map(read_file).collect::<Result<Vec<String>, _>>()?;
@@ -286,7 +288,8 @@ fn handle_compile(
 
     let rules_str;
     let compiled_bind_rules = if !disable_autobind {
-        let input = input.ok_or(anyhow!("An input is required when disable_autobind is false."))?;
+        let input =
+            input.ok_or_else(|| anyhow!("An input is required when disable_autobind is false."))?;
         rules_str = read_file(&input)?;
         let includes = includes.iter().map(read_file).collect::<Result<Vec<String>, _>>()?;
         compiler::compile(&rules_str, &includes, lint, disable_autobind, true, false)?
@@ -313,7 +316,7 @@ fn convert_to_bind_library_enum(
     let enum_name = identifier
         .0
         .strip_prefix(format!("{}/", prefix).as_str())
-        .ok_or(anyhow!("Failed to strip library name from CompoundIdentifier."))?;
+        .ok_or_else(|| anyhow!("Failed to strip library name from CompoundIdentifier."))?;
     let result = format!(include_str!("templates/bind_lib_enum.template"), enum_name = enum_name,);
     Ok(result)
 }

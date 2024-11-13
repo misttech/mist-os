@@ -123,7 +123,8 @@ impl<'a> ThermalPolicyBuilder<'a> {
         futures_out: &FuturesUnordered<LocalBoxFuture<'b, ()>>,
     ) -> Result<Rc<ThermalPolicy>, Error> {
         // Create default values
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         // Query the TemperatureHandler node for its associated sensor name
         let sensor_name = query_sensor_name(&self.config.temperature_node).await;

@@ -97,7 +97,8 @@ impl<'a> CpuStatsHandlerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let node = Rc::new(CpuStatsHandler {
             stats_svc_proxy: proxy,
@@ -203,7 +204,7 @@ impl CpuStatsHandler {
                 .get_cpu_stats()
                 .await?
                 .per_cpu_stats
-                .ok_or(format_err!("Received null per_cpu_stats"))?
+                .ok_or_else(|| format_err!("Received null per_cpu_stats"))?
                 .iter()
                 .enumerate()
                 .map(|(i, per_cpu_stats)| match per_cpu_stats.idle_time {

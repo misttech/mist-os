@@ -100,7 +100,7 @@ fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
 async fn fetch_new_factory_item() -> Result<zx::Vmo, Error> {
     let factory_items = fuchsia_component::client::connect_to_protocol::<FactoryItemsMarker>()?;
     let (vmo_opt, _) = factory_items.get(DEFAULT_BOOTFS_FACTORY_ITEM_EXTRA).await?;
-    vmo_opt.ok_or(format_err!("Failed to get a valid VMO from service"))
+    vmo_opt.ok_or_else(|| format_err!("Failed to get a valid VMO from service"))
 }
 
 async fn read_file_from_proxy<'a>(

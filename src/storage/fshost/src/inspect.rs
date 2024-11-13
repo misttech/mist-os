@@ -68,7 +68,7 @@ async fn record_filesystem_info(
     let (status, info_wrapped) =
         data_dir.query_filesystem().await.context("Transport error on query_filesystem")?;
     zx::Status::ok(status).context("query_filesystem failed")?;
-    let info = info_wrapped.ok_or(anyhow!("failed to get filesystem info"))?;
+    let info = info_wrapped.ok_or_else(|| anyhow!("failed to get filesystem info"))?;
     stats_node.record_uint("fvm_free_bytes", info.free_shared_pool_bytes);
     stats_node.record_uint("allocated_inodes", info.total_nodes);
     stats_node.record_uint("used_inodes", info.used_nodes);

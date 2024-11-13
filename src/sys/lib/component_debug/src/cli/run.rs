@@ -118,14 +118,14 @@ pub async fn run_cmd<W: std::io::Write>(
     let lifecycle_controller = lifecycle_controller_factory().await?;
     let parent = moniker
         .parent()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let leaf = moniker
         .leaf()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
     let child_name = leaf.name();
     let collection = leaf
         .collection()
-        .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
+        .ok_or_else(|| format_err!("Error: {} does not reference a dynamic instance", moniker))?;
 
     if recreate {
         // First try to destroy any existing instance at this monker.

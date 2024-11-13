@@ -615,7 +615,9 @@ fn static_source_from_ip(f: std::net::IpAddr) -> fnet_name::DnsServer_ {
 async fn svc_connect<S: fidl::endpoints::DiscoverableProtocolMarker>(
     svc_dir: &fio::DirectoryProxy,
 ) -> Result<S::Proxy, anyhow::Error> {
-    optional_svc_connect::<S>(svc_dir).await?.ok_or(anyhow::anyhow!("service does not exist"))
+    optional_svc_connect::<S>(svc_dir)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("service does not exist"))
 }
 
 /// Attempt to connect to a service, returning `None` if the service does not
@@ -1251,8 +1253,9 @@ impl<'a> NetCfg<'a> {
                     .context("handle interface watcher event")?;
             }
             ProvisioningEvent::DnsWatcherResult(dns_watchers_res) => {
-                let (source, res) = dns_watchers_res
-                    .ok_or(anyhow::anyhow!("dns watchers stream should never be exhausted"))?;
+                let (source, res) = dns_watchers_res.ok_or_else(|| {
+                    anyhow::anyhow!("dns watchers stream should never be exhausted")
+                })?;
                 let servers = match res {
                     Ok(s) => s,
                     Err(e) => {

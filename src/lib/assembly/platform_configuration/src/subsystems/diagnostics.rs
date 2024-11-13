@@ -170,10 +170,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 insert_disabled(pipelines, name)?;
             } else {
                 for file in files {
-                    let filename = file.file_name().ok_or(anyhow!(
-                        "Failed to get filename for archivist pipeline: {}",
-                        &file
-                    ))?;
+                    let filename = file.file_name().ok_or_else(|| {
+                        anyhow!("Failed to get filename for archivist pipeline: {}", &file)
+                    })?;
                     pipelines.entry(FileEntry {
                         source: file.clone(),
                         destination: format!("{name}/{filename}"),
@@ -211,9 +210,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         }
 
         for metrics_config in &sampler.metrics_configs {
-            let filename = metrics_config
-                .file_name()
-                .ok_or(anyhow!("Failed to get filename for metrics config: {}", &metrics_config))?;
+            let filename = metrics_config.file_name().ok_or_else(|| {
+                anyhow!("Failed to get filename for metrics config: {}", &metrics_config)
+            })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
@@ -226,9 +225,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             // Ensure that the fire_config is the correct format.
             let _ = read_config::<ComponentIdInfoList>(&fire_config)
                 .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config
-                .file_name()
-                .ok_or(anyhow!("Failed to get filename for fire config: {}", &fire_config))?;
+            let filename = fire_config.file_name().ok_or_else(|| {
+                anyhow!("Failed to get filename for fire config: {}", &fire_config)
+            })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {

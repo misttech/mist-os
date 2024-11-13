@@ -157,11 +157,11 @@ impl TryFrom<fnet_dhcp::ClientWatchConfigurationResponse> for Configuration {
                  }| {
                     Ok(Address {
                         address: address
-                            .ok_or(anyhow!("Ipv4AddressWithPrefix should be present"))?,
+                            .ok_or_else(|| anyhow!("Ipv4AddressWithPrefix should be present"))?,
                         address_parameters: address_parameters
-                            .ok_or(anyhow!("AddressParameters should be present"))?,
+                            .ok_or_else(|| anyhow!("AddressParameters should be present"))?,
                         address_state_provider: address_state_provider
-                            .ok_or(anyhow!("AddressStateProvider should be present"))?,
+                            .ok_or_else(|| anyhow!("AddressStateProvider should be present"))?,
                     })
                 },
             )

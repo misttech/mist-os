@@ -63,7 +63,7 @@ impl Items {
             let name = from_utf8(&item.bytes[offset..(offset + name_length)])?.to_owned();
             offset = offset
                 .checked_add(name_length)
-                .ok_or(anyhow!("Overflow when parsing bootloader ZBI item"))?;
+                .ok_or_else(|| anyhow!("Overflow when parsing bootloader ZBI item"))?;
 
             if bootloader_result.contains_key(&name) {
                 return Err(anyhow!("Bootloader items in ZBI have duplicate filenames: {}", name));

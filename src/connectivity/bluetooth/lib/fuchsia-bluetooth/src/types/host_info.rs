@@ -42,14 +42,15 @@ pub struct HostInfo {
 impl TryFrom<&fsys::HostInfo> for HostInfo {
     type Error = Error;
     fn try_from(src: &fsys::HostInfo) -> Result<HostInfo, Self::Error> {
-        let addresses = src.addresses.as_ref().ok_or(Error::missing("HostInfo.addresses"))?;
+        let addresses =
+            src.addresses.as_ref().ok_or_else(|| Error::missing("HostInfo.addresses"))?;
         if addresses.is_empty() {
             return Err(Error::conversion("HostInfo.addresses must be nonempty"));
         }
         let addresses = addresses.iter().map(Into::into).collect();
         Ok(HostInfo {
-            id: HostId::from(src.id.ok_or(Error::missing("HostInfo.id"))?),
-            technology: src.technology.ok_or(Error::missing("HostInfo.technology"))?,
+            id: HostId::from(src.id.ok_or_else(|| Error::missing("HostInfo.id"))?),
+            technology: src.technology.ok_or_else(|| Error::missing("HostInfo.technology"))?,
             addresses,
             active: src.active.unwrap_or(false),
             local_name: src.local_name.clone(),

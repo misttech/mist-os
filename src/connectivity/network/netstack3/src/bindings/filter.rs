@@ -65,7 +65,7 @@ impl UpdateDispatcherInner {
             let id = fnet_filter_ext::ControllerId(
                 NonZeroUsize::new(counter)
                     .map(|counter| format!("{id}-{counter}"))
-                    .unwrap_or(id.clone()),
+                    .unwrap_or_else(|| id.clone()),
             );
             match resources.entry(id.clone()) {
                 Entry::Vacant(entry) => {

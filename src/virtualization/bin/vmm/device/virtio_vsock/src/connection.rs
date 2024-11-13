@@ -212,8 +212,9 @@ impl VsockConnection {
         header: VirtioVsockHeader,
         chain: ReadableChain<'a, 'b, N, M>,
     ) -> Result<(), Error> {
-        let flags = VirtioVsockFlags::from_bits(header.flags.get())
-            .ok_or(anyhow!("Unrecognized VirtioVsockFlags in header: {:#b}", header.flags.get()))?;
+        let flags = VirtioVsockFlags::from_bits(header.flags.get()).ok_or_else(|| {
+            anyhow!("Unrecognized VirtioVsockFlags in header: {:#b}", header.flags.get())
+        })?;
 
         // Cancel any pending async tasks as the state may be updated. The tasks waiting on these
         // tasks will re-wait on them.

@@ -72,7 +72,7 @@ impl fmt::Display for Characteristic {
         };
         let id = &self.0.handle.map_or(0u64, |h| h.value);
         let props_pretty =
-            self.0.properties.map_or(String::from("unknown"), |p| props_to_string(p));
+            self.0.properties.map_or_else(|| String::from("unknown"), |p| props_to_string(p));
         write!(f, "[chara.: id: {}, type: {}, prop.: {}]", id, type_pretty, props_pretty)?;
         if let Some(ref descrs) = self.0.descriptors {
             let mut i: i32 = 0;

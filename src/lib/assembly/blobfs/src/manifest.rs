@@ -72,7 +72,7 @@ impl BlobManifest {
         let manifest_parent = path
             .as_ref()
             .parent()
-            .ok_or(anyhow!("Failed to get parent path of the output blob manifest"))?;
+            .ok_or_else(|| anyhow!("Failed to get parent path of the output blob manifest"))?;
         let mut out = File::create(&path)
             .context(format!("Failed to create file: {}", path.as_ref().display(),))?;
         for (merkle, blob_path) in self.packages.iter() {
@@ -110,7 +110,7 @@ fn path_relative_to_dir(path: impl AsRef<Path>, dir: impl AsRef<Path>) -> Result
 
     // Rebase the paths.
     diff_paths(&path, &dir)
-        .ok_or(anyhow!("Failed to get relative path for file: {}", path.display()))
+        .ok_or_else(|| anyhow!("Failed to get relative path for file: {}", path.display()))
 }
 
 #[cfg(test)]

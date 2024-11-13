@@ -493,7 +493,7 @@ impl HostDispatcher {
     }
 
     pub fn get_name(&self) -> String {
-        self.state.read().name.clone().unwrap_or(DEFAULT_DEVICE_NAME.to_string())
+        self.state.read().name.clone().unwrap_or_else(|| DEFAULT_DEVICE_NAME.to_string())
     }
 
     pub fn get_appearance(&self) -> Appearance {
@@ -1074,7 +1074,8 @@ impl HostDispatcher {
                 drop(discovery_on_closed_task);
                 drop(discovery_proxy);
 
-                let session = session.upgrade().ok_or(format_err!("failed to upgrade session"))?;
+                let session =
+                    session.upgrade().ok_or_else(|| format_err!("failed to upgrade session"))?;
 
                 // Restart discovery.
                 let (session_sender, session_receiver) = oneshot::channel();

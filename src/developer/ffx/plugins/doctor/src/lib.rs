@@ -829,7 +829,7 @@ async fn daemon_restart<W: Write>(
 
     match timeout(retry_delay, daemon_proxy.get_version_info()).await {
         Ok(Ok(v)) => {
-            let daemon_version = v.build_version.clone().unwrap_or("UNKNOWN".to_string());
+            let daemon_version = v.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
             let node = ledger
                 .add_node(&format!("Daemon version: {}", daemon_version), LedgerMode::Automatic)?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -912,7 +912,8 @@ async fn doctor_summary<W: Write>(
     }
 
     let mut main_node = ledger.add_node("FFX doctor", LedgerMode::Automatic)?;
-    let frontend_version = version_info.build_version.clone().unwrap_or("UNKNOWN".to_string());
+    let frontend_version =
+        version_info.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
     let version_node =
         ledger.add_node(&format!("Frontend version: {}", frontend_version), LedgerMode::Verbose)?;
     ledger.set_outcome(version_node, LedgerOutcome::Success)?;
@@ -1091,7 +1092,7 @@ async fn doctor_summary<W: Write>(
 
     match timeout(retry_delay, daemon_proxy.get_version_info()).await {
         Ok(Ok(v)) => {
-            let daemon_version = v.build_version.clone().unwrap_or("UNKNOWN".to_string());
+            let daemon_version = v.build_version.clone().unwrap_or_else(|| "UNKNOWN".to_string());
             let node = ledger
                 .add_node(&format!("Daemon version: {}", daemon_version), LedgerMode::Verbose)?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -1239,7 +1240,7 @@ async fn doctor_summary<W: Write>(
     main_node = ledger.add(verify_inode)?;
 
     for target in targets.iter() {
-        let target_name = target.nodename.clone().unwrap_or("UNKNOWN".to_string());
+        let target_name = target.nodename.clone().unwrap_or_else(|| "UNKNOWN".to_string());
 
         // Note: this match statement intentionally does not have a fallback case in order to
         // ensure that behavior is considered when we add a new state.

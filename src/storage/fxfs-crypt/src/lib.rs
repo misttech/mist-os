@@ -53,8 +53,9 @@ impl CryptService {
             KeyPurpose::Metadata => inner.active_metadata_key.as_ref(),
             _ => return Err(zx::Status::INVALID_ARGS.into_raw()),
         }
-        .ok_or(zx::Status::BAD_STATE.into_raw())?;
-        let cipher = inner.ciphers.get(wrapping_key_id).ok_or(zx::Status::BAD_STATE.into_raw())?;
+        .ok_or_else(|| zx::Status::BAD_STATE.into_raw())?;
+        let cipher =
+            inner.ciphers.get(wrapping_key_id).ok_or_else(|| zx::Status::BAD_STATE.into_raw())?;
         let nonce = zero_extended_nonce(owner);
 
         let mut key = [0u8; 32];
@@ -70,7 +71,8 @@ impl CryptService {
 
     fn create_key_with_id(&self, owner: u64, wrapping_key_id: u128) -> CryptCreateKeyWithIdResult {
         let inner = self.inner.lock().unwrap();
-        let cipher = inner.ciphers.get(&wrapping_key_id).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+        let cipher =
+            inner.ciphers.get(&wrapping_key_id).ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?;
         let nonce = zero_extended_nonce(owner);
 
         let mut key = [0u8; 32];
@@ -86,7 +88,8 @@ impl CryptService {
 
     fn unwrap_key(&self, wrapping_key_id: u128, owner: u64, key: Vec<u8>) -> CryptUnwrapKeyResult {
         let inner = self.inner.lock().unwrap();
-        let cipher = inner.ciphers.get(&wrapping_key_id).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+        let cipher =
+            inner.ciphers.get(&wrapping_key_id).ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?;
         let nonce = zero_extended_nonce(owner);
 
         cipher.decrypt(&nonce, &key[..]).map_err(|_| zx::Status::IO_DATA_INTEGRITY.into_raw())

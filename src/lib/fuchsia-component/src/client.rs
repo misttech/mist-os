@@ -298,7 +298,7 @@ impl<S: ServiceMarker> Service<S> {
         // TODO(https://fxbug.dev/42068248): Some Directory implementations require relative paths,
         // even though they aren't technically supposed to, so strip the leading slash until that's
         // resolved one way or the other.
-        let service_path = service_path.strip_prefix('/').unwrap_or(service_path.as_ref());
+        let service_path = service_path.strip_prefix('/').unwrap_or_else(|| service_path.as_ref());
         let dir = open_directory_async(&dir, &service_path, fio::Rights::empty())?;
         Ok(Self::from_service_dir_proxy(dir, marker))
     }

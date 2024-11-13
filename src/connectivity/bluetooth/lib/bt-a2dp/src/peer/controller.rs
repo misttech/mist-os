@@ -225,7 +225,7 @@ impl Controller {
         peer_id: PeerId,
     ) -> Result<(), anyhow::Error> {
         while let Some(req) = stream.try_next().await? {
-            let peer = { peer.upgrade().ok_or(format_err!("Peer disconnected"))? };
+            let peer = { peer.upgrade().ok_or_else(|| format_err!("Peer disconnected"))? };
             // Find the first discovered stream by the A2DP peer.
             let infos = match peer.collect_capabilities().await {
                 Ok(endpoints) => endpoints,

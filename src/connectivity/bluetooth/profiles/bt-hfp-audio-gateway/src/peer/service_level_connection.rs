@@ -108,7 +108,7 @@ impl SlcState {
     pub fn codecs_supported(&self) -> Vec<CodecId> {
         // All HFs are required to support CVSD, even if they don't support Codec Negotiation.
         // See HFP v1.8, Sec 5.7 for more information.
-        self.hf_supported_codecs.clone().unwrap_or(vec![CodecId::CVSD])
+        self.hf_supported_codecs.clone().unwrap_or_else(|| vec![CodecId::CVSD])
     }
 }
 

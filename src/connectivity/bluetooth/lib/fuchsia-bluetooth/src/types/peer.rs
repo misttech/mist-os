@@ -167,9 +167,9 @@ impl TryFrom<fsys::Peer> for Peer {
     type Error = Error;
     fn try_from(src: fsys::Peer) -> Result<Peer, Self::Error> {
         Ok(Peer {
-            id: src.id.ok_or(Error::missing("sys.Peer.id"))?.into(),
-            address: src.address.ok_or(Error::missing("sys.Peer.address"))?.into(),
-            technology: src.technology.ok_or(Error::missing("sys.Peer.technology"))?,
+            id: src.id.ok_or_else(|| Error::missing("sys.Peer.id"))?.into(),
+            address: src.address.ok_or_else(|| Error::missing("sys.Peer.address"))?.into(),
+            technology: src.technology.ok_or_else(|| Error::missing("sys.Peer.technology"))?,
             connected: src.connected.unwrap_or(false),
             bonded: src.bonded.unwrap_or(false),
             name: src.name.clone(),

@@ -195,8 +195,8 @@ impl TryFrom<String> for SelectorString {
     fn try_from(full_selector: String) -> Result<Self, Self::Error> {
         let mut string_parts = full_selector.splitn(2, ':');
         let selector_type =
-            SelectorType::from_str(string_parts.next().ok_or(anyhow!("Empty selector"))?)?;
-        let body = string_parts.next().ok_or(anyhow!("Selector needs a :"))?.to_owned();
+            SelectorType::from_str(string_parts.next().ok_or_else(|| anyhow!("Empty selector"))?)?;
+        let body = string_parts.next().ok_or_else(|| anyhow!("Selector needs a :"))?.to_owned();
         let parsed_selector = selectors::parse_selector::<VerboseError>(&body)?;
         Ok(SelectorString { full_selector, selector_type, body, parsed_selector })
     }

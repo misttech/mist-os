@@ -62,7 +62,7 @@ pub fn parse<'a>(frame: &'a AuthFrameRx<'_>) -> Result<ParseSuccess<'a>, Error> 
 
 fn parse_anti_clogging_token(body: &[u8]) -> Result<AntiCloggingTokenMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
-    let group_id = reader.read_value::<u16>().ok_or(anyhow!("Failed to read group ID"))?;
+    let group_id = reader.read_value::<u16>().ok_or_else(|| anyhow!("Failed to read group ID"))?;
     if reader.bytes_remaining() == 0 {
         bail!("Commit indicated AntiCloggingTokenRequired, but no token provided");
     }
@@ -72,7 +72,7 @@ fn parse_anti_clogging_token(body: &[u8]) -> Result<AntiCloggingTokenMsg<'_>, Er
 
 fn parse_commit(body: &[u8]) -> Result<CommitMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
-    let group_id = reader.read_value::<u16>().ok_or(anyhow!("Failed to read group ID"))?;
+    let group_id = reader.read_value::<u16>().ok_or_else(|| anyhow!("Failed to read group ID"))?;
 
     let (scalar_size, element_size) = get_scalar_and_element_len_bytes(group_id)?;
     let bytes_remaining = reader.bytes_remaining();
@@ -81,13 +81,14 @@ fn parse_commit(body: &[u8]) -> Result<CommitMsg<'_>, Error> {
         std::cmp::Ordering::Greater => Some(
             reader
                 .read_bytes(bytes_remaining - scalar_size - element_size)
-                .ok_or(anyhow!("Unexpected buffer end"))?,
+                .ok_or_else(|| anyhow!("Unexpected buffer end"))?,
         ),
         std::cmp::Ordering::Less => bail!("Buffer truncated"),
     };
 
-    let scalar = reader.read_bytes(scalar_size).ok_or(anyhow!("Unexpected buffer end"))?;
-    let element = reader.read_bytes(element_size).ok_or(anyhow!("Unexpected buffer end"))?;
+    let scalar = reader.read_bytes(scalar_size).ok_or_else(|| anyhow!("Unexpected buffer end"))?;
+    let element =
+        reader.read_bytes(element_size).ok_or_else(|| anyhow!("Unexpected buffer end"))?;
 
     Ok(CommitMsg { group_id, scalar, element, anti_clogging_token })
 }
@@ -96,8 +97,9 @@ const CONFIRM_BYTES: usize = 32;
 
 fn parse_confirm(body: &[u8]) -> Result<ConfirmMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
-    let send_confirm = reader.read_value::<u16>().ok_or(anyhow!("Failed to read send confirm"))?;
-    let confirm = reader.read_bytes(CONFIRM_BYTES).ok_or(anyhow!("Buffer truncated"))?;
+    let send_confirm =
+        reader.read_value::<u16>().ok_or_else(|| anyhow!("Failed to read send confirm"))?;
+    let confirm = reader.read_bytes(CONFIRM_BYTES).ok_or_else(|| anyhow!("Buffer truncated"))?;
     match reader.bytes_remaining() {
         0 => Ok(ConfirmMsg { send_confirm, confirm }),
         _ => bail!("Buffer too long"),

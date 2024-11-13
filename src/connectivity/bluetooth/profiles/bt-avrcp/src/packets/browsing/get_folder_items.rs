@@ -324,7 +324,7 @@ impl From<fidl_avrcp::MediaPlayerItem> for BrowseableItem {
             src.feature_bits_ext.unwrap_or(DEFAULT_PLAYER_FEATURE_BITS_EXT).bits(),
         ];
         // The displayable name should always be provided. If not, default to empty.
-        let name = src.displayable_name.unwrap_or("".to_string());
+        let name = src.displayable_name.unwrap_or_else(|| "".to_string());
 
         BrowseableItem::MediaPlayer(MediaPlayerItem {
             player_id,

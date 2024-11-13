@@ -49,6 +49,6 @@ fn load_blob(package_manifest: &PackageManifest, path: &str) -> Result<BlobInfo>
         .blobs()
         .iter()
         .find(|blob| blob.path == path)
-        .ok_or(anyhow!("Cannot find {path} in the package"))
+        .ok_or_else(|| anyhow!("Cannot find {path} in the package"))
         .map(|blob| blob.clone())
 }

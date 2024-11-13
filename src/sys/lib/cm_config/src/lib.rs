@@ -703,7 +703,7 @@ fn parse_capability_policy(
                 let source_moniker = ExtendedMoniker::parse_str(
                     e.source_moniker
                         .as_deref()
-                        .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
+                        .ok_or_else(|| Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let source_name = if let Some(source_name) = e.source_name {
                     Ok(source_name
@@ -775,7 +775,7 @@ fn parse_debug_capability_policy(
                 let moniker = parse_allowlist_entry(
                     e.moniker
                         .as_deref()
-                        .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
+                        .ok_or_else(|| Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let name = if let Some(name) = e.name.as_ref() {
                     Ok(name

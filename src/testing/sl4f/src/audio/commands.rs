@@ -49,15 +49,17 @@ impl AudioFacade {
     }
 
     pub async fn put_input_audio(&self, args: Value) -> Result<Value, Error> {
-        let data = args.get("data").ok_or(format_err!("PutInputAudio failed, no data"))?;
-        let data = data.as_str().ok_or(format_err!("PutInputAudio failed, data not string"))?;
+        let data = args.get("data").ok_or_else(|| format_err!("PutInputAudio failed, no data"))?;
+        let data =
+            data.as_str().ok_or_else(|| format_err!("PutInputAudio failed, data not string"))?;
 
         let wave_data_vec = BASE64_STANDARD.decode(data)?;
         let max_buffer_bytes = 8192;
         let wave_data_iter: Vec<&[u8]> = wave_data_vec.chunks(max_buffer_bytes).collect();
 
         let mut byte_cnt = 0;
-        let sample_index = args["index"].as_u64().ok_or(format_err!("index not a number"))?;
+        let sample_index =
+            args["index"].as_u64().ok_or_else(|| format_err!("index not a number"))?;
         let sample_index = sample_index.try_into()?;
 
         let _ = self
@@ -77,7 +79,8 @@ impl AudioFacade {
     }
 
     pub async fn start_input_injection(&self, args: Value) -> Result<Value, Error> {
-        let sample_index = args["index"].as_u64().ok_or(format_err!("index not a number"))?;
+        let sample_index =
+            args["index"].as_u64().ok_or_else(|| format_err!("index not a number"))?;
         let sample_index = sample_index.try_into()?;
         let status = self
             .audio_proxy

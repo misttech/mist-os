@@ -191,13 +191,13 @@ impl Filesystem {
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
-                .ok_or(anyhow!("data volume {} not found", data_volume_name))?
+                .ok_or_else(|| anyhow!("data volume {} not found", data_volume_name))?
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::ServingVolumeInMultiVolume(_, volume_name) => serving_fs
                 .unwrap()
                 .volume(&volume_name)
-                .ok_or(anyhow!("volume {volume_name} not found"))?
+                .ok_or_else(|| anyhow!("volume {volume_name} not found"))?
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::ServingGpt(fs) => fs
@@ -570,7 +570,7 @@ impl FshostEnvironment {
             );
 
             let volume_manager = connect_to_protocol_at_path::<VolumeManagerMarker>(
-                &device.fvm_path().ok_or(anyhow!("Not an fvm device"))?,
+                &device.fvm_path().ok_or_else(|| anyhow!("Not an fvm device"))?,
             )
             .context("Failed to connect to fvm volume manager")?;
             let new_instance_guid = *uuid::Uuid::new_v4().as_bytes();
@@ -633,7 +633,7 @@ impl FshostEnvironment {
 
     /// Mounts Blobfs on the given device.
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
+        let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
 
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
@@ -839,7 +839,7 @@ impl Environment for FshostEnvironment {
             .await
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
-        let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
+        let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
         for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
@@ -951,7 +951,8 @@ impl Environment for FshostEnvironment {
                 }
             }
             ServeFilesystemStatus::FormatRequired => {
-                self.format_data(&device.fvm_path().ok_or(anyhow!("Not an fvm device"))?).await?
+                self.format_data(&device.fvm_path().ok_or_else(|| anyhow!("Not an fvm device"))?)
+                    .await?
             }
         };
         self.bind_data(fs)

@@ -35,9 +35,9 @@ async fn main() -> Result<(), Error> {
         return Err(anyhow!("Only mounts with a parent path are supported"));
     }
 
-    let filename = mount_path.file_name().ok_or(anyhow!("Failed to get file name"))?;
+    let filename = mount_path.file_name().ok_or_else(|| anyhow!("Failed to get file name"))?;
     let filename_str =
-        filename.to_str().ok_or(anyhow!("Failed to convert filename from OsStr to str"))?;
+        filename.to_str().ok_or_else(|| anyhow!("Failed to convert filename from OsStr to str"))?;
 
     // Connect to fs_realm
     const REALM_QUERY_SERVICE_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";

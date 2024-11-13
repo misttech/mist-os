@@ -277,7 +277,8 @@ impl FileOps for Ashmem {
 
                 let user_ref = UserRef::<ashmem_pin>::new(arg.into());
                 let pin = current_task.read_object(user_ref)?;
-                let (lo, hi) = (pin.offset, pin.offset.checked_add(pin.len).ok_or(errno!(EFAULT))?);
+                let (lo, hi) =
+                    (pin.offset, pin.offset.checked_add(pin.len).ok_or_else(|| errno!(EFAULT))?);
 
                 // Bounds check
                 if (lo as usize) >= state.size || (hi as usize) > state.size {

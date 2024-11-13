@@ -41,7 +41,7 @@ pub async fn get_cpu_ctrl_proxy(
                 .filename
                 .as_path()
                 .to_str()
-                .ok_or(anyhow::anyhow!("Failed to convert filename to string"))?
+                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?
                 .to_owned();
             if filename != "." {
                 if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE

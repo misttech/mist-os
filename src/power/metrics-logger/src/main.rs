@@ -155,7 +155,8 @@ impl<'a> ServerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         Ok(MetricsLoggerServer::new(
             temperature_drivers,

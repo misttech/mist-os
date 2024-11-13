@@ -339,7 +339,7 @@ async fn media_stream_task(
     inspect.start();
     loop {
         let mut player_event_fut =
-            player.as_mut().map(|p| p.next_event().fuse()).unwrap_or(Fuse::terminated());
+            player.as_mut().map(|p| p.next_event().fuse()).unwrap_or_else(Fuse::terminated);
 
         select! {
             stream_packet = stream.next() => {

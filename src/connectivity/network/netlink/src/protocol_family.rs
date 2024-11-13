@@ -465,11 +465,11 @@ pub mod route {
         let outbound_interface =
             outbound_interface.map(|id| NonZeroU64::new((*id).into())).flatten();
         let priority = priority.map(NonZeroU32::new).flatten();
-        let table = NonZeroNetlinkRouteTableIndex::new(table).unwrap_or(
+        let table = NonZeroNetlinkRouteTableIndex::new(table).unwrap_or_else(|| {
             NonZeroNetlinkRouteTableIndex::new_non_zero(
                 NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
-            ),
-        );
+            )
+        });
         let destination_addr = match destination_addr {
             Some(addr) => crate::netlink_packet::ip_addr_from_route::<I>(addr)?,
             None => {

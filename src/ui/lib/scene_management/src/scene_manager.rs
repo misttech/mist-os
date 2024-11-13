@@ -498,7 +498,7 @@ impl SceneManager {
         // Create display metrics, and set the device pixel ratio of FlatlandDisplay.
         let info = singleton_display_info.get_metrics().await?;
         let extent_in_px =
-            info.extent_in_px.ok_or(anyhow::anyhow!("Did not receive display size"))?;
+            info.extent_in_px.ok_or_else(|| anyhow::anyhow!("Did not receive display size"))?;
         let display_metrics = DisplayMetrics::new(
             Size { width: extent_in_px.width as f32, height: extent_in_px.height as f32 },
             display_pixel_density,
@@ -529,7 +529,7 @@ impl SceneManager {
         let layout_info = root_flatland.parent_viewport_watcher.get_layout().await?;
         let root_viewport_size = layout_info
             .logical_size
-            .ok_or(anyhow::anyhow!("Did not receive layout info from the display"))?;
+            .ok_or_else(|| anyhow::anyhow!("Did not receive layout info from the display"))?;
 
         let (
             display_rotation_enum,

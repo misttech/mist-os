@@ -70,7 +70,7 @@ async fn get_hosts(state: &Mutex<State>) -> Result<String, Error> {
             addresses_to_custom_string(&host.addresses, "\n"),
             host.active.to_string(),
             format!("{:?}", host.technology),
-            host.local_name.clone().unwrap_or("(unknown)".to_string()),
+            host.local_name.clone().unwrap_or_else(|| "(unknown)".to_string()),
             host.discoverable.to_string(),
             host.discovering.to_string(),
         ]);

@@ -65,7 +65,7 @@ pub(crate) async fn serve(
                 watcher,
                 WatcherOptions {
                     address_properties_interest: address_properties_interest
-                        .unwrap_or(finterfaces::AddressPropertiesInterest::default()),
+                        .unwrap_or_else(finterfaces::AddressPropertiesInterest::default),
                     include_non_assigned_addresses: include_non_assigned_addresses.unwrap_or(false),
                 },
             )

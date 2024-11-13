@@ -196,10 +196,11 @@ async fn serve_device_control(
             fac::DeviceControlRequest::DeviceSetGainState { payload, responder } => {
                 let selector = payload
                     .device
-                    .ok_or(anyhow!("No device specified"))?
+                    .ok_or_else(|| anyhow!("No device specified"))?
                     .try_into()
                     .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
-                let gain_state = payload.gain_state.ok_or(anyhow!("No gain state specified"))?;
+                let gain_state =
+                    payload.gain_state.ok_or_else(|| anyhow!("No gain state specified"))?;
 
                 let device_control =
                     device_control_connector.lock().unwrap().connect(selector).await?;

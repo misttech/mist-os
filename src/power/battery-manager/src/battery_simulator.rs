@@ -124,7 +124,7 @@ impl SimulatedBatteryInfoSource {
 
     // Updates the simulated_battery_info in BatteryManager
     async fn notify_battery_info_changed(&self) -> Result<(), Error> {
-        let observer = self.observer.upgrade().ok_or(format_err!("Observer not found"))?;
+        let observer = self.observer.upgrade().ok_or_else(|| format_err!("Observer not found"))?;
         observer.update_simulated_battery_info((*self.battery_info.lock().await).clone());
         Ok(())
     }
@@ -135,7 +135,7 @@ impl SimulatedBatteryInfoSource {
         is_simulating: bool,
         real_battery_info: fpower::BatteryInfo,
     ) -> Result<(), Error> {
-        let observer = self.observer.upgrade().ok_or(format_err!("Observer not found"))?;
+        let observer = self.observer.upgrade().ok_or_else(|| format_err!("Observer not found"))?;
         observer.update_simulation(is_simulating);
 
         // Copy real_battery_info

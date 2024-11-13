@@ -636,9 +636,9 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
             request = client_stream.try_next() => {
                 let request = request
                     .map_err(|err| anyhow!("failed to get acceptor request: {}", err))?
-                    .ok_or(anyhow!("unexpected end of Listener stream"))?;
+                    .ok_or_else(|| anyhow!("unexpected end of Listener stream"))?;
                 let (_src_cid, src_port, _port, responder) = request
-                    .into_accept().ok_or(anyhow!("failed to parse message as Accept"))?;
+                    .into_accept().ok_or_else(|| anyhow!("failed to parse message as Accept"))?;
 
                 match expected_connections.contains(&src_port) {
                     false => Err(anyhow!("unexpected connection from guest port: {}", src_port)),

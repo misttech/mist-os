@@ -307,7 +307,7 @@ impl StreamProcessorInner {
     fn input_allocation_complete(&mut self) -> Result<(), Error> {
         let _ = Pin::new(&mut self.input_allocation)
             .output_mut()
-            .ok_or(format_err!("allocation isn't complete"))?;
+            .ok_or_else(|| format_err!("allocation isn't complete"))?;
 
         let settings = self.input_buffers().settings();
         self.input_packet_size = (*settings.size_bytes.as_ref().unwrap()).try_into()?;
@@ -326,7 +326,7 @@ impl StreamProcessorInner {
     fn output_allocation_complete(&mut self) -> Result<(), Error> {
         let _ = Pin::new(&mut self.output_allocation)
             .output_mut()
-            .ok_or(format_err!("allocation isn't complete"))?;
+            .ok_or_else(|| format_err!("allocation isn't complete"))?;
         self.processor
             .complete_output_buffer_partial_settings(/*buffer_lifetime_ordinal=*/ 1)
             .context("setting output buffer settings")?;

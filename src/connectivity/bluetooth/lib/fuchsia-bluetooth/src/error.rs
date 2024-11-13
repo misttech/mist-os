@@ -63,7 +63,7 @@ impl Error {
 
 impl From<bt::Error> for Error {
     fn from(err: bt::Error) -> Error {
-        let message = err.description.unwrap_or("unknown Bluetooth FIDL error".to_string());
+        let message = err.description.unwrap_or_else(|| "unknown Bluetooth FIDL error".to_string());
         Error::other(message)
     }
 }

@@ -163,7 +163,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
                 .pressed_buttons
                 .as_ref()
                 .map(|pressed| std::collections::HashSet::from_iter(pressed.iter().copied()))
-                .unwrap_or(std::collections::HashSet::new());
+                .unwrap_or_else(std::collections::HashSet::new);
 
             // Take the first 3 button identifiers (listed in priority order) to be left-click,
             // right-click and middle-click respectively.

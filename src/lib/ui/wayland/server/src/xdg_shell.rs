@@ -412,9 +412,9 @@ impl XdgSurface {
         ftrace::duration!(c"wayland", c"XdgSurface::add_child_view");
         let xdg_surface = this.get(client)?;
         let surface = xdg_surface.surface_ref().get(client)?;
-        let flatland = surface
-            .flatland()
-            .ok_or(format_err!("Unable to create a child view without a flatland instance."))?;
+        let flatland = surface.flatland().ok_or_else(|| {
+            format_err!("Unable to create a child view without a flatland instance.")
+        })?;
         let transform = flatland.borrow_mut().alloc_transform_id();
         let task_queue = client.task_queue();
         let (child_view_watcher, server_end) = create_proxy::<ChildViewWatcherMarker>()
@@ -1369,7 +1369,7 @@ impl XdgToplevel {
             let surface = surface_ref.get(client)?;
             let flatland = surface
                 .flatland()
-                .ok_or(format_err!("Unable to spawn view without a flatland instance"))?;
+                .ok_or_else(|| format_err!("Unable to spawn view without a flatland instance"))?;
 
             // Spawn a child view if `XdgToplevel` has a parent or there's an existing
             // `XdgSurface` that can be used as parent.

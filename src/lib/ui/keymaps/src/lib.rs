@@ -218,7 +218,7 @@ impl<'a> Keymap<'a> {
                 map_entry
                     .get_key(modifier_state, lock_state)
                     .map(|c| c as u32)
-                    .ok_or(format_err!("Invalid USB HID code: {:?}", hid_usage))
+                    .ok_or_else(|| format_err!("Invalid USB HID code: {:?}", hid_usage))
             } else {
                 Ok(EMPTY_CODEPOINT) // No code point provided by a keymap, e.g. Enter.
             }

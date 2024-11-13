@@ -99,7 +99,7 @@ impl RecoveryUpdateConfig {
                     service_url: boot_args
                         .omaha_url
                         .or(json_service_url)
-                        .unwrap_or(String::from(DEFAULT_OMAHA_SERVICE_URL)),
+                        .unwrap_or_else(|| String::from(DEFAULT_OMAHA_SERVICE_URL)),
                 }
             }
             JsonUpdateType::Tuf => UpdateType::Tuf,

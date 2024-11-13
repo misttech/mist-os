@@ -401,7 +401,7 @@ impl MockPiconetServerInner {
         // Clients that require RFCOMM channels should register through the `bt-rfcomm` component.
         let psm = match connection {
             bredr::ConnectParameters::L2cap(params) => {
-                let psm = params.psm.ok_or(format_err!("No PSM provided in connection"))?;
+                let psm = params.psm.ok_or_else(|| format_err!("No PSM provided in connection"))?;
                 Psm::new(psm)
             }
             bredr::ConnectParameters::Rfcomm(_) => return Err(format_err!("RFCOMM not supported")),

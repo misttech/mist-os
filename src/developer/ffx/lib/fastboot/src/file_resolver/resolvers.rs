@@ -135,7 +135,7 @@ impl FileResolver for ZipArchiveResolver {
         copy(&mut file, &mut outfile)?;
         let duration = Utc::now().signed_duration_since(time);
         done_time(writer, duration)?;
-        Ok(outpath.to_str().ok_or(anyhow!("invalid temp file name"))?.to_owned())
+        Ok(outpath.to_str().ok_or_else(|| anyhow!("invalid temp file name"))?.to_owned())
     }
 }
 

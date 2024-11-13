@@ -78,12 +78,12 @@ impl Graph {
             let target_index = self
                 .node_lookup
                 .get(label)
-                .ok_or(GraphInitError::MissingInternalTargetIndex(label.to_owned()))?;
+                .ok_or_else(|| GraphInitError::MissingInternalTargetIndex(label.to_owned()))?;
 
             for dep in &target.description.deps {
-                let dep_index = self.node_lookup.get(dep).ok_or(
-                    GraphInitError::MissingDependencyForTarget(label.to_owned(), dep.to_owned()),
-                )?;
+                let dep_index = self.node_lookup.get(dep).ok_or_else(|| {
+                    GraphInitError::MissingDependencyForTarget(label.to_owned(), dep.to_owned())
+                })?;
                 self.dependencies.add_edge(*target_index, *dep_index, ());
             }
         }

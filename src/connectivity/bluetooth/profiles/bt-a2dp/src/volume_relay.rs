@@ -76,7 +76,8 @@ impl AvrcpVolume {
     /// Convert from a settings volume between 0.0 and 1.0 to a volume that can be sent
     /// through AVRCP (0 to 127 as per the spec)
     fn from_media_volume(value: settings::AudioSettings) -> Result<Self, anyhow::Error> {
-        let streams = value.streams.ok_or(format_err!("No streams in the AudioSettings"))?;
+        let streams =
+            value.streams.ok_or_else(|| format_err!("No streams in the AudioSettings"))?;
 
         // Find the media stream volume
         let volume =

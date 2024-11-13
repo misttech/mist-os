@@ -153,7 +153,7 @@ impl IfaceTreeHolder {
 
     pub fn update_identity(&self, new_identity: Identity) {
         let mut status = self.status.lock();
-        let new_net_type = new_identity.net_type.unwrap_or("".to_string());
+        let new_net_type = new_identity.net_type.unwrap_or_else(|| "".to_string());
         let mut status_change_messages = Vec::new();
         if new_net_type != status.net_type_value {
             status_change_messages

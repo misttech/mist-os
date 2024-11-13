@@ -322,7 +322,7 @@ fn write_target_event<W: Write>(mut writer: W, event: TargetEvent) -> Result<()>
         TargetEvent::Removed(handle) => handle,
     };
 
-    let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+    let node_name = handle.node_name.unwrap_or_else(|| "<unknown>".to_string());
 
     write!(writer, "({symbol})\t{node_name}\t")?;
     write_target_state(&mut writer, handle.state)?;

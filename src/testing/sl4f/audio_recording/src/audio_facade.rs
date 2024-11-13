@@ -116,7 +116,8 @@ impl OutputWorker {
         num_ring_buffer_frames: u32,
         _notifications_per_ring: u32,
     ) -> Result<(), Error> {
-        let va_output = self.va_output.as_mut().ok_or(format_err!("va_output not initialized"))?;
+        let va_output =
+            self.va_output.as_mut().ok_or_else(|| format_err!("va_output not initialized"))?;
 
         // Ignore AudioCore's notification cadence (_notifications_per_ring); set up our own.
         let target_notifications_per_ring =
@@ -364,12 +365,16 @@ impl VirtualOutput {
             .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
         config.unique_id = Some(AUDIO_OUTPUT_ID);
 
-        match config.device_specific.as_mut().ok_or(format_err!("device_specific not in config"))? {
+        match config
+            .device_specific
+            .as_mut()
+            .ok_or_else(|| format_err!("device_specific not in config"))?
+        {
             fidl_fuchsia_virtualaudio::DeviceSpecific::StreamConfig(ref mut stream_config) => {
                 let ring_buffer = stream_config
                     .ring_buffer
                     .as_mut()
-                    .ok_or(format_err!("ring buffer not in StreamConfig config"))?;
+                    .ok_or_else(|| format_err!("ring buffer not in StreamConfig config"))?;
                 ring_buffer.supported_formats =
                     Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
                         sample_format_flags: get_zircon_sample_format(self.sample_format),
@@ -564,7 +569,8 @@ impl InputWorker {
         num_ring_buffer_frames: u32,
         _notifications_per_ring: u32,
     ) -> Result<(), Error> {
-        let va_input = self.va_input.as_mut().ok_or(format_err!("va_input not initialized"))?;
+        let va_input =
+            self.va_input.as_mut().ok_or_else(|| format_err!("va_input not initialized"))?;
 
         // Ignore AudioCore's notification cadence (_notifications_per_ring); set up our own.
         let target_notifications_per_ring =
@@ -775,12 +781,16 @@ impl VirtualInput {
             .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
         config.unique_id = Some(AUDIO_INPUT_ID);
 
-        match config.device_specific.as_mut().ok_or(format_err!("device_specific not in config"))? {
+        match config
+            .device_specific
+            .as_mut()
+            .ok_or_else(|| format_err!("device_specific not in config"))?
+        {
             fidl_fuchsia_virtualaudio::DeviceSpecific::StreamConfig(ref mut stream_config) => {
                 let ring_buffer = stream_config
                     .ring_buffer
                     .as_mut()
-                    .ok_or(format_err!("ring buffer not in StreamConfig config"))?;
+                    .ok_or_else(|| format_err!("ring buffer not in StreamConfig config"))?;
                 ring_buffer.supported_formats =
                     Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
                         sample_format_flags: get_zircon_sample_format(self.sample_format),
@@ -829,16 +839,20 @@ impl VirtualInput {
     }
 
     pub fn play(&mut self, index: usize) -> Result<(), Error> {
-        let sender =
-            self.input_sender.as_mut().ok_or(format_err!("input_sender not initialized"))?;
+        let sender = self
+            .input_sender
+            .as_mut()
+            .ok_or_else(|| format_err!("input_sender not initialized"))?;
         sender.try_send(InjectMsg::Flush)?;
         sender.try_send(InjectMsg::Data { data: self.injection_data[index].clone() })?;
         Ok(())
     }
 
     pub fn stop(&mut self) -> Result<(), Error> {
-        let sender =
-            self.input_sender.as_mut().ok_or(format_err!("input_sender not initialized"))?;
+        let sender = self
+            .input_sender
+            .as_mut()
+            .ok_or_else(|| format_err!("input_sender not initialized"))?;
         sender.try_send(InjectMsg::Flush)?;
         Ok(())
     }
@@ -908,7 +922,7 @@ impl AudioFacade {
             let sender = write
                 .output_sender
                 .as_mut()
-                .ok_or(format_err!("Failed unwrapping output sender"))?;
+                .ok_or_else(|| format_err!("Failed unwrapping output sender"))?;
             sender.try_send(ExtractMsg::Start)?;
             *(capturing) = true;
             Ok(true)
@@ -928,7 +942,7 @@ impl AudioFacade {
             let sender = write
                 .output_sender
                 .as_mut()
-                .ok_or(format_err!("Failed unwrapping output sender"))?;
+                .ok_or_else(|| format_err!("Failed unwrapping output sender"))?;
 
             let (tx, mut rx) = mpsc::channel(512);
             sender.try_send(ExtractMsg::Stop { out_sender: tx })?;

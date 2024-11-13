@@ -56,7 +56,7 @@ async fn get_unlock_challenge(
 ) -> Result<UnlockChallenge> {
     let dir = tempdir()?;
     let path = dir.path().join("challenge");
-    let filepath = path.to_str().ok_or(anyhow!("error getting tempfile path"))?;
+    let filepath = path.to_str().ok_or_else(|| anyhow!("error getting tempfile path"))?;
     fastboot_interface.oem(UNLOCK_CHALLENGE).await.map_err(|e| {
         anyhow!("There was an error sending oem command \"{}\": {}", UNLOCK_CHALLENGE, e)
     })?;
@@ -226,7 +226,8 @@ async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
 
     writeln!(writer, "Preparing to upload unlock token")?;
 
-    let file_path = path.to_str().ok_or(anyhow!("Could not get path for temporary token file"))?;
+    let file_path =
+        path.to_str().ok_or_else(|| anyhow!("Could not get path for temporary token file"))?;
     let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
         mpsc::channel(1);
     let path = file_path.to_string();

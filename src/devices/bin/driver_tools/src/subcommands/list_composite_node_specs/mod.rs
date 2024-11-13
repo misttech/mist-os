@@ -24,13 +24,14 @@ pub async fn list_composite_node_specs(
 
     if !cmd.verbose {
         for composite_info in composite_infos {
-            let name = composite_info.spec.and_then(|spec| spec.name).unwrap_or("N/A".to_string());
+            let name =
+                composite_info.spec.and_then(|spec| spec.name).unwrap_or_else(|| "N/A".to_string());
             let driver = composite_info
                 .matched_driver
                 .and_then(|matched_driver| matched_driver.composite_driver)
                 .and_then(|composite_driver| composite_driver.driver_info)
                 .and_then(|driver_info| driver_info.url)
-                .unwrap_or("None".to_string());
+                .unwrap_or_else(|| "None".to_string());
             writeln!(writer, "{:<20}: {}", name, driver)?;
         }
         return Ok(());

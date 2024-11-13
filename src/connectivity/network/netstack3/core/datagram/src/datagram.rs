@@ -2722,7 +2722,7 @@ fn connect_inner<
         socket: ip_sock,
         ip_options,
         clear_device_on_disconnect,
-        shutdown: original_shutdown.unwrap_or(Shutdown::default()),
+        shutdown: original_shutdown.unwrap_or_else(Shutdown::default),
         addr: bound_addr,
         extra,
     })

@@ -25,7 +25,7 @@ const TEMP_FILE_HEADER: &'static str = r#"
 pub(crate) fn edit_configuration(emu_config: &mut EmulatorConfiguration) -> Result<()> {
     let flags = emu_config.flags.clone();
     // Start by generating a temporary file to hold the flags during editing.
-    let editor = var("EDITOR").unwrap_or("/usr/bin/nano".to_string());
+    let editor = var("EDITOR").unwrap_or_else(|_| "/usr/bin/nano".to_string());
     let mut file_path = temp_dir();
     file_path.push("editable");
     {

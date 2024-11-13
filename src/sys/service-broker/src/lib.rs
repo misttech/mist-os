@@ -33,7 +33,7 @@ async fn wait_for_first_instance(svc: &fio::DirectoryProxy) -> Result<String> {
             })
         });
     let first = stream.try_next().await?.unwrap();
-    let filename = first.to_str().ok_or(format_err!("to_str for filename failed"))?;
+    let filename = first.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
     Ok(format!("{INPUT_SERVICE}/{filename}"))
 }
 

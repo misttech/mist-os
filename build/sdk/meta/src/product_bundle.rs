@@ -51,11 +51,11 @@ impl ZipLoadedProductBundle {
         let product_bundle_manifest_name = zip
             .file_names()
             .find(|x| x == &"product_bundle.json" || x.ends_with("/product_bundle.json"))
-            .ok_or(anyhow!("finding file 'product_bundle.json' in zip archive"))?
+            .ok_or_else(|| anyhow!("finding file 'product_bundle.json' in zip archive"))?
             .to_owned();
 
         let product_bundle_parent_path =
-            product_bundle_manifest_name.strip_suffix("product_bundle.json").ok_or(anyhow!("despite the product_bundle.json being found, it's path did not include it as a suffix"))?;
+            product_bundle_manifest_name.strip_suffix("product_bundle.json").ok_or_else(|| anyhow!("despite the product_bundle.json being found, it's path did not include it as a suffix"))?;
 
         let product_bundle_manifest = zip
             .by_name(&product_bundle_manifest_name)

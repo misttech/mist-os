@@ -114,7 +114,7 @@ impl TryFrom<KeyEvent> for ui_input::KeyboardEvent {
         let inner = event
             .inner
             .as_ref()
-            .ok_or(format_err!("Need underlying input3 event for conversion."))?;
+            .ok_or_else(|| format_err!("Need underlying input3 event for conversion."))?;
         let phase = match event.type_ {
             KeyEventType::Pressed => ui_input::KeyboardEventPhase::Pressed,
             KeyEventType::Released => ui_input::KeyboardEventPhase::Released,
@@ -209,7 +209,7 @@ impl TryFrom<KeyEvent> for ui_input3::KeyEvent {
 
     /// Attempts to convert KeyEvent into `fidl_fuchsia_ui_input3::KeyEvent`.
     fn try_from(event: KeyEvent) -> Result<Self, Error> {
-        event.inner.ok_or(format_err!("Need underlying input3 event for conversion."))
+        event.inner.ok_or_else(|| format_err!("Need underlying input3 event for conversion."))
     }
 }
 

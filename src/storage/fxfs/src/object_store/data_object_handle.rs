@@ -1623,7 +1623,7 @@ impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
 
 impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
-        let offset = offset.unwrap_or(self.get_size());
+        let offset = offset.unwrap_or_else(|| self.get_size());
         let mut transaction = self.new_transaction().await?;
         self.txn_write(&mut transaction, offset, buf).await?;
         let new_size = self.txn_get_size(&transaction);

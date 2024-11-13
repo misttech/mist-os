@@ -145,7 +145,7 @@ impl Button {
         let padding = button_options.padding;
         let bg_size = button_options
             .bg_size
-            .unwrap_or(size2(label_width + padding * 2.0, font_size + padding * 2.0));
+            .unwrap_or_else(|| size2(label_width + padding * 2.0, font_size + padding * 2.0));
         let corner: Coord =
             Coord::from(bg_size.height * (button_options.shape.clone() as i32 as f32) / 100.0);
         let background =

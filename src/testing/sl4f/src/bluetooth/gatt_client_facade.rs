@@ -112,7 +112,7 @@ impl GattClientFacade {
             .read()
             .central
             .as_ref()
-            .ok_or(format_err!("No central proxy created."))?
+            .ok_or_else(|| format_err!("No central proxy created."))?
             .proxy
             .clone();
 
@@ -247,7 +247,7 @@ impl GattClientFacade {
     pub async fn gattc_discover_characteristics(&self) -> Result<Vec<Characteristic>, Error> {
         let discover_characteristics_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .discover_characteristics();
         discover_characteristics_fut.await.map_err(|_| format_err!("Failed to send message"))
     }
@@ -264,7 +264,7 @@ impl GattClientFacade {
             WriteOptions { offset: Some(offset), write_mode: Some(mode), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("No active service"))?
+            .ok_or_else(|| format_err!("No active service"))?
             .write_characteristic(&handle, &write_value, &options);
         write_fut
             .await
@@ -308,7 +308,7 @@ impl GattClientFacade {
         let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_characteristic(&handle, &options);
         let read_value = read_fut
             .await
@@ -347,7 +347,7 @@ impl GattClientFacade {
         let fidl_uuid = fidl_fuchsia_bluetooth::Uuid::from(uuid);
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_by_type(&fidl_uuid);
         let results = read_fut
             .await
@@ -368,7 +368,7 @@ impl GattClientFacade {
         let handle = Handle { value: id };
         let read_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .read_descriptor(&handle, &options);
         let read_value = read_fut
             .await
@@ -412,7 +412,7 @@ impl GattClientFacade {
         let options = WriteOptions { offset: Some(offset), ..Default::default() };
         let write_fut = self
             .get_remote_service_proxy()
-            .ok_or(format_err!("RemoteService proxy not available"))?
+            .ok_or_else(|| format_err!("RemoteService proxy not available"))?
             .write_descriptor(&handle, &write_value, &options);
         write_fut
             .await
@@ -453,7 +453,7 @@ impl GattClientFacade {
             let service = inner
                 .active_remote_service
                 .as_mut()
-                .ok_or(format_err!("Not connected to a service"))?;
+                .ok_or_else(|| format_err!("Not connected to a service"))?;
 
             if !enable {
                 service.notifier_tasks.remove(&id);
@@ -484,7 +484,7 @@ impl GattClientFacade {
             .write()
             .active_remote_service
             .as_mut()
-            .ok_or(format_err!("Not connected to a service"))?
+            .ok_or_else(|| format_err!("Not connected to a service"))?
             .notifier_tasks
             .insert(id, notifier_task);
         Ok(())
@@ -499,7 +499,7 @@ impl GattClientFacade {
             .read()
             .clients
             .get(peer_id)
-            .ok_or(format_err!("Not connected to peer"))?
+            .ok_or_else(|| format_err!("Not connected to peer"))?
             .proxy
             .clone();
         let watch_fut = client_proxy.watch_services(&[]);
@@ -512,7 +512,7 @@ impl GattClientFacade {
         let services = &mut inner
             .clients
             .get_mut(peer_id)
-            .ok_or(format_err!("Not connected to peer"))?
+            .ok_or_else(|| format_err!("Not connected to peer"))?
             .services;
         for handle in removed {
             services.remove(&handle.value);
@@ -540,7 +540,8 @@ impl GattClientFacade {
 
         {
             let inner = self.inner.read();
-            let client = inner.clients.get(&peer_id).ok_or(format_err!("Not connected to peer"))?;
+            let client =
+                inner.clients.get(&peer_id).ok_or_else(|| format_err!("Not connected to peer"))?;
             // If watch_services_task has already been started, then client.services has the latest cached list of services and we can simply return then.
             if client.watch_services_task.is_some() {
                 return Ok(client.services.iter().map(|(_, svc)| svc.clone()).collect());
@@ -552,7 +553,8 @@ impl GattClientFacade {
         let task =
             fasync::Task::spawn(GattClientFacade::watch_services_task(self.inner.clone(), peer_id));
         let mut inner = self.inner.write();
-        let client = inner.clients.get_mut(&peer_id).ok_or(format_err!("Not connected to peer"))?;
+        let client =
+            inner.clients.get_mut(&peer_id).ok_or_else(|| format_err!("Not connected to peer"))?;
         client.watch_services_task = Some(task);
 
         Ok(client.services.iter().map(|(_, svc)| svc.clone()).collect())
@@ -569,7 +571,7 @@ impl GattClientFacade {
             .write()
             .central
             .as_ref()
-            .ok_or(format_err!("Central not set"))?
+            .ok_or_else(|| format_err!("Central not set"))?
             .proxy
             .take_event_stream();
 
@@ -674,7 +676,7 @@ impl GattClientFacade {
         let mut devices = Vec::new();
         for (peer_id, peer) in &self.inner.read().scan_results {
             let id = format!("{}", peer_id);
-            let name = peer.name.clone().unwrap_or(EMPTY_DEVICE.to_string());
+            let name = peer.name.clone().unwrap_or_else(|| EMPTY_DEVICE.to_string());
             let connectable = peer.connectable;
             devices.push(BleScanResponse::new(id, name, connectable));
         }

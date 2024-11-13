@@ -100,7 +100,7 @@ impl RebootController {
                     let mut fastboot_interface = match self
                         .target
                         .fastboot_interface()
-                        .ok_or(anyhow!("No fastboot interface"))?
+                        .ok_or_else(|| anyhow!("No fastboot interface"))?
                     {
                         FastbootInterface::Tcp => {
                             let address: SocketAddr = self
@@ -154,7 +154,7 @@ impl RebootController {
                     let mut fastboot_interface = match self
                         .target
                         .fastboot_interface()
-                        .ok_or(anyhow!("No fastboot interface"))?
+                        .ok_or_else(|| anyhow!("No fastboot interface"))?
                     {
                         FastbootInterface::Tcp => {
                             let address: SocketAddr = self
@@ -321,8 +321,9 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
 
 #[tracing::instrument]
 async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
-    let t = target.upgrade().ok_or(anyhow!("Could not upgrade Target to build ssh command"))?;
-    let addr = t.ssh_address().ok_or(anyhow!("Could not get ssh address for target"))?;
+    let t =
+        target.upgrade().ok_or_else(|| anyhow!("Could not upgrade Target to build ssh command"))?;
+    let addr = t.ssh_address().ok_or_else(|| anyhow!("Could not get ssh address for target"))?;
     let mut cmd = build_ssh_command_local(addr.into(), state).await?;
     tracing::debug!("About to run command on target to reboot: {:?}", cmd);
     let ssh = cmd.spawn()?;

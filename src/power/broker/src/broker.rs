@@ -434,7 +434,7 @@ impl Broker {
     ) -> CurrentLevelSubscriber {
         self.current
             .get_mut(element_id)
-            .ok_or(anyhow!("Element ({element_id}) not added"))
+            .ok_or_else(|| anyhow!("Element ({element_id}) not added"))
             .unwrap()
             .hanging_get
             .new_subscriber()
@@ -488,7 +488,7 @@ impl Broker {
     ) -> RequiredLevelSubscriber {
         self.required
             .get_mut(element_id)
-            .ok_or(anyhow!("Element ({element_id}) not added"))
+            .ok_or_else(|| anyhow!("Element ({element_id}) not added"))
             .unwrap()
             .hanging_get
             .new_subscriber()
@@ -1020,7 +1020,7 @@ impl Broker {
             let max_required_by_assertive = max_level_required_by_claims(
                 &self.catalog.assertive_claims.activated.for_required_element(element_id),
             )
-            .unwrap_or(self.catalog.minimum_level(element_id));
+            .unwrap_or_else(|| self.catalog.minimum_level(element_id));
             for opportunistic_claim in
                 self.catalog.opportunistic_claims.activated.for_required_element(element_id)
             {
@@ -1496,7 +1496,7 @@ impl Catalog {
     /// and a Vec of opportunistic claims marked to deactivate.
     fn drop(&mut self, lease_id: &LeaseID) -> Result<(Lease, Vec<Claim>, Vec<Claim>), Error> {
         tracing::debug!("drop(lease:{lease_id})");
-        let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
+        let lease = self.leases.remove(lease_id).ok_or_else(|| anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         self.lease_contingent.remove(lease_id);
         if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.underlying_element_id)

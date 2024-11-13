@@ -105,7 +105,7 @@ pub async fn boot<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
         writer,
         file_resolver,
         false, /* resolve */
-        path.to_str().ok_or(anyhow!("Could not get temp boot image path"))?,
+        path.to_str().ok_or_else(|| anyhow!("Could not get temp boot image path"))?,
         fastboot_interface,
     )
     .await?;

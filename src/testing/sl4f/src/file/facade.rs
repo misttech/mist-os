@@ -23,8 +23,9 @@ impl FileFacade {
     /// Deletes the given path, which must be a file. Returns OK(NotFound) if the file does not
     /// exist.
     pub async fn delete_file(&self, args: Value) -> Result<DeleteFileResult, Error> {
-        let path = args.get("path").ok_or(format_err!("DeleteFile failed, no path"))?;
-        let path = path.as_str().ok_or(format_err!("DeleteFile failed, path not string"))?;
+        let path = args.get("path").ok_or_else(|| format_err!("DeleteFile failed, no path"))?;
+        let path =
+            path.as_str().ok_or_else(|| format_err!("DeleteFile failed, path not string"))?;
 
         match fs::remove_file(path) {
             Ok(()) => Ok(DeleteFileResult::Success),
@@ -35,8 +36,8 @@ impl FileFacade {
 
     /// Creates a new directory. Returns OK(AlreadyExists) if the directory already exists.
     pub async fn make_dir(&self, args: Value) -> Result<MakeDirResult, Error> {
-        let path = args.get("path").ok_or(format_err!("MakeDir failed, no path"))?;
-        let path = path.as_str().ok_or(format_err!("MakeDir failed, path not string"))?;
+        let path = args.get("path").ok_or_else(|| format_err!("MakeDir failed, no path"))?;
+        let path = path.as_str().ok_or_else(|| format_err!("MakeDir failed, path not string"))?;
         let path = Path::new(path);
 
         let recurse = args["recurse"].as_bool().unwrap_or(false);
@@ -55,8 +56,8 @@ impl FileFacade {
 
     /// Given a source file, fetches its contents.
     pub async fn read_file(&self, args: Value) -> Result<Value, Error> {
-        let path = args.get("path").ok_or(format_err!("ReadFile failed, no path"))?;
-        let path = path.as_str().ok_or(format_err!("ReadFile failed, path not string"))?;
+        let path = args.get("path").ok_or_else(|| format_err!("ReadFile failed, no path"))?;
+        let path = path.as_str().ok_or_else(|| format_err!("ReadFile failed, path not string"))?;
 
         let contents = fs::read(path)?;
         let encoded_contents = BASE64_STANDARD.encode(&contents);
@@ -67,15 +68,17 @@ impl FileFacade {
     /// Given data and the destination, it creates a new file and
     /// puts it in the corresponding path (given by the destination).
     pub async fn write_file(&self, args: Value) -> Result<WriteFileResult, Error> {
-        let data = args.get("data").ok_or(format_err!("WriteFile failed, no data"))?;
-        let data = data.as_str().ok_or(format_err!("WriteFile failed, data not string"))?;
+        let data = args.get("data").ok_or_else(|| format_err!("WriteFile failed, no data"))?;
+        let data = data.as_str().ok_or_else(|| format_err!("WriteFile failed, data not string"))?;
 
         let contents = BASE64_STANDARD.decode(data)?;
 
-        let destination =
-            args.get("dst").ok_or(format_err!("WriteFile failed, no destination path given"))?;
-        let destination =
-            destination.as_str().ok_or(format_err!("WriteFile failed, destination not string"))?;
+        let destination = args
+            .get("dst")
+            .ok_or_else(|| format_err!("WriteFile failed, no destination path given"))?;
+        let destination = destination
+            .as_str()
+            .ok_or_else(|| format_err!("WriteFile failed, destination not string"))?;
 
         fs::write(destination, &contents)?;
         Ok(WriteFileResult::Success)
@@ -83,8 +86,8 @@ impl FileFacade {
 
     /// Returns metadata for the given path. Returns Ok(NotFound) if the path does not exist.
     pub async fn stat(&self, args: Value) -> Result<StatResult, Error> {
-        let path = args.get("path").ok_or(format_err!("Stat failed, no path"))?;
-        let path = path.as_str().ok_or(format_err!("Stat failed, path not string"))?;
+        let path = args.get("path").ok_or_else(|| format_err!("Stat failed, no path"))?;
+        let path = path.as_str().ok_or_else(|| format_err!("Stat failed, path not string"))?;
 
         let metadata = match fs::metadata(path) {
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(StatResult::NotFound),

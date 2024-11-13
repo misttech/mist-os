@@ -70,7 +70,7 @@ impl MediaSessions {
 
     pub fn get_active_session(&self) -> Result<MediaState, Error> {
         let r_inner = self.inner.read().get_active_session();
-        r_inner.ok_or(format_err!("No active player"))
+        r_inner.ok_or_else(|| format_err!("No active player"))
     }
 
     pub fn get_supported_notification_events(&self) -> &'static [fidl_avrcp::NotificationEvent] {
@@ -400,7 +400,7 @@ impl MediaSessionsInner {
         let _evicted = self
             .notifications
             .entry(event_id)
-            .or_insert(BoundedQueue::new(MAX_NOTIFICATION_EVENT_QUEUE_SIZE))
+            .or_insert_with(|| BoundedQueue::new(MAX_NOTIFICATION_EVENT_QUEUE_SIZE))
             .insert(data);
 
         // Notify the evicted responder that the TG has removed it from the active list of responders.

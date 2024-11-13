@@ -299,7 +299,7 @@ impl Device for BlockDevice {
         if self.partition_label.is_none() {
             let (status, name) = self.partition_proxy.get_name().await?;
             zx::Status::ok(status)?;
-            self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
+            self.partition_label = Some(name.ok_or_else(|| anyhow!("Expected name"))?);
         }
         Ok(self.partition_label.as_ref().unwrap())
     }
@@ -308,7 +308,8 @@ impl Device for BlockDevice {
         if self.partition_type.is_none() {
             let (status, partition_type) = self.partition_proxy.get_type_guid().await?;
             zx::Status::ok(status)?;
-            self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
+            self.partition_type =
+                Some(partition_type.ok_or_else(|| anyhow!("Expected type"))?.value);
         }
         Ok(self.partition_type.as_ref().unwrap())
     }
@@ -322,7 +323,7 @@ impl Device for BlockDevice {
                 .context("Transport error get_instance_guid")?;
             zx::Status::ok(status).context("get_instance_guid failed")?;
             self.partition_instance =
-                Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
+                Some(instance_guid.ok_or_else(|| anyhow!("Expected instance guid"))?.value);
         }
         Ok(self.partition_instance.as_ref().unwrap())
     }
@@ -454,7 +455,7 @@ impl Device for VolumeProtocolDevice {
         if self.partition_label.is_none() {
             let (status, name) = self.volume_proxy.get_name().await?;
             zx::Status::ok(status)?;
-            self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
+            self.partition_label = Some(name.ok_or_else(|| anyhow!("Expected name"))?);
         }
         Ok(self.partition_label.as_ref().unwrap())
     }
@@ -463,7 +464,8 @@ impl Device for VolumeProtocolDevice {
         if self.partition_type.is_none() {
             let (status, partition_type) = self.volume_proxy.get_type_guid().await?;
             zx::Status::ok(status)?;
-            self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
+            self.partition_type =
+                Some(partition_type.ok_or_else(|| anyhow!("Expected type"))?.value);
         }
         Ok(self.partition_type.as_ref().unwrap())
     }
@@ -477,7 +479,7 @@ impl Device for VolumeProtocolDevice {
                 .context("Transport error get_instance_guid")?;
             zx::Status::ok(status).context("get_instance_guid failed")?;
             self.partition_instance =
-                Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
+                Some(instance_guid.ok_or_else(|| anyhow!("Expected instance guid"))?.value);
         }
         Ok(self.partition_instance.as_ref().unwrap())
     }

@@ -50,7 +50,7 @@ async fn echo_impl(
     cmd: EchoCommand,
     writer: &mut VerifiedMachineWriter<EchoMessage>,
 ) -> Result<()> {
-    let echo_text = cmd.text.unwrap_or("Ffx".to_string());
+    let echo_text = cmd.text.unwrap_or_else(|| "Ffx".to_string());
     // This outer loop retries connecting to the target every time the
     // connection fails. If we only connect once it only runs once.
     loop {
@@ -72,7 +72,7 @@ async fn echo_impl(
                 let err_string = connect_err
                     .as_ref()
                     .map(|e| format!(". Error encountered: {e}"))
-                    .unwrap_or(".".to_owned());
+                    .unwrap_or_else(|| ".".to_owned());
                 let message = if let Some(target) = &target {
                     format!("Waiting for target {target} to return{err_string}")
                 } else {

@@ -31,15 +31,15 @@ impl VirtualCameraFacade {
     pub async fn add_stream_config(&self, args: Value) -> Result<Value, Error> {
         // Pull the args and cast them if need be.
         let config_index =
-            args["index"].as_u64().ok_or(format_err!("index not a number"))?.try_into()?;
+            args["index"].as_u64().ok_or_else(|| format_err!("index not a number"))?.try_into()?;
 
         info!("AddStreamConfig: index received {:?}", config_index);
 
         let config_width = (args
             .get("width")
-            .ok_or(format_err!("Expected a serde_json Value width."))?
+            .ok_or_else(|| format_err!("Expected a serde_json Value width."))?
             .as_u64()
-            .ok_or(format_err!("Expected u64 type for width."))?
+            .ok_or_else(|| format_err!("Expected u64 type for width."))?
             as u32)
             .try_into()?;
 
@@ -47,9 +47,9 @@ impl VirtualCameraFacade {
 
         let config_height = (args
             .get("height")
-            .ok_or(format_err!("Expected a serde_json Value height."))?
+            .ok_or_else(|| format_err!("Expected a serde_json Value height."))?
             .as_u64()
-            .ok_or(format_err!("Expected u64 type for height."))?
+            .ok_or_else(|| format_err!("Expected u64 type for height."))?
             as u32)
             .try_into()?;
 

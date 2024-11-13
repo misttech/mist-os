@@ -439,7 +439,7 @@ impl GattServerFacade {
 
         let descriptor_list = descriptor_list_json
             .as_array()
-            .ok_or(format_err!("Attribute 'descriptors' is not a parseable list."))?;
+            .ok_or_else(|| format_err!("Attribute 'descriptors' is not a parseable list."))?;
 
         let mut ext_property_bits = CharacteristicPropertyBits::empty();
 
@@ -584,17 +584,19 @@ impl GattServerFacade {
     fn generate_service(&self, service_json: &Value) -> Result<ServiceInfo, Error> {
         // Determine if the service is primary or not.
         let service_id = self.inner.write().generic_id_counter.next();
-        let service_kind =
-            match service_json["type"].as_i64().ok_or(format_err!("Invalid service type"))? {
-                0 => ServiceKind::Primary,
-                1 => ServiceKind::Secondary,
-                _ => return Err(format_err!("Invalid Service type")),
-            };
+        let service_kind = match service_json["type"]
+            .as_i64()
+            .ok_or_else(|| format_err!("Invalid service type"))?
+        {
+            0 => ServiceKind::Primary,
+            1 => ServiceKind::Secondary,
+            _ => return Err(format_err!("Invalid Service type")),
+        };
 
         // Get the service UUID.
         let service_uuid_str = service_json["uuid"]
             .as_str()
-            .ok_or(format_err!("Service uuid was unable to cast  to str"))?;
+            .ok_or_else(|| format_err!("Service uuid was unable to cast  to str"))?;
         let service_uuid =
             Uuid::from_str(service_uuid_str).map_err(|_| format_err!("Invalid service uuid"))?;
 
@@ -626,7 +628,7 @@ impl GattServerFacade {
             .read()
             .server_proxy
             .as_ref()
-            .ok_or(format_err!("No Server Proxy created."))?
+            .ok_or_else(|| format_err!("No Server Proxy created."))?
             .clone();
         match server_proxy.publish_service(&service_info, service_client).await? {
             Ok(()) => info!(
@@ -731,9 +733,11 @@ impl GattServerFacade {
         self.inner.write().server_proxy = Some(server_proxy);
         let services = args
             .get("database")
-            .ok_or(format_err!("Could not find the 'database' key in the json database."))?
+            .ok_or_else(|| format_err!("Could not find the 'database' key in the json database."))?
             .get("services")
-            .ok_or(format_err!("Could not find the 'services' key in the json database."))?;
+            .ok_or_else(|| {
+                format_err!("Could not find the 'services' key in the json database.")
+            })?;
 
         let service_list = match services.as_array() {
             Some(s) => s,

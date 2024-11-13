@@ -360,7 +360,7 @@ impl StashInner {
         }
         let mut bonds_to_store = Vec::new();
         for mut bonds in seen_addresses.into_values() {
-            let last = bonds.pop().ok_or(format_err!("unexpected empty bond list"))?;
+            let last = bonds.pop().ok_or_else(|| format_err!("unexpected empty bond list"))?;
             // Generally, Fuchsia disallows restoration of multiple BondingDatas from the same local
             // address to the same peer address. However, some system bootstrap flows cause the same
             // underlying bond (i.e. security keys + local-peer address tuple) to be restored more

@@ -164,7 +164,7 @@ fn print_opts(opts: &Opt) {
     };
     let count =
         if opts.count.is_some() { format!("up to {} ", opts.count.unwrap()) } else { "".into() };
-    let output = opts.output.clone().unwrap_or("stdout".to_string());
+    let output = opts.output.clone().unwrap_or_else(|| "stdout".to_string());
     info!("{action} snoop log for \"{device}\". {truncate}Outputting {count}packets to {output}.",);
 }
 

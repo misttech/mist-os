@@ -1493,7 +1493,7 @@ async fn inspect_filtering_state(name: &str) {
                                         invert: false \
                                     }",
                                 },
-                                "action": "Jump(UninstalledRoutine(2))",
+                                "action": "Jump(UninstalledRoutine(1))",
                             },
                         },
                     },
@@ -1529,7 +1529,7 @@ async fn inspect_filtering_state(name: &str) {
                 // only exists in the IPv4 filtering state.
                 "uninstalled": {
                     "routines": 1u64,
-                    "2": {
+                    "1": {
                         "rules": 0u64,
                     },
                 },

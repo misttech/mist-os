@@ -107,7 +107,7 @@ fn create_table(collections: Vec<Collection>) -> Table {
     table.set_titles(row!("Moniker", "Name", "Durability", "Environment"));
 
     for collection in collections {
-        let environment = collection.environment.unwrap_or("N/A".to_string());
+        let environment = collection.environment.unwrap_or_else(|| "N/A".to_string());
         table.add_row(row!(
             collection.moniker.to_string(),
             collection.name,
@@ -126,7 +126,7 @@ fn create_verbose_table(collection: &Collection) -> Table {
     table.add_row(row!(r->"Collection Name:", collection.name));
     table.add_row(row!(r->"Durability:", collection.durability.to_string()));
 
-    let environment = collection.environment.clone().unwrap_or("N/A".to_string());
+    let environment = collection.environment.clone().unwrap_or_else(|| "N/A".to_string());
     table.add_row(row!(r->"Environment:", environment));
 
     let offered_capabilities = collection.offered_capabilities.join("\n");

@@ -865,10 +865,12 @@ impl<Time: TimeProvider> Monitor<Time> {
         id: Id,
         name: &str,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
-        let ctx = self.interface_context.get_mut(&id).ok_or(anyhow!(
-            "attempting to update state with context but context for id {} does not exist",
-            id
-        ))?;
+        let ctx = self.interface_context.get_mut(&id).ok_or_else(|| {
+            anyhow!(
+                "attempting to update state with context but context for id {} does not exist",
+                id
+            )
+        })?;
 
         ctx.checker_state = NetworkCheckState::Idle;
         let info = IpVersions {
@@ -1193,10 +1195,9 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
         cookie: NetworkCheckCookie,
         result: NetworkCheckResult,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
-        let ctx = self
-            .interface_context
-            .get_mut(&cookie.id)
-            .ok_or(anyhow!("resume: interface id {} should already exist in map", cookie.id))?;
+        let ctx = self.interface_context.get_mut(&cookie.id).ok_or_else(|| {
+            anyhow!("resume: interface id {} should already exist in map", cookie.id)
+        })?;
         let interface_name = result.interface_name().to_string();
         match ctx.checker_state {
             NetworkCheckState::Begin | NetworkCheckState::Idle => {
@@ -1207,10 +1208,12 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
             }
             NetworkCheckState::PingGateway | NetworkCheckState::PingInternet => {
                 let (PingParameters { interface_name, addr }, success) =
-                    result.ping_result().ok_or(anyhow!(
-                        "resume: mismatched state and result {interface_name} ({})",
-                        cookie.id
-                    ))?;
+                    result.ping_result().ok_or_else(|| {
+                        anyhow!(
+                            "resume: mismatched state and result {interface_name} ({})",
+                            cookie.id
+                        )
+                    })?;
                 ctx.pings_completed = ctx.pings_completed + 1;
 
                 if success {
@@ -1275,10 +1278,12 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
             }
             NetworkCheckState::ResolveDns => {
                 let (ResolveDnsParameters { interface_name, domain }, ips) =
-                    result.resolve_dns_result().ok_or(anyhow!(
-                        "resume: mismatched state and result {interface_name} ({})",
-                        cookie.id
-                    ))?;
+                    result.resolve_dns_result().ok_or_else(|| {
+                        anyhow!(
+                            "resume: mismatched state and result {interface_name} ({})",
+                            cookie.id
+                        )
+                    })?;
 
                 if let Some(ips) = ips {
                     if !ips.v4.is_empty() {
@@ -1330,10 +1335,12 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
             }
             NetworkCheckState::FetchHttp => {
                 let (FetchParameters { interface_name, ip, expected_statuses, .. }, status) =
-                    result.fetch_result().ok_or(anyhow!(
-                        "resume: mismatched state and result {interface_name} ({})",
-                        cookie.id
-                    ))?;
+                    result.fetch_result().ok_or_else(|| {
+                        anyhow!(
+                            "resume: mismatched state and result {interface_name} ({})",
+                            cookie.id
+                        )
+                    })?;
                 ctx.fetches_completed += 1;
 
                 if let Some(status) = status {

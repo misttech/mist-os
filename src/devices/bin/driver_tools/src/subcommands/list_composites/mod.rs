@@ -55,11 +55,11 @@ fn write_composite(
     let spec = composite.spec.unwrap_or_default();
     let driver_match = composite.matched_driver.unwrap_or_default();
     if !verbose {
-        writeln!(writer, "{}", spec.name.unwrap_or("".to_string()))?;
+        writeln!(writer, "{}", spec.name.unwrap_or_else(|| "".to_string()))?;
         return Ok(());
     }
 
-    writeln!(writer, "{0: <9}: {1}", "Name", spec.name.unwrap_or("".to_string()))?;
+    writeln!(writer, "{0: <9}: {1}", "Name", spec.name.unwrap_or_else(|| "".to_string()))?;
     writeln!(
         writer,
         "{0: <9}: {1}",
@@ -68,9 +68,14 @@ fn write_composite(
             .composite_driver
             .and_then(|composite_driver| composite_driver.driver_info)
             .and_then(|driver_info| driver_info.url)
-            .unwrap_or("N/A".to_string())
+            .unwrap_or_else(|| "N/A".to_string())
     )?;
-    writeln!(writer, "{0: <9}: {1}", "Device", topological_path.unwrap_or("N/A".to_string()))?;
+    writeln!(
+        writer,
+        "{0: <9}: {1}",
+        "Device",
+        topological_path.unwrap_or_else(|| "N/A".to_string())
+    )?;
 
     write_parent_nodes_info(
         writer,
@@ -98,7 +103,7 @@ fn write_parent_nodes_info(
             writer,
             "   {0: <1} : {1}",
             "Device",
-            parent_paths[i].clone().unwrap_or("Unbound".to_string())
+            parent_paths[i].clone().unwrap_or_else(|| "Unbound".to_string())
         )?;
     }
     Ok(())

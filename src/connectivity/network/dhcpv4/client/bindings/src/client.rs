@@ -196,7 +196,7 @@ impl Client {
             return Err(Error::Exit(ClientExitReason::InvalidParams));
         }
         let ConfigurationToRequest { routers, dns_servers, .. } =
-            configuration_to_request.unwrap_or(ConfigurationToRequest::default());
+            configuration_to_request.unwrap_or_else(ConfigurationToRequest::default);
 
         let config = dhcp_client_core::client::ClientConfig {
             client_hardware_address: mac,

@@ -392,9 +392,10 @@ pub mod identifier {
             let mut id_parts = s.splitn(2, ":");
             let id_type = id_parts
                 .next()
-                .ok_or(anyhow::anyhow!("no client id type found in string: {}", s))?;
-            let id =
-                id_parts.next().ok_or(anyhow::anyhow!("no client id found in string: {}", s))?;
+                .ok_or_else(|| anyhow::anyhow!("no client id type found in string: {}", s))?;
+            let id = id_parts
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("no client id found in string: {}", s))?;
             let () = match id_parts.next() {
                 None => (),
                 Some(v) => {
@@ -410,7 +411,9 @@ pub mod identifier {
                 CLIENT_IDENTIFIER_CHADDR => Ok(Self {
                     inner: ClientIdentifierInner::Chaddr(MacAddr::new(
                         id.get(..CHADDR_LEN)
-                            .ok_or(anyhow::anyhow!("client id had insufficient length: {:?}", id))?
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("client id had insufficient length: {:?}", id)
+                            })?
                             .try_into()?,
                     )),
                 }),
@@ -889,7 +892,7 @@ impl DhcpOption {
             OptionCode::DefaultIpTtl => {
                 let ttl = get_byte(val)?;
                 let ttl = NonZeroU8::new(ttl)
-                    .ok_or(ProtocolError::InvalidOptionValue(code, val.to_vec()))?;
+                    .ok_or_else(|| ProtocolError::InvalidOptionValue(code, val.to_vec()))?;
                 Ok(DhcpOption::DefaultIpTtl(ttl))
             }
             OptionCode::PathMtuAgingTimeout => {
@@ -959,7 +962,7 @@ impl DhcpOption {
             OptionCode::TcpDefaultTtl => {
                 let ttl = get_byte(val)?;
                 let ttl = NonZeroU8::new(ttl)
-                    .ok_or(ProtocolError::InvalidOptionValue(code, val.to_vec()))?;
+                    .ok_or_else(|| ProtocolError::InvalidOptionValue(code, val.to_vec()))?;
                 Ok(DhcpOption::TcpDefaultTtl(ttl))
             }
             OptionCode::TcpKeepaliveInterval => {
@@ -1754,8 +1757,9 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::MaxDatagramReassemblySize(v))
             }
             fidl_fuchsia_net_dhcp::Option_::DefaultIpTtl(v) => {
-                let ttl = NonZeroU8::new(v)
-                    .ok_or(ProtocolError::InvalidOptionValue(OptionCode::DefaultIpTtl, vec![v]))?;
+                let ttl = NonZeroU8::new(v).ok_or_else(|| {
+                    ProtocolError::InvalidOptionValue(OptionCode::DefaultIpTtl, vec![v])
+                })?;
                 Ok(DhcpOption::DefaultIpTtl(ttl))
             }
             fidl_fuchsia_net_dhcp::Option_::PathMtuAgingTimeout(v) => {
@@ -1805,8 +1809,9 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::EthernetEncapsulation(v))
             }
             fidl_fuchsia_net_dhcp::Option_::TcpDefaultTtl(v) => {
-                let ttl = NonZeroU8::new(v)
-                    .ok_or(ProtocolError::InvalidOptionValue(OptionCode::TcpDefaultTtl, vec![v]))?;
+                let ttl = NonZeroU8::new(v).ok_or_else(|| {
+                    ProtocolError::InvalidOptionValue(OptionCode::TcpDefaultTtl, vec![v])
+                })?;
                 Ok(DhcpOption::TcpDefaultTtl(ttl))
             }
             fidl_fuchsia_net_dhcp::Option_::TcpKeepaliveInterval(v) => {
@@ -2037,8 +2042,9 @@ impl TryFrom<u8> for NodeType {
     type Error = ProtocolError;
 
     fn try_from(n: u8) -> Result<Self, Self::Error> {
-        <Self as num_traits::FromPrimitive>::from_u8(n)
-            .ok_or(ProtocolError::InvalidOptionValue(OptionCode::NetBiosOverTcpipNodeType, vec![n]))
+        <Self as num_traits::FromPrimitive>::from_u8(n).ok_or_else(|| {
+            ProtocolError::InvalidOptionValue(OptionCode::NetBiosOverTcpipNodeType, vec![n])
+        })
     }
 }
 
@@ -2100,7 +2106,7 @@ impl TryFrom<u8> for Overload {
 
     fn try_from(n: u8) -> Result<Self, Self::Error> {
         <Self as num_traits::FromPrimitive>::from_u8(n)
-            .ok_or(ProtocolError::InvalidOptionValue(OptionCode::OptionOverload, vec![n]))
+            .ok_or_else(|| ProtocolError::InvalidOptionValue(OptionCode::OptionOverload, vec![n]))
     }
 }
 

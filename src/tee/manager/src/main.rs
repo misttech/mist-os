@@ -135,10 +135,12 @@ async fn main() -> Result<(), Error> {
         for (path, file) in uuid_filenames {
             let uuid = Path::new(&file)
                 .file_stem()
-                .ok_or(anyhow::anyhow!("Expected path with extension"))?;
+                .ok_or_else(|| anyhow::anyhow!("Expected path with extension"))?;
             let config = TAConfig::parse_config(&path)?;
             let _ = configs.insert(
-                uuid.to_str().ok_or(anyhow::anyhow!("UUID string did not decode"))?.to_string(),
+                uuid.to_str()
+                    .ok_or_else(|| anyhow::anyhow!("UUID string did not decode"))?
+                    .to_string(),
                 config,
             );
         }

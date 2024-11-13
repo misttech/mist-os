@@ -187,9 +187,9 @@ impl InputSettingsHandler {
         let is_enabled = mic_settings[0]
             .state
             .as_ref()
-            .ok_or(format_err!("Microphone DeviceState is None"))?
+            .ok_or_else(|| format_err!("Microphone DeviceState is None"))?
             .toggle_flags
-            .ok_or(format_err!("Microphone ToggleStateFlags is None"))?
+            .ok_or_else(|| format_err!("Microphone ToggleStateFlags is None"))?
             .contains(fsettings::ToggleStateFlags::AVAILABLE);
 
         Ok(is_enabled)

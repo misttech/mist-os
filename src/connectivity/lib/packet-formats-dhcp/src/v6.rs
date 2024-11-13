@@ -759,9 +759,9 @@ impl RecordsImpl for ParsedDhcpOptionImpl {
             },
             OptionCode::StatusCode => {
                 let mut opt_val = &mut opt_val;
-                let code = (&mut opt_val)
-                    .take_obj_front::<U16>()
-                    .ok_or(ParseError::InvalidOpLen(OptionCode::StatusCode, opt_val.len()))?;
+                let code = (&mut opt_val).take_obj_front::<U16>().ok_or_else(|| {
+                    ParseError::InvalidOpLen(OptionCode::StatusCode, opt_val.len())
+                })?;
                 let message = str::from_utf8(opt_val)?;
                 Ok(ParsedDhcpOption::StatusCode(*code, message))
             }
@@ -781,7 +781,7 @@ impl RecordsImpl for ParsedDhcpOptionImpl {
                 let mut opt_val = &mut opt_val;
                 let sol_max_rt = (&mut opt_val)
                     .take_obj_front::<U32>()
-                    .ok_or(ParseError::InvalidOpLen(OptionCode::SolMaxRt, opt_val.len()))?;
+                    .ok_or_else(|| ParseError::InvalidOpLen(OptionCode::SolMaxRt, opt_val.len()))?;
                 Ok(ParsedDhcpOption::SolMaxRt(*sol_max_rt))
             }
             OptionCode::DnsServers => {

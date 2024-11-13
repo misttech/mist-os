@@ -87,7 +87,7 @@ impl FidlProtocol for Mdns {
     }
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
-        self.mdns_task.take().ok_or(anyhow!("mdns_task never started"))?;
+        self.mdns_task.take().ok_or_else(|| anyhow!("mdns_task never started"))?;
         Ok(())
     }
 

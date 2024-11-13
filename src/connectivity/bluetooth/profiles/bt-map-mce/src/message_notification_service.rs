@@ -322,10 +322,12 @@ impl ObexServerHandler for ServerHandler {
             ));
         };
         let app_params =
-            headers.get(&HeaderIdentifier::ApplicationParameters).ok_or(new_operation_error(
-                OperationResponseCode::NotAcceptable,
-                "Application Parameters header missing",
-            ))?;
+            headers.get(&HeaderIdentifier::ApplicationParameters).ok_or_else(|| {
+                new_operation_error(
+                    OperationResponseCode::NotAcceptable,
+                    "Application Parameters header missing",
+                )
+            })?;
         let Header::ApplicationParameters(params) = app_params else { unreachable!() };
 
         // Parse MAS instance ID.

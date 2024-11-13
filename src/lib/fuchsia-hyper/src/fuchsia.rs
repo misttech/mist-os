@@ -89,9 +89,9 @@ impl Service<Uri> for HyperConnector {
 
 impl HyperConnector {
     async fn call_async(&self, dst: Uri) -> Result<TcpStream, io::Error> {
-        let host = dst
-            .host()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "destination host is unspecified"))?;
+        let host = dst.host().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "destination host is unspecified")
+        })?;
         let port = match dst.port() {
             Some(port) => port.as_u16(),
             None => {

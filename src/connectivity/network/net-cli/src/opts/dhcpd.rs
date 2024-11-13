@@ -635,7 +635,7 @@ pub struct HostName {
 
 impl Into<fidl_fuchsia_net_dhcp::Option_> for HostName {
     fn into(self) -> fidl_fuchsia_net_dhcp::Option_ {
-        let name = self.name.unwrap_or("".to_string());
+        let name = self.name.unwrap_or_else(|| "".to_string());
         fidl_fuchsia_net_dhcp::Option_::HostName(name)
     }
 }

@@ -270,7 +270,7 @@ where
                     .read()
                     .await
                     .as_ref()
-                    .ok_or(anyhow!("protocol has been shutdown"))?
+                    .ok_or_else(|| anyhow!("protocol has been shutdown"))?
                     .serve(&cx, stream)
                     .await
             } else {
@@ -286,7 +286,7 @@ where
             .write()
             .await
             .take()
-            .ok_or(anyhow!("protocol has been stopped"))?
+            .ok_or_else(|| anyhow!("protocol has been stopped"))?
             .stop(cx)
             .await
     }

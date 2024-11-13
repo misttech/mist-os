@@ -122,7 +122,8 @@ impl<'a> LidShutdownBuilder<'a> {
         };
 
         // In tests use the provided inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
 
         let node = Rc::new(LidShutdown {
             mutable_inner: RefCell::new(mutable_inner),
@@ -196,7 +197,7 @@ impl LidShutdown {
             .borrow()
             .driver_proxy
             .as_ref()
-            .ok_or(format_err!("Missing driver_proxy"))
+            .ok_or_else(|| format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .clone();
 

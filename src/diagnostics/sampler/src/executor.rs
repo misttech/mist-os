@@ -274,20 +274,22 @@ impl SamplerExecutor {
         let project_sampler_futures =
             sampler_config.project_configs.iter().cloned().map(|project_config| {
                 let project_sampler_stats =
-                    project_to_stats_map.entry(project_config.project_id).or_insert(Arc::new(
-                        ProjectSamplerStats::new()
-                            .with_inspect(
-                                &sampler_executor_stats.inspect_node,
-                                format!("project_{:?}", project_config.project_id,),
-                            )
-                            .unwrap_or_else(|err| {
-                                warn!(
-                                    ?err,
-                                    "Failed to attach inspector to ProjectSamplerStats struct"
-                                );
-                                ProjectSamplerStats::default()
-                            }),
-                    ));
+                    project_to_stats_map.entry(project_config.project_id).or_insert_with(|| {
+                        Arc::new(
+                            ProjectSamplerStats::new()
+                                .with_inspect(
+                                    &sampler_executor_stats.inspect_node,
+                                    format!("project_{:?}", project_config.project_id,),
+                                )
+                                .unwrap_or_else(|err| {
+                                    warn!(
+                                        ?err,
+                                        "Failed to attach inspector to ProjectSamplerStats struct"
+                                    );
+                                    ProjectSamplerStats::default()
+                                }),
+                        )
+                    });
                 ProjectSampler::new(
                     project_config,
                     metric_logger_factory.clone(),

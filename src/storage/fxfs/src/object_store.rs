@@ -1057,7 +1057,8 @@ impl ObjectStore {
             ..
         } = &mut mutation.item.value
         {
-            *refs = refs.checked_add_signed(delta).ok_or(anyhow!("refs underflow/overflow"))?;
+            *refs =
+                refs.checked_add_signed(delta).ok_or_else(|| anyhow!("refs underflow/overflow"))?;
             refs
         } else {
             bail!(FxfsError::NotFile);

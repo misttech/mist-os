@@ -103,11 +103,11 @@ async fn handle_socat_listen(
     let connection = vsock_acceptor_stream
         .try_next()
         .await?
-        .ok_or(SocatError::InternalFailure("unexpected end of stream".to_string()))?;
+        .ok_or_else(|| SocatError::InternalFailure("unexpected end of stream".to_string()))?;
 
     let (_src_cid, _src_port, port, responder) = connection
         .into_accept()
-        .ok_or(SocatError::InternalFailure("unexpected message on stream".to_string()))?;
+        .ok_or_else(|| SocatError::InternalFailure("unexpected message on stream".to_string()))?;
 
     if port != host_port {
         responder.send(Err(zx_status::Status::CONNECTION_REFUSED.into_raw()))?;

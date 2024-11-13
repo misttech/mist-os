@@ -344,7 +344,7 @@ impl<C: ComponentInstanceInterface> WeakExtendedInstanceInterface<C> {
             }
             WeakExtendedInstanceInterface::AboveRoot(p) => {
                 Ok(ExtendedInstanceInterface::AboveRoot(
-                    p.upgrade().ok_or(ComponentInstanceError::cm_instance_unavailable())?,
+                    p.upgrade().ok_or_else(ComponentInstanceError::cm_instance_unavailable)?,
                 ))
             }
         }

@@ -133,7 +133,8 @@ impl<'a> RppmHandlerBuilder<'a> {
         };
 
         // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect_root =
+            self.inspect_root.unwrap_or_else(|| inspect::component::inspector().root());
         let inspect_data = InspectData::new(inspect_root, &self.node_name);
         inspect_data.log_energy_model(&energy_model);
 

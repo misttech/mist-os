@@ -946,9 +946,11 @@ pub mod test_utils {
                 .expect("no mlme event stream available")
                 .try_next()
                 .map_err(|e| anyhow::format_err!("Failed to read mlme event stream: {}", e))
-                .and_then(|opt_next| opt_next.ok_or(anyhow::format_err!("No message available")))
+                .and_then(|opt_next| {
+                    opt_next.ok_or_else(|| anyhow::format_err!("No message available"))
+                })
                 .and_then(|evt| {
-                    T::from_event(evt).ok_or(anyhow::format_err!("Unexpected mlme event"))
+                    T::from_event(evt).ok_or_else(|| anyhow::format_err!("Unexpected mlme event"))
                 })
                 .map_err(|e| e.into())
         }

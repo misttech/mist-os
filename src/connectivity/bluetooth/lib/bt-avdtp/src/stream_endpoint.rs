@@ -453,7 +453,7 @@ impl MediaStream {
     fn try_upgrade(&self) -> Result<Arc<RwLock<Channel>>, io::Error> {
         self.channel
             .upgrade()
-            .ok_or(io::Error::new(io::ErrorKind::ConnectionAborted, "lost connection"))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::ConnectionAborted, "lost connection"))
     }
 
     pub fn max_tx_size(&self) -> Result<usize, io::Error> {

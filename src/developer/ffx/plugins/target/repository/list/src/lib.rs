@@ -194,7 +194,7 @@ impl ListTool {
             .map_err(|e| bug!(e))?
         {
             for registered_target in registered_targets {
-                let repo = registered_target.repo_name.unwrap_or("<unknown>".to_owned());
+                let repo = registered_target.repo_name.unwrap_or_else(|| "<unknown>".to_owned());
                 let mut aliases = registered_target.aliases.unwrap_or_else(Vec::new);
                 aliases.sort();
 

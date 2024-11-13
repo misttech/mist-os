@@ -1546,7 +1546,7 @@ impl Journal {
                     .terminate_reason
                     .as_ref()
                     .map(|e| format!("Journal closed with error: {:?}", e))
-                    .unwrap_or("Journal closed".to_string());
+                    .unwrap_or_else(|| "Journal closed".to_string());
                 Poll::Ready(Err(anyhow!(FxfsError::JournalFlushError).context(context)))
             } else {
                 inner.sync_waker = Some(ctx.waker().clone());
@@ -1606,7 +1606,7 @@ impl Journal {
                         .terminate_reason
                         .as_ref()
                         .map(|e| format!("Journal closed with error: {:?}", e))
-                        .unwrap_or("Journal closed".to_string());
+                        .unwrap_or_else(|| "Journal closed".to_string());
                     break Err(anyhow!(FxfsError::JournalFlushError).context(context));
                 }
                 if self.objects.last_end_offset()
