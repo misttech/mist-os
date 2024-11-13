@@ -25,9 +25,9 @@ impl Reporter {
 
     fn validate_information(info: Information) -> Result<(PeerId, BatteryInfo), Error> {
         // The `identifier` and `battery_info` are mandatory fields.
-        let identifier = info.identifier.clone().ok_or(Error::from(&info))?;
+        let identifier = info.identifier.clone().ok_or_else(|| Error::from(&info))?;
         let battery_info =
-            BatteryInfo::try_from(info.battery_info.clone().ok_or(Error::from(&info))?)?;
+            BatteryInfo::try_from(info.battery_info.clone().ok_or_else(|| Error::from(&info))?)?;
 
         // Currently, there is nothing to do if the local_device is specified. This component only
         // handles updates about peripherals.

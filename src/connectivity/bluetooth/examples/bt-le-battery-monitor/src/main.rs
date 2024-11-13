@@ -73,7 +73,7 @@ fn read_characteristics(
         return Err(format_err!("No battery level characteristic"));
     };
     // TODO(https://fxbug.dev/42074755): `handle` check can be removed when converted to a local type.
-    let handle = chrc.handle.ok_or(format_err!("characteristic missing handle"))?;
+    let handle = chrc.handle.ok_or_else(|| format_err!("characteristic missing handle"))?;
     Ok((handle, is_notifiable(chrc)))
 }
 
@@ -83,7 +83,7 @@ fn read_services(services: Vec<gatt::ServiceInfo>) -> Result<gatt::ServiceHandle
         return Err(format_err!("No compatible Battery service"));
     };
     // TODO(https://fxbug.dev/42074755): `handle` check can be removed when converted to a local type.
-    service.handle.ok_or(format_err!("service missing handle"))
+    service.handle.ok_or_else(|| format_err!("service missing handle"))
 }
 
 /// Monitors GATT notifications received in the `stream` and logs changes in battery level.

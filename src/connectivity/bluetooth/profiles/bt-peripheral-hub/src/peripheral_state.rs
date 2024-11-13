@@ -85,7 +85,7 @@ impl PeripheralStateInner {
     }
 
     fn record_power_update(&mut self, id: PeerId, battery: BatteryInfo) {
-        let entry = self.peripherals.entry(id).or_insert(PeripheralData::new(id));
+        let entry = self.peripherals.entry(id).or_insert_with(|| PeripheralData::new(id));
         entry.battery = Some(battery);
     }
 }
@@ -126,7 +126,8 @@ impl TryFrom<fidl_fuchsia_power_battery::BatteryInfo> for BatteryInfo {
 
     fn try_from(src: fidl_fuchsia_power_battery::BatteryInfo) -> Result<BatteryInfo, Self::Error> {
         // The `level_percent` must be specified per the `fidl_fuchsia_bluetooth_power` docs.
-        let level_percent = src.level_percent.ok_or(Error::battery("missing level percent"))?;
+        let level_percent =
+            src.level_percent.ok_or_else(|| Error::battery("missing level percent"))?;
         Ok(BatteryInfo { level_percent, level_status: src.level_status })
     }
 }

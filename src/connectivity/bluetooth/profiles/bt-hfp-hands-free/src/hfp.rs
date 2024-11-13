@@ -96,7 +96,7 @@ where
                 profile_event_result_option = self.profile_client.next() => {
                     debug!("Received profile event: {:?}", profile_event_result_option);
                     let profile_event_result = profile_event_result_option
-                        .ok_or(format_err!("Profile client stream closed."))?;
+                        .ok_or_else(|| format_err!("Profile client stream closed."))?;
                     let profile_event = profile_event_result?;
                     self.handle_profile_event(profile_event)?;
                 },
@@ -111,7 +111,7 @@ where
                      .as_ref().map(|_stream| "<stream>");
                     debug!("HandsFree FIDL protocol client connected: {:?}", stream_str);
                     let hands_free_request_stream = hands_free_request_stream_option
-                        .ok_or(format_err!("HandsFree FIDL protocol connection stream closed."))?;
+                        .ok_or_else(|| format_err!("HandsFree FIDL protocol connection stream closed."))?;
                     self.handle_hands_free_request_stream(hands_free_request_stream)
                 },
 
