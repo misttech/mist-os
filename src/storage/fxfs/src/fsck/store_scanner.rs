@@ -883,9 +883,7 @@ impl<'a> ScannedStore<'a> {
                         attributes,
                         ..
                     })) => {
-                        let mut expected_key_ids = vec![];
                         if !attributes.extended_attributes.is_empty() {
-                            expected_key_ids.push(0);
                             if !key_ids.contains(&0) {
                                 self.fsck.error(FsckError::MissingKey(
                                     self.store_id,
@@ -895,7 +893,6 @@ impl<'a> ScannedStore<'a> {
                             }
                         }
                         if wrapping_key_id.is_some() {
-                            expected_key_ids.push(1);
                             if !key_ids.contains(&1) {
                                 self.fsck.error(FsckError::MissingKey(
                                     self.store_id,
