@@ -64,6 +64,9 @@ exports_files(
     # mcu firmwares
     glob(["prebuilt/mcu/firmware/**/*"]) +
 
+    # prebuilt firmware
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"]) +
+
     # build/info
     [
         "integration/.git/HEAD",
