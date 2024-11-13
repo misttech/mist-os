@@ -18,7 +18,7 @@ pub trait DeviceOps {
         &mut self,
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status>;
-    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo>;
+    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse>;
     fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport>;
     fn query_spectrum_management_support(
@@ -89,7 +89,7 @@ impl DeviceOps for FullmacDevice {
         resp.sme_channel.ok_or(zx::Status::INVALID_ARGS)
     }
 
-    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+    fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
         self.fullmac_impl_sync_proxy
             .query(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryDeviceInfo")?
@@ -246,10 +246,10 @@ impl DeviceOps for FullmacDevice {
 #[cfg(test)]
 pub mod test_utils {
     use super::*;
+    use fidl_fuchsia_wlan_sme as fidl_sme;
     use futures::channel::mpsc;
     use std::sync::{Arc, Mutex};
     use wlan_common::sink::UnboundedSink;
-    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme};
 
     #[derive(Debug)]
     pub enum DriverCall {
@@ -282,7 +282,7 @@ pub mod test_utils {
         //
         // If any of the query mocks are None, then an Err is returned from DeviceOps with an empty
         // error message.
-        pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacQueryInfo>,
+        pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacImplQueryResponse>,
         pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
         pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
         pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
@@ -308,19 +308,6 @@ pub mod test_utils {
         pub mocks: Arc<Mutex<FakeFullmacDeviceMocks>>,
     }
 
-    const fn dummy_band_cap() -> fidl_fullmac::WlanFullmacBandCapability {
-        fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::TwoGhz,
-            basic_rates: vec![],
-            ht_supported: false,
-            ht_caps: fidl_ieee80211::HtCapabilities { bytes: [0u8; 26] },
-            vht_supported: false,
-            vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0u8; 12] },
-            operating_channel_count: 0,
-            operating_channel_list: [0u8; 256],
-        }
-    }
-
     impl FakeFullmacDevice {
         pub fn new() -> (Self, mpsc::UnboundedReceiver<DriverCall>) {
             // Create a channel for SME requests, to be surfaced by init().
@@ -336,11 +323,11 @@ pub mod test_utils {
                 mocks: Arc::new(Mutex::new(FakeFullmacDeviceMocks {
                     fullmac_ifc_client_end: None,
                     start_fn_status_mock: None,
-                    query_device_info_mock: Some(fidl_fullmac::WlanFullmacQueryInfo {
-                        sta_addr: [0u8; 6],
-                        role: fidl_common::WlanMacRole::Client,
-                        band_cap_list: std::array::from_fn(|_| dummy_band_cap()),
-                        band_cap_count: 0,
+                    query_device_info_mock: Some(fidl_fullmac::WlanFullmacImplQueryResponse {
+                        sta_addr: Some([0u8; 6]),
+                        role: Some(fidl_common::WlanMacRole::Client),
+                        band_caps: Some(vec![]),
+                        ..Default::default()
                     }),
                     query_mac_sublayer_support_mock: Some(fidl_common::MacSublayerSupport {
                         rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
@@ -393,7 +380,7 @@ pub mod test_utils {
             }
         }
 
-        fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+        fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
             self.mocks.lock().unwrap().query_device_info_mock.clone().ok_or(format_err!(""))
         }
 

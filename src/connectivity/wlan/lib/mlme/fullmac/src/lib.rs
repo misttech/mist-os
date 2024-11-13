@@ -48,6 +48,8 @@ pub enum FullmacMlmeError {
     InvalidDataPlaneType(fidl_common::DataPlaneType),
     #[error("Failed to query vendor driver: {0:?}")]
     FailedToQueryVendorDriver(anyhow::Error),
+    #[error("Failed to convert query from vendor driver: {0:?}")]
+    FailedToConvertVendorDriverQuery(anyhow::Error),
     #[error("Failed to create persistence proxy: {0}")]
     FailedToCreatePersistenceProxy(fidl::Error),
     #[error("Failed to create sme: {0}")]
@@ -307,9 +309,10 @@ async fn start<D: DeviceOps + Send + 'static>(
     let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
     let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
 
-    let device_info = fullmac_to_mlme::convert_device_info(
-        device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?,
-    );
+    let device_info =
+        device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+    let device_info = fullmac_to_mlme::convert_device_info(device_info)
+        .map_err(FullmacMlmeError::FailedToConvertVendorDriverQuery)?;
 
     let mac_sublayer_support =
         device.query_mac_sublayer_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
@@ -552,6 +555,20 @@ mod tests {
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
         assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+    }
+
+    #[test]
+    fn test_mlme_startup_fails_due_to_failure_to_convert_query_device_info() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = None;
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToConvertVendorDriverQuery(_)));
     }
 
     #[test]

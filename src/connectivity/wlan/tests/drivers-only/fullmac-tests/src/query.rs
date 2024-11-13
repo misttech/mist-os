@@ -14,9 +14,9 @@ async fn test_generic_sme_query() {
     // the platform driver doesn't hardcode either of these values.
     let roles = [fidl_common::WlanMacRole::Client, fidl_common::WlanMacRole::Ap];
     let config = FullmacDriverConfig {
-        query_info: fidl_fullmac::WlanFullmacQueryInfo {
-            sta_addr: rand::random(),
-            role: *roles.choose(&mut rand::thread_rng()).unwrap(),
+        query_info: fidl_fullmac::WlanFullmacImplQueryResponse {
+            sta_addr: Some(rand::random()),
+            role: Some(*roles.choose(&mut rand::thread_rng()).unwrap()),
             ..default_fullmac_query_info()
         },
         ..Default::default()
@@ -39,6 +39,6 @@ async fn test_generic_sme_query() {
     };
 
     let (query_resp, _) = futures::join!(sme_fut, driver_fut);
-    assert_eq!(query_resp.role, fullmac_driver.config.query_info.role);
+    assert_eq!(query_resp.role, fullmac_driver.config.query_info.role.unwrap());
     assert_eq!(query_resp.sta_addr, fullmac_driver.sta_addr());
 }

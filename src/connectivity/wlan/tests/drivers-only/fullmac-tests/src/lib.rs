@@ -48,7 +48,7 @@ impl FullmacDriverFixture {
     }
 
     fn sta_addr(&self) -> [u8; 6] {
-        self.config.query_info.sta_addr
+        self.config.query_info.sta_addr.unwrap()
     }
 }
 

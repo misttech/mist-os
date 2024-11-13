@@ -29,7 +29,7 @@ TEST_F(SimTest, ClientIfcQuery) {
   SimInterface client_ifc;
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
+  wlan_fullmac_wire::WlanFullmacImplQueryResponse ifc_query_result;
   // TODO(https://fxbug.dev/42176028): This query silently logs errors and fails because the
   // the "chanspecs", "ldpc_cap", and other iovars are not supported by the simulated firmware.
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
@@ -39,16 +39,20 @@ TEST_F(SimTest, ClientIfcQuery) {
   // Mac address returned should match the one we specified when we created the interface
   ASSERT_EQ(wlan_ieee80211::kMacAddrLen, common::kMacAddrLen);
   EXPECT_EQ(
-      0, memcmp(kDefaultMac.byte, ifc_query_result.sta_addr.data(), wlan_ieee80211::kMacAddrLen));
+      0, memcmp(kDefaultMac.byte, ifc_query_result.sta_addr().data(), wlan_ieee80211::kMacAddrLen));
 
-  EXPECT_EQ(ifc_query_result.role, wlan_common::WlanMacRole::kClient);
+  ASSERT_TRUE(ifc_query_result.has_role());
+  ASSERT_TRUE(ifc_query_result.has_sta_addr());
+  ASSERT_TRUE(ifc_query_result.has_band_caps());
+
+  EXPECT_EQ(ifc_query_result.role(), wlan_common::WlanMacRole::kClient);
 
   // Number of bands shouldn't exceed the maximum allowable
-  ASSERT_LE(ifc_query_result.band_cap_count, (size_t)wlan_common::kMaxBands);
-  ASSERT_GT(ifc_query_result.band_cap_count, 0);
+  ASSERT_LE(ifc_query_result.band_caps().count(), (size_t)wlan_common::kMaxBands);
+  ASSERT_GT(ifc_query_result.band_caps().count(), 0);
 
-  for (size_t band = 0; band < ifc_query_result.band_cap_count; band++) {
-    wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_cap_list[band];
+  for (size_t band = 0; band < ifc_query_result.band_caps().count(); band++) {
+    wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_caps()[band];
 
     // Band id should be in valid range
     ASSERT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
@@ -82,7 +86,7 @@ TEST_F(SimTest, BadNchainIovar) {
                                          &alt_rxchain_data);
   });
 
-  wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
+  wlan_fullmac_wire::WlanFullmacImplQueryResponse ifc_query_result;
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
                              zx::sec(1));
   env_->Run(kSimulatedClockDuration);

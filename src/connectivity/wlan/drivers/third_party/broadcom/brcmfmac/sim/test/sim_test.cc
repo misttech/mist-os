@@ -298,12 +298,12 @@ void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
   completer.Reply();
 }
 
-void SimInterface::Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info) {
+void SimInterface::Query(wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info) {
   auto result = client_.buffer(test_arena_)->Query();
   ZX_ASSERT(result.ok());
   ZX_ASSERT(!result->is_error());
 
-  *out_info = result->value()->info;
+  *out_info = *result->value();
 }
 
 void SimInterface::QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp) {
@@ -332,9 +332,10 @@ void SimInterface::QuerySpectrumManagementSupport(
 }
 
 void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
-  wlan_fullmac_wire::WlanFullmacQueryInfo info;
+  wlan_fullmac_wire::WlanFullmacImplQueryResponse info;
   Query(&info);
-  memcpy(out_macaddr->byte, info.sta_addr.data(), ETH_ALEN);
+  ZX_ASSERT(info.has_sta_addr());
+  memcpy(out_macaddr->byte, info.sta_addr().data(), ETH_ALEN);
 }
 
 void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,

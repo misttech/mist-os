@@ -146,21 +146,25 @@ pub fn convert_iface_histogram_stats(
     }
 }
 
-pub fn convert_device_info(info: fidl_fullmac::WlanFullmacQueryInfo) -> fidl_mlme::DeviceInfo {
-    let bands: Vec<fidl_mlme::BandCapability> = info.band_cap_list[0..info.band_cap_count as usize]
+pub fn convert_device_info(
+    info: fidl_fullmac::WlanFullmacImplQueryResponse,
+) -> Result<fidl_mlme::DeviceInfo> {
+    let bands: Vec<fidl_mlme::BandCapability> = info
+        .band_caps
+        .context("missing band_caps")?
         .into_iter()
         .map(|band_cap| convert_band_cap(band_cap.clone()))
         .collect();
-    fidl_mlme::DeviceInfo {
-        sta_addr: info.sta_addr,
-        role: info.role,
+    Ok(fidl_mlme::DeviceInfo {
+        sta_addr: info.sta_addr.context("missing sta_addr")?,
+        role: info.role.context("missing role")?,
         bands,
         // TODO(https://fxbug.dev/42169534): This field will be replaced in the new driver features
         // framework.
         softmac_hardware_capability: 0,
         // TODO(https://fxbug.dev/42120297): This field is stubbed out for future use.
         qos_capable: false,
-    }
+    })
 }
 
 pub fn convert_set_keys_resp(

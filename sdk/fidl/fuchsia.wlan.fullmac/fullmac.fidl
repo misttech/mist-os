@@ -195,14 +195,6 @@ type WlanFullmacBandCapability = struct {
     operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
 };
 
-type WlanFullmacQueryInfo = struct {
-    sta_addr ieee80211.MacAddr;
-    /// WLAN_MAC_ROLE_*
-    role fuchsia.wlan.common.WlanMacRole;
-    band_cap_list array<WlanFullmacBandCapability, fuchsia.wlan.common.MAX_BANDS>;
-    band_cap_count uint8;
-};
-
 type WlanFullmacRssiStats = struct {
     hist vector<uint64>:MAX;
 };
@@ -557,10 +549,19 @@ closed protocol WlanFullmacImpl {
         1: sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
 
-    // State operation
-    strict Query() -> (struct {
-        info WlanFullmacQueryInfo;
+    /// Returns high-level information describing the state of the FullMAC driver.
+    /// This is safe to call even before the call to WlanFullmacImpl::Start.
+    strict Query() -> (table {
+        /// Station address. Required.
+        1: sta_addr ieee80211.MacAddr;
+
+        /// MAC role. Required.
+        2: role fuchsia.wlan.common.WlanMacRole;
+
+        /// Supported bands. Required.
+        3: band_caps vector<WlanFullmacBandCapability>:fuchsia.wlan.common.MAX_BANDS;
     }) error zx.Status;
+
     strict QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     }) error zx.Status;

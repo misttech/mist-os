@@ -4772,19 +4772,35 @@ static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCap
   }
 }
 
-static void brcmf_dump_if_query_info(fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
+static void brcmf_dump_if_query_info(
+    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* info) {
   BRCMF_DBG_UNFILTERED(" Device capabilities as reported to wlanif:");
-  BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr.data()));
-  BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kClient ? "client " : "",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kAp ? "ap " : "",
-                       info->role == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
-  for (unsigned i = 0; i < info->band_cap_count; i++) {
-    brcmf_dump_if_band_cap(&info->band_cap_list[i]);
+  if (info->has_sta_addr()) {
+    BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr().data()));
+  } else {
+    BRCMF_DBG_UNFILTERED("   missing sta_addr");
+  }
+
+  if (info->has_role()) {
+    BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kClient ? "client " : "",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kAp ? "ap " : "",
+                         info->role() == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
+  } else {
+    BRCMF_DBG_UNFILTERED("    missing role");
+  }
+
+  if (info->has_band_caps()) {
+    for (unsigned i = 0; i < info->band_caps().count(); i++) {
+      brcmf_dump_if_band_cap(&info->band_caps()[i]);
+    }
+  } else {
+    BRCMF_DBG_UNFILTERED("    missing band caps");
   }
 }
 
-void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info,
+void brcmf_if_query(net_device* ndev,
+                    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info,
                     fdf::Arena& arena) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct wireless_dev* wdev = ndev_to_wdev(ndev);
@@ -4802,23 +4818,25 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
 
   BRCMF_IFDBG(WLANIF, ndev, "Query request received from SME.");
 
-  memset(info, 0, sizeof(*info));
+  auto builder = fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse::Builder(arena);
 
   // mac_addr
-  memcpy(info->sta_addr.data(), ifp->mac_addr, ETH_ALEN);
+  fidl::Array<uint8_t, ETH_ALEN> address;
+  memcpy(address.data(), ifp->mac_addr, ETH_ALEN);
+  builder.sta_addr(address);
 
   // role
   switch (wdev->iftype) {
     case fuchsia_wlan_common_wire::WlanMacRole::kClient: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kClient;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kClient);
       break;
     }
     case fuchsia_wlan_common_wire::WlanMacRole::kAp: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kAp;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kAp);
       break;
     }
     case fuchsia_wlan_common_wire::WlanMacRole::kMesh: {
-      info->role = fuchsia_wlan_common::WlanMacRole::kMesh;
+      builder.role(fuchsia_wlan_common::WlanMacRole::kMesh);
       break;
     }
     default:
@@ -4837,14 +4855,11 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
   fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_2ghz = nullptr;
   fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_5ghz = nullptr;
 
-  /* first entry in bandlist is number of bands */
-  info->band_cap_count = bandlist[0];
-  for (unsigned i = 1; i <= info->band_cap_count && i < std::size(bandlist); i++) {
-    if (i > std::size(info->band_cap_list)) {
-      BRCMF_ERR("insufficient space in query response for all bands, truncating");
-      continue;
-    }
-    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
+  // Firmware puts the number of bands in the first entry in |bandlist|.
+  builder.band_caps(
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability>(arena, bandlist[0]));
+  for (unsigned i = 1; i <= bandlist[0] && i < std::size(bandlist); i++) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &builder.band_caps()[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
       band_cap->band = fuchsia_wlan_common::WlanBand::kTwoGhz;
 
@@ -4995,8 +5010,10 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
     brcmf_update_vht_cap(ifp, band_cap_5ghz, bw_cap, nchain, ldpc_cap, max_ampdu_len_exp);
   }
 
+  *out_info = builder.Build();
+
   if (BRCMF_IS_ON(QUERY)) {
-    brcmf_dump_if_query_info(info);
+    brcmf_dump_if_query_info(out_info);
   }
 
 fail_pbuf:

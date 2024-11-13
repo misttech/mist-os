@@ -82,7 +82,7 @@ async fn test_start_2ghz_bss_success() {
     ];
 
     // channel support is defined by fullmac driver config
-    let driver_band_cap = &fullmac_driver.config.query_info.band_cap_list[0];
+    let driver_band_cap = &fullmac_driver.config.query_info.band_caps.as_ref().unwrap()[0];
     let supported_channels = &driver_band_cap.operating_channel_list
         [0..driver_band_cap.operating_channel_count as usize];
 

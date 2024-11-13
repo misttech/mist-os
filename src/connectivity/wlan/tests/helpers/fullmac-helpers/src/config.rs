@@ -16,7 +16,7 @@ use {
 /// supports 2.4 GHz bands and HT capabilities.
 #[derive(Debug, Clone)]
 pub struct FullmacDriverConfig {
-    pub query_info: fidl_fullmac::WlanFullmacQueryInfo,
+    pub query_info: fidl_fullmac::WlanFullmacImplQueryResponse,
     pub mac_sublayer_support: fidl_common::MacSublayerSupport,
     pub security_support: fidl_common::SecuritySupport,
     pub spectrum_management_support: fidl_common::SpectrumManagementSupport,
@@ -39,8 +39,8 @@ impl Default for FullmacDriverConfig {
 impl FullmacDriverConfig {
     pub fn default_ap() -> Self {
         Self {
-            query_info: fidl_fullmac::WlanFullmacQueryInfo {
-                role: fidl_common::WlanMacRole::Ap,
+            query_info: fidl_fullmac::WlanFullmacImplQueryResponse {
+                role: Some(fidl_common::WlanMacRole::Ap),
                 ..default_fullmac_query_info()
             },
             ..Default::default()
@@ -48,12 +48,12 @@ impl FullmacDriverConfig {
     }
 }
 
-pub fn default_fullmac_query_info() -> fidl_fullmac::WlanFullmacQueryInfo {
-    fidl_fullmac::WlanFullmacQueryInfo {
-        sta_addr: DEFAULT_CLIENT_STA_ADDR,
-        role: fidl_common::WlanMacRole::Client,
-        band_cap_list: default_fullmac_band_capability_array(),
-        band_cap_count: 1,
+pub fn default_fullmac_query_info() -> fidl_fullmac::WlanFullmacImplQueryResponse {
+    fidl_fullmac::WlanFullmacImplQueryResponse {
+        sta_addr: Some(DEFAULT_CLIENT_STA_ADDR),
+        role: Some(fidl_common::WlanMacRole::Client),
+        band_caps: Some(vec![default_fullmac_band_capability()]),
+        ..Default::default()
     }
 }
 
@@ -109,10 +109,4 @@ fn default_fullmac_band_capability() -> fidl_fullmac::WlanFullmacBandCapability 
         cap.operating_channel_list[i] = (i + 1) as u8;
     }
     cap
-}
-
-// It's difficult to initialize an array of WlanFullmacBandCapability directly since
-// WlanFullmacBandCapability doesn't implement Copy.
-fn default_fullmac_band_capability_array() -> [fidl_fullmac::WlanFullmacBandCapability; 16] {
-    (0..16).map(|_| default_fullmac_band_capability()).collect::<Vec<_>>().try_into().unwrap()
 }

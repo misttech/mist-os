@@ -6,7 +6,7 @@ use crate::convert::{fullmac_to_mlme, mlme_to_fullmac};
 use crate::device::DeviceOps;
 use crate::wlan_fullmac_impl_ifc_request_handler::serve_wlan_fullmac_impl_ifc_request_handler;
 use crate::{DriverState, FullmacDriverEvent, FullmacDriverEventSink};
-use anyhow::bail;
+use anyhow::{bail, Context};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
 use std::pin::Pin;
@@ -71,7 +71,11 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
         fullmac_ifc_request_stream: fidl_fullmac::WlanFullmacImplIfcRequestStream,
         driver_event_sink: FullmacDriverEventSink,
     ) -> anyhow::Result<()> {
-        let mac_role = self.device.query_device_info()?.role;
+        let mac_role = self
+            .device
+            .query_device_info()?
+            .role
+            .context("Vendor driver query response missing MAC role")?;
 
         // The WlanFullmacImplIfc server is a background task so that a blocking call into the
         // vendor driver does not prevent MLME from handling incoming WlanFullmacImplIfc requests.
@@ -155,7 +159,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             SetCtrlPort(req) => self.set_link_state(req.state)?,
             QueryDeviceInfo(responder) => {
                 let device_info =
-                    fullmac_to_mlme::convert_device_info(self.device.query_device_info()?);
+                    fullmac_to_mlme::convert_device_info(self.device.query_device_info()?)?;
                 responder.respond(device_info);
             }
             QueryDiscoverySupport(..) => info!("QueryDiscoverySupport is unsupported"),
@@ -1296,7 +1300,8 @@ mod handle_driver_event_tests {
     fn test_deauth_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_conf = fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest {
@@ -1330,7 +1335,8 @@ mod handle_driver_event_tests {
     fn test_deauth_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_ind = fidl_fullmac::WlanFullmacDeauthIndication {
@@ -1404,7 +1410,8 @@ mod handle_driver_event_tests {
     fn test_disassoc_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_conf = fidl_fullmac::WlanFullmacImplIfcDisassocConfRequest {
@@ -1437,7 +1444,8 @@ mod handle_driver_event_tests {
     fn test_disassoc_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role =
+            Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_ind = fidl_fullmac::WlanFullmacDisassocIndication {

@@ -327,7 +327,7 @@ void WlanInterface::Init(InitRequestView request, InitCompleter::Sync& completer
 void WlanInterface::Query(QueryCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   fdf::Arena arena('WLAN');
-  fuchsia_wlan_fullmac::wire::WlanFullmacQueryInfo info;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplQueryResponse info;
   if (wdev_ != nullptr) {
     brcmf_if_query(wdev_->netdev, &info, arena);
   }
