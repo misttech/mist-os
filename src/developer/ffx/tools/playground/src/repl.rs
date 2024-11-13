@@ -32,7 +32,7 @@ fn common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
         .zip(b.char_indices())
         .find(|((_, x), (_, y))| x != y)
         .map(|((x, _), _)| x)
-        .unwrap_or(std::cmp::min(a.len(), b.len()));
+        .unwrap_or_else(|| std::cmp::min(a.len(), b.len()));
     &a[..len]
 }
 
