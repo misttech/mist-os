@@ -95,17 +95,6 @@ class Evictor {
   // to this and EnableEviction.
   void DisableEviction();
 
-  // Set |eviction_target_| to the specified |target|. The previous values are overridden.
-  void SetEvictionTarget(EvictionTarget target);
-
-  // Combine the specified |target| with the pre-existing |eviction_target_|.
-  void CombineEvictionTarget(EvictionTarget target);
-
-  // Perform eviction based on the current values of |eviction_target_|. The expectation is that the
-  // user will have set the target before calling this function with either SetEvictionTarget() or
-  // CombineEvictionTarget(). This may acquire arbitrary vmo and aspace locks.
-  EvictedPageCounts EvictFromPreloadedTarget();
-
   // Evict from a user specified external |target| which is only used for this eviction attempt and
   // does not interfere with the |eviction_target_|.
   EvictedPageCounts EvictFromExternalTarget(EvictionTarget target);
@@ -159,6 +148,14 @@ class Evictor {
   EvictionTarget DebugGetEvictionTarget() const;
 
   friend class vm_unittest::TestPmmNode;
+
+  // Combine the specified |target| with the pre-existing |eviction_target_|.
+  void CombineEvictionTarget(EvictionTarget target);
+
+  // Perform eviction based on the current values of |eviction_target_|. The expectation is that the
+  // user will have set the target before calling this function with either SetEvictionTarget() or
+  // CombineEvictionTarget(). This may acquire arbitrary vmo and aspace locks.
+  EvictedPageCounts EvictFromPreloadedTarget();
 
   // Helper for EvictFromPreloadedTarget and EvictFromExternalTarget.
   EvictedPageCounts EvictFromTargetInternal(EvictionTarget target);

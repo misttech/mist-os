@@ -173,11 +173,6 @@ Evictor::EvictionTarget Evictor::DebugGetEvictionTarget() const {
   return eviction_target_;
 }
 
-void Evictor::SetEvictionTarget(EvictionTarget target) {
-  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  eviction_target_ = target;
-}
-
 void Evictor::CombineEvictionTarget(EvictionTarget target) {
   Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
   eviction_target_.pending = eviction_target_.pending || target.pending;
