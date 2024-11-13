@@ -203,25 +203,17 @@ static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> RecursivelyWalkPath(
       (kOpenFlags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kNotDirectory)) == 0,
       "kOpenFlags must not include fuchsia_io::wire::OpenFlags::kNotDirectory");
   ZX_DEBUG_ASSERT(root.is_valid());
-
   // If the path is lexicographically equivalent to the (relative) root directory, clone the root
   // channel instead of opening the path. An empty path is considered equivalent to the relative
   // root directory.
   if (path.empty() || path == std::filesystem::path(".")) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    auto [client_end, server_end] = std::move(endpoints.value());
-
-    auto result = fidl::WireCall(root)->Clone(fuchsia_io::wire::OpenFlags::kCloneSameRights,
-                                              std::move(server_end));
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    auto result = fidl::WireCall(root)->Clone2(
+        fidl::ServerEnd<fuchsia_unknown::Cloneable>{server_end.TakeChannel()});
     if (!result.ok()) {
       return zx::error(result.status());
     }
-
-    return zx::ok(fidl::ClientEnd<fuchsia_io::Directory>(client_end.TakeChannel()));
+    return zx::ok(std::move(client_end));
   }
 
   // If the path is more than just the root, then we need to walk the path.
