@@ -97,7 +97,6 @@ _METRICS_TRACK_COMMAND_OPS=(
     "shell paste"
     "shell pathchk"
     "shell pkgctl"
-    "shell pm"
     "shell present_view"
     "shell print_input"
     "shell printenv"
