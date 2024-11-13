@@ -345,6 +345,14 @@
             as: "fuchsia.sys2.RouteValidator.root",
             to: "#toolbox",
         },
+        {
+            runner: [
+                "builtin_devfs",
+                "builtin_shutdown_shim",
+            ],
+            from: "parent",
+            to: "#bootstrap",
+        },
 
         // Offer boot resolver to `bootstrap` for driver usage.
         {

@@ -20,7 +20,10 @@
             ],
         },
         {
-            runner: "builtin",
+            runner: "builtin_elf_runner",
+        },
+        {
+            runner: "builtin_devfs",
         },
         {
             runner: "realm_builder",

@@ -11,6 +11,7 @@ use fidl_fuchsia_boot::UserbootRequest;
 
 use crate::bootfs::BootfsSvc;
 use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
+use crate::builtin::builtin_runner::BuiltinProgramGen;
 use crate::builtin::crash_introspect::CrashIntrospectSvc;
 use crate::builtin::fuchsia_boot_resolver::{
     FuchsiaBootPackageResolver, FuchsiaBootResolver, SCHEME as BOOT_SCHEME,
@@ -131,7 +132,7 @@ pub struct BuiltinEnvironmentBuilder {
     runtime_config: Option<RuntimeConfig>,
     top_instance: Option<Arc<ComponentManagerInstance>>,
     bootfs_svc: Option<BootfsSvc>,
-    runners: Vec<(Name, Arc<dyn BuiltinRunnerFactory>)>,
+    builtin_runners: Vec<BuiltinRunnerData>,
     resolvers: ResolverRegistry,
     utc_clock: Option<Arc<UtcClock>>,
     add_environment_resolvers: bool,
@@ -142,13 +143,19 @@ pub struct BuiltinEnvironmentBuilder {
     scope_factory: Option<Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>>,
 }
 
+struct BuiltinRunnerData {
+    name: Name,
+    runner: Arc<dyn BuiltinRunnerFactory>,
+    add_to_env: bool,
+}
+
 impl Default for BuiltinEnvironmentBuilder {
     fn default() -> Self {
         Self {
             runtime_config: None,
             top_instance: None,
             bootfs_svc: None,
-            runners: vec![],
+            builtin_runners: vec![],
             resolvers: ResolverRegistry::default(),
             utc_clock: None,
             add_environment_resolvers: false,
@@ -216,15 +223,12 @@ impl BuiltinEnvironmentBuilder {
         Ok(self)
     }
 
-    pub fn add_builtin_runner(self) -> Result<Self, Error> {
+    pub fn add_builtin_elf_runner(self, add_to_env: bool) -> Result<Self, Error> {
         use crate::builtin::builtin_runner::{BuiltinRunner, ElfRunnerResources};
-
         let runtime_config = self
             .runtime_config
             .as_ref()
             .ok_or_else(|| format_err!("Runtime config should be set to add builtin runner."))?;
-
-        let top_instance = self.top_instance.clone().unwrap();
 
         let elf_runner_resources = ElfRunnerResources {
             security_policy: runtime_config.security_policy.clone(),
@@ -232,18 +236,36 @@ impl BuiltinEnvironmentBuilder {
             crash_records: self.crash_records.clone(),
             instance_registry: self.instance_registry.clone(),
         };
+        let program = BuiltinRunner::get_elf_program(Arc::new(elf_runner_resources));
+        self.add_builtin_runner("builtin_elf_runner", program, add_to_env)
+    }
+
+    pub fn add_builtin_runner(
+        self,
+        name: &str,
+        program: BuiltinProgramGen,
+        add_to_env: bool,
+    ) -> Result<Self, Error> {
+        use crate::builtin::builtin_runner::BuiltinRunner;
+
+        let top_instance = self.top_instance.clone().unwrap();
         let runner = Arc::new(BuiltinRunner::new(
             fuchsia_runtime::job_default(),
             top_instance.task_group(),
-            BuiltinRunner::get_builtin_programs(Arc::new(elf_runner_resources)),
+            program,
         ));
-        Ok(self.add_runner("builtin".parse().unwrap(), runner))
+        Ok(self.add_runner(name.parse().unwrap(), runner, add_to_env))
     }
 
-    pub fn add_runner(mut self, name: Name, runner: Arc<dyn BuiltinRunnerFactory>) -> Self {
+    pub fn add_runner(
+        mut self,
+        name: Name,
+        runner: Arc<dyn BuiltinRunnerFactory>,
+        add_to_env: bool,
+    ) -> Self {
         // We don't wrap these in a BuiltinRunner immediately because that requires the
         // RuntimeConfig, which may be provided after this or may fall back to the default.
-        self.runners.push((name, runner));
+        self.builtin_runners.push(BuiltinRunnerData { name, runner, add_to_env });
         self
     }
 
@@ -322,10 +344,11 @@ impl BuiltinEnvironmentBuilder {
 
         let realm_builder_resolver = match runtime_config.realm_builder_resolver_and_runner {
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::Namespace => {
-                self.runners.push((
-                    REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
-                    Arc::new(RealmBuilderRunnerFactory::new()),
-                ));
+                self.builtin_runners.push(BuiltinRunnerData {
+                    name: REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
+                    runner: Arc::new(RealmBuilderRunnerFactory::new()),
+                    add_to_env: true,
+                });
                 Some(register_realm_builder_resolver(&mut self.resolvers)?)
             }
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::None => None,
@@ -337,17 +360,21 @@ impl BuiltinEnvironmentBuilder {
         };
 
         let runner_map = self
-            .runners
+            .builtin_runners
             .iter()
-            .map(|(name, _)| {
-                (
+            .filter_map(|data| {
+                let BuiltinRunnerData { name, runner: _, add_to_env } = data;
+                if !add_to_env {
+                    return None;
+                }
+                Some((
                     name.clone(),
                     RunnerRegistration {
                         source_name: name.clone(),
                         target_name: name.clone(),
                         source: cm_rust::RegistrationSource::Self_,
                     },
-                )
+                ))
             })
             .collect();
 
@@ -371,10 +398,11 @@ impl BuiltinEnvironmentBuilder {
 
         // Wrap BuiltinRunnerFactory in BuiltinRunner now that we have the definite RuntimeConfig.
         let builtin_runners = self
-            .runners
+            .builtin_runners
             .into_iter()
-            .map(|(name, runner)| {
-                BuiltinRunner::new(name, runner, runtime_config.security_policy.clone())
+            .map(|data| {
+                let BuiltinRunnerData { name, runner, add_to_env } = data;
+                BuiltinRunner::new(name, runner, runtime_config.security_policy.clone(), add_to_env)
             })
             .collect();
 
@@ -644,6 +672,7 @@ impl RootComponentInputBuilder {
 
     pub fn add_runner(&mut self, runner: BuiltinRunner) {
         let name = runner.name().clone();
+        let add_to_env = runner.add_to_env();
         let capability_source = CapabilitySource::Builtin(BuiltinSource {
             capability: InternalCapability::Runner(name.clone()),
         });
@@ -685,12 +714,17 @@ impl RootComponentInputBuilder {
         ) {
             warn!("failed to add runner {} to root component offered capabilities: {e:?}", name);
         }
-        if let Err(e) = self.input.environment().runners().insert_capability(
-            &name,
-            r.with_porcelain_type(CapabilityTypeName::Runner, ExtendedMoniker::ComponentManager)
+        if add_to_env {
+            if let Err(e) = self.input.environment().runners().insert_capability(
+                &name,
+                r.with_porcelain_type(
+                    CapabilityTypeName::Runner,
+                    ExtendedMoniker::ComponentManager,
+                )
                 .into(),
-        ) {
-            warn!("failed to add runner {} to root component environment: {e:?}", name)
+            ) {
+                warn!("failed to add runner {} to root component environment: {e:?}", name)
+            }
         }
     }
 

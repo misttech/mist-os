@@ -319,12 +319,12 @@ impl RoutingTest {
             .set_inspector(inspector)
             .set_runtime_config(config)
             .add_resolver("test".to_string(), Arc::new(mock_resolver))
-            .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone());
+            .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone(), true);
         for name in builder.mock_builtin_runners.clone() {
-            env_builder = env_builder.add_runner(name, mock_runner.clone())
+            env_builder = env_builder.add_runner(name, mock_runner.clone(), true)
         }
         for (name, runner) in builder.builtin_runners.clone() {
-            env_builder = env_builder.add_runner(name, runner);
+            env_builder = env_builder.add_runner(name, runner, true);
         }
         if let Some(f) = builder.scope_factory {
             env_builder = env_builder.set_scope_factory(f);

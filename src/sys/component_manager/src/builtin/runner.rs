@@ -33,6 +33,7 @@ pub struct BuiltinRunner {
     name: Name,
     factory: Arc<dyn BuiltinRunnerFactory>,
     security_policy: Arc<SecurityPolicy>,
+    add_to_env: bool,
 }
 
 impl BuiltinRunner {
@@ -40,8 +41,9 @@ impl BuiltinRunner {
         name: Name,
         factory: Arc<dyn BuiltinRunnerFactory>,
         security_policy: Arc<SecurityPolicy>,
+        add_to_env: bool,
     ) -> Self {
-        Self { name, factory, security_policy }
+        Self { name, factory, security_policy, add_to_env }
     }
 
     pub fn name(&self) -> &Name {
@@ -50,6 +52,10 @@ impl BuiltinRunner {
 
     pub fn factory(&self) -> &Arc<dyn BuiltinRunnerFactory> {
         &self.factory
+    }
+
+    pub fn add_to_env(&self) -> bool {
+        self.add_to_env
     }
 }
 

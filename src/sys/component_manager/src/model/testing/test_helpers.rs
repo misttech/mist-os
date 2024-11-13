@@ -336,7 +336,7 @@ impl TestEnvironmentBuilder {
         let builtin_environment = Arc::new(Mutex::new(
             BuiltinEnvironmentBuilder::new()
                 .add_resolver("test".to_string(), mock_resolver.clone())
-                .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone())
+                .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone(), true)
                 .set_runtime_config(self.runtime_config)
                 .build()
                 .await

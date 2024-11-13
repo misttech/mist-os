@@ -69,21 +69,11 @@ struct ManifestNotFoundError(pub BuiltinUrl);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
-    use fidl_fuchsia_data as fdata;
 
     #[fuchsia::test]
     fn elf_runner_cm_smoke_test() {
         let decl = resolving::read_and_validate_manifest_bytes(ELF_RUNNER_CM).unwrap();
         let program = decl.program.unwrap();
-        assert_eq!(program.runner.unwrap().as_str(), "builtin");
-        let entries = program.info.entries.unwrap();
-        let program_type = entries.iter().find(|entry| entry.key == "type").unwrap();
-        let value = *program_type.value.clone().unwrap();
-        assert_matches!(
-            value,
-            fdata::DictionaryValue::Str(s)
-            if &s == "elf_runner"
-        );
+        assert_eq!(program.runner.unwrap().as_str(), "builtin_elf_runner");
     }
 }

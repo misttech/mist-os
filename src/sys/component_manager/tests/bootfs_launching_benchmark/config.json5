@@ -15,7 +15,7 @@
     ],
     builtin_capabilities: [
         {
-            runner: "builtin",
+            runner: "builtin_elf_runner",
         },
         {
             resolver: "boot_resolver",

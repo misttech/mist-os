@@ -4,8 +4,12 @@
 {
     include: [ "//src/devices/bin/devfs/meta/devfs-base.shard.cml" ],
     program: {
-        runner: "builtin",
-        type: "devfs",
         main_process_critical: "true",
     },
+    use: [
+        {
+            runner: "builtin_devfs",
+            from: "parent",
+        },
+    ],
 }
