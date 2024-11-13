@@ -92,7 +92,7 @@ use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -279,13 +279,33 @@ impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
 trait LifetimeExt {
     /// Converts `self` to `zx::MonotonicInstant`.
     fn into_zx_time(self) -> zx::MonotonicInstant;
+    /// Converts from `zx::MonotonicInstant` to `Self`.
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self;
 }
 
 impl LifetimeExt for Lifetime<StackTime> {
     fn into_zx_time(self) -> zx::MonotonicInstant {
+        self.map_instant(|i| i.into_zx()).into_zx_time()
+    }
+
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self {
+        Lifetime::<zx::MonotonicInstant>::from_zx_time(t).map_instant(StackTime::from_zx)
+    }
+}
+
+impl LifetimeExt for Lifetime<zx::MonotonicInstant> {
+    fn into_zx_time(self) -> zx::MonotonicInstant {
         match self {
-            Lifetime::Finite(time) => time.into_zx(),
+            Lifetime::Finite(time) => time,
             Lifetime::Infinite => zx::MonotonicInstant::INFINITE,
+        }
+    }
+
+    fn from_zx_time(t: zx::MonotonicInstant) -> Self {
+        if t == zx::MonotonicInstant::INFINITE {
+            Self::Infinite
+        } else {
+            Self::Finite(t)
         }
     }
 }
@@ -632,6 +652,9 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                         addr: addr.into(),
                         assignment_state: state,
                         valid_until,
+                        // TODO(https://fxbug.dev/42056818): Expose the real
+                        // lifetime here once core exposes it.
+                        preferred_lifetime: PreferredLifetime::preferred_forever(),
                     },
                 );
                 self.notify_address_update(&device, addr.addr().into(), state);
@@ -665,7 +688,12 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                     &device,
                     InterfaceUpdate::AddressPropertiesChanged {
                         addr: addr.to_ip_addr(),
-                        update: AddressPropertiesUpdate { valid_until: valid_until.into_zx_time() },
+                        update: AddressPropertiesUpdate {
+                            valid_until: valid_until.into_zx_time(),
+                            // TODO(https://fxbug.dev/42056818): Expose the real
+                            // lifetime here once core exposes it.
+                            preferred_lifetime: PreferredLifetime::preferred_forever(),
+                        },
                     },
                 ),
         };

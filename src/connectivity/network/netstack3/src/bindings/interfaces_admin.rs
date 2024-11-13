@@ -76,7 +76,9 @@ use crate::bindings::util::{
     IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
     TryIntoCore,
 };
-use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack};
+use crate::bindings::{
+    netdevice_worker, BindingId, Ctx, DeviceIdExt as _, LifetimeExt as _, Netstack,
+};
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {
@@ -1176,12 +1178,16 @@ fn add_address(
         todo!("https://fxbug.dev/42056881: support adding temporary addresses");
     }
     const INFINITE_NANOS: i64 = zx::MonotonicInstant::INFINITE.into_nanos();
-    let initial_properties =
-        params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
-    let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);
+    let fnet_interfaces_admin::AddressProperties {
+        valid_lifetime_end,
+        preferred_lifetime_info,
+        __source_breaking: fidl::marker::SourceBreaking,
+    } = params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
 
-    match initial_properties
-        .preferred_lifetime_info
+    let valid_lifetime_end =
+        zx::MonotonicInstant::from_nanos(valid_lifetime_end.unwrap_or(INFINITE_NANOS));
+
+    match preferred_lifetime_info
         .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS))
     {
         fnet_interfaces::PreferredLifetimeInfo::Deprecated(_) => {
@@ -1197,11 +1203,7 @@ fn add_address(
         }
     }
 
-    let valid_until = if valid_lifetime_end == INFINITE_NANOS {
-        Lifetime::Infinite
-    } else {
-        Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(valid_lifetime_end)))
-    };
+    let valid_until = Lifetime::from_zx_time(valid_lifetime_end);
 
     let addr_subnet_either = match addr_subnet_either {
         AddrSubnetEither::V4(addr_subnet) => {
@@ -2092,6 +2094,7 @@ mod tests {
                 addr: address,
                 assignment_state: _,
                 valid_until: _,
+                preferred_lifetime: _,
             }
         }) if (id.get() == binding_id && address.into_fidl() == addr ));
         let mut asp_event_stream = asp_client_end.take_event_stream();

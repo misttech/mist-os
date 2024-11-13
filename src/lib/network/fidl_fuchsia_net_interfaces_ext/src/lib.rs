@@ -248,6 +248,12 @@ impl From<PreferredLifetimeInfo> for fnet_interfaces::PreferredLifetimeInfo {
     }
 }
 
+/// The error returned by attempting to convert a non positive instant to
+/// `PositiveMonotonicInstant`.
+#[derive(Error, Debug)]
+#[error("{0} is not a positive monotonic instant")]
+pub struct NotPositiveMonotonicInstantError(i64);
+
 /// A positive monotonic instant.
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone, Hash)]
 pub struct PositiveMonotonicInstant(i64);
@@ -287,7 +293,7 @@ impl From<PositiveMonotonicInstant> for zx::MonotonicInstant {
 
 #[cfg(target_os = "fuchsia")]
 impl TryFrom<zx::MonotonicInstant> for PositiveMonotonicInstant {
-    type Error = anyhow::Error;
+    type Error = NotPositiveMonotonicInstantError;
 
     fn try_from(value: zx::MonotonicInstant) -> Result<Self, Self::Error> {
         Self::try_from(value.into_nanos())
@@ -301,11 +307,10 @@ impl From<PositiveMonotonicInstant> for zx_types::zx_time_t {
 }
 
 impl TryFrom<zx_types::zx_time_t> for PositiveMonotonicInstant {
-    type Error = anyhow::Error;
+    type Error = NotPositiveMonotonicInstantError;
 
     fn try_from(value: zx_types::zx_time_t) -> Result<Self, Self::Error> {
-        Self::from_nanos(value)
-            .ok_or_else(|| anyhow::anyhow!("non-positive value for positive monotonic instant"))
+        Self::from_nanos(value).ok_or(NotPositiveMonotonicInstantError(value))
     }
 }
 
@@ -976,12 +981,7 @@ mod interest {
             fidl: Option<F>,
         ) -> Result<Self::Ty, anyhow::Error> {
             match fidl {
-                Some(_) => {
-                    // TODO(https://fxbug.dev/42061967): Make this stricter when
-                    // Netstack3 observes interest, we should return an error
-                    // here.
-                    Ok(NoInterest)
-                }
+                Some(_) => Err(anyhow::anyhow!("unexpected set field with no registered interest")),
                 None => Ok(NoInterest),
             }
         }

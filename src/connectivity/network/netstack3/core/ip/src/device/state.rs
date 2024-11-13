@@ -867,6 +867,16 @@ impl<I: Instant> Lifetime<I> {
     }
 }
 
+impl<Instant> Lifetime<Instant> {
+    /// Maps the instant value in this `Lifetime` with `f`.
+    pub fn map_instant<N, F: FnOnce(Instant) -> N>(self, f: F) -> Lifetime<N> {
+        match self {
+            Self::Infinite => Lifetime::Infinite,
+            Self::Finite(i) => Lifetime::Finite(f(i)),
+        }
+    }
+}
+
 /// An address' preferred lifetime information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PreferredLifetime<Instant> {
@@ -896,6 +906,14 @@ impl<Instant> PreferredLifetime<Instant> {
         match self {
             Self::Preferred(_) => false,
             Self::Deprecated => true,
+        }
+    }
+
+    /// Maps the instant value in this `PreferredLifetime` with `f`.
+    pub fn map_instant<N, F: FnOnce(Instant) -> N>(self, f: F) -> PreferredLifetime<N> {
+        match self {
+            Self::Deprecated => PreferredLifetime::Deprecated,
+            Self::Preferred(l) => PreferredLifetime::Preferred(l.map_instant(f)),
         }
     }
 }
