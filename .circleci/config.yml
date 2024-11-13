@@ -29,17 +29,22 @@ jobs:
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache-v1 jiri-{{ checksum "tmp/jiri.lock" }}
-            - jiri
+            - &jiri-cache jiri-{{ checksum "tmp/jiri.lock" }}
+      - run:
+          name: Jiri project config
+          command: | 
+            export PATH=$PWD/.jiri_root/bin:$PATH
+            set +e  # `jiri project-config`  will fail when there is no cache
+            jiri project-config --no-update=true --no-rebase=true
+            true
       - run:
           name: Update Jiri
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri project-config --no-update=true --no-rebase=true
             jiri update
       - save_cache:
           name: Save Jiri Cache
-          key: *jiri-cache-v1
+          key: *jiri-cache
           paths:
             - .cipd
             - .git/jiri
@@ -47,9 +52,12 @@ jobs:
             - .jiri_manifest
             - prebuilt
       - run:
+          name: Branch checkout
+          command: git checkout $CIRCLE_BRANCH
+      - run:
           name: Build
           command: |
-            make kasan args gen
+            make args gen
             NOECHO= make kernel_unit_test
       - run:
           name: Test
