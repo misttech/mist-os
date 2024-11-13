@@ -70,10 +70,13 @@ pub struct Archivist {
     log_server: Arc<LogServer>,
 
     /// The server handling fuchsia.inspect.InspectSink
-    inspect_sink_server: Arc<InspectSinkServer>,
+    _inspect_sink_server: Arc<InspectSinkServer>,
 
     /// Top level scope.
     top_level_scope: fasync::Scope,
+
+    /// All tasks for FIDL servers that ingest data into the Archivist must run in this scope.
+    servers_scope: fasync::Scope,
 }
 
 impl Archivist {
@@ -84,6 +87,7 @@ impl Archivist {
         // Initialize the pipelines that the archivist will expose.
         let pipelines = Self::init_pipelines(&config);
         let top_level_scope = fasync::Scope::new();
+        let servers_scope = top_level_scope.new_child();
 
         // Initialize the core event router
         let mut event_router =
@@ -115,7 +119,8 @@ impl Archivist {
         let inspect_repo =
             Arc::new(InspectRepository::new(pipelines.iter().map(Arc::downgrade).collect()));
 
-        let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+        let inspect_sink_server =
+            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), servers_scope.to_handle()));
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
@@ -174,9 +179,9 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
-            inspect_sink_server,
             event_router,
             _serial_task: serial_task,
+            _inspect_sink_server: inspect_sink_server,
             stop_recv: None,
             lifecycle_task: None,
             _drain_klog_task: None,
@@ -185,6 +190,7 @@ impl Archivist {
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
             top_level_scope,
+            servers_scope,
         }
     }
 
@@ -295,20 +301,20 @@ impl Archivist {
         let accessor_server = Arc::clone(&self.accessor_server);
         let log_server = Arc::clone(&self.log_server);
         let logs_repo = Arc::clone(&self.logs_repository);
-        let inspect_sink_server = Arc::clone(&self.inspect_sink_server);
+        let servers_scope_handle = self.servers_scope.to_handle();
+        let servers_scope = self.servers_scope;
         let all_msg = async {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
             accessor_server.wait_for_servers_to_complete().await;
             log_server.wait_for_servers_to_complete().await;
             debug!("Log listeners and batch iterators stopped.");
-            inspect_sink_server.wait_for_servers_to_complete().await;
+            servers_scope.join().await;
         };
 
         let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
         let log_server = self.log_server;
-        let inspect_sink_server = self.inspect_sink_server;
         let accessor_server = self.accessor_server;
         let incoming_external_event_producers = self.incoming_external_event_producers;
         let logs_repo = Arc::clone(&self.logs_repository);
@@ -317,7 +323,7 @@ impl Archivist {
                 stop_recv.into_future().await.ok();
                 terminate_handle.terminate().await;
                 std::mem::drop(incoming_external_event_producers);
-                inspect_sink_server.stop();
+                servers_scope_handle.close();
                 log_server.stop();
                 accessor_server.stop();
                 logs_repo.stop_accepting_new_log_sinks();

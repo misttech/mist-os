@@ -9,8 +9,6 @@ use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
 use fidl::endpoints::{ControlHandle, Responder};
-use fuchsia_sync::{Mutex, RwLock};
-use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
@@ -20,41 +18,24 @@ pub struct InspectSinkServer {
     /// Shared repository holding the Inspect handles.
     repo: Arc<InspectRepository>,
 
-    /// Sender end of drain_listeners_task.
-    task_sender: RwLock<mpsc::UnboundedSender<fasync::Task<()>>>,
-
-    /// Task that makes sure every handler closes down before closing down InspectSinkSErver.
-    drain_listeners_task: Mutex<Option<fasync::Task<()>>>,
+    /// Scope holding all tasks associated with this server.
+    scope: fasync::ScopeHandle,
 }
 
 impl InspectSinkServer {
     /// Construct a server.
-    pub fn new(repo: Arc<InspectRepository>) -> Self {
-        let (sender, receiver) = mpsc::unbounded();
-        Self {
-            repo,
-            task_sender: RwLock::new(sender),
-            drain_listeners_task: Mutex::new(Some(fasync::Task::spawn(async move {
-                receiver
-                    .for_each_concurrent(None, |rx| async move {
-                        rx.await;
-                    })
-                    .await;
-            }))),
-        }
+    pub fn new(repo: Arc<InspectRepository>, scope: fasync::ScopeHandle) -> Self {
+        Self { repo, scope }
     }
 
     /// Handle incoming events. Mainly for use in EventConsumer impl.
     fn spawn(&self, component: Arc<ComponentIdentity>, stream: finspect::InspectSinkRequestStream) {
         let repo = Arc::clone(&self.repo);
-
-        if let Err(e) = self.task_sender.read().unbounded_send(fasync::Task::spawn(async move {
+        self.scope.spawn(async move {
             if let Err(e) = Self::handle_requests(repo, component, stream).await {
                 warn!("error handling InspectSink requests: {e}");
             }
-        })) {
-            warn!("couldn't queue listener task: {e:?}");
-        }
+        });
     }
 
     async fn handle_requests(
@@ -142,21 +123,6 @@ impl InspectSinkServer {
 
         Ok(())
     }
-
-    /// Instructs the server to finish handling all connections.
-    pub async fn wait_for_servers_to_complete(&self) {
-        let task = self
-            .drain_listeners_task
-            .lock()
-            .take()
-            .expect("the accessor server task is only awaited once");
-        task.await;
-    }
-
-    /// Instructs the server to stop accepting new connections.
-    pub fn stop(&self) {
-        self.task_sender.write().disconnect();
-    }
 }
 
 impl EventConsumer for InspectSinkServer {
@@ -175,12 +141,12 @@ impl EventConsumer for InspectSinkServer {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::events::router::EventConsumer;
     use crate::events::types::{Event, EventPayload, InspectSinkRequestedPayload};
     use crate::identity::ComponentIdentity;
     use crate::inspect::container::InspectHandle;
     use crate::inspect::repository::InspectRepository;
-    use crate::inspect::servers::InspectSinkServer;
     use crate::pipeline::StaticHierarchyAllowlist;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_json_diff;
@@ -206,13 +172,15 @@ mod tests {
         repo: Arc<InspectRepository>,
 
         /// The server that would be held by the Archivist.
-        server: Arc<InspectSinkServer>,
+        _server: Arc<InspectSinkServer>,
 
         /// The koids of the published TreeProxies in the order they were published.
         koids: Vec<zx::Koid>,
 
         /// The servers for each component's Tree protocol
         tree_pairs: Vec<(Arc<ComponentIdentity>, Option<Task<()>>)>,
+
+        scope: Option<fasync::Scope>,
     }
 
     impl TestHarness {
@@ -221,7 +189,8 @@ mod tests {
         fn new(identity: Vec<Arc<ComponentIdentity>>) -> Self {
             let mut proxy_pairs = vec![];
             let repo = Arc::new(InspectRepository::default());
-            let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo)));
+            let scope = fasync::Scope::new();
+            let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo), scope.to_handle()));
             for id in identity.into_iter() {
                 let (proxy, request_stream) =
                     create_proxy_and_stream::<InspectSinkMarker>().unwrap();
@@ -237,7 +206,14 @@ mod tests {
                 proxy_pairs.push((id, Some(proxy)));
             }
 
-            Self { proxy_pairs, repo, server, koids: vec![], tree_pairs: vec![] }
+            Self {
+                proxy_pairs,
+                repo,
+                _server: server,
+                koids: vec![],
+                tree_pairs: vec![],
+                scope: Some(scope),
+            }
         }
 
         /// Publish `tree` via the proxy associated with `component`.
@@ -341,8 +317,7 @@ mod tests {
                 proxy.take();
             }
 
-            self.server.stop();
-            self.server.wait_for_servers_to_complete().await;
+            self.scope.take().unwrap().close().await;
         }
 
         async fn wait_until_gone(&self, component: &Arc<ComponentIdentity>) {

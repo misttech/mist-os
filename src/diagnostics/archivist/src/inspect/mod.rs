@@ -575,7 +575,9 @@ mod tests {
             .publish(InspectSinkPublishRequest { tree: Some(tree_client), ..Default::default() })
             .unwrap();
 
-        let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+        let scope = fasync::Scope::new();
+        let inspect_sink_server =
+            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), scope.to_handle()));
         Arc::clone(&inspect_sink_server).handle(Event {
             timestamp: zx::BootInstant::get(),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
@@ -586,8 +588,7 @@ mod tests {
 
         drop(proxy);
 
-        inspect_sink_server.stop();
-        inspect_sink_server.wait_for_servers_to_complete().await;
+        scope.close().await;
 
         let expected_get_next_result_errors = match mode {
             VerifyMode::ExpectComponentFailure => 1u64,
