@@ -18,8 +18,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"

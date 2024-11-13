@@ -8,8 +8,6 @@ group("bin") {
     "package-tool",
     "package-tool:host",
     "pkgctl",
-    "pm",
-    "pm:host",
     "system-update-configurator",
     "update",
   ]
@@ -56,7 +54,6 @@ if (is_host) {
     testonly = true
     public_deps = [
       "package-tool:host_tests",
-      "pm:host_tests",
       "system-updater:host_tests",
     ]
   }

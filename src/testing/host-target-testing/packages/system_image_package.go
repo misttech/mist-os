@@ -12,7 +12,7 @@ import (
 	"math/rand"
 	"os"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 )
 

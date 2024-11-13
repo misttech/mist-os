@@ -9,7 +9,7 @@ if (is_host) {
   go_library("util") {
     testonly = true
     deps = [
-      "//src/sys/pkg/bin/pm/build",
+      "//src/testing/host-target-testing/build",
       "//tools/lib/logger",
     ]
     sources = [

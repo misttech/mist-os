@@ -16,8 +16,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	pmBuild "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
+	pmBuild "go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"

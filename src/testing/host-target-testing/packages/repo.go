@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"

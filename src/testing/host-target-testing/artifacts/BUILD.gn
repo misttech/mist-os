@@ -15,7 +15,7 @@ if (is_host) {
       "../paver",
       "../util",
       "../zbi",
-      "//src/sys/pkg/bin/pm/build",
+      "//src/testing/host-target-testing/build",
       "//third_party/golibs:golang.org/x/crypto",
       "//tools/build",
       "//tools/lib/logger",

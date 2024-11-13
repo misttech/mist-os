@@ -13,8 +13,8 @@ import (
 	"strconv"
 
 	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/pkg"
 )
 
 // Config contains global build configuration for other build commands

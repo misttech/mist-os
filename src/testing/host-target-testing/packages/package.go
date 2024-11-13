@@ -15,9 +15,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	far "go.fuchsia.dev/fuchsia/src/sys/pkg/lib/far/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
