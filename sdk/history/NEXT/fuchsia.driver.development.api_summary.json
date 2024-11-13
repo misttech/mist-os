@@ -117,6 +117,12 @@
         "value": "64"
     },
     {
+        "kind": "const",
+        "name": "fuchsia.driver.development/MAX_SEGMENTS",
+        "type": "uint32",
+        "value": "20"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.driver.development/Manager.AddTestNode",
         "strictness": "flexible",
@@ -409,6 +415,12 @@
         "name": "fuchsia.driver.development/NodeInfo.bound_driver_url",
         "ordinal": "5",
         "type": "string:4096"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/NodeInfo.bus_topology",
+        "ordinal": "11",
+        "type": "vector<fuchsia.driver.framework/BusInfo>:20"
     },
     {
         "kind": "table/member",

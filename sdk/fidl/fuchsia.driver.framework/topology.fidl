@@ -24,6 +24,11 @@ const MAX_PROPERTY_COUNT uint8 = 64;
 const MAX_NODE_NAME_LENGTH uint8 = 128;
 const MAX_SYMBOL_NAME_LENGTH uint8 = 128;
 
+@available(added=NEXT)
+const MAX_DEVICE_ADDRESS_ARRAY_LEN uint32 = 10;
+@available(added=NEXT)
+const MAX_DEVICE_ADDRESS_STR_LEN uint32 = 32;
+
 @available(added=18)
 const MAX_RESOURCE_NAME_LENGTH uint8 = 128;
 
@@ -104,6 +109,66 @@ type DevfsAddArgs = resource table {
     5: controller_connector client_end:fuchsia.device.fs.Connector;
 };
 
+@available(added=NEXT)
+type BusType = flexible enum {
+    PLATFORM = 1;
+    ACPI = 2;
+    DEVICE_TREE = 3;
+    PCI = 4;
+    USB = 5;
+    GPIO = 6;
+    I2C = 7;
+    SPI = 8;
+    SDIO = 9;
+    UART = 10;
+    SPMI = 11;
+};
+
+@available(added=NEXT)
+type DeviceAddress = flexible union {
+    /// A fixed integer id, eg a spi bus address
+    1: int_value uint8;
+
+    /// An array of integers, eg a PCI BDF.
+    2: array_int_value vector<uint8>:MAX_DEVICE_ADDRESS_ARRAY_LEN;
+
+    /// A uint32 value that can be interpretted as a 4 character sequence.
+    3: char_int_value string:4;
+
+    /// An array of character sequences, eg a ACPI node path.
+    4: array_char_int_value vector<string:4>:MAX_DEVICE_ADDRESS_ARRAY_LEN;
+
+    /// A generic string, eg the device tree node path.
+    5: string_value string:MAX_DEVICE_ADDRESS_STR_LEN;
+};
+
+@available(added=NEXT)
+type DeviceAddressStability = flexible enum {
+    /// When the driver is restarted, the device address may change.
+    UNSTABLE_BETWEEN_DRIVER_RESTART = 0;
+
+    /// When the system is restarted, the device address may change.
+    UNSTABLE_BETWEEN_BOOT = 1;
+
+    /// When the system is updated, the device address may change.
+    UNSTABLE_BETWEEN_SOFTWARE_UPDATE = 2;
+
+    /// The device address on the bus is guaranteed stable for the lifetime of the system.
+    STABLE = 3;
+};
+
+@available(added=NEXT)
+type BusInfo = table {
+    /// The type of bus this node sits on.
+    1: bus BusType;
+
+    /// A unique identifier that describes the identity of this device on the given bus.
+    2: address DeviceAddress;
+
+    /// How stable the address.
+    3: address_stability DeviceAddressStability;
+};
+
 /// Arguments for adding a node.
 type NodeAddArgs = resource table {
     /// Name of the node.
@@ -132,6 +197,11 @@ type NodeAddArgs = resource table {
     /// before adding the child node.
     @available(added=18)
     6: offers2 NodeOffersVector;
+
+    /// Information that feeds into a structured bus topology for the device. It should
+    /// only be specified by bus drivers, ideally those which are included by default.
+    @available(added=NEXT)
+    7: bus_info BusInfo;
 };
 
 /// Protocol through which a parent node controls one of its children.

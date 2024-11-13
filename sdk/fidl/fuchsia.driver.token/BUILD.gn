@@ -1,0 +1,15 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.driver.token") {
+  sdk_area = "Driver SDK"
+  sources = [
+    "node_bus_topology.fidl",
+    "node_token.fidl",
+    "overview.fidl",
+  ]
+  public_deps = [ "//sdk/fidl/fuchsia.driver.framework" ]
+}

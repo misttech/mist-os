@@ -38,6 +38,11 @@ type DriverStartArgs = resource table {
     @available(added=25)
     10: node_offers NodeOffersVector;
 
+    /// Provides a token representing this node which can be exchanged with the
+    /// driver framework to discern additional information about this node.
+    @available(added=NEXT)
+    11: node_token zx.Handle:EVENT;
+
     /// Node properties of the node the driver is bound to.
     /// If the node is non-composite then the "default" entry will contain the
     /// node's own properties.
