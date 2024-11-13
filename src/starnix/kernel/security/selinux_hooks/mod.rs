@@ -129,11 +129,15 @@ where
                 if dir_entry.parent().is_none() {
                     root_sid
                 } else {
-                    log_warn!(
-                        "Unlabeled node in {} ({:?}-labeled) filesystem",
-                        fs.name(),
-                        fs_use_type
-                    );
+                    if fs.name() == "remotefs" {
+                        track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
+                    } else {
+                        log_warn!(
+                            "Unlabeled node in {} ({:?}-labeled) filesystem",
+                            fs.name(),
+                            fs_use_type
+                        );
+                    }
                     def_sid
                 }
             })
@@ -189,6 +193,10 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
         starnix_uapi::S_IFBLK => Ok(FileClass::Block),
         starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
         starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
+        0 => {
+            track_stub!(TODO("https://fxbug.dev/378864191"), "File with zero IFMT?");
+            Ok(FileClass::File)
+        }
         _ => error!(EINVAL, format!("mode: {:?}", mode)),
     }
 }
