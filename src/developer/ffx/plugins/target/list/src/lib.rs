@@ -30,6 +30,7 @@ fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
 }
 
 #[derive(FfxTool)]
+#[no_target]
 pub struct ListTool {
     #[command]
     cmd: ListCommand,
@@ -44,11 +45,14 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let infos = if ffx_target::is_discovery_enabled(&self.context).await {
-            list_targets(self.tc_proxy.await?, &self.cmd).await?
-        } else {
-            local_list_targets(&self.context, &self.cmd).await?
-        };
+        // XXX Shouldn't check `is_strict()`. Eventually we'll _always_ do local discovery,
+        // at which point this check goes away.
+        let infos =
+            if !self.context.is_strict() && ffx_target::is_discovery_enabled(&self.context).await {
+                list_targets(self.tc_proxy.await?, &self.cmd).await?
+            } else {
+                local_list_targets(&self.context, &self.cmd).await?
+            };
         show_targets(self.cmd, infos, &mut writer, &self.context).await?;
         Ok(())
     }
@@ -209,8 +213,10 @@ async fn do_connect_to_target(ctx: &EnvironmentContext, cmd: &ListCommand) -> bo
         // It'd be nice to use the FfxConfigBacked functionality, but that only works with Option arguments
         false
     } else {
+        // XXX Shouldn't check `is_strict()`. Eventually we'll fix b/340330010,
+        // at which point this check goes away.
         // TODO(b/340330010) Change the default to "true" when we are ready to roll this out to everyone
-        ctx.get("ffx.target-list.local-connect").unwrap_or(false)
+        ctx.is_strict() || ctx.get("ffx.target-list.local-connect").unwrap_or(false)
     }
 }
 
