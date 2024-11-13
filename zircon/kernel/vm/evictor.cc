@@ -188,9 +188,11 @@ void Evictor::CombineEvictionTarget(EvictionTarget target) {
   eviction_target_.print_counts = eviction_target_.print_counts || target.print_counts;
 }
 
-Evictor::EvictedPageCounts Evictor::EvictFromPreloadedTarget() {
-  EvictedPageCounts total_evicted_counts = {};
+Evictor::EvictedPageCounts Evictor::EvictFromExternalTarget(Evictor::EvictionTarget target) {
+  return EvictFromTargetInternal(target);
+}
 
+Evictor::EvictedPageCounts Evictor::EvictFromPreloadedTarget() {
   // Create a local copy of the eviction target to operate against.
   EvictionTarget target;
   {
@@ -198,6 +200,12 @@ Evictor::EvictedPageCounts Evictor::EvictFromPreloadedTarget() {
     target = eviction_target_;
     eviction_target_ = {};
   }
+  return EvictFromTargetInternal(target);
+}
+
+Evictor::EvictedPageCounts Evictor::EvictFromTargetInternal(Evictor::EvictionTarget target) {
+  EvictedPageCounts total_evicted_counts = {};
+
   if (!target.pending) {
     return total_evicted_counts;
   }
@@ -236,7 +244,7 @@ uint64_t Evictor::EvictSynchronous(uint64_t min_mem_to_free, EvictionLevel evict
   if (!IsEvictionEnabled()) {
     return 0;
   }
-  SetEvictionTarget(EvictionTarget{
+  EvictionTarget target = {
       .pending = true,
       // No target free pages to get to. Evict based only on the min pages requested to evict.
       .free_pages_target = 0,
@@ -245,9 +253,9 @@ uint64_t Evictor::EvictSynchronous(uint64_t min_mem_to_free, EvictionLevel evict
       .level = eviction_level,
       .print_counts = (output == Output::Print),
       .oom_trigger = (reason == TriggerReason::OOM),
-  });
+  };
 
-  auto evicted_counts = EvictFromPreloadedTarget();
+  auto evicted_counts = EvictFromExternalTarget(target);
   return evicted_counts.pager_backed + evicted_counts.discardable + evicted_counts.compressed;
 }
 

@@ -106,6 +106,10 @@ class Evictor {
   // CombineEvictionTarget(). This may acquire arbitrary vmo and aspace locks.
   EvictedPageCounts EvictFromPreloadedTarget();
 
+  // Evict from a user specified external |target| which is only used for this eviction attempt and
+  // does not interfere with the |eviction_target_|.
+  EvictedPageCounts EvictFromExternalTarget(EvictionTarget target);
+
   // Performs a synchronous request to evict |min_mem_to_free| (in bytes). The return value is the
   // number of pages evicted. The |eviction_level| is a rough control that maps to how old a page
   // needs to be for being considered for eviction. This may acquire arbitrary vmo and aspace locks.
@@ -155,6 +159,9 @@ class Evictor {
   EvictionTarget DebugGetEvictionTarget() const;
 
   friend class vm_unittest::TestPmmNode;
+
+  // Helper for EvictFromPreloadedTarget and EvictFromExternalTarget.
+  EvictedPageCounts EvictFromTargetInternal(EvictionTarget target);
 
   // Evict until |min_pages_to_evict| have been evicted and there are at least |free_pages_target|
   // free pages on the system. Note that the eviction operation here is one-shot, i.e. as soon as

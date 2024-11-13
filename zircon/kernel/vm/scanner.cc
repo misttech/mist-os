@@ -200,13 +200,13 @@ int scanner_request_thread(void*) {
     if (op & kScannerOpReclaimAll) {
       op &= ~kScannerOpReclaimAll;
       reclaim_all = true;
-      pmm_evictor()->SetEvictionTarget(Evictor::EvictionTarget{
+      Evictor::EvictionTarget target = {
           .pending = true,
           .free_pages_target = UINT64_MAX,
           .level = Evictor::EvictionLevel::IncludeNewest,
           .print_counts = print,
-      });
-      pmm_evictor()->EvictFromPreloadedTarget();
+      };
+      pmm_evictor()->EvictFromExternalTarget(target);
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
       scanner_wait_for_accessed_scan(current_time(), true);

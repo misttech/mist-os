@@ -331,12 +331,50 @@ static bool evictor_free_target_test() {
   END_TEST;
 }
 
+// Test that eviction using an external target does not alter a previously set eviction target.
+static bool evictor_external_target_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+  TestPmmNode node(false);
+
+  auto expected = Evictor::EvictionTarget{
+      .pending = static_cast<bool>(rand() % 2),
+      .free_pages_target = 111,
+      .min_pages_to_free = 33,
+      .level =
+          (rand() % 2) ? Evictor::EvictionLevel::IncludeNewest : Evictor::EvictionLevel::OnlyOldest,
+  };
+
+  node.evictor()->SetEvictionTarget(expected);
+
+  auto external = Evictor::EvictionTarget{
+      .pending = !expected.pending,
+      .free_pages_target = 99,
+      .min_pages_to_free = 22,
+      .level = expected.level == Evictor::EvictionLevel::OnlyOldest
+                   ? Evictor::EvictionLevel::IncludeNewest
+                   : Evictor::EvictionLevel::OnlyOldest,
+  };
+  node.evictor()->EvictFromExternalTarget(external);
+
+  auto actual = node.GetEvictionTarget();
+
+  ASSERT_EQ(actual.pending, expected.pending);
+  ASSERT_EQ(actual.free_pages_target, expected.free_pages_target);
+  ASSERT_EQ(actual.min_pages_to_free, expected.min_pages_to_free);
+  ASSERT_EQ(actual.level, expected.level);
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(evictor_tests)
 VM_UNITTEST(evictor_set_target_test)
 VM_UNITTEST(evictor_combine_targets_test)
 VM_UNITTEST(evictor_pager_backed_test)
 VM_UNITTEST(evictor_discardable_test)
 VM_UNITTEST(evictor_free_target_test)
+VM_UNITTEST(evictor_external_target_test)
 UNITTEST_END_TESTCASE(evictor_tests, "evictor", "Evictor tests")
 
 }  // namespace vm_unittest
