@@ -136,7 +136,6 @@ impl GoldenFile {
     /// provided. This should be an empty vector unless there is a mismatch.
     pub fn compare(&self, content: Vec<String>) -> CompareResult {
         let mut not_permitted: Vec<String> = Vec::new();
-        let mut observed: Vec<String> = Vec::new();
 
         // Take copies of all the sets and work on those, so that this function
         // does not mutate `self`.
@@ -147,16 +146,12 @@ impl GoldenFile {
 
         for line in content.iter() {
             if required.contains(line) {
-                observed.push(line.clone());
                 required.remove(line);
             } else if optional.contains(line) {
-                observed.push(line.clone());
                 optional.remove(line);
             } else if let Some(found) = matches_prefix(line, &required_prefix) {
-                observed.push(line.clone());
                 required_prefix.remove(&found);
             } else if let Some(found) = matches_prefix(line, &optional_prefix) {
-                observed.push(line.clone());
                 optional_prefix.remove(&found);
             } else {
                 not_permitted.push(line.clone());
@@ -164,7 +159,6 @@ impl GoldenFile {
         }
 
         not_permitted.sort();
-        observed.sort();
 
         let mut errors: Vec<String> = Vec::new();
         for entry in not_permitted.iter() {
