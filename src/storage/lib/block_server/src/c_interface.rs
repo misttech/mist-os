@@ -499,7 +499,7 @@ pub unsafe extern "C" fn block_server_serve(block_server: *const BlockServer, ha
     let block_server = &*block_server;
     let ehandle = &block_server.ehandle;
     let handle = zx::Handle::from_raw(handle);
-    ehandle.root_scope().spawn(async move {
+    ehandle.global_scope().spawn(async move {
         let _ = block_server
             .server
             .handle_requests(fvolume::VolumeRequestStream::from_channel(

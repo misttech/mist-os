@@ -650,7 +650,7 @@ impl EHandle {
     ///
     /// Most users should create an owned scope with
     /// [`Scope::new`][crate::Scope::new] instead of using this method.
-    pub fn root_scope(&self) -> &ScopeHandle {
+    pub fn global_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }
 
@@ -699,7 +699,7 @@ impl EHandle {
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.inner().spawn(self.root_scope(), AtomicFuture::new(future, true));
+        self.inner().spawn(self.global_scope(), AtomicFuture::new(future, true));
     }
 
     /// See `Inner::spawn_local`.
@@ -717,7 +717,7 @@ impl EHandle {
     /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
     /// this executor is a LocalExecutor.
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
-        self.inner().spawn_local(self.root_scope(), future, true);
+        self.inner().spawn_local(self.global_scope(), future, true);
     }
 
     pub(crate) fn mono_timers(&self) -> &Arc<Timers<MonotonicInstant>> {

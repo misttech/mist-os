@@ -228,7 +228,7 @@ impl ExecutionScopeParams {
                 #[cfg(target_os = "fuchsia")]
                 scope: self
                     .async_executor
-                    .map_or_else(|| OnceLock::new(), |e| e.root_scope().new_child().into()),
+                    .map_or_else(|| OnceLock::new(), |e| e.global_scope().new_child().into()),
                 #[cfg(not(target_os = "fuchsia"))]
                 scope: OnceLock::new(),
             }),

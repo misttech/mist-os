@@ -106,7 +106,7 @@ impl LocalExecutor {
         // SAFETY: We spawned the task earlier, so `R` (the return type) will be the correct type
         // here.
         unsafe {
-            self.ehandle.root_scope().poll_join_result(
+            self.ehandle.global_scope().poll_join_result(
                 MAIN_TASK_ID,
                 &mut Context::from_waker(&futures::task::noop_waker()),
             )
@@ -116,7 +116,7 @@ impl LocalExecutor {
     #[doc(hidden)]
     /// Returns the root scope of the executor.
     pub fn root_scope(&self) -> &ScopeHandle {
-        self.ehandle.root_scope()
+        self.ehandle.global_scope()
     }
 }
 
@@ -181,7 +181,7 @@ impl TestExecutor {
         self.local.ehandle.inner().set_fake_time(t)
     }
 
-    /// Sets the offset between the reading of the monotonic and the boot
+    /// Set the offset between the reading of the monotonic and the boot
     /// clocks.
     ///
     /// This is useful to test the situations in which the boot and monotonic
@@ -195,9 +195,8 @@ impl TestExecutor {
         self.local.ehandle.inner().set_fake_boot_to_mono_offset(d)
     }
 
-    #[doc(hidden)]
-    /// Returns the root scope of the executor.
-    pub fn root_scope(&self) -> &ScopeHandle {
+    /// Get the global scope of the executor.
+    pub fn global_scope(&self) -> &ScopeHandle {
         self.local.root_scope()
     }
 

@@ -71,9 +71,36 @@ pub struct Scope {
 }
 
 impl Scope {
-    /// Return a new scope that is a child of the root scope of the executor.
+    /// Create a new scope.
+    ///
+    /// The returned scope is a child of the global scope.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
     pub fn new() -> Scope {
-        EHandle::local().root_scope().new_child()
+        EHandle::local().global_scope().new_child()
+    }
+
+    /// Get the global scope of the executor.
+    ///
+    /// This can be used to spawn tasks that live as long as the executor.
+    /// Usually, this means until the end of the program or test. This should
+    /// only be done for tasks where this is expected. If in doubt, spawn on a
+    /// shorter lived scope instead.
+    ///
+    /// In code that uses scopes, you are strongly encouraged to use this API
+    /// instead of the spawn APIs on [`Task`][crate::Task].
+    ///
+    /// All scopes are descendants of the global scope.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
+    pub fn global() -> ScopeHandle {
+        EHandle::local().global_scope().clone()
     }
 
     /// Create a child scope.
@@ -954,7 +981,7 @@ mod tests {
     #[test]
     fn compute_works_on_root_scope() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope();
+        let scope = executor.global_scope();
         let mut task = pin!(scope.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
     }
@@ -962,7 +989,7 @@ mod tests {
     #[test]
     fn compute_works_on_new_child() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let mut task = pin!(scope.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
     }
@@ -970,7 +997,7 @@ mod tests {
     #[test]
     fn scope_drop_cancels_tasks() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let mut task = pin!(scope.compute(async { 1 }));
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
@@ -979,7 +1006,7 @@ mod tests {
     #[test]
     fn tasks_do_not_spawn_on_cancelled_scopes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let mut cancel = pin!(scope.cancel());
         assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
@@ -990,7 +1017,7 @@ mod tests {
     #[test]
     fn tasks_do_not_spawn_on_closed_empty_scopes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let mut close = pin!(scope.cancel());
         assert_eq!(executor.run_until_stalled(&mut close), Poll::Ready(()));
@@ -1001,7 +1028,7 @@ mod tests {
     #[test]
     fn tasks_do_not_spawn_on_closed_nonempty_scopes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         handle.spawn(pending());
         let mut close = pin!(scope.close());
@@ -1013,7 +1040,7 @@ mod tests {
     #[test]
     fn spawn_works_on_child_and_grandchild() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         let grandchild = child.new_child();
         let mut child_task = pin!(child.compute(async { 1 }));
@@ -1025,7 +1052,7 @@ mod tests {
     #[test]
     fn spawn_drop_cancels_child_and_grandchild_tasks() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         let grandchild = child.new_child();
         let mut child_task = pin!(child.compute(async { 1 }));
@@ -1038,7 +1065,7 @@ mod tests {
     #[test]
     fn completed_tasks_are_cleaned_up_after_cancel() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
 
         let task1 = scope.spawn(pending::<()>());
         let task2 = scope.spawn(async {});
@@ -1058,14 +1085,14 @@ mod tests {
     #[test]
     fn join_emtpy_scope() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         assert_eq!(executor.run_until_stalled(&mut pin!(scope.join())), Poll::Ready(()));
     }
 
     #[test]
     fn task_handle_preserves_access_to_result_after_join_begins() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let mut task = scope.compute(async { 1 });
         scope.spawn(async {});
         let task2 = scope.spawn(pending::<()>());
@@ -1083,7 +1110,7 @@ mod tests {
         // Scope with one outstanding task handle and one cancelled task.
         // The scope is not complete until the outstanding task handle is cancelled.
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let outstanding_task = scope.spawn(pending::<()>());
         let cancelled_task = scope.spawn(pending::<()>());
         assert_eq!(
@@ -1102,7 +1129,7 @@ mod tests {
     #[test]
     fn join_blocks_but_cancel_succeeds_if_detached_task_never_completes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         // The default is to detach.
         scope.spawn(pending::<()>());
         let mut join = pin!(scope.join());
@@ -1114,7 +1141,7 @@ mod tests {
     #[test]
     fn close_blocks_but_cancel_succeeds_if_detached_task_never_completes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         // The default is to detach.
         scope.spawn(pending::<()>());
         let mut close = pin!(scope.close());
@@ -1126,7 +1153,7 @@ mod tests {
     #[test]
     fn join_scope_blocks_until_spawned_task_completes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let remote = RemoteControlFuture::new();
         let mut task = scope.spawn(remote.as_future());
         let mut scope_join = pin!(scope.join());
@@ -1139,7 +1166,7 @@ mod tests {
     #[test]
     fn close_scope_blocks_until_spawned_task_completes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let remote = RemoteControlFuture::new();
         let mut task = scope.spawn(remote.as_future());
         let mut scope_close = pin!(scope.close());
@@ -1152,7 +1179,7 @@ mod tests {
     #[test]
     fn join_scope_blocks_until_detached_task_of_detached_child_completes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         let remote = RemoteControlFuture::new();
         child.spawn(remote.as_future());
@@ -1168,7 +1195,7 @@ mod tests {
     #[test]
     fn join_scope_blocks_when_blocked_child_is_detached() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         child.spawn(pending());
         let mut scope_join = pin!(scope.join());
@@ -1181,7 +1208,7 @@ mod tests {
     #[test]
     fn join_scope_completes_when_blocked_child_is_cancelled() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         child.spawn(pending());
         let mut scope_join = pin!(scope.join());
@@ -1196,7 +1223,7 @@ mod tests {
     #[test]
     fn detached_scope_can_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         scope.detach();
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Ready(1));
@@ -1205,7 +1232,7 @@ mod tests {
     #[test]
     fn dropped_scope_cannot_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut handle.compute(async { 1 })), Poll::Pending);
@@ -1214,7 +1241,7 @@ mod tests {
     #[test]
     fn dropped_scope_with_running_task_cannot_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let _running_task = handle.spawn(pending::<()>());
         drop(scope);
@@ -1224,7 +1251,7 @@ mod tests {
     #[test]
     fn joined_scope_cannot_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
@@ -1234,7 +1261,7 @@ mod tests {
     #[test]
     fn joining_scope_with_running_task_can_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let _running_task = handle.spawn(pending::<()>());
         let mut scope_join = pin!(scope.join());
@@ -1245,7 +1272,7 @@ mod tests {
     #[test]
     fn joined_scope_child_cannot_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let child_before_join = scope.new_child();
         assert_eq!(
@@ -1273,7 +1300,7 @@ mod tests {
     #[test]
     fn closed_scope_child_cannot_spawn() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let child_before_close = scope.new_child();
         assert_eq!(
@@ -1301,7 +1328,7 @@ mod tests {
     #[test]
     fn can_join_child_first() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         assert_eq!(executor.run_until_stalled(&mut child.compute(async { 1 })), Poll::Ready(1));
         assert_eq!(executor.run_until_stalled(&mut pin!(child.join())), Poll::Ready(()));
@@ -1311,7 +1338,7 @@ mod tests {
     #[test]
     fn can_join_parent_first() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         assert_eq!(executor.run_until_stalled(&mut child.compute(async { 1 })), Poll::Ready(1));
         assert_eq!(executor.run_until_stalled(&mut pin!(scope.join())), Poll::Ready(()));
@@ -1321,7 +1348,7 @@ mod tests {
     #[test]
     fn task_in_parent_scope_can_join_child() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let child = scope.new_child();
         let remote = RemoteControlFuture::new();
         child.spawn(remote.as_future());
@@ -1335,7 +1362,7 @@ mod tests {
     #[test]
     fn join_completes_while_completed_task_handle_is_held() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let mut task = scope.compute(async { 1 });
         scope.spawn(async {});
         let mut join = pin!(scope.join());
@@ -1346,7 +1373,7 @@ mod tests {
     #[test]
     fn cancel_completes_while_task_holds_handle() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let handle = scope.to_handle();
         let mut task = scope.compute(async move {
             loop {
@@ -1367,7 +1394,7 @@ mod tests {
     #[test]
     fn cancel_from_handle_inside_task() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         {
             // Spawn a task that never finishes until the scope is cancelled.
             scope.spawn(pending::<()>());
@@ -1389,7 +1416,7 @@ mod tests {
     #[test]
     fn can_spawn_from_non_executor_thread() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().clone();
+        let scope = executor.global_scope().clone();
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let _ = std::thread::spawn(move || {
@@ -1410,7 +1437,7 @@ mod tests {
         //  / \
         // C   D
         let mut executor = TestExecutor::new();
-        let a = executor.root_scope().new_child();
+        let a = executor.global_scope().new_child();
         let b = a.new_child();
         let c = b.new_child();
         let d = b.new_child();
@@ -1442,7 +1469,7 @@ mod tests {
     #[test]
     fn on_no_tasks() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
         let _task1 = scope.spawn(std::future::ready(()));
         let task2 = scope.spawn(pending::<()>());
 
@@ -1464,7 +1491,7 @@ mod tests {
     #[test]
     fn wake_all() {
         let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
+        let scope = executor.global_scope().new_child();
 
         let poll_count = Arc::new(AtomicU64::new(0));
 
@@ -1663,7 +1690,7 @@ mod tests {
             can_quit.1.notify_all();
 
             let ehandle = EHandle::local();
-            let scope = ehandle.root_scope();
+            let scope = ehandle.global_scope();
 
             // The only way of testing for this is to poll.
             while scope.lock().all_tasks().len() > 1 || scope.lock().join_results.len() > 0 {
