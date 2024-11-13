@@ -92,7 +92,7 @@ use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SlaacConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -643,7 +643,13 @@ impl UdpBindingsTypes for BindingsCtx {
 impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for BindingsCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>) {
         match event {
-            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
+            IpDeviceEvent::AddressAdded {
+                device,
+                addr,
+                state,
+                valid_until,
+                preferred_lifetime,
+            } => {
                 let valid_until = valid_until.into_zx_time();
 
                 self.notify_interface_update(
@@ -652,9 +658,7 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                         addr: addr.into(),
                         assignment_state: state,
                         valid_until,
-                        // TODO(https://fxbug.dev/42056818): Expose the real
-                        // lifetime here once core exposes it.
-                        preferred_lifetime: PreferredLifetime::preferred_forever(),
+                        preferred_lifetime: preferred_lifetime.map_instant(|i| i.into_zx()),
                     },
                 );
                 self.notify_address_update(&device, addr.addr().into(), state);
@@ -683,19 +687,21 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                 &device,
                 InterfaceUpdate::IpEnabledChanged { version: I::VERSION, enabled: ip_enabled },
             ),
-            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => self
-                .notify_interface_update(
-                    &device,
-                    InterfaceUpdate::AddressPropertiesChanged {
-                        addr: addr.to_ip_addr(),
-                        update: AddressPropertiesUpdate {
-                            valid_until: valid_until.into_zx_time(),
-                            // TODO(https://fxbug.dev/42056818): Expose the real
-                            // lifetime here once core exposes it.
-                            preferred_lifetime: PreferredLifetime::preferred_forever(),
-                        },
+            IpDeviceEvent::AddressPropertiesChanged {
+                device,
+                addr,
+                valid_until,
+                preferred_lifetime,
+            } => self.notify_interface_update(
+                &device,
+                InterfaceUpdate::AddressPropertiesChanged {
+                    addr: addr.to_ip_addr(),
+                    update: AddressPropertiesUpdate {
+                        valid_until: valid_until.into_zx_time(),
+                        preferred_lifetime: preferred_lifetime.map_instant(|i| i.into_zx()),
                     },
-                ),
+                },
+            ),
         };
     }
 }

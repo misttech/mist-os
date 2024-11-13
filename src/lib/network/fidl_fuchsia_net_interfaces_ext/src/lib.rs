@@ -228,7 +228,7 @@ impl PreferredLifetimeInfo {
 }
 
 impl TryFrom<fnet_interfaces::PreferredLifetimeInfo> for PreferredLifetimeInfo {
-    type Error = anyhow::Error;
+    type Error = NotPositiveMonotonicInstantError;
 
     fn try_from(value: fnet_interfaces::PreferredLifetimeInfo) -> Result<Self, Self::Error> {
         match value {

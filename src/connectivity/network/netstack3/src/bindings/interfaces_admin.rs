@@ -39,6 +39,7 @@ use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
+use fidl_fuchsia_net_interfaces_ext::{NotPositiveMonotonicInstantError, PositiveMonotonicInstant};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
@@ -51,18 +52,20 @@ use netstack3_core::device::{
     NdpConfiguration, NdpConfigurationUpdate,
 };
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
-    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
-    Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties,
+    IpDeviceConfiguration, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
+    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_async as fasync,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
 };
 
 use crate::bindings::devices::{
@@ -1159,12 +1162,13 @@ fn add_address(
     let (req_stream, control_handle) = address_state_provider
         .into_stream_and_control_handle()
         .expect("failed to decompose AddressStateProvider handle");
+    let core_addr = address.addr.into_core();
     let addr_subnet_either: AddrSubnetEither = match address.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
-            warn!("not adding invalid address {:?} to interface {}: {:?}", address, id, e);
+            warn!("not adding invalid address {} to interface {}: {:?}", core_addr, id, e);
             send_address_removal_event(
-                address.addr.into_core(),
+                core_addr,
                 id,
                 control_handle,
                 fnet_interfaces_admin::AddressRemovalReason::Invalid,
@@ -1173,45 +1177,78 @@ fn add_address(
         }
     };
     let specified_addr = addr_subnet_either.addr();
-
-    if params.temporary.unwrap_or(false) {
-        todo!("https://fxbug.dev/42056881: support adding temporary addresses");
-    }
     const INFINITE_NANOS: i64 = zx::MonotonicInstant::INFINITE.into_nanos();
+
+    let fnet_interfaces_admin::AddressParameters {
+        initial_properties,
+        temporary,
+        add_subnet_route,
+        __source_breaking: fidl::marker::SourceBreaking,
+    } = params;
+
     let fnet_interfaces_admin::AddressProperties {
         valid_lifetime_end,
         preferred_lifetime_info,
         __source_breaking: fidl::marker::SourceBreaking,
-    } = params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
+    } = initial_properties.unwrap_or_default();
 
-    let valid_lifetime_end =
-        zx::MonotonicInstant::from_nanos(valid_lifetime_end.unwrap_or(INFINITE_NANOS));
-
-    match preferred_lifetime_info
-        .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS))
-    {
-        fnet_interfaces::PreferredLifetimeInfo::Deprecated(_) => {
-            todo!("https://fxbug.dev/42056881: support adding deprecated addresses")
+    let valid_lifetime_end = valid_lifetime_end.unwrap_or(INFINITE_NANOS);
+    // Disallow non-positive lifetimes.
+    let valid_until = match PositiveMonotonicInstant::try_from(valid_lifetime_end) {
+        Ok(i) => Lifetime::from_zx_time(i.into()),
+        Err(e) => {
+            warn!("not adding address {core_addr} to interface {id}: invalid lifetime {e}",);
+            send_address_removal_event(
+                core_addr,
+                id,
+                control_handle,
+                fnet_interfaces_admin::AddressRemovalReason::Invalid,
+            );
+            return;
         }
-        fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(preferred_until) => {
-            if preferred_until != INFINITE_NANOS {
-                warn!(
-                    "TODO(https://fxbug.dev/42056881): ignoring preferred_until: {:?}",
-                    preferred_until
-                );
+    };
+
+    let preferred_lifetime = preferred_lifetime_info
+        .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS));
+    let preferred_lifetime =
+        match fnet_interfaces_ext::PreferredLifetimeInfo::try_from(preferred_lifetime) {
+            Ok(p) => {
+                let p: PreferredLifetime<zx::MonotonicInstant> = p.into_core();
+                p.map_instant(StackTime::from_zx)
             }
-        }
-    }
+            Err(e) => {
+                warn!(
+                    "not adding address {} to interface {}: invalid preferred lifetime: {:?}",
+                    core_addr, id, e
+                );
+                send_address_removal_event(
+                    core_addr,
+                    id,
+                    control_handle,
+                    fnet_interfaces_admin::AddressRemovalReason::Invalid,
+                );
+                return;
+            }
+        };
 
-    let valid_until = Lifetime::from_zx_time(valid_lifetime_end);
+    let temporary = temporary.unwrap_or(false);
+
+    let common = CommonAddressProperties { valid_until, preferred_lifetime };
 
     let addr_subnet_either = match addr_subnet_either {
         AddrSubnetEither::V4(addr_subnet) => {
-            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { valid_until })
+            // Core doesn't take temporary addresses into account for source
+            // address selection over IPv4 and we don't expose it over the
+            // watcher API at all, so we shouldn't need to keep that around.
+            if temporary {
+                warn!("v4 address {core_addr} requested temporary, ignoring for IPv4");
+            }
+            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { common })
         }
-        AddrSubnetEither::V6(addr_subnet) => {
-            AddrSubnetAndManualConfigEither::V6(addr_subnet, Ipv6AddrManualConfig { valid_until })
-        }
+        AddrSubnetEither::V6(addr_subnet) => AddrSubnetAndManualConfigEither::V6(
+            addr_subnet,
+            Ipv6AddrManualConfig { common, temporary },
+        ),
     };
 
     let core_id =
@@ -1240,7 +1277,7 @@ fn add_address(
         let worker = fasync::Task::spawn(run_address_state_provider(
             ctx.clone(),
             addr_subnet_either,
-            params.add_subnet_route.unwrap_or(false),
+            add_subnet_route.unwrap_or(false),
             id,
             control_handle,
             req_stream,
@@ -1565,7 +1602,10 @@ async fn address_state_provider_main_loop(
                         break Some(AddressStateProviderCancellationReason::UserRemoved)
                     }
                     Ok(None) => {}
-                    Err(err @ AddressStateProviderError::PreviousPendingWatchRequest) => {
+                    Err(
+                        err @ AddressStateProviderError::PreviousPendingWatchRequest
+                        | err @ AddressStateProviderError::InvalidPropertiesUpdate { .. },
+                    ) => {
                         warn!(
                             "failed to handle request for address {:?} on interface {}: {}",
                             address, id, err
@@ -1626,6 +1666,8 @@ pub(crate) enum AddressStateProviderError {
     PreviousPendingWatchRequest,
     #[error("FIDL error: {0}")]
     Fidl(fidl::Error),
+    #[error("invalid address properties update for {field}: {err}")]
+    InvalidPropertiesUpdate { field: &'static str, err: NotPositiveMonotonicInstantError },
 }
 
 // State Machine for the `WatchAddressAssignmentState` "Hanging-Get" FIDL API.
@@ -1724,30 +1766,44 @@ fn dispatch_address_state_provider_request(
                 fnet_interfaces_admin::AddressProperties {
                     valid_lifetime_end: valid_lifetime_end_nanos,
                     preferred_lifetime_info,
-                    ..
+                    __source_breaking: fidl::marker::SourceBreaking,
                 },
             responder,
         } => {
-            if preferred_lifetime_info.is_some() {
-                warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42058290)");
-            }
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
-            let valid_lifetime_end = valid_lifetime_end_nanos
+            let valid_until = valid_lifetime_end_nanos
                 .map(|nanos| {
-                    Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(nanos)))
+                    PositiveMonotonicInstant::try_from(nanos)
+                        .map(|i| Lifetime::from_zx_time(i.into()))
+                        .map_err(|err| AddressStateProviderError::InvalidPropertiesUpdate {
+                            field: "valid_until",
+                            err,
+                        })
                 })
-                .unwrap_or(Lifetime::Infinite);
+                .unwrap_or(Ok(Lifetime::Infinite))?;
+            let preferred_lifetime = preferred_lifetime_info
+                .map(|p| {
+                    fnet_interfaces_ext::PreferredLifetimeInfo::try_from(p).map(|p| p.into_core())
+                })
+                .unwrap_or(Ok(PreferredLifetime::preferred_forever()))
+                .map_err(|err| AddressStateProviderError::InvalidPropertiesUpdate {
+                    field: "preferred_lifetime_info",
+                    err,
+                })?
+                .map_instant(StackTime::from_zx);
+
+            let common_props = CommonAddressProperties { valid_until, preferred_lifetime };
             let result = match address.into() {
                 IpAddr::V4(address) => ctx.api().device_ip::<Ipv4>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end,
+                    common_props,
                 ),
                 IpAddr::V6(address) => ctx.api().device_ip::<Ipv6>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end,
+                    common_props,
                 ),
             };
             match result {

@@ -950,16 +950,48 @@ impl<I: Instant> InspectableValue for PreferredLifetime<I> {
     }
 }
 
+/// Address properties common to IPv4 and IPv6.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CommonAddressProperties<Instant> {
+    /// The lifetime for which the address is valid.
+    pub valid_until: Lifetime<Instant>,
+    /// The address' preferred lifetime.
+    ///
+    /// Address preferred status is used in IPv6 source address selection. IPv4
+    /// addresses simply keep this information on behalf of bindings.
+    ///
+    /// Note that core does not deprecate manual addresses automatically. Manual
+    /// addresses are fully handled outside of core.
+    pub preferred_lifetime: PreferredLifetime<Instant>,
+}
+
+impl<I> Default for CommonAddressProperties<I> {
+    fn default() -> Self {
+        Self {
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        }
+    }
+}
+
+impl<Inst: Instant> Inspectable for CommonAddressProperties<Inst> {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { valid_until, preferred_lifetime } = self;
+        inspector.record_inspectable_value("ValidUntil", valid_until);
+        inspector.record_inspectable_value("PreferredLifetime", preferred_lifetime);
+    }
+}
+
 /// The configuration for an IPv4 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv4AddrConfig<Instant> {
-    /// The lifetime for which the address is valid.
-    pub valid_until: Lifetime<Instant>,
+    /// IP version agnostic properties.
+    pub common: CommonAddressProperties<Instant>,
 }
 
 impl<I> Default for Ipv4AddrConfig<I> {
     fn default() -> Self {
-        Self { valid_until: Lifetime::Infinite }
+        Self { common: Default::default() }
     }
 }
 
@@ -1004,8 +1036,8 @@ pub struct Ipv4AddressState<Instant> {
 impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self { config } = self;
-        if let Some(Ipv4AddrConfig { valid_until }) = config {
-            inspector.record_inspectable_value("ValidUntil", valid_until)
+        if let Some(Ipv4AddrConfig { common }) = config {
+            inspector.delegate_inspectable(common);
         }
     }
 }
@@ -1053,13 +1085,17 @@ pub struct Ipv6AddrSlaacConfig<Instant> {
 /// The configuration for a manually-assigned IPv6 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv6AddrManualConfig<Instant> {
-    /// The lifetime for which the address is valid.
-    pub valid_until: Lifetime<Instant>,
+    /// IP version agnostic properties.
+    pub common: CommonAddressProperties<Instant>,
+    /// True if the address is temporary.
+    ///
+    /// Used in source address selection.
+    pub temporary: bool,
 }
 
 impl<Instant> Default for Ipv6AddrManualConfig<Instant> {
     fn default() -> Self {
-        Self { valid_until: Lifetime::Infinite }
+        Self { common: Default::default(), temporary: false }
     }
 }
 
@@ -1093,16 +1129,16 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
                     dad_counter: _,
                 }) => Lifetime::Finite(*valid_until),
             },
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => *valid_until,
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => common.valid_until,
         }
     }
 
     /// Returns the preferred lifetime for this address.
     pub fn preferred_lifetime(&self) -> PreferredLifetime<Instant> {
         match self {
-            // TODO(https://fxbug.dev/42056881): Allow manual addresses to
-            // carry lifetime.
-            Ipv6AddrConfig::Manual(_) => PreferredLifetime::preferred_forever(),
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => {
+                common.preferred_lifetime
+            }
             Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { preferred_lifetime, .. }) => {
                 *preferred_lifetime
             }
@@ -1112,6 +1148,17 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// Returns true if the address is deprecated.
     pub fn is_deprecated(&self) -> bool {
         self.preferred_lifetime().is_deprecated()
+    }
+
+    /// Returns true if the address is temporary.
+    pub fn is_temporary(&self) -> bool {
+        match self {
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
+                SlaacConfig::Static { .. } => false,
+                SlaacConfig::Temporary(_) => true,
+            },
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { temporary, .. }) => *temporary,
+        }
     }
 }
 
@@ -1138,7 +1185,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
 
         if let Some(config) = config {
             let is_slaac = match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until: _ }) => false,
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
                         SlaacConfig::Static { valid_until: _ } => {}
@@ -1162,6 +1209,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
             inspector.record_bool("IsSlaac", is_slaac);
             inspector.record_inspectable_value("ValidUntil", &config.valid_until());
             inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
+            inspector.record_bool("Temporary", config.is_temporary());
         }
     }
 }
@@ -1236,18 +1284,18 @@ mod tests {
         const PREFIX_LEN: u8 = 8;
 
         let mut ipv4 = IpDeviceAddresses::<Ipv4, FakeBindingsCtxImpl>::default();
+        let config = Ipv4AddrConfig {
+            common: CommonAddressProperties { valid_until, ..Default::default() },
+        };
 
         let _: StrongRc<_> = ipv4
-            .add(Ipv4AddressEntry::new(
-                AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
-                Ipv4AddrConfig { valid_until },
-            ))
+            .add(Ipv4AddressEntry::new(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(), config))
             .unwrap();
         // Adding the same address with different prefix should fail.
         assert_eq!(
             ipv4.add(Ipv4AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
-                Ipv4AddrConfig { valid_until },
+                config,
             ))
             .unwrap_err(),
             ExistsError
@@ -1286,7 +1334,10 @@ mod tests {
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 Ipv6DadState::Assigned,
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }),
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                    common: CommonAddressProperties { valid_until, ..Default::default() },
+                    ..Default::default()
+                }),
             ))
             .unwrap_err(),
             ExistsError,

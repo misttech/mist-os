@@ -125,13 +125,13 @@ pub mod ip {
     // Re-exported types.
     pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
-        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason, IidSecret,
-        IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate,
-        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-        Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
-        SlaacConfiguration, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
-        UpdateIpConfigurationError,
+        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
+        CommonAddressProperties, IidSecret, IpAddressState, IpDeviceConfiguration,
+        IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4AddrConfig,
+        Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6DeviceConfigurationUpdate,
+        Lifetime, PreferredLifetime, SetIpAddressPropertiesError, SlaacConfiguration,
+        SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::multicast_forwarding::{
         ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,

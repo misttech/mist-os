@@ -173,9 +173,6 @@ closed protocol State {
     strict GetWatcher(resource struct {
         /// Options for configuring the interface state watcher.
         options @generated_name("WatcherOptions") table {
-            // TODO(https://fxbug.dev/42056881): Add netemul integration tests
-            // once fuchsia.net.interfaces.admin/Control.AddAddress supports
-            // address lifetimes.
             /// Bitfield for registering interest in address properties.
             ///
             /// Optional; interpreted as all bits set to 0 if not present.

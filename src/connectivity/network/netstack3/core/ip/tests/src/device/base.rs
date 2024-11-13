@@ -26,11 +26,12 @@ use netstack3_core::testutil::{
 use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
-    AddIpAddrSubnetError, AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState,
-    IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags,
-    IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError,
-    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddressRemovedReason, CommonAddressProperties, DadTimerId,
+    IpAddressId as _, IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate,
+    IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime,
+    PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
+    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::MldTimerId;
 use netstack3_ip::nud::{self, LinkResolutionResult};
@@ -130,6 +131,7 @@ fn enable_disable_ipv4() {
             addr: ipv4_addr_subnet.clone(),
             state: IpAddressState::Unavailable,
             valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
         })]
     );
 
@@ -152,24 +154,29 @@ fn enable_disable_ipv4() {
     set_ipv4_enabled(&mut ctx, true, true);
     assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
-    let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
+    let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(2)));
+    let preferred_lifetime =
+        PreferredLifetime::preferred_until(FakeInstant::from(Duration::from_secs(1)));
+    let properties = CommonAddressProperties { valid_until, preferred_lifetime };
+
     ctx.core_api()
         .device_ip::<Ipv4>()
-        .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), valid_until)
+        .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), properties)
         .expect("set properties should succeed");
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressPropertiesChanged {
             device: weak_device_id.clone(),
             addr: ipv4_addr_subnet.addr(),
-            valid_until
+            valid_until,
+            preferred_lifetime
         })]
     );
 
     // Verify that a redundant "set properties" does not generate any events.
     ctx.core_api()
         .device_ip::<Ipv4>()
-        .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), valid_until)
+        .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), properties)
         .expect("set properties should succeed");
     assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
@@ -302,6 +309,7 @@ fn enable_disable_ipv6() {
                 addr: ll_addr.to_witness(),
                 state: IpAddressState::Tentative,
                 valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
             }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
@@ -310,13 +318,12 @@ fn enable_disable_ipv6() {
         ]
     );
 
-    // Because the added address is from SLAAC, setting its lifetime should fail.
-    let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
+    // Because the added address is from SLAAC, setting properties should fail.
     assert_matches!(
         ctx.core_api().device_ip::<Ipv6>().set_addr_properties(
             &device_id,
             ll_addr.addr().into(),
-            valid_until,
+            CommonAddressProperties::default(),
         ),
         Err(SetIpAddressPropertiesError::NotManual)
     );
@@ -400,6 +407,7 @@ fn enable_disable_ipv6() {
             addr: ll_addr.to_witness(),
             state: IpAddressState::Unavailable,
             valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
         })]
     );
 
@@ -419,23 +427,28 @@ fn enable_disable_ipv6() {
         ]
     );
 
+    let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(2)));
+    let preferred_lifetime =
+        PreferredLifetime::preferred_until(FakeInstant::from(Duration::from_secs(1)));
+    let properties = CommonAddressProperties { valid_until, preferred_lifetime };
     ctx.core_api()
         .device_ip::<Ipv6>()
-        .set_addr_properties(&device_id, ll_addr.addr().into(), valid_until)
+        .set_addr_properties(&device_id, ll_addr.addr().into(), properties)
         .expect("set properties should succeed");
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressPropertiesChanged {
             device: weak_device_id.clone(),
             addr: ll_addr.addr().into(),
-            valid_until
+            valid_until,
+            preferred_lifetime,
         })]
     );
 
     // Verify that a redundant "set properties" does not generate any events.
     ctx.core_api()
         .device_ip::<Ipv6>()
-        .set_addr_properties(&device_id, ll_addr.addr().into(), valid_until)
+        .set_addr_properties(&device_id, ll_addr.addr().into(), properties)
         .expect("set properties should succeed");
     assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
@@ -551,6 +564,7 @@ fn notify_on_dad_failure_ipv6() {
                 addr: ll_addr.to_witness(),
                 state: IpAddressState::Tentative,
                 valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
             }),
             DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
@@ -572,6 +586,7 @@ fn notify_on_dad_failure_ipv6() {
             addr: assigned_addr.to_witness(),
             state: IpAddressState::Tentative,
             valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
         }),]
     );
 

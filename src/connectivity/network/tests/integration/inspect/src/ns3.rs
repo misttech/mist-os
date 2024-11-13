@@ -682,6 +682,7 @@ async fn inspect_devices(name: &str) {
                     Addresses: {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                         }
                     },
                     Configuration: {
@@ -697,6 +698,7 @@ async fn inspect_devices(name: &str) {
                             PreferredLifetime: "infinite",
                             IsSlaac: false,
                             Assigned: true,
+                            Temporary: false,
                         }
                     },
                     Configuration: {
@@ -740,6 +742,7 @@ async fn inspect_devices(name: &str) {
                     "Addresses": {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                         }
                     },
                     Configuration: {
@@ -757,6 +760,7 @@ async fn inspect_devices(name: &str) {
                             // This will always be `false` because DAD will never complete; we set
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
+                            Temporary: false,
                         }
                     },
                     Configuration: {
