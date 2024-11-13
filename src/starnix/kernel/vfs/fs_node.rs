@@ -1606,7 +1606,8 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        // TODO(qsr): Is there a permission check here?
+        // TODO: 378864856 - Is there a permission check here other than security checks?
+        security::check_fs_node_read_link_access(current_task, self)?;
         self.ops().readlink(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 

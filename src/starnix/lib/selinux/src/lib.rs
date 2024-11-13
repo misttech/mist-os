@@ -327,6 +327,9 @@ common_permission_enum! {
         Link("link"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission to read file contents. Note this applies to reading more than regular file's
+        /// data.
+        Read("read"),
         /// Permission checked against the existing label when updating a file's security label.
         RelabelFrom("relabelfrom"),
         /// Permission checked against the new label when updating a file's security label.

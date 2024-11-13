@@ -545,6 +545,24 @@ pub(super) fn check_fs_node_rename_access(
     Ok(())
 }
 
+/// Validates that `current_task` has the permissions to read the symbolic link `fs_node`.
+pub(super) fn check_fs_node_read_link_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/378863048", "Check read permission on links."),
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::Read.for_class(file_class),
+    )
+}
+
 pub(super) fn check_fs_node_setxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,

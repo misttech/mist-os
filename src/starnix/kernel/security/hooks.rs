@@ -321,6 +321,16 @@ pub fn check_fs_node_rename_access(
     })
 }
 
+/// Checks whether the `current_task` can read the symbolic link in `fs_node`.
+pub fn check_fs_node_read_link_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_read_link_access(security_server, current_task, fs_node)
+    })
+}
+
 /// Returns the security state for a new file object created by `current_task`.
 /// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
