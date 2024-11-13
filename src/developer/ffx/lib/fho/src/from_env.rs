@@ -9,11 +9,11 @@ use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, FDomainResourceDialect,
     Proxy as FProxy,
 };
+use ffx_build_version::VersionInfo;
 use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use ffx_fidl::VersionInfo;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
 use fidl::encoding::DefaultFuchsiaResourceDialect;

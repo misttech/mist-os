@@ -9,6 +9,7 @@ use async_lock::Mutex;
 use async_trait::async_trait;
 use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
 use errors::{ffx_bail, ffx_error};
+use ffx_build_version::VersionInfo;
 use ffx_config::environment::EnvironmentContext;
 use ffx_config::{get, global_env_context, print_config};
 use ffx_daemon::DaemonConfig;
@@ -22,7 +23,7 @@ use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
-    TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState, VersionInfo,
+    TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
@@ -443,15 +444,15 @@ fn get_platform_info() -> Result<String> {
     Ok(serde_json::to_string_pretty(&platform_info)?)
 }
 
-fn get_api_level(v: VersionInfo) -> String {
-    match v.api_level {
+fn get_api_level(api_level: Option<u64>) -> String {
+    match api_level {
         Some(api) => format!("{}", api),
         None => "UNKNOWN".to_string(),
     }
 }
 
-fn get_abi_revision(v: VersionInfo) -> String {
-    match v.abi_revision {
+fn get_abi_revision(revision: Option<u64>) -> String {
+    match revision {
         Some(abi) => format!("{:#X}", abi),
         None => "UNKNOWN".to_string(),
     }
@@ -835,13 +836,13 @@ async fn daemon_restart<W: Write>(
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("abi-revision: {}", get_abi_revision(v.clone())),
+                &format!("abi-revision: {}", get_abi_revision(v.abi_revision)),
                 LedgerMode::Automatic,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("api-level: {}", get_api_level(v.clone())),
+                &format!("api-level: {}", get_api_level(v.api_level)),
                 LedgerMode::Automatic,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -919,13 +920,13 @@ async fn doctor_summary<W: Write>(
     ledger.set_outcome(version_node, LedgerOutcome::Success)?;
 
     let abi_revision_node = ledger.add_node(
-        &format!("abi-revision: {}", get_abi_revision(version_info.clone())),
+        &format!("abi-revision: {}", get_abi_revision(version_info.abi_revision)),
         LedgerMode::Verbose,
     )?;
     ledger.set_outcome(abi_revision_node, LedgerOutcome::Success)?;
 
     let api_level_node = ledger.add_node(
-        &format!("api-level: {}", get_api_level(version_info.clone())),
+        &format!("api-level: {}", get_api_level(version_info.api_level)),
         LedgerMode::Verbose,
     )?;
     ledger.set_outcome(api_level_node, LedgerOutcome::Success)?;
@@ -1122,13 +1123,13 @@ async fn doctor_summary<W: Write>(
             }
 
             let node = ledger.add_node(
-                &format!("abi-revision: {}", get_abi_revision(v.clone())),
+                &format!("abi-revision: {}", get_abi_revision(v.abi_revision)),
                 LedgerMode::Verbose,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
 
             let node = ledger.add_node(
-                &format!("api-level: {}", get_api_level(v.clone())),
+                &format!("api-level: {}", get_api_level(v.api_level)),
                 LedgerMode::Verbose,
             )?;
             ledger.set_outcome(node, LedgerOutcome::Success)?;
@@ -2172,8 +2173,8 @@ mod test {
         }
     }
 
-    fn daemon_version_info() -> VersionInfo {
-        VersionInfo {
+    fn daemon_version_info() -> fidl_fuchsia_developer_ffx::VersionInfo {
+        fidl_fuchsia_developer_ffx::VersionInfo {
             commit_hash: None,
             commit_timestamp: None,
             build_version: Some(DAEMON_VERSION.to_string()),

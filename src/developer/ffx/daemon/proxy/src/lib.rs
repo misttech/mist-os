@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::time::Duration;
-
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error, FfxError};
@@ -23,6 +21,7 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use timeout::timeout;
 use {fdomain_fuchsia_io as fio_fdomain, fidl_fuchsia_io as fio};
 
@@ -33,7 +32,7 @@ pub enum DaemonVersionCheck {
     SameBuildId(String),
     /// Compare details from VersionInfo other than buildid, requires the daemon to have been
     /// spawned by the same overall build.
-    SameVersionInfo(VersionInfo),
+    SameVersionInfo(ffx_build_version::VersionInfo),
     /// Checks to see if the API level matches.
     CheckApiLevel(version_history::ApiLevel),
 }
@@ -347,7 +346,19 @@ impl Injector for Injection {
     }
 
     async fn build_info(&self) -> Result<VersionInfo> {
-        Ok::<VersionInfo, anyhow::Error>(ffx_build_version::build_info())
+        let version_info = ffx_build_version::build_info();
+        let ffx_version_info = VersionInfo {
+            commit_hash: version_info.commit_hash,
+            commit_timestamp: version_info.commit_timestamp,
+            build_version: version_info.build_version,
+            abi_revision: version_info.abi_revision,
+            api_level: version_info.api_level,
+            exec_path: version_info.exec_path,
+            build_id: version_info.build_id,
+            ..Default::default()
+        };
+
+        Ok(ffx_version_info)
     }
 }
 

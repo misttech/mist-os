@@ -821,9 +821,19 @@ impl Daemon {
                             fidl::AsyncChannel::from_channel(chan);
                         let daemon_clone = self.clone();
                         let mut quit_tx = quit_tx.clone();
-                        let info = info.clone();
+                        let version_info = info.clone();
                         Task::local(async move {
-                            if let Err(err) = daemon_clone.handle_requests_from_stream(&quit_tx, DaemonRequestStream::from_channel(chan), &info).await {
+                            let ffx_version_info = VersionInfo {
+                                commit_hash: version_info.commit_hash,
+                                commit_timestamp: version_info.commit_timestamp,
+                                build_version: version_info.build_version,
+                                abi_revision: version_info.abi_revision,
+                                api_level: version_info.api_level,
+                                exec_path: version_info.exec_path,
+                                build_id: version_info.build_id,
+                                ..Default::default()
+                            };
+                            if let Err(err) = daemon_clone.handle_requests_from_stream(&quit_tx, DaemonRequestStream::from_channel(chan), &ffx_version_info).await {
                                 tracing::error!("error handling request: {:?}", err);
                                 quit_tx.send(()).await.expect("Failed to gracefully send quit message, aborting.");
                             }
@@ -926,7 +936,19 @@ mod test {
 
         let d2 = d.clone();
         let task = Task::local(async move {
-            d2.handle_requests_from_stream(&quit_tx, stream, &build_info()).await
+            let version_info = build_info();
+            let ffx_version_info = VersionInfo {
+                commit_hash: version_info.commit_hash,
+                commit_timestamp: version_info.commit_timestamp,
+                build_version: version_info.build_version,
+                abi_revision: version_info.abi_revision,
+                api_level: version_info.api_level,
+                exec_path: version_info.exec_path,
+                build_id: version_info.build_id,
+                ..Default::default()
+            };
+
+            d2.handle_requests_from_stream(&quit_tx, stream, &ffx_version_info).await
         });
 
         (proxy, d, task)

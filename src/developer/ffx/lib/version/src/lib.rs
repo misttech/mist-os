@@ -2,9 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 
-pub use fidl_fuchsia_developer_ffx::VersionInfo;
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct VersionInfo {
+    /// Git commit hash of HEAD at build time.
+    pub commit_hash: Option<String>,
+    /// UTC timestamp of the HEAD commit in seconds.
+    pub commit_timestamp: Option<u64>,
+    /// The build version, pulled from //build/info.
+    pub build_version: Option<String>,
+    /// The ABI revision denotes the semantics of the Fuchsia System Interface
+    /// that an application expects the platform to provide. The number
+    /// has no ordering relationship (higher is not newer or older).
+    /// Can be mapped to an api_level using //sdk/version_history.json.
+    pub abi_revision: Option<u64>,
+    /// The API level denotes a set of APIs available when building an
+    /// application for a given release of the FUCHSIA IDK. Higher number
+    /// means newer.
+    /// Can be mapped to an abi_revision using //sdk/version_history.json.
+    pub api_level: Option<u64>,
+    /// Path of the actual FFX executable. This allows us to make absolutely
+    /// sure commands match the daemon they're communicating with.
+    pub exec_path: Option<String>,
+    /// Build ID of the FFX executable.
+    pub build_id: Option<String>,
+}
 
 type VersionBuf = [u8; 64];
 

@@ -7,7 +7,7 @@ use analytics::{
     add_custom_event, ga4_metrics, initialize_ga4_metrics_service, redact_host_and_user_from,
 };
 use anyhow::{Context, Result};
-use fidl_fuchsia_developer_ffx::VersionInfo;
+use ffx_build_version::VersionInfo;
 use fuchsia_async::TimeoutExt;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

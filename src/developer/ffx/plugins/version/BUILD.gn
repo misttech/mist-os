@@ -16,6 +16,7 @@ ffx_plugin("ffx_version") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/version:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:chrono",
