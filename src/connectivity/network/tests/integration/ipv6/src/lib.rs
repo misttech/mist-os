@@ -13,13 +13,11 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use anyhow::Context as _;
-use futures::{
-    future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::{future, Future, FutureExt as _, StreamExt, TryFutureExt as _, TryStreamExt as _};
 use net_declare::net_ip_v6;
 use net_types::ethernet::Mac;
 use net_types::ip::{self as net_types_ip, Ip, Ipv6};
@@ -1439,4 +1437,70 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
         link_local_subnet_route_events.next().await.expect("stream unexpectedly ended"),
         fnet_routes_ext::Event::Removed(_)
     );
+}
+
+/// Tests that temporary IPv6 addresses are preferred.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn prefers_temporary<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let endpoint = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let iface = realm
+        .install_endpoint(endpoint, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+
+    const ADDR1: net::Subnet = net_declare::fidl_subnet!("2001:db8::1/64");
+    const ADDR2: net::Subnet = net_declare::fidl_subnet!("2001:db8::2/64");
+    const ADDR3: std::net::SocketAddr = net_declare::std_socket_addr!("[2001:db8::3]:1234");
+
+    // Do everything twice so we show we're not relying on some other property
+    // of address selection.
+    let control = iface.control();
+    for temp in [ADDR1, ADDR2] {
+        let asp = futures::stream::iter([ADDR1, ADDR2])
+            .map(|addr| async move {
+                interfaces::add_address_wait_assigned(
+                    control,
+                    addr,
+                    fnet_interfaces_admin::AddressParameters {
+                        add_subnet_route: Some(true),
+                        temporary: Some(addr == temp),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .expect("add_address_wait_assigned failed")
+            })
+            .buffer_unordered(usize::MAX)
+            .collect::<Vec<_>>()
+            .await;
+
+        let sock = realm
+            .datagram_socket(
+                fposix_socket::Domain::Ipv6,
+                fposix_socket::DatagramSocketProtocol::Udp,
+            )
+            .await
+            .expect("udp socket");
+        sock.connect(&ADDR3.into()).expect("connect UDP");
+        let addr = sock.local_addr().expect("get local addr").as_socket().expect("network socket");
+        let ip: net::IpAddress = fidl_fuchsia_net_ext::IpAddress(addr.ip()).into();
+        assert_eq!(ip, temp.addr);
+
+        // Remove the addresses cleanly so we can add them again switching which
+        // one is the temporary addr.
+        futures::stream::iter(asp)
+            .for_each_concurrent(None, |asp| async move {
+                asp.remove().expect("remove addr");
+                assert_matches!(
+                    asp.take_event_stream().next().await,
+                    Some(Ok(fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                        error: fnet_interfaces_admin::AddressRemovalReason::UserRemoved
+                    }))
+                );
+            })
+            .await;
+    }
 }

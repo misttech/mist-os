@@ -400,14 +400,21 @@ fn get_ipv6_sas_candidate<
         device_id,
         &addr_id,
         |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config }| {
+            // Assume an address is deprecated if config is not available. That
+            // means the address is going away, so we should not prefer it.
+            const ASSUME_DEPRECATED: bool = true;
+            // Assume an address is not temporary if config is not available.
+            // That means the address is going away and we should remove any
+            // preference on it.
+            const ASSUME_TEMPORARY: bool = false;
+            let (deprecated, temporary) = config
+                .map(|c| (c.is_deprecated(), c.is_temporary()))
+                .unwrap_or((ASSUME_DEPRECATED, ASSUME_TEMPORARY));
             SasCandidate {
                 addr_sub: addr_id.addr_sub(),
                 assigned: *assigned,
-                // Assume an address is deprecated if config
-                // is not available. That means the address
-                // is going away, so we should not prefer
-                // it.
-                deprecated: config.map(|c| c.is_deprecated()).unwrap_or(true),
+                temporary,
+                deprecated,
                 device: device_id.clone(),
             }
         },
