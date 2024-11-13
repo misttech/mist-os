@@ -155,7 +155,6 @@ pub fn map_elf_segments(
     mapper_base: usize,
     vaddr_bias: usize,
 ) -> Result<(), ElfLoadError> {
-    let page_size = zx::system_get_page_size() as usize;
     // We intentionally use wrapping subtraction here, in case the ELF file happens to use vaddr's
     // that are higher than the VMAR base chosen by the kernel. Wrapping addition will be used when
     // adding this bias to vaddr values.
@@ -243,8 +242,6 @@ pub fn map_elf_segments(
                 anon_vmo
                     .set_name(&vmo_name_with_prefix(&vmo_name, VMO_NAME_PREFIX_BSS))
                     .map_err(ElfLoadError::SetVmoName)?;
-                let mut page_buf = Vec::with_capacity(page_size);
-                page_buf.resize(page_size, 0u8);
                 mapper
                     .map(virt_addr + bss_vmo_start, &anon_vmo, 0, bss_vmo_size, flags)
                     .map_err(ElfLoadError::VmarMap)?;
