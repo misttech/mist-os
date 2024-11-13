@@ -6,10 +6,6 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
 declare_args() {
-  # TODO(bcastell): Streaming writes is now enabled by default. Remove this argument when out of
-  # tree users don't set this anymore.
-  blobfs_enable_streaming_writes = true
-
   # Set this to true when configuring gn args to enable blobfs page-in metrics recording. This will
   # also increase the inspect VMO size for blobfs to 2 MiB, to accommodate the large number of
   # metrics entries.
