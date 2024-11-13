@@ -1202,7 +1202,7 @@ fn add_address(
                 core_addr,
                 id,
                 control_handle,
-                fnet_interfaces_admin::AddressRemovalReason::Invalid,
+                fnet_interfaces_admin::AddressRemovalReason::InvalidProperties,
             );
             return;
         }
@@ -1225,7 +1225,7 @@ fn add_address(
                     core_addr,
                     id,
                     control_handle,
-                    fnet_interfaces_admin::AddressRemovalReason::Invalid,
+                    fnet_interfaces_admin::AddressRemovalReason::InvalidProperties,
                 );
                 return;
             }
@@ -1315,6 +1315,7 @@ fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthori
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum AddressStateProviderCancellationReason {
+    InvalidProperties,
     UserRemoved,
     DadFailed,
     InterfaceRemoved,
@@ -1331,6 +1332,9 @@ impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::Add
             }
             AddressStateProviderCancellationReason::InterfaceRemoved => {
                 fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+            }
+            AddressStateProviderCancellationReason::InvalidProperties => {
+                fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
             }
         }
     }
@@ -1602,20 +1606,23 @@ async fn address_state_provider_main_loop(
                         break Some(AddressStateProviderCancellationReason::UserRemoved)
                     }
                     Ok(None) => {}
-                    Err(
-                        err @ AddressStateProviderError::PreviousPendingWatchRequest
-                        | err @ AddressStateProviderError::InvalidPropertiesUpdate { .. },
-                    ) => {
+                    Err(err) => {
                         warn!(
                             "failed to handle request for address {:?} on interface {}: {}",
                             address, id, err
                         );
-                        break None;
+                        match err {
+                            AddressStateProviderError::PreviousPendingWatchRequest => {
+                                break None;
+                            }
+                            AddressStateProviderError::InvalidPropertiesUpdate { .. } => {
+                                break Some(
+                                    AddressStateProviderCancellationReason::InvalidProperties,
+                                );
+                            }
+                            AddressStateProviderError::Fidl(_) => todo!(),
+                        }
                     }
-                    Err(err @ AddressStateProviderError::Fidl(_)) => error!(
-                        "failed to handle request for address {:?} on interface {}: {}",
-                        address, id, err
-                    ),
                 },
                 Err(e) => {
                     error!(
@@ -1650,9 +1657,9 @@ async fn address_state_provider_main_loop(
             | Some(AddressStateProviderCancellationReason::InterfaceRemoved) => {
                 AddressNeedsExplicitRemovalFromCore::No
             }
-            Some(AddressStateProviderCancellationReason::UserRemoved) | None => {
-                AddressNeedsExplicitRemovalFromCore::Yes
-            }
+            Some(AddressStateProviderCancellationReason::UserRemoved)
+            | Some(AddressStateProviderCancellationReason::InvalidProperties)
+            | None => AddressNeedsExplicitRemovalFromCore::Yes,
         },
         cancelation_reason,
     )

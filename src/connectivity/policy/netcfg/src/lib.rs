@@ -3309,7 +3309,8 @@ fn map_address_state_provider_error(
                 errors::Error::NonFatal
             }
             fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(e) => match e {
-                fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Invalid => {
+                fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Invalid
+                | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InvalidProperties => {
                     errors::Error::Fatal
                 }
                 fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::AlreadyAssigned

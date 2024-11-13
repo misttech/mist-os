@@ -412,6 +412,7 @@ impl Client {
             Ok(reason) => match reason {
                 fnet_interfaces_admin::AddressRemovalReason::UserRemoved => (),
                 reason @ (fnet_interfaces_admin::AddressRemovalReason::Invalid
+                | fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
                 | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 | fnet_interfaces_admin::AddressRemovalReason::DadFailed
                 | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
@@ -450,6 +451,9 @@ impl Client {
                         Some(reason) => match reason {
                             fnet_interfaces_admin::AddressRemovalReason::Invalid => {
                                 panic!("yielded invalid address")
+                            }
+                            fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
+                                panic!("used invalid properties")
                             }
                             fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
                                 tracing::warn!("{debug_log_prefix} interface removed; stopping");

@@ -25,7 +25,7 @@ use netstack_testing_common::devices::{
 use netstack_testing_common::interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _};
 use netstack_testing_common::ndp::{send_ra_with_router_lifetime, wait_for_router_solicitation};
 use netstack_testing_common::realms::{
-    Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
+    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
@@ -468,6 +468,70 @@ async fn add_address_errors<N: Netstack>(name: &str) {
             Err(fidl_fuchsia_net_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
                 fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Invalid
             ))
+        );
+    }
+}
+
+#[netstack_test]
+async fn invalid_address_properties(name: &str) {
+    // NB: Only runs on netstack3 because netstack2 doesn't perform property
+    // validation.
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "testif1").await.expect("join network");
+    let control = iface.control();
+
+    let invalid_properties = [
+        finterfaces_admin::AddressProperties { valid_lifetime_end: Some(-1), ..Default::default() },
+        finterfaces_admin::AddressProperties { valid_lifetime_end: Some(0), ..Default::default() },
+        finterfaces_admin::AddressProperties {
+            preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                -1,
+            )),
+            ..Default::default()
+        },
+        finterfaces_admin::AddressProperties {
+            preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                0,
+            )),
+            ..Default::default()
+        },
+    ];
+    const ADDR: fnet::Subnet = fidl_subnet!("1.1.1.1/24");
+    // Adding an address with invalid properties always fails.
+    for p in invalid_properties {
+        assert_matches::assert_matches!(
+            interfaces::add_address_wait_assigned(
+                control,
+                ADDR,
+                finterfaces_admin::AddressParameters {
+                    initial_properties: Some(p.clone()),
+                    ..Default::default()
+                }
+            )
+            .await,
+            Err(fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
+                finterfaces_admin::AddressRemovalReason::InvalidProperties
+            ))
+        );
+
+        // Now do the same thing but attempting to update properties.
+        let asp = interfaces::add_address_wait_assigned(control, ADDR, Default::default())
+            .await
+            .expect("add address");
+        let mut events = asp.take_event_stream().filter_map(|m| {
+            futures::future::ready(match m.expect("stream error") {
+                finterfaces_admin::AddressStateProviderEvent::OnAddressAdded { .. } => None,
+                finterfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
+                    Some(error)
+                }
+            })
+        });
+        assert_matches!(asp.update_address_properties(&p).await, Err(e) if e.is_closed());
+        assert_eq!(
+            events.next().await,
+            Some(finterfaces_admin::AddressRemovalReason::InvalidProperties)
         );
     }
 }

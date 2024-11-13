@@ -891,7 +891,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
                 Err(match e {
                     AddressStateProviderError::AddressRemoved(reason) => match reason {
-                        AddressRemovalReason::Invalid => RequestError::InvalidRequest,
+                        AddressRemovalReason::Invalid | AddressRemovalReason::InvalidProperties => {
+                            RequestError::InvalidRequest
+                        }
                         AddressRemovalReason::AlreadyAssigned => RequestError::AlreadyExists,
                         reason @ (AddressRemovalReason::DadFailed
                         | AddressRemovalReason::InterfaceRemoved
