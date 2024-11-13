@@ -98,13 +98,6 @@ if (is_host) {
     sdk_name = "fidlgen_cpp"
   }
 
-  # TODO(https://fxbug.dev/42160879): Remove once Bazel SDK uses the non-experimental name.
-  go_binary("fidlgen_cpp_experimental_driver_only_toolchain") {
-    library = ":main"
-    sdk_category = "partner"
-    sdk_name = "fidlgen_cpp_experimental_driver_only_toolchain"
-  }
-
   golden_files("fidlgen_cpp_golden_tests") {
     testonly = true
 
