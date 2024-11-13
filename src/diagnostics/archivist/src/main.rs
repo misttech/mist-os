@@ -46,8 +46,8 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .record_child("config", |config_node| config.record_inspect(config_node));
 
     let is_embedded = !config.log_to_debuglog;
-    let mut archivist = Archivist::new(config).await;
-    archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
+    let archivist =
+        Archivist::new(config, component_lifecycle::take_lifecycle_request_stream()).await;
     debug!("Archivist initialized from configuration.");
 
     let startup_handle =
