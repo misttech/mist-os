@@ -262,7 +262,6 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     tracing::debug!("Preparing to flash {} in sparse mode", file_to_upload);
 
     let sparse_files = build_sparse_files(
-        writer,
         name,
         file_to_upload,
         std::env::temp_dir().as_path(),
