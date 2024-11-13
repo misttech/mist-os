@@ -286,7 +286,10 @@ impl KeyManager {
         match wrapped_keys
             .take()
             .unwrap()
-            .map_err(|_| zx::Status::INTERNAL)
+            .map_err(|error| {
+                error!(?error, "Failed to get wrapped keys");
+                zx::Status::INTERNAL
+            })
             .and_then(|keys| async move { crypt.unwrap_keys(&keys, object_id).await })
             .await
         {
