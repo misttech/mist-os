@@ -193,9 +193,18 @@ Evictor::EvictedPageCounts Evictor::EvictFromPreloadedTarget() {
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
     target = eviction_target_;
-    eviction_target_ = {};
   }
-  return EvictFromTargetInternal(target);
+  EvictedPageCounts counts = EvictFromTargetInternal(target);
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
+    uint64_t total = counts.compressed + counts.discardable + counts.pager_backed;
+    // Clear the eviction target but retain any min pages that we might still need to free in a
+    // subsequent eviction attempt.
+    eviction_target_ = {};
+    eviction_target_.min_pages_to_free =
+        (total < target.min_pages_to_free) ? target.min_pages_to_free - total : 0;
+  }
+  return counts;
 }
 
 Evictor::EvictedPageCounts Evictor::EvictFromTargetInternal(Evictor::EvictionTarget target) {

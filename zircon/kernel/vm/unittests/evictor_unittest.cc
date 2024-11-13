@@ -27,8 +27,6 @@ class TestPmmNode {
 
   ~TestPmmNode() = default;
 
-  void IncrementFreePages(uint64_t num_pages) { free_pages_ += num_pages; }
-
   Evictor::EvictionTarget GetEvictionTarget() const { return evictor_.DebugGetEvictionTarget(); }
 
   void CombineEvictionTarget(Evictor::EvictionTarget target) {
@@ -43,25 +41,36 @@ class TestPmmNode {
 
   Evictor* evictor() { return &evictor_; }
 
+  void CapEvictions(uint64_t max) { max_evictions_ = max; }
+
+  void UncapEvictions() { max_evictions_ = UINT64_MAX; }
+
  private:
   ktl::optional<Evictor::EvictedPageCounts> TestReclaim(VmCompressor* compression_instance,
                                                         Evictor::EvictionLevel eviction_level) {
+    if (total_evictions_ >= max_evictions_) {
+      return ktl::nullopt;
+    }
     if (discardable_) {
       // Discardable VMOs get freed in their entirety, which could be any amount of pages. Claiming
       // 10 here is a bit arbitrary, and could be made configurable if/when there are some tests
       // that need it.
-      IncrementFreePages(10);
+      free_pages_ += 10;
+      total_evictions_ += 10;
       return Evictor::EvictedPageCounts{
           .discardable = 10,
       };
     }
-    IncrementFreePages(1);
+    free_pages_++;
+    total_evictions_++;
     return Evictor::EvictedPageCounts{
         .pager_backed = 1,
     };
   }
 
   uint64_t free_pages_ = 0;
+  uint64_t total_evictions_ = 0;
+  uint64_t max_evictions_ = UINT64_MAX;
   Evictor evictor_;
   bool discardable_;
 };
@@ -210,11 +219,7 @@ static bool evictor_discardable_test() {
   EXPECT_EQ(counts.pager_backed, 0u);
   // Free pages target was greater than min pages target. So precisely free pages target must have
   // been evicted. However, a discardable vmo can only be discarded in its entirety, so we can't
-  // check for equality with free pages target. We can't check for equality with |kNumPages| either
-  // as it is possible (albeit unlikely) that a discardable vmo other than the one we created
-  // here was discarded, since we're discarding from the global list of discardable vmos. In the
-  // future (if and) when vmos are PMM node aware, we will be able to control this better by
-  // creating a vmo backed by the test node.
+  // check for equality with free pages target.
   EXPECT_GE(counts.discardable, target.free_pages_target);
   EXPECT_GE(counts.discardable, target.min_pages_to_free);
   // The node has the desired number of free pages now, and a minimum of min pages have been freed.
@@ -236,11 +241,7 @@ static bool evictor_discardable_test() {
   EXPECT_EQ(counts.pager_backed, 0u);
   // Min pages target was greater than free pages target. So precisely min pages target must have
   // been evicted. However, a discardable vmo can only be discarded in its entirety, so we can't
-  // check for equality with free pages target. We can't check for equality with |kNumPages| either
-  // as it is possible (albeit unlikely) that a discardable vmo other than the one we created
-  // here was discarded, since we're discarding from the global list of discardable vmos. In the
-  // future (if and) when vmos are PMM node aware, we will be able to control this better by
-  // creating a vmo backed by the test node.
+  // check for equality with free pages target.
   EXPECT_GE(counts.discardable, target.min_pages_to_free);
   // The node has the desired number of free pages now, and a minimum of min pages have been freed.
   EXPECT_GE(node.FreePages(), target.free_pages_target);
@@ -374,6 +375,58 @@ static bool evictor_external_target_test() {
   END_TEST;
 }
 
+// Test that a one shot eviction target can be set as expected.
+static bool evictor_min_target_carried_over_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+  TestPmmNode node(false);
+
+  auto target = Evictor::EvictionTarget{
+      .pending = true,
+      .free_pages_target = 10,
+      .min_pages_to_free = 15,
+      .level = Evictor::EvictionLevel::IncludeNewest,
+  };
+
+  // The node starts off with zero pages.
+  uint64_t free_count = node.FreePages();
+  EXPECT_EQ(free_count, 0u);
+
+  // Cap the number of evictions to 5.
+  node.CapEvictions(5);
+
+  node.CombineEvictionTarget(target);
+  auto counts = node.EvictFromPreloadedTarget();
+
+  // No discardable pages evicted.
+  EXPECT_EQ(counts.discardable, 0u);
+  // Exactly 5 pages evicted.
+  EXPECT_EQ(counts.pager_backed, 5u);
+
+  // Uncap evictions.
+  node.UncapEvictions();
+
+  // Combine target with zero min pages requested.
+  node.CombineEvictionTarget(Evictor::EvictionTarget{
+      .pending = true,
+      .free_pages_target = 0,
+      .min_pages_to_free = 0,
+      .level = Evictor::EvictionLevel::IncludeNewest,
+  });
+  counts = node.EvictFromPreloadedTarget();
+
+  // No discardable pages evicted.
+  EXPECT_EQ(counts.discardable, 0u);
+  // Remaining pages should have been evicted.
+  EXPECT_EQ(counts.pager_backed, target.min_pages_to_free - 5u);
+
+  free_count = node.FreePages();
+  EXPECT_EQ(free_count, target.min_pages_to_free);
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(evictor_tests)
 VM_UNITTEST(evictor_set_target_test)
 VM_UNITTEST(evictor_combine_targets_test)
@@ -381,6 +434,7 @@ VM_UNITTEST(evictor_pager_backed_test)
 VM_UNITTEST(evictor_discardable_test)
 VM_UNITTEST(evictor_free_target_test)
 VM_UNITTEST(evictor_external_target_test)
+VM_UNITTEST(evictor_min_target_carried_over_test)
 UNITTEST_END_TESTCASE(evictor_tests, "evictor", "Evictor tests")
 
 }  // namespace vm_unittest
