@@ -5,9 +5,7 @@
 use anyhow::Result;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
-};
+use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, ExecutionStateLevel};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc;
 use futures::StreamExt;
@@ -128,7 +126,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         fctrl::SystemActivityGovernorState {
             execution_state_level: Some(ExecutionStateLevel::Active),
             application_activity_level: Some(ApplicationActivityLevel::Inactive),
-            wake_handling_level: Some(WakeHandlingLevel::Inactive),
             ..Default::default()
         }
     );
@@ -209,7 +206,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     let mut current_state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Active),
-        wake_handling_level: Some(WakeHandlingLevel::Inactive),
         ..Default::default()
     };
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -288,7 +284,6 @@ async fn test_set_valid_sag_states() -> Result<()> {
     let mut current_state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Inactive),
-        wake_handling_level: Some(WakeHandlingLevel::Inactive),
         ..Default::default()
     };
 
@@ -398,7 +393,6 @@ async fn test_set_invalid_sag_states() -> Result<()> {
         fctrl::SystemActivityGovernorState {
             execution_state_level: Some(ExecutionStateLevel::Active),
             application_activity_level: Some(ApplicationActivityLevel::Inactive),
-            wake_handling_level: Some(WakeHandlingLevel::Inactive),
             ..Default::default()
         }
     );
@@ -406,7 +400,6 @@ async fn test_set_invalid_sag_states() -> Result<()> {
     let mut state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Inactive),
-        wake_handling_level: Some(WakeHandlingLevel::Inactive),
         ..Default::default()
     };
 
@@ -441,7 +434,6 @@ async fn test_set_invalid_sag_states() -> Result<()> {
             .set(&fctrl::SystemActivityGovernorState {
                 execution_state_level: Some(ExecutionStateLevel::Active),
                 application_activity_level: Some(ApplicationActivityLevel::Inactive),
-                wake_handling_level: Some(WakeHandlingLevel::Active),
                 ..Default::default()
             },)
             .await
@@ -455,23 +447,6 @@ async fn test_set_invalid_sag_states() -> Result<()> {
             .set(&fctrl::SystemActivityGovernorState {
                 execution_state_level: Some(ExecutionStateLevel::Inactive),
                 application_activity_level: Some(ApplicationActivityLevel::Active),
-                wake_handling_level: Some(WakeHandlingLevel::Inactive),
-                ..Default::default()
-            },)
-            .await
-            .unwrap(),
-        Err(fctrl::SetSystemActivityGovernorStateError::NotSupported)
-    );
-
-    // When ExecutionState is Suspending, ApplicationActivity has to be
-    // inactive, at least one of WakeHandling or FullWakeHandling needs to be
-    // Active.
-    assert_eq!(
-        sag_ctrl_state
-            .set(&fctrl::SystemActivityGovernorState {
-                execution_state_level: Some(ExecutionStateLevel::Suspending),
-                application_activity_level: Some(ApplicationActivityLevel::Active),
-                wake_handling_level: Some(WakeHandlingLevel::Inactive),
                 ..Default::default()
             },)
             .await

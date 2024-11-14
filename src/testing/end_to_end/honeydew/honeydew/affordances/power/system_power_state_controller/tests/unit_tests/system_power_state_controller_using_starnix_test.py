@@ -79,7 +79,6 @@ _SAG_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
                         "resume_latency": 0,
                         "power_level": 0,
                     },
-                    "wake_handling": {"power_level": 0},
                     "application_activity": {"power_level": 1},
                     "execution_state": {"power_level": 2},
                 },

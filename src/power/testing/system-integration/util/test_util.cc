@@ -60,7 +60,6 @@ test_sagcontrol::SystemActivityGovernorState TestLoopBase::GetBootCompleteState(
   test_sagcontrol::SystemActivityGovernorState state;
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
   state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kActive);
-  state.wake_handling_level(fuchsia_power_system::WakeHandlingLevel::kInactive);
   return state;
 }
 

@@ -6,9 +6,7 @@ use anyhow::Result;
 use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
-};
+use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, ExecutionStateLevel};
 use fuchsia_component::client as fclient;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
@@ -125,16 +123,9 @@ impl SystemActivityGovernorControl {
         )
         .unwrap();
 
-        let wh_status = status_endpoints.remove("wake_handling").unwrap();
-        let initial_wake_handling_level = WakeHandlingLevel::from_primitive(
-            wh_status.watch_power_level().await.unwrap().unwrap(),
-        )
-        .unwrap();
-
         let state = fctrl::SystemActivityGovernorState {
             execution_state_level: Some(initial_execution_state_level),
             application_activity_level: Some(initial_application_activity_level),
-            wake_handling_level: Some(initial_wake_handling_level),
             ..Default::default()
         };
         let current_state = Rc::new(Mutex::new(state.clone()));
@@ -194,24 +185,6 @@ impl SystemActivityGovernorControl {
                     && *boot_complete_clone.lock().await == false
                 {
                     *boot_complete_clone.lock().await = true;
-                }
-            }
-        })
-        .detach();
-
-        let publisher = state_publisher.clone();
-        let current_state_clone = current_state.clone();
-        let required_state_clone = required_state.clone();
-        fasync::Task::local(async move {
-            loop {
-                let new_status = WakeHandlingLevel::from_primitive(
-                    wh_status.watch_power_level().await.unwrap().unwrap(),
-                )
-                .unwrap();
-                current_state_clone.lock().await.wake_handling_level.replace(new_status);
-                let state = current_state_clone.lock().await.clone();
-                if state == *required_state_clone.lock().await {
-                    publisher.set(state);
                 }
             }
         })
@@ -302,11 +275,6 @@ impl SystemActivityGovernorControl {
             } else {
                 self.current_state.lock().await.application_activity_level.unwrap()
             };
-        let required_wake_handling_level = if let Some(r) = sag_state.wake_handling_level {
-            r
-        } else {
-            self.current_state.lock().await.wake_handling_level.unwrap()
-        };
         self.required_state
             .lock()
             .await
@@ -317,13 +285,11 @@ impl SystemActivityGovernorControl {
             .await
             .application_activity_level
             .replace(required_application_activity_level);
-        self.required_state.lock().await.wake_handling_level.replace(required_wake_handling_level);
 
         match required_execution_state_level {
             ExecutionStateLevel::Inactive => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                    || required_wake_handling_level != WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
@@ -338,7 +304,6 @@ impl SystemActivityGovernorControl {
             ExecutionStateLevel::Suspending => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                        && required_wake_handling_level == WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }

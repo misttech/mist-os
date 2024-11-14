@@ -95,7 +95,6 @@ type ComponentPowerConfiguration = struct {
 // of SAG elements, see `fuchsia.power.system.PowerElements`.
 type SagElement = strict enum {
     EXECUTION_STATE = 1;
-    WAKE_HANDLING = 3;
     APPLICATION_ACTIVITY = 4;
 };
 

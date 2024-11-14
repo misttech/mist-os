@@ -165,12 +165,13 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     constexpr char kPowerElementName[] = "aml-hrtimer-wake";
     fuchsia_hardware_power::LevelTuple wake_handling_on = {{
         .child_level = kPowerLevelOn,
-        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+        .parent_level =
+            static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kSuspending),
     }};
     fuchsia_hardware_power::PowerDependency wake_handling = {{
         .child = kPowerElementName,
         .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kWakeHandling),
+            fuchsia_hardware_power::SagElement::kExecutionState),
         .level_deps = {{std::move(wake_handling_on)}},
         .strength = fuchsia_hardware_power::RequirementType::kAssertive,
     }};
@@ -210,11 +211,6 @@ class FakeSystemActivityGovernor
     fuchsia_power_system::PowerElements elements;
     zx::event duplicate;
     wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
-
-    fuchsia_power_system::WakeHandling wake_handling = {
-        {.assertive_dependency_token = std::move(duplicate)}};
-
-    elements = {{.wake_handling = std::move(wake_handling)}};
 
     completer.Reply({{std::move(elements)}});
   }

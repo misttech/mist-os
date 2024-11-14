@@ -17,7 +17,6 @@ type SetSystemActivityGovernorStateError = strict enum : uint32 {
 type SystemActivityGovernorState = table {
     1: execution_state_level fuchsia.power.system.ExecutionStateLevel;
     2: application_activity_level fuchsia.power.system.ApplicationActivityLevel;
-    3: wake_handling_level fuchsia.power.system.WakeHandlingLevel;
 };
 
 @discoverable

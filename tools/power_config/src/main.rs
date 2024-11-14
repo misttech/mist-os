@@ -66,7 +66,6 @@ impl From<PowerElement> for fidl_power::PowerElement {
 #[derive(Deserialize, Debug)]
 enum SagElement {
     ExecutionState,
-    WakeHandling,
     ApplicationActivity,
 }
 
@@ -74,7 +73,6 @@ impl From<SagElement> for fidl_power::SagElement {
     fn from(value: SagElement) -> Self {
         match value {
             SagElement::ExecutionState => fidl_power::SagElement::ExecutionState,
-            SagElement::WakeHandling => fidl_power::SagElement::WakeHandling,
             SagElement::ApplicationActivity => fidl_power::SagElement::ApplicationActivity,
         }
     }

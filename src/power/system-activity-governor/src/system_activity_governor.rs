@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel, WakeHandlingLevel,
+    self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel,
 };
 use fuchsia_inspect::{IntProperty as IInt, Node as INode, Property, UintProperty as IUint};
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
@@ -274,8 +274,6 @@ pub struct SystemActivityGovernor {
     execution_state: PowerElementContext,
     /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
-    /// The context used to manage the wake handling power element.
-    wake_handling: PowerElementContext,
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
@@ -384,34 +382,6 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let wake_handling = PowerElementContext::builder(
-            topology,
-            "wake_handling",
-            &[
-                WakeHandlingLevel::Inactive.into_primitive(),
-                WakeHandlingLevel::Active.into_primitive(),
-            ],
-        )
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: WakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state
-                .assertive_dependency_token()
-                .expect("token not registered"),
-            requires_level_by_preference: vec![ExecutionStateLevel::Suspending.into_primitive()],
-        }])
-        .build()
-        .await
-        .expect("PowerElementContext encountered error while building wake_handling");
-
-        element_power_level_names.push(generate_element_power_level_names(
-            "wake_handling",
-            vec![
-                (WakeHandlingLevel::Inactive.into_primitive(), "Inactive".to_string()),
-                (WakeHandlingLevel::Active.into_primitive(), "Active".to_string()),
-            ],
-        ));
-
         let boot_control = Rc::new(
             PowerElementContext::builder(
                 topology,
@@ -458,7 +428,6 @@ impl SystemActivityGovernor {
             inspect_root,
             execution_state,
             application_activity,
-            wake_handling,
             suspend_stats,
             lease_manager,
             listeners: RefCell::new(Vec::new()),
@@ -477,8 +446,6 @@ impl SystemActivityGovernor {
         tracing::info!("Handling power elements");
 
         self.run_execution_state(&elements_node);
-        self.run_wake_handling(&elements_node);
-
         tracing::info!("System is booting. Acquiring boot control lease.");
         let boot_control_lease = self
             .boot_control
@@ -624,23 +591,6 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_wake_handling(self: &Rc<Self>, inspect_node: &INode) {
-        let wake_handling_node = inspect_node.create_child("wake_handling");
-        let this = self.clone();
-
-        fasync::Task::local(async move {
-            run_power_element(
-                this.wake_handling.name(),
-                &this.wake_handling.required_level,
-                WakeHandlingLevel::Inactive.into_primitive(),
-                Some(wake_handling_node),
-                basic_update_fn_factory(&this.wake_handling),
-            )
-            .await;
-        })
-        .detach();
-    }
-
     async fn get_status_endpoints(&self) -> Vec<fbroker::ElementStatusEndpoint> {
         let mut endpoints = Vec::new();
 
@@ -658,7 +608,6 @@ impl SystemActivityGovernor {
             &mut endpoints,
         );
 
-        register_element_status_endpoint("wake_handling", &self.wake_handling, &mut endpoints);
         register_element_status_endpoint("boot_control", &self.boot_control, &mut endpoints);
         endpoints
     }
@@ -684,14 +633,6 @@ impl SystemActivityGovernor {
                         application_activity: Some(fsystem::ApplicationActivity {
                             assertive_dependency_token: Some(
                                 self.application_activity
-                                    .assertive_dependency_token()
-                                    .expect("token not registered"),
-                            ),
-                            ..Default::default()
-                        }),
-                        wake_handling: Some(fsystem::WakeHandling {
-                            assertive_dependency_token: Some(
-                                self.wake_handling
                                     .assertive_dependency_token()
                                     .expect("token not registered"),
                             ),

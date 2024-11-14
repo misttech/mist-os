@@ -287,9 +287,6 @@ async fn test_system_activity_control() -> Result<()> {
                 application_activity: {
                     power_level: 1u64,
                 },
-                wake_handling: {
-                    power_level: 0u64,
-                },
                 cpu: {
                     power_level: 1u64,
                 },
@@ -322,9 +319,6 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 1u64,
                 },
                 application_activity: {
-                    power_level: 0u64,
-                },
-                wake_handling: {
                     power_level: 0u64,
                 },
                 cpu: {

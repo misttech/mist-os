@@ -241,11 +241,7 @@ class FakeSystemActivityGovernor
     fuchsia_power_system::ExecutionState exec_state = {
         {.opportunistic_dependency_token = std::move(execution_element)}};
 
-    fuchsia_power_system::WakeHandling wake_handling = {
-        {.assertive_dependency_token = std::move(wake_handling_element)}};
-
-    elements = {
-        {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
+    elements = {{.execution_state = std::move(exec_state)}};
 
     completer.Reply({{std::move(elements)}});
   }

@@ -39,18 +39,12 @@ class FakeSystemActivityGovernor
     // The wake handling element isn't actually used by the mali driver, but is included for
     // completeness and consistency with the real implementation.
     fuchsia_power_system::PowerElements elements;
-    zx::event execution_element, wake_handling_element;
+    zx::event execution_element;
     exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
-    wake_handling_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
-
     fuchsia_power_system::ExecutionState exec_state = {
         {.opportunistic_dependency_token = std::move(execution_element)}};
 
-    fuchsia_power_system::WakeHandling wake_handling = {
-        {.assertive_dependency_token = std::move(wake_handling_element)}};
-
-    elements = {
-        {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
+    elements = {{.execution_state = std::move(exec_state)}};
 
     completer.Reply({{std::move(elements)}});
   }
