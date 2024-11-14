@@ -181,6 +181,40 @@ If the `host_restart_on_crash` field is not specified, its value defaults to the
 When `host_restart_on_crash` is `false`, the node is removed from the driver framework's
 node topology if the driver goes down unexpectedly.
 
+### Service Connect Validation {:#service-connect-validation}
+
+The `service_connect_validation` field is used by the driver sdk's DriverBase
+to enable availability valdations to run on service capability connections.
+
+It does this by looking through the offers available to the bound node of the
+drive, and ensuring all `incoming()->Connect()` requests are trying to connect
+to a valid offer.
+
+In single parent cases, this just ensures the service is available to the node,
+as all requests should be going to a `"default"` instance, when no instance is
+specified by the user.
+
+In composite cases, this ensures that the instance name requested, and the
+`"default"` instance name case, have a corresponding offer from that parent.
+
+If these validations fail, the `Connect()` method will return ZX_ERR_NOT_FOUND
+immediately, instead of making a connection that will fail only when a two-way
+method is called on it.
+
+```json5 {:.devsite-disable-click-to-copy}
+{
+    program: {
+        runner: "driver",
+        binary: "driver/example.so",
+        bind: "meta/bind/example.bindbc",
+        {{ '<strong>' }}service_connect_validation: "true"{{ '</strong>' }}
+    }
+}
+```
+
+If this field is not set, the validations are disabled by default.
+
+
 ## Further reading
 
 For more detailed explanation of how drivers are bound, see
