@@ -83,7 +83,7 @@ impl TestHarness {
         let inspector = Inspector::default();
         let log_manager =
             LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
-        let log_server = LogServer::new(Arc::clone(&log_manager), scope.to_handle());
+        let log_server = LogServer::new(Arc::clone(&log_manager), scope.new_child());
 
         let (log_proxy, log_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
@@ -420,7 +420,7 @@ where
 pub async fn debuglog_test(
     expected: impl IntoIterator<Item = LogMessage>,
     debug_log: TestDebugLog,
-    scope: fasync::ScopeHandle,
+    scope: fasync::Scope,
 ) -> Inspector {
     let inspector = Inspector::default();
     let lm =

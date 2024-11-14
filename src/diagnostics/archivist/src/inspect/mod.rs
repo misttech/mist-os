@@ -579,7 +579,7 @@ mod tests {
 
         let scope = fasync::Scope::new();
         let inspect_sink_server =
-            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), scope.to_handle()));
+            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), scope.new_child()));
         Arc::clone(&inspect_sink_server).handle(Event {
             timestamp: zx::BootInstant::get(),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {

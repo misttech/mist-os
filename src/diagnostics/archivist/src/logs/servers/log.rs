@@ -17,18 +17,18 @@ pub struct LogServer {
     logs_repo: Arc<LogsRepository>,
 
     /// Scope in which we spawn all of the server tasks.
-    scope: fasync::ScopeHandle,
+    scope: fasync::Scope,
 }
 
 impl LogServer {
-    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::ScopeHandle) -> Self {
+    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::Scope) -> Self {
         Self { logs_repo, scope }
     }
 
     /// Spawn a task to handle requests from components reading the shared log.
     pub fn spawn(&self, stream: flogger::LogRequestStream) {
         let logs_repo = Arc::clone(&self.logs_repo);
-        let scope = self.scope.clone();
+        let scope = self.scope.to_handle();
         self.scope.spawn(async move {
             if let Err(e) = Self::handle_requests(logs_repo, stream, scope).await {
                 warn!("error handling Log requests: {}", e);

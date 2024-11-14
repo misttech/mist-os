@@ -616,7 +616,7 @@ mod tests {
         ];
 
         let scope = fasync::Scope::new();
-        let klog_stats_tree = debuglog_test(expected_logs, klog_reader, scope.to_handle()).await;
+        let klog_stats_tree = debuglog_test(expected_logs, klog_reader, scope.new_child()).await;
         assert_data_tree!(
             klog_stats_tree,
             root: contains {

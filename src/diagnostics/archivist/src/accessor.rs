@@ -63,7 +63,7 @@ pub struct ArchiveAccessorServer {
     inspect_repository: Arc<InspectRepository>,
     logs_repository: Arc<LogsRepository>,
     maximum_concurrent_snapshots_per_reader: u64,
-    scope: fasync::ScopeHandle,
+    scope: fasync::Scope,
     default_batch_timeout_seconds: BatchRetrievalTimeout,
 }
 
@@ -130,7 +130,7 @@ impl ArchiveAccessorServer {
         logs_repository: Arc<LogsRepository>,
         maximum_concurrent_snapshots_per_reader: u64,
         default_batch_timeout_seconds: BatchRetrievalTimeout,
-        scope: fasync::ScopeHandle,
+        scope: fasync::Scope,
     ) -> Self {
         ArchiveAccessorServer {
             inspect_repository,
@@ -263,7 +263,7 @@ impl ArchiveAccessorServer {
         let inspect_repo = Arc::clone(&self.inspect_repository);
         let maximum_concurrent_snapshots_per_reader = self.maximum_concurrent_snapshots_per_reader;
         let default_batch_timeout_seconds = self.default_batch_timeout_seconds;
-        let scope = self.scope.clone();
+        let scope = self.scope.to_handle();
         self.scope.spawn(async move {
             let stats = pipeline.accessor_stats();
             stats.global_stats.connections_opened.add(1);
@@ -801,7 +801,7 @@ mod tests {
             log_repo,
             4,
             BatchRetrievalTimeout::max(),
-            scope.to_handle(),
+            scope.new_child(),
         );
         server.spawn_server(pipeline, stream);
 
@@ -864,7 +864,7 @@ mod tests {
             log_repo,
             4,
             BatchRetrievalTimeout::max(),
-            scope.to_handle(),
+            scope.new_child(),
         ));
         server.spawn_server(pipeline, stream);
 
@@ -1010,7 +1010,7 @@ mod tests {
             log_repo,
             4,
             BatchRetrievalTimeout::max(),
-            scope.to_handle(),
+            scope.new_child(),
         );
         server.spawn_server(pipeline, stream);
 

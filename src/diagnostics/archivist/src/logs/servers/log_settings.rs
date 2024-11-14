@@ -15,11 +15,11 @@ pub struct LogSettingsServer {
     logs_repo: Arc<LogsRepository>,
 
     /// Scope holding all of the server Tasks.
-    scope: fasync::ScopeHandle,
+    scope: fasync::Scope,
 }
 
 impl LogSettingsServer {
-    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::ScopeHandle) -> Self {
+    pub fn new(logs_repo: Arc<LogsRepository>, scope: fasync::Scope) -> Self {
         Self { logs_repo, scope }
     }
 

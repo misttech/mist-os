@@ -61,7 +61,7 @@ pub struct Archivist {
     _inspect_sink_server: Arc<InspectSinkServer>,
 
     /// Top level scope.
-    top_level_scope: fasync::Scope,
+    general_scope: fasync::Scope,
 
     /// Tasks receiving external events from component manager.
     incoming_events_scope: fasync::Scope,
@@ -75,8 +75,8 @@ impl Archivist {
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
     pub async fn new(config: Config, request_stream: LifecycleRequestStream) -> Self {
-        let top_level_scope = fasync::Scope::new();
-        let servers_scope = top_level_scope.new_child();
+        let general_scope = fasync::Scope::new();
+        let servers_scope = fasync::Scope::new();
 
         // Initialize the pipelines that the archivist will expose.
         let pipelines = Self::init_pipelines(&config);
@@ -84,7 +84,7 @@ impl Archivist {
         // Initialize the core event router
         let mut event_router =
             EventRouter::new(component::inspector().root().create_child("events"));
-        let incoming_events_scope = top_level_scope.new_child();
+        let incoming_events_scope = general_scope.new_child();
         Self::initialize_external_event_sources(&mut event_router, &incoming_events_scope).await;
 
         let initial_interests =
@@ -99,21 +99,21 @@ impl Archivist {
             config.logs_max_cached_original_bytes,
             initial_interests,
             component::inspector().root(),
-            top_level_scope.new_child(),
+            general_scope.new_child(),
         );
         if !config.allow_serial_logs.is_empty() {
             let write_logs_to_serial =
                 SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
                     .write_logs(Arc::clone(&logs_repo), SerialSink);
-            top_level_scope.spawn(write_logs_to_serial);
+            general_scope.spawn(write_logs_to_serial);
         }
         let inspect_repo = Arc::new(InspectRepository::new(
             pipelines.iter().map(Arc::downgrade).collect(),
-            top_level_scope.new_child(),
+            general_scope.new_child(),
         ));
 
         let inspect_sink_server =
-            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), servers_scope.to_handle()));
+            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), servers_scope.new_child()));
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
@@ -121,11 +121,11 @@ impl Archivist {
             Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
-            servers_scope.to_handle(),
+            servers_scope.new_child(),
         ));
 
         let log_server =
-            Arc::new(LogServer::new(Arc::clone(&logs_repo), servers_scope.to_handle()));
+            Arc::new(LogServer::new(Arc::clone(&logs_repo), servers_scope.new_child()));
 
         // Initialize the external event providers containing incoming diagnostics directories and
         // log sink connections.
@@ -171,7 +171,7 @@ impl Archivist {
             );
         }
 
-        let stop_recv = component_lifecycle::serve(request_stream, &top_level_scope);
+        let stop_recv = component_lifecycle::serve(request_stream, &general_scope);
 
         Self {
             accessor_server,
@@ -182,7 +182,7 @@ impl Archivist {
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
-            top_level_scope,
+            general_scope,
             servers_scope,
             incoming_events_scope,
         }
@@ -280,7 +280,7 @@ impl Archivist {
             accessor_server: _accessor_server,
             log_server: _log_server,
             _inspect_sink_server,
-            top_level_scope,
+            general_scope,
             incoming_events_scope,
             servers_scope,
             stop_recv,
@@ -292,7 +292,7 @@ impl Archivist {
             .start()
             // panic: can only panic if we didn't register event producers and consumers correctly.
             .expect("Failed to start event router");
-        top_level_scope.spawn(drain_events_fut);
+        general_scope.spawn(drain_events_fut);
 
         let servers_scope_handle = servers_scope.to_handle();
         let stop_fut = async move {
@@ -361,7 +361,7 @@ impl Archivist {
             Arc::clone(&self.logs_repository),
             // Don't create this in the servers scope. We don't care about this protocol for
             // shutdown purposes.
-            self.top_level_scope.to_handle(),
+            self.general_scope.new_child(),
         );
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.diagnostics.LogSettings connection");

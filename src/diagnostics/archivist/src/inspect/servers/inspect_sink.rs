@@ -19,12 +19,12 @@ pub struct InspectSinkServer {
     repo: Arc<InspectRepository>,
 
     /// Scope holding all tasks associated with this server.
-    scope: fasync::ScopeHandle,
+    scope: fasync::Scope,
 }
 
 impl InspectSinkServer {
     /// Construct a server.
-    pub fn new(repo: Arc<InspectRepository>, scope: fasync::ScopeHandle) -> Self {
+    pub fn new(repo: Arc<InspectRepository>, scope: fasync::Scope) -> Self {
         Self { repo, scope }
     }
 
@@ -190,7 +190,7 @@ mod tests {
             let mut proxy_pairs = vec![];
             let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
             let scope = fasync::Scope::new();
-            let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo), scope.to_handle()));
+            let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo), scope.new_child()));
             for id in identity.into_iter() {
                 let (proxy, request_stream) =
                     create_proxy_and_stream::<InspectSinkMarker>().unwrap();
