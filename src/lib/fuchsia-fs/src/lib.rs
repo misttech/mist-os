@@ -10,7 +10,8 @@ pub mod directory;
 pub mod file;
 pub mod node;
 
-// Reexported from fidl_fuchsia_io for convenience
+// Re-exported from fidl_fuchsia_io for convenience.
+// TODO(https://324111518): Remove the re-export of OpenFlags.
 pub use fio::{Flags, OpenFlags};
 
 // The following symbols are defined in fuchsia.io for convenience, but they only exist at HEAD.

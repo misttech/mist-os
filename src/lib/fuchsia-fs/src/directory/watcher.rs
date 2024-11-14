@@ -375,6 +375,7 @@ mod tests {
     }
 
     impl Directory for MockDirectory {
+        // TODO(https://fxbug.dev/324111518): Mark this as unimplemented and replace with open3.
         fn open(
             self: Arc<Self>,
             scope: ExecutionScope,

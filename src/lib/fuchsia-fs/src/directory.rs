@@ -291,6 +291,28 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
     ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
 }
 
+/// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
+pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
+    let (client_end, server_end) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(CloneError::CreateProxy)?;
+    dir.clone2(ServerEnd::new(server_end.into_channel())).map_err(CloneError::SendCloneRequest)?;
+    Ok(client_end)
+}
+
+/// Opens a new connection to the given `directory` using `request`. The cloned connection has the
+/// same permissions as `directory`.
+pub fn clone_onto(
+    directory: &fio::DirectoryProxy,
+    request: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), CloneError> {
+    directory.clone2(ServerEnd::new(request.into_channel())).map_err(CloneError::SendCloneRequest)
+}
+
+// TODO(https://fxbug.dev/324111518): Transition callers of the below functions to `clone` and
+// remove them when no longer required.
+
+/// [DEPRECATED - Use `clone` instead.]
+///
 /// Opens a new connection to the given directory using `flags` if provided, or
 /// `fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS` otherwise.
 pub fn clone_no_describe(
@@ -302,6 +324,8 @@ pub fn clone_no_describe(
     Ok(clone)
 }
 
+/// [DEPRECATED - Use `clone` instead.]
+///
 /// Opens a new connection to the given directory onto the given server end using `flags` if
 /// provided, or `fidl_fuchsia_io::OpenFlags::SAME_RIGHTS` otherwise.
 pub fn clone_onto_no_describe(
@@ -1242,6 +1266,7 @@ mod tests {
     }
 
     // readdir
+    // TODO(https://fxbug.dev/324111518): Transition test to open3.
 
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir() {
@@ -1278,6 +1303,7 @@ mod tests {
 
     // dir_contains
 
+    // TODO(https://fxbug.dev/324111518): Transition test to open3.
     #[fasync::run_singlethreaded(test)]
     async fn test_dir_contains() {
         let (dir_client, server_end) =

@@ -777,6 +777,7 @@ mod tests {
         proxy
     }
 
+    // TODO(https://fxbug.dev/324111518): Transition this to fuchsia.io/Flags instead of OpenFlags.
     #[fasync::run_singlethreaded(test)]
     async fn read_file_with_on_open_event_with_stream() {
         let data = b"file-contents".repeat(1000);
