@@ -28,7 +28,7 @@ pub enum FullmacRequest {
     SaeFrameTx(fidl_fullmac::WlanFullmacSaeFrame),
     WmmStatusReq,
     SetMulticastPromisc(bool),
-    OnLinkStateChanged(bool),
+    OnLinkStateChanged(fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest),
 
     // Note: WlanFullmacImpl::Start has a channel as an argument, but we don't keep the channel
     // here.
@@ -128,8 +128,8 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::SetMulticastPromisc { enable, .. } => {
                 self.history.push(FullmacRequest::SetMulticastPromisc(*enable))
             }
-            WlanFullmacImpl_Request::OnLinkStateChanged { online, .. } => {
-                self.history.push(FullmacRequest::OnLinkStateChanged(*online))
+            WlanFullmacImpl_Request::OnLinkStateChanged { payload, .. } => {
+                self.history.push(FullmacRequest::OnLinkStateChanged(payload.clone()))
             }
             WlanFullmacImpl_Request::Init { .. } => self.history.push(FullmacRequest::Init),
 

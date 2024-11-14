@@ -344,8 +344,12 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             return Ok(());
         }
 
-        let online = new_link_state == fidl_mlme::ControlledPortState::Open;
-        self.device.on_link_state_changed(online)?;
+        let req = fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+            online: Some(new_link_state == fidl_mlme::ControlledPortState::Open),
+            ..Default::default()
+        };
+
+        self.device.on_link_state_changed(req)?;
         self.device_link_state = new_link_state;
         Ok(())
     }
@@ -469,9 +473,12 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         assert!(h.mlme.is_bss_protected);
+
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { req })) => {
             let selected_bss = req.selected_bss.clone().unwrap();
@@ -560,7 +567,9 @@ mod handle_mlme_request_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DeauthReq { req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
@@ -598,7 +607,9 @@ mod handle_mlme_request_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Disassoc{ req })) => req);
@@ -850,8 +861,8 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { online })) => {
-            assert_eq!(online, expected_link_state);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+            assert_eq!(req.online, Some(expected_link_state));
         });
     }
 
@@ -1255,13 +1266,17 @@ mod handle_driver_event_tests {
 
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+              assert_eq!(req.online, Some(false));
+          }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { .. })));
         if expected_online {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                  assert_eq!(req.online, Some(true));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1317,7 +1332,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1353,7 +1370,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1427,7 +1446,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1462,7 +1483,9 @@ mod handle_driver_event_tests {
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req })) =>{
+                  assert_eq!(req.online, Some(false));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1501,7 +1524,9 @@ mod handle_driver_event_tests {
         if expected_link_state_changed {
             assert_variant!(
                 h.driver_calls.try_next(),
-                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+                Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+                  assert_eq!(req.online, Some(true));
+              }
             );
         } else {
             assert_variant!(h.driver_calls.try_next(), Err(_));
@@ -1601,7 +1626,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam start causes MLME to close the controlled port.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+              assert_eq!(req.online, Some(false));
+          }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1634,7 +1661,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam request causes MLME to close the controlled port.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                assert_eq!(req.online, Some(false));
+            }
         );
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::RoamReq { req })) => {
             assert_eq!(selected_bss, req.selected_bss.clone().unwrap());
@@ -1671,7 +1700,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req }))=>{
+              assert_eq!(req.online, Some(true));
+          }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1721,7 +1752,9 @@ mod handle_driver_event_tests {
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
         assert_variant!(
             h.driver_calls.try_next(),
-            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+            Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
+                assert_eq!(req.online, Some(true));
+            }
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);

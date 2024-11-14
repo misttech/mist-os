@@ -56,7 +56,7 @@ async fn setup_test_bss_started(
                 .expect("Could not send StartConf");
 
             assert_variant!(fullmac_driver.request_stream.next().await,
-                fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+                fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                     responder.send().expect("Could not respond to OnLinkStateChanged");
             });
         };
@@ -115,7 +115,7 @@ async fn test_start_2ghz_bss_success() {
             .expect("Could not send StartConf");
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
     };
@@ -142,7 +142,15 @@ async fn test_start_2ghz_bss_success() {
         })
     );
 
-    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(true));
+    assert_eq!(
+        fullmac_request_history[1],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(true),
+                ..Default::default()
+            }
+        )
+    );
 
     // Check AP status to see that SME reports that an AP is running.
     // Driver does not take part in this interaction.
@@ -227,7 +235,7 @@ async fn test_stop_bss() {
             .expect("Could not send StopConf");
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { online:_ , responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::OnLinkStateChanged { payload:_ , responder } => {
                 responder.send().expect("Could not respond to OnLinkStateChanged");
         });
     };
@@ -247,7 +255,15 @@ async fn test_stop_bss() {
         })
     );
 
-    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(false));
+    assert_eq!(
+        fullmac_request_history[1],
+        FullmacRequest::OnLinkStateChanged(
+            fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest {
+                online: Some(false),
+                ..Default::default()
+            }
+        )
+    );
 }
 
 #[fuchsia::test]

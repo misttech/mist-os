@@ -51,7 +51,10 @@ pub trait DeviceOps {
     ) -> anyhow::Result<()>;
     fn sae_frame_tx(&self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()>;
     fn wmm_status_req(&self) -> anyhow::Result<()>;
-    fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()>;
+    fn on_link_state_changed(
+        &self,
+        req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+    ) -> anyhow::Result<()>;
 }
 
 pub struct FullmacDevice {
@@ -236,9 +239,12 @@ impl DeviceOps for FullmacDevice {
             .wmm_status_req(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on WmmStatusReq")
     }
-    fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()> {
+    fn on_link_state_changed(
+        &self,
+        req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+    ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .on_link_state_changed(online, zx::MonotonicInstant::INFINITE)
+            .on_link_state_changed(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on OnLinkStateChanged")
     }
 }
@@ -271,7 +277,7 @@ pub mod test_utils {
         SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacSaeHandshakeResp },
         SaeFrameTx { frame: fidl_fullmac::WlanFullmacSaeFrame },
         WmmStatusReq,
-        OnLinkStateChanged { online: bool },
+        OnLinkStateChanged { req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest },
     }
 
     pub struct FakeFullmacDeviceMocks {
@@ -522,8 +528,11 @@ pub mod test_utils {
             self.driver_call_sender.send(DriverCall::WmmStatusReq);
             Ok(())
         }
-        fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::OnLinkStateChanged { online });
+        fn on_link_state_changed(
+            &self,
+            req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest,
+        ) -> anyhow::Result<()> {
+            self.driver_call_sender.send(DriverCall::OnLinkStateChanged { req });
             Ok(())
         }
     }

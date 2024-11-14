@@ -550,7 +550,13 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request,
                                        OnLinkStateChangedCompleter::Sync& completer) {
   {
     std::shared_lock<std::shared_mutex> guard(lock_);
-    bool online = request->online;
+    if (!request->has_online()) {
+      BRCMF_ERR("Reset req does not contain required field, online: %d", request->has_online());
+      completer.Reply();
+      return;
+    }
+
+    bool online = request->online();
     SetPortOnline(online);
   }
   completer.Reply();

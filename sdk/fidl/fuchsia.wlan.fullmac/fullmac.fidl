@@ -693,8 +693,8 @@ closed protocol WlanFullmacImpl {
 
     // Notify the interface whether it's online or offline. For client interfaces the online status
     // changes based on such things as being associated/disassociated with an AP. For encrypted
-    // connections this will be regulated by MLME calls to SetControlledPort, for open connections
-    // the interface is considered online as soon as association is confirmed.
+    // connections, the interface is considered online after the key exchange completes successfully,
+    // for open connections the interface is considered online as soon as association is confirmed.
     //
     // A SoftAP interface is set to online when:
     // 1) The driver confirms that a request to start a SoftAP succeeded.
@@ -706,8 +706,8 @@ closed protocol WlanFullmacImpl {
     // above where a call to stop an AP has been made there will be a call to OnLinkStateChanged.
     // However when the driver confirms this there will be no additional call to OnLinkStateChanged
     // because it was already offline.
-    strict OnLinkStateChanged(struct {
-        online bool;
+    strict OnLinkStateChanged(table {
+        1: online bool;
     }) -> ();
 };
 
