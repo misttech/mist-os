@@ -33,47 +33,68 @@ ffx session launch fuchsia-pkg://fuchsia.com/your_session#meta/your_session.cm
 ### Launching a session on boot
 
 `session_manager` attempts to launch a session on boot based on the contents of
-its `session_url` configuration parameter.
+its `product.session.url` configuration parameter.
 
 To boot into a session, include `session_manager` and the session component in
 the base package set and assign the URL of the session component to the product
-configuration:
+configuration, update your `//local/BUILD.gn` file to use the
+`assembly_developer_overrides` template:
+
+  <pre><code>
+  import("//build/assembly/developer_overrides.gni")
+
+  assembly_developer_overrides("<var>custom_session</var>") {
+    base_packages = [
+      "<var>//path/to/your/session</var>"
+    ]
+    platform = {
+      session = {
+        enabled = true
+      }
+    }
+    product = {
+      session = {
+        url = "fuchsia-pkg://fuchsia.com/your_package#meta/your_session.cm"
+      }
+    }
+  }
+  </code></pre>
+
+Then include the new build target in your `fx set`:
 
 ```
-fx set core.x64 \
-  --with-base //src/session/bin/session_manager \
-  --with-base //path/to/your_session \
-  --args=product_config.session_url="fuchsia-pkg://fuchsia.com/your_package#meta/your_session.cm"
+fx set minimal.x64 --assembly-override=//local:<var>custom_session</var>
 ```
 
-This can also be configured directly in a product's definition `*.gni` files
-or via `fx args`.
-
-Re-build, re-pave, and restart your device and it will boot into
-`session_manager` and launch your session.
+Re-build and ota, and the device will boot into `session_manager` and
+autolaunch your session.
 
 ### Temporarily disabling launch-on-boot
 
-TODO(https://fxbug.dev/42077029): Update this documentation once we move this
-functionality to only rely on structured config.
+If your development device runs a product that specifies `product.session.url`,
+you may nonetheless want to stop the session from launching (e.g., to avoid log
+spam from the session, or make changes to the device's state _before_ the
+session launches).
 
-If your development device runs a product that specifies
-`product_config.session_url`, you may nonetheless want to stop the session from
-launching (e.g., to avoid log spam from the session, or make changes to the
-device's state _before_ the session launches).
+You can disable autolaunching by updating your `//local/BUILD.gn` accordingly:
 
-You can disable autolaunching without reflashing or OTAing your device by
-creating an empty file at `/data/session-manager/noautolaunch`.
+  <pre><code>
+  import("//build/assembly/developer_overrides.gni")
 
-To prevent your device from autolaunching the session, run:
-
-    fx shell 'mkdir -p /data/session-manager && echo "" > /data/session-manager/noautolaunch'
-
-To re-enable autolaunching, run:
-
-    fx shell 'rm /data/session-manager/noautolaunch'
-
-The setting will take effect the next time `session-manager` restarts.
+  assembly_developer_overrides("<var>custom_session</var>") {
+     platform = {
+        session = {
+           enabled = true
+           autolaunch = false
+        }
+     }
+     product = {
+        session = {
+           url = "fuchsia-pkg://fuchsia.com/your_package#meta/your_session.cm"
+        }
+     }
+  }
+  </code></pre>
 
 ## Testing
 

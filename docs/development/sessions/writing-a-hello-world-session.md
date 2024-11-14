@@ -124,26 +124,60 @@ fuchsia-pkg://fuchsia.com/hello-world-session#meta/hello-world-session.cm
 
 ## Building the session {#building-the-session}
 
-To build the session `fx set` must first be used to configure the build so that
-`session_manager`, your session component, and the session config are included
-in the base package set. This is done using the `--with-base` flag. The session
-URL must also be configured, which is done using the `--args` flag.
+To build the session `//local/BUILD.gn` must first be used to override
+assembly configuration values so that `session_manager`, your session
+component, and the session config are included in the base package set.
+This is done using the `assembly_developer_overrides` template.
+
+  <pre><code>
+  import("//build/assembly/developer_overrides.gni")
+
+  assembly_developer_overrides("<var>custom_session</var>") {
+    base_packages = [
+      "<var>//path/to/your/session</var>"
+    ]
+    platform = {
+      session = {
+        enabled = true
+      }
+    }
+    product = {
+      session = {
+        url = "fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm"
+      }
+    }
+  }
+  </code></pre>
+
+The `fx set` command must then be used to include the custom session
+configurations in the build.
 
 ```posix-terminal
-fx set core.x64 \
-    --with-base //src/session/bin/session_manager \
-    --with-base {{ '<var label="session path">//path/to/your/session</var>' }} \
-    --args=product_config.session_url = "fuchsia-pkg://fuchsia.com/<var>package_name</var>#meta/<var>component_name</var>.cm"
+fx set minimal.x64 --assembly-override=//local:<var>custom_session</var>
 ```
 
 If you are using the example project from the `//src/session/examples` directory,
-the `fx set` command would be:
+the `assembly_developer_overrides` would be:
 
-```posix-terminal
-fx set core.x64 \
-    --with-base //src/session/bin/session_manager \
-    --with-base //src/session/examples/hello-world-session \
-    --args=product_config.session_url = "fuchsia-pkg://fuchsia.com/hello-world-session#meta/hello-world-session.cm"
+  <pre><code>
+  assembly_developer_overrides("hello-world-session") {
+     platform = {
+        session = {
+           enabled = true
+        }
+     }
+     product = {
+        session = {
+           url = "fuchsia-pkg://fuchsia.com/hello-world-session#meta/hello-world-session.cm"
+        }
+     }
+  }
+  </code></pre>
+
+And include the build target in your `fx set` arguments:
+
+```
+fx set minimal.x64 --assembly-override=//local:hello-world-session
 ```
 
 Once that's done and built `session_manager` should automatically start your

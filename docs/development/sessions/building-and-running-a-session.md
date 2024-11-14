@@ -8,35 +8,50 @@ component is responsible for building a product's user experience.
 To boot into a session, do the following:
 
 1. For a session to run at boot you need to configure the product build with
-the session's URL. Identify the component URL for your session:
+   the session's URL. Identify the component URL for your session:
 
-   <pre><code>
-       fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm</var>
-   </code></pre>
+      <pre><code>
+      fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm</var>
+      </code></pre>
 
    Replace the following:
-   * <var>pkg-name</var>: the package name
-   * <var>your_session.cm</var>: the name of your session, including the `.cm`
-   extension.
+
+   - <var>pkg-name</var>: the package name
+   - <var>your_session.cm</var>: the name of your session, including the `.cm`
+     extension.
 
    For more information, see
    [`fuchsia-pkg`](/docs/reference/components/url.md#fuchsia-pkg) and
    [Package name](/docs/concepts/packages/package_url.md#package-name).
 
-1. Run the following command to include `session_manager` and `your_session`
-   in your base image, configuring `session_manager` to start your session:
+1. Update your `//local/BUILD.gn` to include `product_assembly_overrides`.
+
+  <pre><code>
+  import("//build/assembly/developer_overrides.gni")
+
+  assembly_developer_overrides("<var>custom_session</var>") {
+    base_packages = [
+      "<var>//path/to/your/session</var>"
+    ]
+    platform = {
+      session = {
+        enabled = true
+      }
+    }
+    product = {
+      session = {
+        url = "fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm"
+      }
+    }
+  }
+  </code></pre>
+
+1. Run the following command to include `your_session` in your base image and set
+   the configuration values you defined in `//local:custom_session`.
 
    <pre class="prettyprint"><code class="devsite-terminal">
-      fx set <var>product</var>.<var>board</var> \
-         --with-base=//src/session/bin/session_manager \
-         --with-base=<var>//path/to/your/session</var> \
-         --args=product_config.session_url="fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm</var>"
+   fx set <var>product</var>.<var>board</var> --assembly-override=//local:<var>custom_session</var>
    </code></pre>
-
-   Note: Selecting a product that already has a session manager package will
-   result in a build error because the packages will conflict. The `core`
-   product would be a good choice as a starting point as it includes only the
-   bare minimum needed to launch Fuchsia.
 
    `fx list-products` and `fx list-boards` will show lists of the products and
    boards available to be used in the `fx set` command. For more information on
@@ -59,14 +74,39 @@ World Session](/docs/development/sessions/writing-a-hello-world-session.md).
 There are cases when you don't want your session to launch at boot but still
 want to be able to launch it from the command line. `session_manager` needs
 to be running to launch a session. The `session_manager` target
-ensures `session_manager` itself starts, but does not launch a session.
+ensures `session_manager` itself starts, but does not autolaunch a session.
 
 To launch a session from the command line, do the following:
 
-1. Add the `session_manager` target in the base dependency set, in
-addition to the session target.
+1. Update your `//local/BUILD.gn` with `product_assembly_overrides` using `autolaunch`.
 
-   <pre class="prettyprint"><code class="devsite-terminal">fx set <var>product</var>.<var>board</var> --with-base=//src/session/bin/session_manager --with=<var>//path/to/your/session</var></code></pre>
+  <pre><code>
+  import("//build/assembly/developer_overrides.gni")
+
+  assembly_developer_overrides("custom_session") {
+    base_packages = [
+      "<var>//path/to/your/session</var>"
+    ]
+    platform = {
+      session = {
+        enabled = true
+        autolaunch = false
+      }
+    }
+    product = {
+      session = {
+        url = "fuchsia-pkg://fuchsia.com/<var>pkg-name</var>#meta/<var>your_session.cm"
+      }
+    }
+  }
+  </code></pre>
+
+1. Add the `session_manager` target in the base dependency set, in
+   addition to the session target.
+
+   <pre class="prettyprint"><code class="devsite-terminal">
+   fx set <var>product</var>.<var>board</var> --assembly-override=<var>//local:custom_session</var>
+   </code></pre>
 
    `fx list-products` and `fx list-boards` will show lists of the products and
    boards available to be used in the `fx set` command. For more information on
