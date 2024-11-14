@@ -15,6 +15,8 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
+use fuchsia_async::Timer;
+use futures::future::{pending, Either};
 use futures::{select, Future, FutureExt, TryStreamExt};
 use std::net::IpAddr;
 use std::time::Duration;
@@ -305,15 +307,14 @@ async fn wait_for_device_inner(
                             Err(ffx_command::Error::Unexpected(e.into()))
                         } else {
                             tracing::debug!("error non-critical. retrying.");
-                            async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS))
-                                .await;
+                            Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                             continue;
                         }
                     }
                 }
                 Ok(()) => {
                     if let WaitFor::DeviceOffline = behavior {
-                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
+                        Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                         continue;
                     } else {
                         Ok(())
@@ -323,9 +324,9 @@ async fn wait_for_device_inner(
         }
     };
     let timer = if wait_timeout.is_some() {
-        async_io::Timer::after(wait_timeout.unwrap())
+        Either::Left(fuchsia_async::Timer::new(wait_timeout.unwrap()))
     } else {
-        async_io::Timer::never()
+        Either::Right(pending())
     };
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;

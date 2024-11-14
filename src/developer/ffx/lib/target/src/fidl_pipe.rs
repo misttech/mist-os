@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
 use ffx_ssh::parse::HostAddr;
-use fuchsia_async::Task;
+use fuchsia_async::{Task, Timer};
 use futures::FutureExt;
 use futures_lite::stream::StreamExt;
 use std::io;
@@ -112,7 +112,7 @@ impl FidlPipe {
             let error = format!("non-fatal error connecting to device. Retrying again after {wait_duration:?}: {error:?}");
             tracing::debug!(error);
             eprintln!("{}", error);
-            async_io::Timer::after(wait_duration).await;
+            Timer::new(wait_duration).await;
             wait_duration *= 2;
         };
 

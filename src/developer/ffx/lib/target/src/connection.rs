@@ -231,7 +231,7 @@ pub mod testing {
     use crate::target_connector::{OvernetConnection, TargetConnection, TargetConnectionError};
     use async_channel::Receiver;
     use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
-    use fuchsia_async::Task;
+    use fuchsia_async::{Task, Timer};
     use futures::{FutureExt, StreamExt, TryStreamExt};
     use std::time::Duration;
 
@@ -342,7 +342,7 @@ pub mod testing {
             if let FakeOvernetBehavior::FailNonFatalOnce = self.behavior {
                 if !self.already_failed {
                     self.already_failed = true;
-                    async_io::Timer::after(Duration::from_secs(5)).await;
+                    Timer::new(Duration::from_secs(5)).await;
                     return Err(TargetConnectionError::NonFatal(anyhow::anyhow!(
                         "awww, we have to try again (for testing, of course)!"
                     )));
