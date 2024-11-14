@@ -24,7 +24,7 @@
 // (see llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp and
 // compiler-rt/lib/asan/*).
 
-constexpr size_t kAsanMaxGlobalsRegions = 450;
+constexpr size_t kAsanMaxGlobalsRegions = 500;
 static ktl::array<ktl::span<const asan_global>, kAsanMaxGlobalsRegions> g_globals_regions;
 static size_t g_total_globals;
 
