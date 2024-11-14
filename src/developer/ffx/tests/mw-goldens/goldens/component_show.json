@@ -59,6 +59,12 @@
             "null"
           ]
         },
+        "runner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "incoming_capabilities": {
           "type": "array",
           "items": {
