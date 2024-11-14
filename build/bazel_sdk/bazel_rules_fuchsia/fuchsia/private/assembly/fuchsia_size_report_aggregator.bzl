@@ -8,21 +8,21 @@ load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_size_report_aggregator_impl(ctx):
-    size_budgets = ",".join([
-        report[FuchsiaSizeCheckerInfo].size_budgets.path
+    size_budgets = [
+        report[FuchsiaSizeCheckerInfo].size_budgets
         for report in ctx.attr.size_reports
         if hasattr(report[FuchsiaSizeCheckerInfo], "size_budgets")
-    ])
-    size_reports = ",".join([
-        report[FuchsiaSizeCheckerInfo].size_report.path
+    ]
+    size_reports = [
+        report[FuchsiaSizeCheckerInfo].size_report
         for report in ctx.attr.size_reports
         if hasattr(report[FuchsiaSizeCheckerInfo], "size_report")
-    ])
-    verbose_outputs = ",".join([
-        report[FuchsiaSizeCheckerInfo].verbose_output.path
+    ]
+    verbose_outputs = [
+        report[FuchsiaSizeCheckerInfo].verbose_output
         for report in ctx.attr.size_reports
         if hasattr(report[FuchsiaSizeCheckerInfo], "verbose_output")
-    ])
+    ]
 
     size_budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
     size_report_file = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
@@ -40,22 +40,22 @@ def _fuchsia_size_report_aggregator_impl(ctx):
     if size_budgets:
         _merge_arguments += [
             "--size-budgets",
-            size_budgets,
+            ",".join([budget.path for budget in size_budgets]),
         ]
     if size_reports:
         _merge_arguments += [
             "--size-reports",
-            size_reports,
+            ",".join([report.path for report in size_reports]),
         ]
     if verbose_outputs:
         _merge_arguments += [
             "--verbose-outputs",
-            verbose_outputs,
+            ",".join([output.path for output in verbose_outputs]),
         ]
 
     ctx.actions.run(
         outputs = [size_budgets_file, size_report_file, verbose_output_file],
-        inputs = ctx.files.size_reports,
+        inputs = size_budgets + size_reports + verbose_outputs,
         executable = ctx.executable._size_report_merger,
         arguments = _merge_arguments,
         **LOCAL_ONLY_ACTION_KWARGS
