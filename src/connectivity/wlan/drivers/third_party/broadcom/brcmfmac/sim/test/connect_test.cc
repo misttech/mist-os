@@ -26,7 +26,7 @@ namespace wlan_ieee80211 = wlan_ieee80211;
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
-const uint8_t kIes[] = {
+constexpr uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
     // Supported rates
@@ -141,7 +141,7 @@ class ConnectTest : public SimTest {
   // Event handlers
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
-  void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp);
+  void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
@@ -252,7 +252,8 @@ void ConnectInterface::ConnectConf(ConnectConfRequestView request,
 }
 void ConnectInterface::DisassocConf(DisassocConfRequestView request,
                                     DisassocConfCompleter::Sync& completer) {
-  test_->OnDisassocConf(request);
+  auto disassoc_conf = fidl::ToNatural(*request);
+  test_->OnDisassocConf(&disassoc_conf);
   completer.Reply();
 }
 void ConnectInterface::DeauthConf(DeauthConfRequestView request,
@@ -379,8 +380,8 @@ void ConnectTest::OnConnectConf(
 }
 
 void ConnectTest::OnDisassocConf(
-    const wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest* resp) {
-  if (resp->status() == ZX_OK) {
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp) {
+  if (resp->status().has_value() && resp->status().value() == ZX_OK) {
     context_.disassoc_conf_count++;
   }
 }

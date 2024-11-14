@@ -233,11 +233,7 @@ void SimInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync
 
 void SimInterface::DisassocConf(DisassocConfRequestView request,
                                 DisassocConfCompleter::Sync& completer) {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest::Builder(test_arena_);
-  if (request->has_status()) {
-    builder.status(request->status());
-  }
-  stats_.disassoc_results.emplace_back(builder.Build());
+  stats_.disassoc_results.emplace_back(fidl::ToNatural(*request));
   assoc_ctx_.state = AssocContext::kNone;
   completer.Reply();
 }

@@ -60,7 +60,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
     std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcAuthIndRequest> auth_indications;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDeauthConfRequest> deauth_results;
-    std::list<wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
     std::list<wlan_fullmac_wire::WlanFullmacDeauthIndication> deauth_indications;
     std::list<wlan_fullmac_wire::WlanFullmacDisassocIndication> disassoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
