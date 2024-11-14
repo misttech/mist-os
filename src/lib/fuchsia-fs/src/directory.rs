@@ -319,24 +319,12 @@ pub fn clone_no_describe(
     dir: &fio::DirectoryProxy,
     flags: Option<fio::OpenFlags>,
 ) -> Result<fio::DirectoryProxy, CloneError> {
-    let (clone, server_end) = fidl::endpoints::create_proxy().map_err(CloneError::CreateProxy)?;
-    clone_onto_no_describe(dir, flags, server_end)?;
-    Ok(clone)
-}
-
-/// [DEPRECATED - Use `clone` instead.]
-///
-/// Opens a new connection to the given directory onto the given server end using `flags` if
-/// provided, or `fidl_fuchsia_io::OpenFlags::SAME_RIGHTS` otherwise.
-pub fn clone_onto_no_describe(
-    dir: &fio::DirectoryProxy,
-    flags: Option<fio::OpenFlags>,
-    request: ServerEnd<fio::DirectoryMarker>,
-) -> Result<(), CloneError> {
-    let node_request = ServerEnd::new(request.into_channel());
+    let (client_end, server_end) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(CloneError::CreateProxy)?;
     let flags = flags.unwrap_or(fio::OpenFlags::CLONE_SAME_RIGHTS);
-
-    dir.clone(flags, node_request).map_err(CloneError::SendCloneRequest)
+    dir.clone(flags, ServerEnd::new(server_end.into_channel()))
+        .map_err(CloneError::SendCloneRequest)?;
+    Ok(client_end)
 }
 
 /// Gracefully closes the directory proxy from the remote end.

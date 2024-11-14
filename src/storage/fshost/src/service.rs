@@ -24,7 +24,7 @@ use fs_management::partition::{
 };
 use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
 use fuchsia_async::TimeoutExt as _;
-use fuchsia_fs::directory::clone_onto_no_describe;
+use fuchsia_fs::directory::clone_onto;
 use fuchsia_fs::file::write;
 use fuchsia_runtime::HandleType;
 use futures::channel::mpsc;
@@ -194,7 +194,7 @@ async fn wipe_storage_fxblob(
         )
         .await
         .context("making blob volume")?;
-    clone_onto_no_describe(blob_volume.root(), None, blobfs_root)?;
+    clone_onto(blob_volume.root(), blobfs_root)?;
     blob_volume.exposed_dir().open(
         fio::OpenFlags::empty(),
         fio::ModeType::empty(),
@@ -318,7 +318,7 @@ async fn wipe_storage_fvm(
     let mut blobfs = filesystem::Filesystem::new(blobfs_controller, blobfs_config);
     blobfs.format().await.context("Failed to format blobfs")?;
     let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
-    clone_onto_no_describe(started_blobfs.root(), None, blobfs_root)?;
+    clone_onto(started_blobfs.root(), blobfs_root)?;
     // Prevent fs_management from shutting down the filesystem when it's dropped.
     let _ = started_blobfs.take_exposed_dir();
     Ok(())

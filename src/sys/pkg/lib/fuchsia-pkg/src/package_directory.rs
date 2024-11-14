@@ -110,7 +110,7 @@ impl PackageDirectory {
 
     /// Send request to also serve this package directory on the given directory request.
     pub fn reopen(&self, dir_request: ServerEnd<fio::DirectoryMarker>) -> Result<(), CloneError> {
-        fuchsia_fs::directory::clone_onto_no_describe(&self.proxy, None, dir_request)
+        fuchsia_fs::directory::clone_onto(&self.proxy, dir_request)
     }
 
     /// Unwraps the inner DirectoryProxy, consuming self.
