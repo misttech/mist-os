@@ -1159,7 +1159,7 @@ async fn doctor_summary<W: Write>(
                 if t.is_none() || t.as_ref().unwrap().is_empty() {
                     "(none)".to_string()
                 } else {
-                    t.clone().unwrap()
+                    t.unwrap()
                 }
             };
             let node = ledger.add_node(

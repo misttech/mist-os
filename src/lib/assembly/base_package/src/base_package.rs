@@ -111,7 +111,7 @@ impl BasePackageBuilder {
             base_packages,
             cache_packages,
             generated_files,
-            manifest_path: manifest_path.clone(),
+            manifest_path: manifest_path,
         })
     }
 }

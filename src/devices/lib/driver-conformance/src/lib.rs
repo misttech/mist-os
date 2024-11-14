@@ -26,7 +26,7 @@ use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm};
 impl From<parser::TestInfo> for run_test_suite_lib::TestParams {
     fn from(item: parser::TestInfo) -> Self {
         run_test_suite_lib::TestParams {
-            test_url: item.url.to_string(),
+            test_url: item.url,
             ..run_test_suite_lib::TestParams::default()
         }
     }

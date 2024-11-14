@@ -180,7 +180,7 @@ pub fn get_repo_base_name(
             .get::<Option<String>, _>(CONFIG_KEY_DEFAULT_REPOSITORY)
             .map_err(|e| bug!("{e}"))?
         {
-            return Ok(repo_name.to_string());
+            return Ok(repo_name);
         }
     }
     Ok(DEFAULT_REPO_NAME.to_string())

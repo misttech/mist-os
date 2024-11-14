@@ -296,7 +296,7 @@ impl KeyboardViewAssistant {
     ) -> Result<KeyboardViewAssistant, Error> {
         Ok(KeyboardViewAssistant {
             font_face,
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             view_key,
             focused: false,
             field_name: String::new(),

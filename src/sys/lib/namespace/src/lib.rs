@@ -75,7 +75,7 @@ impl Namespace {
 
     /// Get a copy of the paths in the namespace.
     pub fn paths(&self) -> Vec<NamespacePath> {
-        self.tree.map_ref(|_| ()).clone().flatten().into_iter().map(|(path, ())| path).collect()
+        self.tree.map_ref(|_| ()).flatten().into_iter().map(|(path, ())| path).collect()
     }
 }
 

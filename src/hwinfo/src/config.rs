@@ -99,7 +99,7 @@ impl DeviceInfo {
         // in vim3
         if device_info.serial_number.is_none() {
             device_info.serial_number = match get_zbi_serial_number().await {
-                Ok(content) => Some(content.to_string()),
+                Ok(content) => Some(content),
                 Err(err) => {
                     tracing::warn!("Failed to read serial number from boot {}", err);
                     None

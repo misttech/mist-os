@@ -275,7 +275,7 @@ impl Interpreter {
                             };
 
                             Ok(Value::Object(vec![
-                                ("name".to_owned(), Value::String(name.to_owned())),
+                                ("name".to_owned(), Value::String(name)),
                                 ("kind".to_owned(), Value::String(format!("{:?}", kind))),
                             ]))
                         };

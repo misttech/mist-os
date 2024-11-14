@@ -246,7 +246,7 @@ impl Instance {
             XmlEvent::Characters(chars) => {
                 // There are probably more ways in which we can get characters, like cdata
                 // and such.
-                self.state = State::String { name: token_name, text: text.to_owned() + &chars };
+                self.state = State::String { name: token_name, text: text + &chars };
             }
             XmlEvent::EndElement { ref name, .. } => {
                 if name.local_name != "string" {
@@ -282,7 +282,7 @@ impl Instance {
             XmlEvent::Characters(chars) => {
                 // There are probably more ways in which we can get characters, like cdata
                 // and such.
-                self.state = State::XliffG { name: token_name, text: text.to_owned() + &chars };
+                self.state = State::XliffG { name: token_name, text: text + &chars };
             }
             XmlEvent::EndElement { ref name, .. } => {
                 let ns = name.namespace.clone();

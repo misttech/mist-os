@@ -150,7 +150,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             }
             .boxed()
         });
-        let weak_self_for_fut = weak_self.clone();
+        let weak_self_for_fut = weak_self;
         this.node.record_lazy_child("@total", move || {
             let weak_self_clone = weak_self_for_fut.clone();
             async move {

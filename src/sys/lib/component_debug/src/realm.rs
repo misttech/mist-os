@@ -267,7 +267,7 @@ impl TryFrom<fcdecl::ResolvedConfigField> for ConfigField {
                 })
             }
         };
-        Ok(ConfigField { key: field.key.clone(), value })
+        Ok(ConfigField { key: field.key, value })
     }
 }
 

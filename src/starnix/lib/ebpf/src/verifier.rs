@@ -1516,11 +1516,7 @@ impl ComputationContext {
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
                 let offset = op(x as u64, y);
-                Type::PtrToMemory {
-                    id: id.clone(),
-                    offset: offset as i64,
-                    buffer_size: buffer_size,
-                }
+                Type::PtrToMemory { id: id, offset: offset as i64, buffer_size: buffer_size }
             }
             (
                 alu_type,
@@ -1528,11 +1524,7 @@ impl ComputationContext {
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
                 let offset = op(x as u64, y);
-                Type::PtrToStruct {
-                    id: id.clone(),
-                    offset: offset as i64,
-                    descriptor: descriptor.clone(),
-                }
+                Type::PtrToStruct { id: id, offset: offset as i64, descriptor: descriptor }
             }
             (
                 alu_type,
@@ -1540,7 +1532,7 @@ impl ComputationContext {
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
                 let offset = op(x as u64, y);
-                Type::PtrToArray { id: id.clone(), offset: offset as i64 }
+                Type::PtrToArray { id: id, offset: offset as i64 }
             }
             (
                 AluType::Sub,
@@ -1600,7 +1592,7 @@ impl ComputationContext {
         }
         let op1 = self.reg(dst)?;
         let op2 = self.compute_source(src)?;
-        let result = Self::apply_computation(op1.clone(), op2, alu_type, op)?;
+        let result = Self::apply_computation(op1, op2, alu_type, op)?;
         let mut next = self.next()?;
         next.set_reg(dst, result)?;
         verification_context.states.push(next);
@@ -1640,11 +1632,11 @@ impl ComputationContext {
         op: impl FnOnce(Type, Type) -> Result<Type, String>,
     ) -> Result<(), String> {
         self.log_atomic_operation(op_name, verification_context, fetch, dst, offset, src);
-        let addr = self.reg(dst)?.clone();
+        let addr = self.reg(dst)?;
         let value = self.reg(src)?;
         let field = Field::new(offset, width);
         let loaded_type = self.load_memory(verification_context, &addr, field)?;
-        let result = op(loaded_type.clone(), value.clone())?;
+        let result = op(loaded_type.clone(), value)?;
         let mut next = self.next()?;
         next.store_memory(verification_context, &addr, field, result)?;
         if fetch {
@@ -1693,7 +1685,7 @@ impl ComputationContext {
             JumpWidth::W32 => DataWidth::U32,
             JumpWidth::W64 => DataWidth::U64,
         };
-        let addr = self.reg(dst)?.clone();
+        let addr = self.reg(dst)?;
         let field = Field::new(offset, width);
         let dst = self.load_memory(verification_context, &addr, field)?;
         let value = self.reg(src)?;
@@ -1705,14 +1697,13 @@ impl ComputationContext {
             let (dst, r0) =
                 Type::constraint(&mut next, JumpType::Eq, jump_width, dst.clone(), r0.clone())?;
             next.set_reg(0, dst)?;
-            next.store_memory(verification_context, &addr, field, value.clone())?;
+            next.store_memory(verification_context, &addr, field, value)?;
             verification_context.states.push(next);
         }
         // r0 != dst
         if !branch.unwrap_or(false) {
             let mut next = self.next()?;
-            let (dst, r0) =
-                Type::constraint(&mut next, JumpType::Ne, jump_width, dst.clone(), r0.clone())?;
+            let (dst, r0) = Type::constraint(&mut next, JumpType::Ne, jump_width, dst, r0)?;
             next.set_reg(0, dst.clone())?;
             next.store_memory(verification_context, &addr, field, dst)?;
             verification_context.states.push(next);
@@ -2059,7 +2050,7 @@ impl DataDependencies {
         if fetch && self.registers.contains(&src) {
             is_read = true;
         }
-        let addr = context.reg(dst)?.clone();
+        let addr = context.reg(dst)?;
         if let Type::PtrToStack { offset: stack_offset } = addr {
             let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
             if !stack_offset.is_valid() {
@@ -2689,7 +2680,7 @@ impl BpfVisitor for DataDependencies {
     ) -> Result<(), String> {
         let context = &context.computation_context;
         if self.registers.contains(&dst) {
-            let addr = context.reg(src)?.clone();
+            let addr = context.reg(src)?;
             if let Type::PtrToStack { offset: stack_offset } = addr {
                 let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
                 if !stack_offset.is_valid() {
@@ -2745,7 +2736,7 @@ impl BpfVisitor for DataDependencies {
         width: DataWidth,
     ) -> Result<(), String> {
         let context = &context.computation_context;
-        let addr = context.reg(dst)?.clone();
+        let addr = context.reg(dst)?;
         if let Type::PtrToStack { offset: stack_offset } = addr {
             let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
             if !stack_offset.is_valid() {
@@ -3841,7 +3832,7 @@ impl BpfVisitor for ComputationContext {
             display_register(src),
             print_offset(offset)
         );
-        let addr = self.reg(src)?.clone();
+        let addr = self.reg(src)?;
         let loaded_type = self.load_memory(context, &addr, Field::new(offset, width))?;
         let mut next = self.next()?;
         next.set_reg(dst, loaded_type)?;
@@ -3945,7 +3936,7 @@ impl BpfVisitor for ComputationContext {
                     print_offset(offset),
                     display_register(r),
                 );
-                self.reg(r)?.clone()
+                self.reg(r)?
             }
             Source::Value(v) => {
                 bpf_log!(
@@ -3961,7 +3952,7 @@ impl BpfVisitor for ComputationContext {
             }
         };
         let mut next = self.next()?;
-        let addr = self.reg(dst)?.clone();
+        let addr = self.reg(dst)?;
         next.store_memory(context, &addr, Field::new(offset, width), value)?;
         context.states.push(next);
         Ok(())

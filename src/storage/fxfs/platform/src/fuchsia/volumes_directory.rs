@@ -565,7 +565,7 @@ impl VolumesDirectory {
         }
         entry_container::Directory::open(
             outgoing_dir,
-            scope.clone(),
+            scope,
             flags,
             Path::dot(),
             outgoing_dir_server_end.into_channel().into(),

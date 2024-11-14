@@ -351,7 +351,7 @@ mod factory {
             }
 
             // Insert the new device into the list.
-            devices.insert(name.clone(), driver.clone());
+            devices.insert(name, driver);
 
             Ok(())
         }

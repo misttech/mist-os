@@ -482,11 +482,7 @@ fn resolve_elf(
         )?;
         let file_write_guard =
             interp_file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-        Some(ResolvedInterpElf {
-            file: interp_file,
-            memory: interp_memory.clone(),
-            file_write_guard,
-        })
+        Some(ResolvedInterpElf { file: interp_file, memory: interp_memory, file_write_guard })
     } else {
         None
     };

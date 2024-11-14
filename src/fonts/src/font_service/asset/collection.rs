@@ -122,7 +122,7 @@ where
         }
         let id = AssetId(self.next_id);
         self.id_to_location_map.insert(id, full_location.clone());
-        self.location_to_id_map.insert(full_location.clone(), id);
+        self.location_to_id_map.insert(full_location, id);
         self.file_name_to_id_map.insert(manifest_asset.file_name.clone(), id);
         self.next_id += 1;
         id

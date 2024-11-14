@@ -582,7 +582,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
     }
 
     fn add_domain_config(&mut self, name: PackageSetDestination) -> &mut dyn DomainConfigBuilder {
-        self.domain_configs.entry(name.clone()).or_insert_with_key(|name| DomainConfig {
+        self.domain_configs.entry(name).or_insert_with_key(|name| DomainConfig {
             directories: NamedMap::new("directories"),
             name: name.clone(),
             expose_directories: true,

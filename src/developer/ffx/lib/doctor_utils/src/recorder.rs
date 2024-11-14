@@ -65,7 +65,7 @@ impl Recorder for DoctorRecorder {
 
     fn generate(&self, output_dir: PathBuf) -> Result<PathBuf> {
         let fname = format!("ffx-record-{}.zip", Local::now().format("%Y%m%d-%H%M%S"));
-        let mut output_path = output_dir.clone();
+        let mut output_path = output_dir;
         output_path.push(fname);
         let file = File::create(output_path.clone())?;
 

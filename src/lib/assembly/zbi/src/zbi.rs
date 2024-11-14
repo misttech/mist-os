@@ -73,7 +73,7 @@ impl ZbiBuilder {
         // will exist under a `blob` directory, and will be identified by
         // its merkle root.
         let bootfs_path = format!("blob/{}", merkle_root);
-        self.bootfs_files.insert(bootfs_path.to_string(), source.into());
+        self.bootfs_files.insert(bootfs_path, source.into());
     }
 
     /// Add a BootFS file to the ZBI.

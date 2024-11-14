@@ -205,7 +205,7 @@ fn apply_insertions(
                 .into(),
         );
     }
-    (lines.join("\n") + if ends_with_newline { "\n" } else { "" }).to_owned()
+    lines.join("\n") + if ends_with_newline { "\n" } else { "" }
 }
 
 #[cfg(test)]

@@ -28,7 +28,7 @@ async fn handle_target_request(
         }
         TargetHandlerRequest::GetPlayStatus { responder } => {
             if let Ok(state) = media_sessions.get_active_session() {
-                responder.send(Ok(&state.session_info().get_play_status().clone().into()))?;
+                responder.send(Ok(&state.session_info().get_play_status().into()))?;
             } else {
                 responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
             }

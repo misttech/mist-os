@@ -65,7 +65,7 @@ async fn generate_sensor_drivers<T: fidl::endpoints::ProtocolMarker>(
     let mut drivers = Vec::new();
     for (topological_path, class_path) in topo_to_class {
         let proxy: T::Proxy = connect_proxy::<T>(&class_path)?;
-        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
+        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c);
         drivers.push(Driver { alias, topological_path, proxy });
     }
     Ok(drivers)

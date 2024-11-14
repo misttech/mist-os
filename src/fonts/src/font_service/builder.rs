@@ -182,7 +182,7 @@ where
                 FamilyOrAliasBuilder::Alias(_, _) => {
                     return Err(FontServiceBuilderError::AliasFamilyConflict {
                         conflicting_name: family_name.to_string(),
-                        manifest_path: manifest_path.clone(),
+                        manifest_path: manifest_path,
                     }
                     .into());
                 }
@@ -254,7 +254,7 @@ where
                     Some(FamilyOrAliasBuilder::Family(_)) => {
                         return Err(FontServiceBuilderError::AliasFamilyConflict {
                             conflicting_name: key.to_string(),
-                            manifest_path: manifest_path.clone(),
+                            manifest_path: manifest_path,
                         }
                         .into());
                     }
@@ -265,7 +265,7 @@ where
                                 alias: key.to_string(),
                                 canonical_1: other_family_name.to_string(),
                                 canonical_2: family_name.to_string(),
-                                manifest_path: manifest_path.clone(),
+                                manifest_path: manifest_path,
                             }
                             .into());
                         }

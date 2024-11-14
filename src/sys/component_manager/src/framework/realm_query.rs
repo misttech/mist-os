@@ -175,10 +175,7 @@ impl FrameworkCapability for RealmQuery {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(RealmQueryCapabilityProvider {
-            query: self.clone(),
-            scope_moniker: scope.moniker.clone(),
-        })
+        Box::new(RealmQueryCapabilityProvider { query: self.clone(), scope_moniker: scope.moniker })
     }
 }
 

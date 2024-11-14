@@ -29,7 +29,7 @@ pub enum ButtonMessages {
 }
 
 // These values and the text and padding sizes are used to calculate the corners.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[allow(unused)]
 pub enum ButtonShape {
     Square = 0,

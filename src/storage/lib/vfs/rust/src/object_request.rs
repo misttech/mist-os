@@ -262,7 +262,7 @@ impl ObjectRequest {
     ) -> Result<BoxFuture<'static, ()>, Status> {
         assert!(!self.object_request.is_invalid_handle());
         if protocols.is_node() {
-            Ok(Box::pin(node::Connection::create(scope.clone(), node, protocols, self)?))
+            Ok(Box::pin(node::Connection::create(scope, node, protocols, self)?))
         } else {
             Ok(Box::pin(f(scope, node, protocols, self)?))
         }

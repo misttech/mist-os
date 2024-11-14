@@ -65,8 +65,7 @@ impl BuiltinCapability for BuiltinRunner {
     }
 
     fn new_provider(&self, target: WeakComponentInstance) -> Box<dyn CapabilityProvider> {
-        let checker =
-            ScopedPolicyChecker::new(self.security_policy.clone(), target.moniker.clone());
+        let checker = ScopedPolicyChecker::new(self.security_policy.clone(), target.moniker);
         let runner = self.factory.clone();
         Box::new(RunnerCapabilityProvider::new(runner, checker))
     }

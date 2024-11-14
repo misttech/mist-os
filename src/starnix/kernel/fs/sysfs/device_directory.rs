@@ -51,7 +51,7 @@ impl DeviceDirectory {
     }
 
     pub fn kobject(&self) -> KObjectHandle {
-        self.device.kobject().clone()
+        self.device.kobject()
     }
 }
 

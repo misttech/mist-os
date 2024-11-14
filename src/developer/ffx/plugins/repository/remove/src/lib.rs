@@ -33,7 +33,7 @@ pub async fn remove(cmd: RemoveCommand, repos_proxy: RepositoryRegistryProxy) ->
         let repos = list_repositories(repos_proxy.clone()).await?;
         repos.iter().map(|r| r.name.to_string()).collect()
     } else if let Some(name) = cmd.name {
-        vec![name.clone()]
+        vec![name]
     } else {
         return_user_error!(
             "No repository name specified. Use `--all` or specify the repository name to remove."

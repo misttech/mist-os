@@ -153,7 +153,7 @@ pub fn convert_device_info(
         .band_caps
         .context("missing band_caps")?
         .into_iter()
-        .map(|band_cap| convert_band_cap(band_cap.clone()))
+        .map(|band_cap| convert_band_cap(band_cap))
         .collect();
     Ok(fidl_mlme::DeviceInfo {
         sta_addr: info.sta_addr.context("missing sta_addr")?,

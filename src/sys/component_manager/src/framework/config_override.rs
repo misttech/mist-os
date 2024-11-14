@@ -76,7 +76,7 @@ impl FrameworkCapability for ConfigOverride {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(ConfigOverrideCapabilityProvider {
             config_override: self.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }

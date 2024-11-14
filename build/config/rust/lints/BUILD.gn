@@ -13,6 +13,7 @@ config("clippy_warn_production") {
     "-Wclippy::needless_collect",
     "-Wclippy::or_fun_call",
     "-Wclippy::perf",
+    "-Wclippy::redundant_clone",
     "-Wclippy::unnecessary_lazy_evaluation",
 
     # go/keep-sorted end

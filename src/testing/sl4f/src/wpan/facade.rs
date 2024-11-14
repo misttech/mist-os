@@ -40,9 +40,9 @@ impl WpanFacade {
             Ok(low_pan_context) => low_pan_context.get_default_device_proxies().await?,
             _ => bail!("Error retrieving default device proxies"),
         };
-        *self.device.write() = Some(device.clone());
-        *self.device_extra.write() = Some(device_extra.clone());
-        *self.device_test.write() = Some(device_test.clone());
+        *self.device.write() = Some(device);
+        *self.device_extra.write() = Some(device_extra);
+        *self.device_test.write() = Some(device_test);
         Ok(())
     }
 

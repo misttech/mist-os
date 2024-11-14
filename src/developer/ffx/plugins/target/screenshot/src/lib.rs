@@ -109,7 +109,7 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
         None => {
             let dir = default_output_dir();
             fs::create_dir_all(&dir)?;
-            dir.to_path_buf().join("screenshot")
+            dir.join("screenshot")
         }
     };
 

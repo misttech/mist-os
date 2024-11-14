@@ -43,7 +43,7 @@ fn preprocess(value: &Value) -> Option<String> {
 }
 
 fn postprocess(value: String) -> Value {
-    Value::String(value.to_string().replace(TEMP_REPLACE, "$"))
+    Value::String(value.replace(TEMP_REPLACE, "$"))
 }
 
 fn replace_regex<T>(value: &String, regex: &Regex, replacer: T) -> String

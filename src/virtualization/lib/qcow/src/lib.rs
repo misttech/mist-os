@@ -283,7 +283,7 @@ impl TranslationTable {
     /// backing the range and the latter means that the linear range is valid but no physical disk
     /// clusters have been allocated to it.
     pub fn translate<'a>(&'a self, linear_range: std::ops::Range<u64>) -> Translation<'a> {
-        Translation { linear_range: linear_range.clone(), translation: self }
+        Translation { linear_range: linear_range, translation: self }
     }
 
     fn translate_range(&self, linear_range: &std::ops::Range<u64>) -> Option<Mapping> {

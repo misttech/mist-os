@@ -402,7 +402,7 @@ impl BrokerSvc {
         element_id: ElementID,
         server_end: ServerEnd<fpb::CurrentLevelMarker>,
     ) -> Rc<CurrentLevelHandler> {
-        let handler = Rc::new(CurrentLevelHandler::new(self.broker.clone(), element_id.clone()));
+        let handler = Rc::new(CurrentLevelHandler::new(self.broker.clone(), element_id));
         let stream = server_end.into_stream().unwrap();
         handler.clone().start(stream);
         handler

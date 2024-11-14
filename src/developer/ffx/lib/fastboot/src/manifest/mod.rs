@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common::cmd::{BootParams, Command, ManifestParams};
-use crate::common::{ Boot, Flash, Unlock};
+use crate::common::{Boot, Flash, Unlock};
 use crate::file_resolver::resolvers::{Resolver, ZipArchiveResolver};
 use crate::file_resolver::FileResolver;
 use crate::manifest::resolvers::{
@@ -80,9 +80,9 @@ impl FlashManifestVersion {
             _ => ffx_bail!("Could not parse flash manifest."),
         };
         match manifest.version {
-            1 => Ok(Self::V1(from_value(manifest.manifest.clone())?)),
-            2 => Ok(Self::V2(from_value(manifest.manifest.clone())?)),
-            3 => Ok(Self::V3(from_value(manifest.manifest.clone())?)),
+            1 => Ok(Self::V1(from_value(manifest.manifest)?)),
+            2 => Ok(Self::V2(from_value(manifest.manifest)?)),
+            3 => Ok(Self::V3(from_value(manifest.manifest)?)),
             _ => ffx_bail!("{}", UNKNOWN_VERSION),
         }
     }

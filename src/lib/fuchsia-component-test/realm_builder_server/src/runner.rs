@@ -199,7 +199,7 @@ fn extract_local_component_id<'a>(dict: fdata::Dictionary) -> Result<LocalCompon
             .ok_or_else(|| format_err!("program section is missing value"))?;
         match (entry.key.as_str(), entry_value) {
             (LOCAL_COMPONENT_ID_KEY, fdata::DictionaryValue::Str(s)) => {
-                return Ok(LocalComponentId(s.clone()))
+                return Ok(LocalComponentId(s))
             }
             _ => continue,
         }

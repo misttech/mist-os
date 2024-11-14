@@ -404,7 +404,7 @@ fn symbolize_trace_file(
 ) -> Result<()> {
     let content = std::fs::read(trace_file)?;
     let mut parser = SessionParser::new(std::io::Cursor::new(content));
-    let output = std::fs::File::create(outfile.clone())?;
+    let output = std::fs::File::create(outfile)?;
     let mut output = LineWriter::new(output);
 
     let (ord_map, _) = generate_symbolization_map(ir_files_list(ctx).unwrap_or_default());

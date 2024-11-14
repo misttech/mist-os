@@ -74,7 +74,7 @@ impl LowpanServiceTree {
                 *lazy_telemetry = LazyNode::default();
             }
 
-            dead_iface_list.insert(iface_id, child_holder.clone());
+            dead_iface_list.insert(iface_id, child_holder);
         }
     }
 }

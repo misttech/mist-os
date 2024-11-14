@@ -80,7 +80,7 @@ pub fn short_socket_path(real_path: &Path) -> std::io::Result<ShortPathLink> {
         let tempdir = tempfile::tempdir()?;
         let symlink_path = tempdir.path().join("root");
 
-        short_path = symlink_path.join(socket_filename).to_owned();
+        short_path = symlink_path.join(socket_filename);
         if short_path.as_os_str().len() > ShortPathLink::MAX_SUN_LEN {
             let error_str = format!(
                 "Even tmpdir path was too long to create a short enough socket path for {real_path} (tried: {short_path})",

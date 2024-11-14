@@ -106,13 +106,13 @@ impl GuestInitiated {
         // transitions are to a clean or forced shutdown.
         match op {
             OpType::Shutdown => VsockConnectionState::GuestInitiatedShutdown(
-                GuestInitiatedShutdown::new(self.key, self.control_packets.clone()),
+                GuestInitiatedShutdown::new(self.key, self.control_packets),
             ),
             op => {
                 tracing::error!("Unsupported GuestInitiated operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -397,7 +397,7 @@ impl ReadWrite {
                     // initiated shutdown.
                     VsockConnectionState::GuestInitiatedShutdown(GuestInitiatedShutdown::new(
                         self.key,
-                        self.control_packets.clone(),
+                        self.control_packets,
                     ))
                 } else {
                     VsockConnectionState::ReadWrite(self)
@@ -407,7 +407,7 @@ impl ReadWrite {
                 tracing::error!("Unsupported ReadWrite operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -741,7 +741,7 @@ impl GuestInitiatedShutdown {
                 tracing::error!("Unsupported GuestInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -788,12 +788,12 @@ impl ClientInitiatedShutdown {
                 tracing::info!("Guest sent shutdown while being asked to shutdown");
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
             OpType::Reset => VsockConnectionState::ShutdownClean(ShutdownClean::new(
                 self.key,
-                self.control_packets.clone(),
+                self.control_packets,
             )),
             OpType::ReadWrite | OpType::CreditUpdate | OpType::CreditRequest => {
                 // The guest may have already had pending TX packets on the queue when it received
@@ -804,7 +804,7 @@ impl ClientInitiatedShutdown {
                 tracing::error!("Unsupported ClientInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
-                    self.control_packets.clone(),
+                    self.control_packets,
                 ))
             }
         }
@@ -865,10 +865,7 @@ impl ShutdownClean {
             but received operation {:?}",
             op
         );
-        VsockConnectionState::ShutdownForced(ShutdownForced::new(
-            self.key,
-            self.control_packets.clone(),
-        ))
+        VsockConnectionState::ShutdownForced(ShutdownForced::new(self.key, self.control_packets))
     }
 
     async fn do_state_action(&self) -> StateAction {

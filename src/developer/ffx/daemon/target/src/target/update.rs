@@ -162,7 +162,7 @@ impl<'a> TargetUpdateBuilder<'a> {
             })
             .collect::<Vec<_>>();
 
-        let mut update = Self::new().rcs(rcs.clone()).ids(identify.ids.as_deref().unwrap_or(&[]));
+        let mut update = Self::new().rcs(rcs).ids(identify.ids.as_deref().unwrap_or(&[]));
 
         let identity = Identity::try_from_name_serial(
             identify.nodename.clone(),

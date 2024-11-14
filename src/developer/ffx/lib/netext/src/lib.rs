@@ -354,7 +354,7 @@ fn select_mcast_interfaces(
         .group_by(|ifaddr| ifaddr.interface_name.to_string())
         .into_iter()
         .map(|(name, ifaddrs)| McastInterface {
-            name: name.to_string(),
+            name: name,
             addrs: ifaddrs.filter_map(ifaddr_to_socketaddr).collect(),
         })
         .collect()

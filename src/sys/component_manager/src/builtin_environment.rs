@@ -690,10 +690,7 @@ impl RootComponentInputBuilder {
                     .factory()
                     .clone()
                     .get_scoped_runner(
-                        ScopedPolicyChecker::new(
-                            security_policy.clone(),
-                            weak_component.moniker.clone(),
-                        ),
+                        ScopedPolicyChecker::new(security_policy.clone(), weak_component.moniker),
                         OpenRequest::new(
                             execution_scope.clone(),
                             flags,
@@ -1563,7 +1560,7 @@ impl BuiltinEnvironment {
             Some(&self.capability_store),
         );
 
-        let scope = self.model.top_instance().task_group().clone();
+        let scope = self.model.top_instance().task_group();
 
         // If capability passthrough is enabled, add a remote directory to proxy
         // capabilities exposed by the root component.
@@ -1572,7 +1569,7 @@ impl BuiltinEnvironment {
             service_fs.add_remote("root-exposed", proxy);
             let root = self.model.top_instance().root();
             let root = WeakComponentInstance::new(&root);
-            scope.clone().spawn(async move {
+            scope.spawn(async move {
                 let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
                 let mut object_request = flags.to_object_request(server_end);
                 object_request.wait_till_ready().await;
@@ -1691,7 +1688,7 @@ impl BuiltinEnvironment {
             return;
         };
         let cap = cap.clone();
-        let scope = self.model.top_instance().task_group().clone();
+        let scope = self.model.top_instance().task_group();
         let root = self.model.root().as_weak();
         service_fs.dir("svc").add_service_connector(move |server: ServerEnd<M>| {
             let cap = cap.clone();

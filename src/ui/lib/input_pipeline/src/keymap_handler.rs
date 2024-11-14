@@ -112,7 +112,7 @@ impl KeymapHandler {
         );
         input_device::UnhandledInputEvent {
             device_event: input_device::InputDeviceEvent::Keyboard(
-                event.clone().into_with_key_meaning(key_meaning),
+                event.into_with_key_meaning(key_meaning),
             ),
             device_descriptor,
             event_time,

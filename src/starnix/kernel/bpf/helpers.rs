@@ -611,7 +611,7 @@ pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContex
                     function_pointer: Arc::new(bpf_ringbuf_discard),
                     signature: FunctionSignature {
                         args: vec![
-                            Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
+                            Type::ReleaseParameter { id: ring_buffer_reservation },
                             Type::ScalarValueParameter,
                         ],
                         return_value: Type::default(),
@@ -692,7 +692,7 @@ pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContex
                     name: GET_SOCKET_COOKIE_NAME,
                     function_pointer: Arc::new(bpf_get_socket_cookie_bpf_sock),
                     signature: FunctionSignature {
-                        args: vec![Type::StructParameter { id: bpf_sock_id.clone() }],
+                        args: vec![Type::StructParameter { id: bpf_sock_id }],
                         return_value: Type::unknown_written_scalar_value(),
                         invalidate_array_bounds: false,
                     },
@@ -815,7 +815,7 @@ pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContex
                     function_pointer: Arc::new(bpf_skb_load_bytes_relative),
                     signature: FunctionSignature {
                         args: vec![
-                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::StructParameter { id: sk_buf_id },
                             Type::ScalarValueParameter,
                             Type::MemoryParameter {
                                 size: MemoryParameterSize::Reference { index: 3 },

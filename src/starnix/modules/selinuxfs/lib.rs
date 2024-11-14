@@ -724,7 +724,7 @@ impl FsNodeOps for ClassDirectory {
             PermsDirectory::new(self.security_server.clone(), name.to_string()),
             mode!(IFDIR, 0o555),
         );
-        Ok(dir.build(current_task).clone())
+        Ok(dir.build(current_task))
     }
 }
 

@@ -111,7 +111,7 @@ pub(crate) fn check_includes(
 
     // Write includes to depfile
     if let Some(depfile_path) = depfile {
-        let mut inputs = actual.clone();
+        let mut inputs = actual;
         inputs.push(file.clone());
         write_depfile(depfile_path, stamp, &inputs)?;
     }

@@ -80,12 +80,7 @@ impl FxFile {
                 }
             }
         }
-        object_request.create_connection(
-            scope.clone(),
-            this.take(),
-            flags,
-            StreamIoConnection::create,
-        )
+        object_request.create_connection(scope, this.take(), flags, StreamIoConnection::create)
     }
 
     /// Marks the file to be purged when the open count drops to zero.

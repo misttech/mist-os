@@ -508,8 +508,7 @@ fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion
         properties.push(inspector.root().create_int("i", i));
     }
 
-    let (proxy, tree_server_fut) =
-        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) = fuchsia_inspect_bench_utils::spawn_server(inspector).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
     // Force TLB shootdown for following writes on the local inspector
     let _ = proxy.vmo();

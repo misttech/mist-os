@@ -96,7 +96,7 @@ impl From<VirtualDeviceV1> for VirtualDeviceInfo {
             memory_bytes: value.hardware.memory.as_bytes().unwrap_or(0),
             window_height: value.hardware.window_size.height,
             window_width: value.hardware.window_size.width,
-            ports: value.ports.clone(),
+            ports: value.ports,
         }
     }
 }

@@ -51,7 +51,7 @@ pub fn next_match_one_of<'a, Rule: RuleType>(
     let pair_rule = pair.as_rule();
     if !expected_rules.contains(&pair_rule) {
         return Err(ParseError::NextRuleUnexpected {
-            expected_rules: expected_rules.clone(),
+            expected_rules: expected_rules,
             actual_rule: pair_rule,
         });
     }

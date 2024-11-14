@@ -40,7 +40,7 @@ struct InitialState {
 impl MemoryAttributionManager {
     pub fn new(kernel: Weak<Kernel>) -> Self {
         let (publisher_tx, publisher_rx) = mpsc::sync_channel(1);
-        let weak_kernel = kernel.clone();
+        let weak_kernel = kernel;
         let publisher_rx = Arc::new(Mutex::new(Some(publisher_rx)));
         let memory_attribution_server = AttributionServer::new(Box::new(move || {
             // Initial scan of the PID table when a client connects.
@@ -155,7 +155,7 @@ fn attribution_info_for_thread_group(
     name: String,
     thread_group: &ThreadGroup,
 ) -> Vec<fattribution::AttributionUpdate> {
-    let new = new_principal(thread_group.leader, name.clone());
+    let new = new_principal(thread_group.leader, name);
     let updated = updated_principal(thread_group);
     iter::once(new).chain(updated.into_iter()).collect()
 }

@@ -298,7 +298,7 @@ impl ImageAssemblyConfigBuilder {
         }
 
         let memory_buckets: Vec<Utf8PathBuf> =
-            memory_buckets.clone().into_iter().map(|b| b.to_utf8_pathbuf()).collect();
+            memory_buckets.into_iter().map(|b| b.to_utf8_pathbuf()).collect();
         self.add_memory_buckets(&memory_buckets)?;
 
         assembly_util::set_option_once_or(

@@ -295,7 +295,7 @@ pub fn create_env_path(tools_path: Option<String>) -> String {
     let mut path_envvar = "".to_string();
     if let Some(tp) = tools_path {
         path_envvar.push_str("PATH=");
-        path_envvar.push_str(&tp.to_string());
+        path_envvar.push_str(&tp);
     }
     path_envvar
 }

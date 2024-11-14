@@ -257,7 +257,7 @@ impl Broker {
                 let broken_claims = assertive_dependencies_broken
                     .into_iter()
                     .chain(opportunistic_dependencies_broken.into_iter())
-                    .map(|d| Claim::new(d.clone(), &lease_id))
+                    .map(|d| Claim::new(d, &lease_id))
                     .collect::<HashSet<_>>();
 
                 for claim in broken_claims {
@@ -1212,7 +1212,7 @@ impl Lease {
         let id =
             if ID_DEBUG_MODE { format!("{synthetic_element_id}@{level}:{uuid:.6}") } else { uuid };
         Lease {
-            id: id.clone(),
+            id: id,
             synthetic_element_id: synthetic_element_id.clone(),
             underlying_element_id: underlying_element_id.clone(),
             level: level.clone(),
@@ -1464,7 +1464,7 @@ impl Catalog {
         self.leases.insert(lease.id.clone(), lease.clone());
 
         let lease_element_level = ElementLevel {
-            element_id: lease_element_id.clone(),
+            element_id: lease_element_id,
             level: IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
         };
         let (assertive_dependencies, opportunistic_dependencies) =
@@ -1472,11 +1472,11 @@ impl Catalog {
         // Create all possible claims from the assertive and opportunistic dependencies.
         let assertive_claims = assertive_dependencies
             .into_iter()
-            .map(|dependency| Claim::new(dependency.clone(), &lease.id))
+            .map(|dependency| Claim::new(dependency, &lease.id))
             .collect::<Vec<Claim>>();
         let opportunistic_claims = opportunistic_dependencies
             .into_iter()
-            .map(|dependency| Claim::new(dependency.clone(), &lease.id))
+            .map(|dependency| Claim::new(dependency, &lease.id))
             .collect::<Vec<Claim>>();
         // Filter claims down to only the essential (i.e. non-redundant) claims.
         let (essential_assertive_claims, essential_opportunistic_claims) =

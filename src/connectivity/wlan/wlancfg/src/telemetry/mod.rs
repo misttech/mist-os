@@ -1009,7 +1009,7 @@ impl Telemetry {
             auto_persist_client_stats_counters: AutoPersist::new(
                 (),
                 "wlancfg-client-stats-counters",
-                persistence_req_sender.clone(),
+                persistence_req_sender,
             ),
             experiments: experiment::Experiments::new(),
             last_enabled_client_connections: None,

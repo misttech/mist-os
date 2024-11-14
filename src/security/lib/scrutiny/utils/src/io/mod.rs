@@ -164,6 +164,7 @@ impl<RS: Read + Seek> Read for WrappedReaderSeeker<RS> {
         let position = named_u64("position", self.reader_seeker.seek(SeekFrom::Current(0))?);
         let offset = named_u64("offset", self.offset);
         let length = named_u64("length", self.length);
+        #[allow(clippy::redundant_clone)] // false positive
         let absolute_start = offset.clone();
         let absolute_end = u64_add(&offset, &length);
         {

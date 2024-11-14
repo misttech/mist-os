@@ -125,10 +125,7 @@ impl Ref {
     fn check_scope(&self, realm_scope: &Vec<String>) -> Result<(), Error> {
         if let Some(ref_scope) = self.scope.as_ref() {
             if ref_scope != realm_scope {
-                return Err(Error::RefUsedInWrongRealm(
-                    self.clone(),
-                    realm_scope.join("/").to_string(),
-                ));
+                return Err(Error::RefUsedInWrongRealm(self.clone(), realm_scope.join("/")));
             }
         }
         Ok(())
@@ -226,10 +223,7 @@ impl ChildRef {
     fn check_scope(&self, realm_scope: &Vec<String>) -> Result<(), Error> {
         if let Some(ref_scope) = self.scope.as_ref() {
             if ref_scope != realm_scope {
-                return Err(Error::RefUsedInWrongRealm(
-                    self.into(),
-                    realm_scope.join("/").to_string(),
-                ));
+                return Err(Error::RefUsedInWrongRealm(self.into(), realm_scope.join("/")));
             }
         }
         Ok(())

@@ -413,8 +413,7 @@ impl Entry for MockDir {
             "."
         };
         if segment == "." {
-            fuchsia_async::Task::local(self.clone().serve(ServerEnd::new(object.into_channel())))
-                .detach();
+            fuchsia_async::Task::local(self.serve(ServerEnd::new(object.into_channel()))).detach();
             return;
         }
         if let Some(entry) = self.subdirs.get(segment) {

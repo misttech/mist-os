@@ -243,7 +243,7 @@ impl StarnixNodeConnection {
                 return Ok((directory::traversal_position::TraversalPosition::End, sink.seal()));
             }
         };
-        let kernel = self.kernel().unwrap().clone();
+        let kernel = self.kernel().unwrap();
         if *self.file.offset.lock() != offset {
             self.file.seek(
                 kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -290,7 +290,7 @@ impl StarnixNodeConnection {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         let current_task = self.task()?;
-        let kernel = self.kernel().unwrap().clone();
+        let kernel = self.kernel().unwrap();
         if self.is_dir() {
             if path.is_dot() {
                 // Reopen the current directory.

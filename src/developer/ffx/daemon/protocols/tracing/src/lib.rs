@@ -58,7 +58,7 @@ impl TriggerSetItem {
 
     /// Convenience constructor for doing a lookup.
     fn lookup(alert: String) -> Self {
-        Self { alert: alert.to_owned(), action: ffx::Action::Terminate }
+        Self { alert: alert, action: ffx::Action::Terminate }
     }
 }
 

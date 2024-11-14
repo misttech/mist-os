@@ -28,7 +28,7 @@ fn dump_node(
 }
 
 pub fn dump_bind_rules(bytecode: Vec<u8>) -> Result<String, BytecodeError> {
-    match DecodedRules::new(bytecode.clone())? {
+    match DecodedRules::new(bytecode)? {
         DecodedRules::Normal(decoded_rules) => {
             Ok(dump_instructions(decoded_rules.decoded_instructions))
         }

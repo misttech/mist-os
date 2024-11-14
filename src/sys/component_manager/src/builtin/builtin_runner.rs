@@ -458,7 +458,7 @@ impl ElfRunnerProgram {
     ///   child of the provided job.
     fn new(job: zx::Job, namespace: Namespace, resources: Arc<ElfRunnerResources>) -> Self {
         let namespace = Arc::new(namespace);
-        let connector = NamespaceConnector { namespace: namespace.clone() };
+        let connector = NamespaceConnector { namespace: namespace };
         let elf_runner = elf_runner::ElfRunner::new(
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
             Box::new(connector),
@@ -487,7 +487,7 @@ impl ElfRunnerProgram {
             }),
         ));
 
-        let inner_clone = inner.clone();
+        let inner_clone = inner;
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
             CapabilitySource::Builtin(BuiltinSource {
                 capability: InternalCapability::Protocol(

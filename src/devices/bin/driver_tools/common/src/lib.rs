@@ -174,7 +174,7 @@ pub async fn get_driver_by_device(
                 // We don't appear to have a string builder crate in-tree.
                 builder = format!("{}{}\n", builder, device.get_full_name()?.to_string());
             }
-            return Err(anyhow!(builder.to_string()));
+            return Err(anyhow!(builder));
         }
         device_list = fuzzy_device_list;
     }

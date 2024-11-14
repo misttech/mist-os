@@ -88,7 +88,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         builder
             .package("sampler")
             .config_data(FileEntry {
-                source: index_path.clone(),
+                source: index_path,
                 destination: "component_id_index".to_string(),
             })
             .context("Adding component id index to sampler".to_string())?;

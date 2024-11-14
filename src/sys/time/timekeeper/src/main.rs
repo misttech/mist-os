@@ -207,7 +207,7 @@ async fn main() -> Result<()> {
 
     let time_source_urls = TimeSourceUrls {
         primary: TimeSourceDetails {
-            url: config.get_primary_time_source_url().clone(),
+            url: config.get_primary_time_source_url(),
             name: Role::Primary.to_string(),
         },
         monitor: config

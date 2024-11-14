@@ -126,7 +126,7 @@ struct HealthCheck {
 impl Into<component_internal::HealthCheck> for HealthCheck {
     fn into(self) -> component_internal::HealthCheck {
         component_internal::HealthCheck {
-            monikers: self.monikers.clone(),
+            monikers: self.monikers,
             ..component_internal::HealthCheck::default()
         }
     }
@@ -173,7 +173,7 @@ pub struct AbiRevisionPolicy {
 impl Into<component_internal::AbiRevisionPolicy> for AbiRevisionPolicy {
     fn into(self) -> component_internal::AbiRevisionPolicy {
         component_internal::AbiRevisionPolicy {
-            allowlist: self.allowlist.clone(),
+            allowlist: self.allowlist,
             ..component_internal::AbiRevisionPolicy::default()
         }
     }

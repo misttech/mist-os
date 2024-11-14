@@ -61,7 +61,7 @@ impl SocketProxy {
         Self {
             registry: registry::Registry::new(mark.clone(), dns_tx),
             dns_watcher: dns_watcher::DnsServerWatcher::new(Arc::new(Mutex::new(dns_rx))),
-            socket_provider: socket_provider::SocketProvider::new(mark.clone()),
+            socket_provider: socket_provider::SocketProvider::new(mark),
         }
     }
 }

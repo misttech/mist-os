@@ -112,7 +112,7 @@ impl Index {
         instance_id: InstanceId,
     ) -> Result<(), ValidationError> {
         if !self.instance_ids.insert(instance_id.clone()) {
-            return Err(ValidationError::DuplicateId(instance_id.clone()));
+            return Err(ValidationError::DuplicateId(instance_id));
         }
         if self.moniker_to_instance_id.insert(moniker.clone(), instance_id).is_some() {
             return Err(ValidationError::DuplicateMoniker(moniker));

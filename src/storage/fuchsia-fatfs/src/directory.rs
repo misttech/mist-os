@@ -890,18 +890,13 @@ impl Directory for FatDirectory {
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    object_request.spawn_connection(
-                        scope,
-                        entry.clone(),
-                        flags,
-                        MutableConnection::create,
-                    )
+                    object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
                 }
                 FatNode::File(entry) => {
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    entry.clone().create_connection(scope, flags, object_request)
+                    entry.create_connection(scope, flags, object_request)
                 }
             }
         });
@@ -919,21 +914,11 @@ impl Directory for FatDirectory {
         match self.lookup_with_open3_flags(flags, path, &mut closer)? {
             FatNode::Dir(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    flags,
-                    MutableConnection::create,
-                )
+                object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
             }
             FatNode::File(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    flags,
-                    FidlIoConnection::create,
-                )
+                object_request.spawn_connection(scope, entry, flags, FidlIoConnection::create)
             }
         }
     }
@@ -1001,7 +986,7 @@ impl Directory for FatDirectory {
             match result {
                 AppendResult::Ok(new_sink) => cur_sink = new_sink,
                 AppendResult::Sealed(sealed) => {
-                    return Ok((TraversalPosition::Name(name.clone()), sealed));
+                    return Ok((TraversalPosition::Name(name), sealed));
                 }
             }
         }

@@ -136,7 +136,7 @@ pub(crate) fn get_mouse_model(
             let vid = to_hex(device_info.vendor_id.unwrap_or_default());
             match DB.get(&vid) {
                 Some(v) => match v.get(device_info.product_id.unwrap_or_default()) {
-                    Some(m) => m.clone(),
+                    Some(m) => m,
                     None => DEFAULT_MODEL.clone(),
                 },
                 None => DEFAULT_MODEL.clone(),

@@ -299,7 +299,7 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
 
     // MCE device advertises the MNS on it and and searches for MAS on remote peers.
     let mut profile_client =
-        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)
+        ProfileClient::advertise(profile_svc, service_defs, channel_parameters)
             .map_err(MapError::other)?;
 
     profile_client

@@ -445,7 +445,7 @@ impl Ffx {
                     exe_kind,
                     domain_root.clone(),
                     runtime_args,
-                    isolate_root.clone(),
+                    isolate_root,
                     self.no_environment,
                 )
                 .map_err(Into::into)

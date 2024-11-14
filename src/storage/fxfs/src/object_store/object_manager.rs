@@ -265,7 +265,7 @@ impl ObjectManager {
         let mut inner = self.inner.write().unwrap();
         assert!(!inner.stores.contains_key(&allocator.object_id()));
         inner.allocator_object_id = allocator.object_id();
-        inner.allocator = Some(allocator.clone());
+        inner.allocator = Some(allocator);
     }
 
     pub fn allocator(&self) -> Arc<Allocator> {

@@ -74,7 +74,7 @@ where
         to.outgoing_edges.retain(|_, n| n.is_valid());
 
         to.incoming_edges.insert(self.internal_id, weak_ref.clone());
-        self.outgoing_edges.insert(to.internal_id, weak_ref.clone());
+        self.outgoing_edges.insert(to.internal_id, weak_ref);
         edge
     }
 

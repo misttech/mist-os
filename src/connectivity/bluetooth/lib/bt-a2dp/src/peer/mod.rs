@@ -173,7 +173,7 @@ impl StreamPermits {
             {
                 let mut lock = peer.lock();
                 match lock.suspend_local_stream(&local_id) {
-                    Ok(remote_id) => drop(lock.peer.suspend(&[remote_id.clone()])),
+                    Ok(remote_id) => drop(lock.peer.suspend(&[remote_id])),
                     Err(e) => warn!("Couldn't stop local stream {local_id:?}: {e:?}"),
                 }
             }
@@ -957,7 +957,7 @@ impl PeerInner {
                             // Happens when we cannot start because of permits.
                             // Accept this one, then queue up for suspend.
                             // We are already reserved for a permit.
-                            immediate_suspend.push(remote_id.clone());
+                            immediate_suspend.push(remote_id);
                             return Ok(());
                         };
                         match self.start_local_stream(permit, &seid) {

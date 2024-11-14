@@ -65,7 +65,7 @@ impl TryFrom<ViewRef> for ui_views::ViewRef {
     type Error = Error;
 
     fn try_from(view_ref: ViewRef) -> Result<Self, Error> {
-        Ok(view_ref.clone().inner)
+        Ok(view_ref.inner)
     }
 }
 

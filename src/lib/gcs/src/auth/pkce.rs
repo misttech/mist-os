@@ -289,7 +289,7 @@ pub(crate) async fn auth_code_to_refresh(
     let info: ExchangeAuthCodeResponse = serde_json::from_slice(&bytes)?;
     let refresh_token = info.refresh_token;
     let access_token = info.access_token;
-    Ok((refresh_token.to_string(), access_token))
+    Ok((refresh_token, access_token))
 }
 
 /// Create a random number expressed as a url safe string of base64.

@@ -55,8 +55,7 @@ pub struct PartitionInfo {
 
 impl PartitionInfo {
     pub fn from_entry(entry: &format::PartitionTableEntry) -> Result<Self, Error> {
-        let label =
-            String::from_utf16(entry.name.split(|v| *v == 0u16).next().unwrap())?.to_owned();
+        let label = String::from_utf16(entry.name.split(|v| *v == 0u16).next().unwrap())?;
         Ok(Self {
             label,
             type_guid: Guid::from_bytes(entry.type_guid),

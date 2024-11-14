@@ -221,7 +221,7 @@ impl Canonicalizer for DiskCanonicalizer {
                     let mut ns = self.not_supported.borrow_mut();
                     ns.insert(image_type.clone());
                 }
-                self.product_bundle_dir.join(path).to_owned()
+                self.product_bundle_dir.join(path)
             }
         }
     }

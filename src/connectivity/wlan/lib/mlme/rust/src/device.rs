@@ -1119,7 +1119,7 @@ pub mod test_utils {
             match (request.packet_template, request.tim_ele_offset, request.beacon_interval) {
                 (Some(packet_template), Some(tim_ele_offset), Some(beacon_interval)) => Ok({
                     self.state.lock().beacon_config = Some((
-                        packet_template.mac_frame.clone(),
+                        packet_template.mac_frame,
                         usize::try_from(tim_ele_offset).map_err(|_| zx::Status::INTERNAL)?,
                         TimeUnit(beacon_interval),
                     ));

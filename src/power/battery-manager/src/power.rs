@@ -184,7 +184,7 @@ async fn process_watch_event(
     {
         debug!("::power:: process_watch_event => UPDATE_STATUS");
         battery_manager
-            .update_status(power_info.clone(), battery_info.clone())
+            .update_status(power_info.clone(), battery_info)
             .context("adding watch events")?;
     }
 

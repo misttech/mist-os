@@ -32,7 +32,6 @@ impl LowpanContext {
         Ok(LowpanContext {
             device_watcher,
             device_name: device_name
-                .clone()
                 .unwrap_or_else(|| LowpanContext::DEFAULT_DEVICE_NAME.to_string()),
         })
     }

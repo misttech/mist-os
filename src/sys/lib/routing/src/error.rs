@@ -82,7 +82,7 @@ impl From<ComponentInstanceError> for ExtendedMoniker {
             | ComponentInstanceError::MalformedUrl { moniker, .. }
             | ComponentInstanceError::NoAbsoluteUrl { moniker, .. }
             | ComponentInstanceError::ResolveFailed { moniker, .. } => {
-                ExtendedMoniker::ComponentInstance(moniker.clone())
+                ExtendedMoniker::ComponentInstance(moniker)
             }
             ComponentInstanceError::ComponentManagerInstanceUnavailable {}
             | ComponentInstanceError::ComponentManagerInstanceUnexpected {} => {

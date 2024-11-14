@@ -376,7 +376,7 @@ impl SensorManager {
             async move {
                 match request {
                     IncomingRequest::SensorManager(stream) => {
-                        let client = Client::new(stream.control_handle().clone());
+                        let client = Client::new(stream.control_handle());
                         manager.lock().await.clients.insert(client.clone());
                         handle_sensor_manager_request_stream(
                             stream,

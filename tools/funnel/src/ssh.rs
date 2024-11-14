@@ -106,7 +106,7 @@ pub(crate) async fn do_ssh<W: Write>(
     match ssh.wait() {
         Ok(e) => match e.code() {
             None => Err(TunnelError::SshTerminatedFromSignal),
-            Some(255) => Err(TunnelError::TunnelAlreadyRunning { remote_host: host.clone() }),
+            Some(255) => Err(TunnelError::TunnelAlreadyRunning { remote_host: host }),
             Some(0) => Ok(()),
             Some(i) => Err(TunnelError::SshError(i)),
         },
@@ -133,7 +133,7 @@ fn build_ssh_args<W: Write>(
     if addrs.len() > 1 {
         tracing::warn!(
             "Target: {} has {} addresses associated with it: {:?}. Choosing the first one: {}",
-            target.nodename.clone(),
+            target.nodename,
             addrs.len(),
             addrs,
             target_ip

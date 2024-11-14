@@ -247,7 +247,7 @@ impl CrateVersion {
         let package_dir = manifest_path.parent().unwrap().join("target").join("package");
         let crate_source = std::fs::read_dir(package_dir)
             .unwrap()
-            .map(|e| e.unwrap().path().to_owned())
+            .map(|e| e.unwrap().path())
             .filter(|p| p.extension() == Some(OsStr::new("crate")))
             .next()
             .unwrap();

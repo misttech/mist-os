@@ -198,6 +198,6 @@ pub mod test {
     pub fn setup_connection_factory(
     ) -> (Arc<Mutex<FakeServiceCommands>>, impl FastbootConnectionFactory) {
         let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
-        (state.clone(), TestConnectionFactory { state: state.clone() })
+        (state.clone(), TestConnectionFactory { state: state })
     }
 }

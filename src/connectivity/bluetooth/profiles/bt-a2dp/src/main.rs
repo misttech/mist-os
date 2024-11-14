@@ -221,7 +221,7 @@ fn handle_services_found(
     if let Some(initiator_delay) = initiator_delay {
         fasync::Task::local(connect_after_timeout(
             peer_id.clone(),
-            peers.clone(),
+            peers,
             channel_parameters,
             initiator_delay,
         ))

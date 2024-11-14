@@ -293,7 +293,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         dir.entry(
             current_task,
             "prev",
-            AttrNode::new(task.clone(), security::ProcAttr::Previous),
+            AttrNode::new(task, security::ProcAttr::Previous),
             mode!(IFREG, 0o444),
         );
     });

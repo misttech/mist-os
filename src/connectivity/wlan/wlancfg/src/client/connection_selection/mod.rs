@@ -167,7 +167,7 @@ impl ConnectionSelector {
         let inspect_node_for_connection_selection = AutoPersist::new(
             inspect_node_for_connection_selection,
             "wlancfg-network-selection",
-            persistence_req_sender.clone(),
+            persistence_req_sender,
         );
         Self {
             saved_network_manager,
@@ -598,7 +598,7 @@ fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthe
                 "Failed to negotiate authentication for BSS ({:?}) with mutually supported
                 security protocols: {:?}, and credential type: {:?}.",
                 bss.bssid,
-                mutual_security_protocols.clone(),
+                mutual_security_protocols,
                 credential.type_str()
             );
             None

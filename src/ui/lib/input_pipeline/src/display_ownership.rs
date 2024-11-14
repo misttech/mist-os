@@ -150,7 +150,7 @@ impl DisplayOwnership {
         let initial_ownership: Ownership = initial_state.into();
         let ownership = Rc::new(RefCell::new(initial_ownership.clone()));
 
-        let mut ownership_clone = initial_ownership.clone();
+        let mut ownership_clone = initial_ownership;
         let (ownership_sender, ownership_receiver) = mpsc::unbounded();
         let display_ownership_task = Task::local(async move {
             loop {

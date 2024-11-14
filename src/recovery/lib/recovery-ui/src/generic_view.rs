@@ -94,7 +94,7 @@ impl GenericSplitViewAssistant {
         let qr_file = load_rive(QR_PATH).ok();
 
         Ok(GenericSplitViewAssistant {
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             view_key,
             split,
             text1,

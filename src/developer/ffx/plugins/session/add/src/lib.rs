@@ -68,7 +68,7 @@ pub async fn add_impl<W: std::io::Write>(
                 namespace: felement::MANAGER_NAMESPACE.to_string(),
                 value: felement::ANNOTATION_KEY_NAME.to_string(),
             },
-            value: AnnotationValue::Text(name.clone()),
+            value: AnnotationValue::Text(name),
         });
     }
 

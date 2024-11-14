@@ -850,7 +850,7 @@ fn rewrite_reply_tuple_port<I: IpExt, BC: FilterBindingsContext>(
                     // simply adopt the existing one rather than attempting port remapping.
                     if conflict.compatible_with(&*conn) {
                         return Verdict::Accept(NatConfigurationResult::AdoptExisting(
-                            Connection::Shared(conflict.clone()),
+                            Connection::Shared(conflict),
                         ));
                     }
                 }

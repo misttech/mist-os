@@ -124,7 +124,7 @@ where
 {
     let kernel = current_task.kernel();
     let state = kernel.expando.get::<TTYState>();
-    let device = DevPtsDevice::new(state.clone());
+    let device = DevPtsDevice::new(state);
 
     let registry = &kernel.device_registry;
 

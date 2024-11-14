@@ -155,7 +155,7 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
                 source_moniker: scope.moniker,
             });
         }
-        Box::new(IntrospectorCapability::new(scope.moniker.clone(), self.instance_registry.clone()))
+        Box::new(IntrospectorCapability::new(scope.moniker, self.instance_registry.clone()))
     }
 }
 

@@ -121,11 +121,11 @@ fn print_prelude_info(
 ) -> Result<()> {
     let ssh_connection = std::env::var("SSH_CONNECTION")?;
     let info = ConnectionInfo {
-        ssh_connection: ssh_connection.clone(),
+        ssh_connection: ssh_connection,
         compatibility: CompatibilityInfo {
             status,
             platform_abi: platform_abi.as_u64(),
-            message: message.clone(),
+            message: message,
         },
     };
 

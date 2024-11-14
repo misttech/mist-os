@@ -35,9 +35,9 @@ fn create_roam_monitor(
                 ap_state,
                 network_identifier,
                 credential,
-                telemetry_sender.clone(),
+                telemetry_sender,
                 saved_networks,
-                past_roams.clone(),
+                past_roams,
             ))
         }
         RoamingPolicy::Disabled => {

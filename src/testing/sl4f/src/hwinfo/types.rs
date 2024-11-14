@@ -61,7 +61,7 @@ impl SerializableProductInfo {
             Some(date) => {
                 let sub = &date[2..10];
                 let result = sub.replace("-", "");
-                Some(result.to_string())
+                Some(result)
             }
             None => None,
         };

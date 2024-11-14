@@ -396,7 +396,7 @@ for more detail on the progress of update-related downloads.\n"
                 if let Some(product_path) =
                     context.get::<Option<PathBuf>, _>("product.path").map_err(|e| bug!(e))?
                 {
-                    product_path.clone()
+                    product_path
                 } else {
                     return_user_error!("No product bundle path specified nor configured")
                 }

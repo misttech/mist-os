@@ -74,7 +74,7 @@ impl ActionSet {
     where
         A: Action,
     {
-        let (task, rx) = Self::register_inner(action_set.clone(), component, action);
+        let (task, rx) = Self::register_inner(action_set, component, action);
         if let Some(task) = task {
             task.spawn();
         }

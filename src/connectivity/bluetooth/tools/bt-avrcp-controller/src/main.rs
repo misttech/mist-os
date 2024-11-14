@@ -431,7 +431,7 @@ async fn handle_cmd<'a>(
             Ok(Cmd::IsConnected) => {
                 is_connected(args, &test_controller, &test_browse_controller).await
             }
-            Ok(Cmd::Help) => Ok(Cmd::help_msg().to_string()),
+            Ok(Cmd::Help) => Ok(Cmd::help_msg()),
             Ok(Cmd::Exit) | Ok(Cmd::Quit) => return Ok(ReplControl::Break),
             Err(_) => Ok(format!("\"{}\" is not a valid command", raw_cmd)),
         }?;

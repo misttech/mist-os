@@ -1290,7 +1290,6 @@ impl HardwareInfo {
             // TODO(https://fxbug.dev/333120537): Support plug detect caps for hardware Composite/Dai
             _ => None,
         }
-        .clone()
     }
 
     pub fn clock_domain(&self) -> Option<ClockDomain> {

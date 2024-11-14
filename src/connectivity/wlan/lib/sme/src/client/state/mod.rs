@@ -1753,7 +1753,7 @@ fn roam_handle_result(
 
             if result_fields.target_bss_authenticated {
                 Err(AfterRoamFailureState::Disconnecting(Roaming::to_disconnecting(
-                    msg.to_owned(),
+                    msg,
                     failure,
                     state.cfg,
                     state.cmd.connect_txn_sink,
@@ -1761,11 +1761,7 @@ fn roam_handle_result(
                     context,
                 )))
             } else {
-                Err(AfterRoamFailureState::Idle(state.to_idle(
-                    msg.to_owned(),
-                    failure,
-                    state_change_ctx,
-                )))
+                Err(AfterRoamFailureState::Idle(state.to_idle(msg, failure, state_change_ctx)))
             }
         }
     }

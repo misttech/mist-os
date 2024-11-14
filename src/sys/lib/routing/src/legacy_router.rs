@@ -1038,13 +1038,13 @@ impl Offer {
                         } else {
                             OfferResult::Source(CapabilitySource::Component(ComponentSource {
                                 capability,
-                                moniker: component.moniker.clone(),
+                                moniker: component.moniker,
                             }))
                         }
                     }
                     _ => OfferResult::Source(CapabilitySource::Component(ComponentSource {
                         capability,
-                        moniker: component.moniker.clone(),
+                        moniker: component.moniker,
                     })),
                 };
                 OfferSegment::Done(res)

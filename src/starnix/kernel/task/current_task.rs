@@ -1674,7 +1674,7 @@ impl CurrentTask {
             return error!(ENOSYS);
         }
 
-        let fs = if clone_fs { self.fs().clone() } else { self.fs().fork() };
+        let fs = if clone_fs { self.fs() } else { self.fs().fork() };
         let files = if clone_files { self.files.clone() } else { self.files.fork() };
 
         let kernel = self.kernel();

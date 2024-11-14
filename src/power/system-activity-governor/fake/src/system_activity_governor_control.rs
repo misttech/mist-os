@@ -203,7 +203,7 @@ impl SystemActivityGovernorControl {
     }
 
     pub async fn run(self: Rc<Self>, fs: &mut ServiceFs<ServiceObjLocal<'_, ()>>) {
-        let this = self.clone();
+        let this = self;
         fs.dir("svc")
             .add_fidl_service(move |mut stream: fctrl::StateRequestStream| {
                 let this = this.clone();

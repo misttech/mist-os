@@ -187,7 +187,7 @@ impl RouteValidatorCapabilityProvider {
                     fsys::DeclType::Any => {
                         let mut use_target = target.clone();
                         use_target.decl_type = fsys::DeclType::Use;
-                        let mut expose_target = target.clone();
+                        let mut expose_target = target;
                         expose_target.decl_type = fsys::DeclType::Expose;
                         vec![use_target, expose_target].into_iter()
                     }
@@ -524,7 +524,7 @@ impl FrameworkCapability for RouteValidatorFrameworkCapability {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(RouteValidatorCapabilityProvider {
             model: self.model.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }

@@ -34,7 +34,7 @@ pub async fn generate_gpu_drivers(
     let mut drivers = Vec::new();
     for (topological_path, class_path) in topo_to_class {
         let proxy = connect_proxy::<fgpu::DeviceMarker>(&class_path)?;
-        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c.to_string());
+        let alias = get_driver_alias(&driver_aliases, &topological_path).map(|c| c);
         // Add driver if querying `MagmaQueryTotalTime` is supported.
         if is_total_time_supported(&proxy).await? {
             drivers.push(Driver { alias, topological_path, proxy });

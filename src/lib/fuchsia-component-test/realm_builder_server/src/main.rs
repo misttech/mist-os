@@ -274,7 +274,7 @@ impl RealmBuilderFactory {
             realm_node,
             registry: self.registry.clone(),
             runner: self.runner.clone(),
-            runner_proxy_placeholder: runner_proxy_placeholder.clone(),
+            runner_proxy_placeholder: runner_proxy_placeholder,
             realm_has_been_built: realm_has_been_built,
             realm_contents,
         };
@@ -672,7 +672,7 @@ impl Realm {
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![
                 (runner::LOCAL_COMPONENT_ID_KEY.to_string(), local_component_id.into()),
-                (ftest::LOCAL_COMPONENT_NAME_KEY.to_string(), child_path.join("/").to_string()),
+                (ftest::LOCAL_COMPONENT_NAME_KEY.to_string(), child_path.join("/")),
             ]),
             true,
         );
@@ -1606,7 +1606,7 @@ fn create_capability_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -1780,7 +1780,7 @@ fn create_offer_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -1813,7 +1813,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&protocol.name, &protocol.as_)?,
             };
             cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1903,7 +1903,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&resolver.name, &resolver.as_)?,
             };
             cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1921,7 +1921,7 @@ fn create_expose_decl(
                 ExposingIn::Realm => try_into_target_name(&runner.name, &runner.as_)?,
             };
             cm_rust::ExposeDecl::Runner(cm_rust::ExposeRunnerDecl {
-                source: source.clone(),
+                source: source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1932,7 +1932,7 @@ fn create_expose_decl(
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })
@@ -2048,7 +2048,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             let target_path = try_into_capability_path(&event.path)?;
             cm_rust::UseDecl::EventStream(cm_rust::UseEventStreamDecl {
                 source: cm_rust::UseSource::Parent,
-                source_name: source_name.clone(),
+                source_name: source_name,
                 target_path,
                 filter,
                 scope: event.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
@@ -2071,7 +2071,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
-                capability.clone()
+                capability
             )));
         }
     })

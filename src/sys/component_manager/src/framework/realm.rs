@@ -84,7 +84,7 @@ impl FrameworkCapability for Realm {
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
         Box::new(RealmCapabilityProvider {
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
             model: self.model.clone(),
             config: self.config.clone(),
         })

@@ -196,6 +196,6 @@ where
             }
         }
 
-        Arc::new(RouterEntry { router: self.clone(), entry_type, scope })
+        Arc::new(RouterEntry { router: self, entry_type, scope })
     }
 }

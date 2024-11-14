@@ -292,8 +292,8 @@ impl ChromebookKeyboardHandler {
                     // 2) There was a non-remapped key used with Search.
                     if search_key_only || self.is_regular_keys_pressed() {
                         new_events.push(into_unhandled_input_event(
-                            event.clone().into_with_event_type(KeyEventType::Released),
-                            device_descriptor.clone(),
+                            event.into_with_event_type(KeyEventType::Released),
+                            device_descriptor,
                             self.next_event_time(event_time),
                             None,
                         ));
@@ -324,9 +324,9 @@ impl ChromebookKeyboardHandler {
                         |kp: &KeyPair| kp.without_search,
                     );
                     new_events.append(&mut self.synthesize_input_events(
-                        event.clone(),
+                        event,
                         KeyEventType::Pressed,
-                        device_descriptor.clone(),
+                        device_descriptor,
                         event_time,
                         None,
                         keys_to_release.iter(),

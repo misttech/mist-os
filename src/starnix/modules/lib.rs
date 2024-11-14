@@ -77,7 +77,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         current_task,
         "tun".into(),
         DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
-        misc_class.clone(),
+        misc_class,
         DeviceDirectory::new,
         simple_device_ops::<DevTun>,
     );

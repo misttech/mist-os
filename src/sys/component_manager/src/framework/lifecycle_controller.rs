@@ -291,7 +291,7 @@ impl FrameworkCapability for LifecycleController {
     ) -> Box<dyn CapabilityProvider> {
         Box::new(LifecycleControllerCapabilityProvider {
             model: self.model.clone(),
-            scope_moniker: scope.moniker.clone(),
+            scope_moniker: scope.moniker,
         })
     }
 }

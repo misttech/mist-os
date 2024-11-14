@@ -256,7 +256,7 @@ impl FlatlandViewStrategy {
             flatland,
             allocator,
             view_key: key,
-            app_sender: app_sender.clone(),
+            app_sender: app_sender,
             last_presentation_time: fasync::MonotonicInstant::now().into_nanos(),
             future_presentation_times: Vec::new(),
             custom_render_offset: None,
@@ -415,7 +415,7 @@ impl FlatlandViewStrategy {
             flatland.create_view(view_creation_token, server_end)?;
         }
 
-        let sender = app_sender.clone();
+        let sender = app_sender;
         fasync::Task::local(async move {
             let mut layout_info_stream = HangingGetStream::new(
                 parent_viewport_watcher,

@@ -312,7 +312,7 @@ impl ScopeHandle {
             }),
         };
         let weak = child.downgrade();
-        state.insert_child(weak.clone());
+        state.insert_child(weak);
         Scope { inner: child }
     }
 

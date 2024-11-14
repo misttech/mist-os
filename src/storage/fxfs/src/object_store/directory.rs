@@ -130,7 +130,7 @@ impl<S: HandleOwner> Directory<S> {
 
     /// Enables/disables casefolding. This can only be done on an empty directory.
     pub async fn set_casefold(&self, val: bool) -> Result<(), Error> {
-        let fs = self.store().filesystem().clone();
+        let fs = self.store().filesystem();
         // Nb: We lock the directory to ensure it doesn't change during our check for children.
         let mut transaction = fs
             .new_transaction(

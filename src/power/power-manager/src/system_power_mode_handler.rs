@@ -464,7 +464,7 @@ impl SystemPowerModeHandler {
             clone.clone().spawn_mode_requester_handler(stream);
         });
 
-        let clone = self.clone();
+        let clone = self;
         outgoing_svc_dir.add_fidl_service(move |stream| {
             clone.clone().spawn_configurator_handler(stream);
         });

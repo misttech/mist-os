@@ -277,7 +277,7 @@ where
     };
 
     let fastboot_file_watcher = if sources.contains(DiscoverySources::FASTBOOT_FILE) {
-        let fastboot_file_sender = sender.clone();
+        let fastboot_file_sender = sender;
         if let Some(fastboot_devices_file) = fastboot_devices_file_path {
             Some(FastbootWatcher::new(fastboot_devices_file, fastboot_file_sender)?)
         } else {

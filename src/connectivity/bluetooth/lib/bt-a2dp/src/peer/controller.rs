@@ -372,7 +372,7 @@ impl ControllerPool {
     /// There can only be one active client at a time. As such, any client connections thereafter
     /// will be dropped.
     pub fn connected(&self, stream: PeerManagerRequestStream) {
-        if self.inner.lock().set_control_handle(stream.control_handle().clone()) {
+        if self.inner.lock().set_control_handle(stream.control_handle()) {
             // Spawns the control service task if the control handle hasn't been set.
             let inner = self.inner.clone();
             fasync::Task::local(

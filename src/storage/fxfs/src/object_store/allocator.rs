@@ -1808,7 +1808,7 @@ impl JournalingObject for Allocator {
                 owner_object_id,
             }) => {
                 let item = AllocatorItem {
-                    key: AllocatorKey { device_range: device_range.clone().into() },
+                    key: AllocatorKey { device_range: device_range.into() },
                     value: AllocatorValue::None,
                     sequence: context.checkpoint.file_offset,
                 };

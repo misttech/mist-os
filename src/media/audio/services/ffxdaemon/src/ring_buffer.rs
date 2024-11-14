@@ -132,7 +132,6 @@ impl AudioDeviceRingBuffer {
 
         let rb_format: Format = ring_buffer
             .format
-            .clone()
             .ok_or_else(|| anyhow!("missing 'format'"))?
             .try_into()
             .map_err(|err| anyhow!("invalid ring buffer format: {}", err))?;

@@ -60,7 +60,7 @@ impl GenerateProductDescription {
         let description = ProductDescription::V1(ProductDescriptionV1 {
             product_name: product_bundle.product_name.to_string(),
             product_version: product_bundle.product_version.to_string(),
-            sdk_version: Some(product_bundle.sdk_version.to_string()),
+            sdk_version: Some(product_bundle.sdk_version),
             transfer_url: self.transfer_url.to_string(),
             ..Default::default()
         });

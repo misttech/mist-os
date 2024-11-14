@@ -73,7 +73,7 @@ impl AppStrategy for FlatlandAppStrategy {
     ) -> Result<(), Error> {
         let mut public = fs.dir("svc");
 
-        let sender = app_sender.clone();
+        let sender = app_sender;
         let f = move |stream: ViewProviderRequestStream| {
             let sender = sender.clone();
             fasync::Task::local(

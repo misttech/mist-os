@@ -65,7 +65,7 @@ impl ZipLoadedProductBundle {
         // parent directory may be arbitrarily deep in the zip file
         match try_load_product_bundle(product_bundle_manifest)? {
             ProductBundle::V2(data) => {
-                let mut data = data.clone();
+                let mut data = data;
                 let mut canonicalizer = ZipCanonicalizer::new(product_bundle_parent_path);
                 data.canonicalize_paths_with(product_bundle_parent_path, &mut canonicalizer)
                     .with_context(|| {
@@ -108,7 +108,7 @@ impl Canonicalizer for ZipCanonicalizer {
         path: impl AsRef<Utf8Path>,
         _image_types: Vec<Type>,
     ) -> Utf8PathBuf {
-        self.root_path().join(path).to_owned()
+        self.root_path().join(path)
     }
 }
 
@@ -147,7 +147,7 @@ impl LoadedProductBundle {
 
         match try_load_product_bundle(file)? {
             ProductBundle::V2(data) => {
-                let mut data = data.clone();
+                let mut data = data;
                 data.canonicalize_paths(path.as_ref())
                     .with_context(|| format!("Canonicalizing paths from {:?}", path.as_ref()))?;
                 Ok(LoadedProductBundle::new(ProductBundle::V2(data), path))

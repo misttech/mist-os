@@ -184,7 +184,7 @@ impl From<FastbootEvent> for TargetEvent {
                 let handle = TargetHandle {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: serial.clone(),
+                        serial_number: serial,
                         connection_state: FastbootConnectionState::Usb,
                     }),
                 };
@@ -194,7 +194,7 @@ impl From<FastbootEvent> for TargetEvent {
                 let handle = TargetHandle {
                     node_name: Some("".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: serial.clone(),
+                        serial_number: serial,
                         connection_state: FastbootConnectionState::Usb,
                     }),
                 };

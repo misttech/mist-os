@@ -391,7 +391,7 @@ impl HostDispatcherState {
     }
 
     fn add_host(&mut self, id: HostId, host: HostDevice) {
-        if self.host_devices.insert(id, host.clone()).is_some() {
+        if self.host_devices.insert(id, host).is_some() {
             warn!("Host replaced: {}", id.to_string())
         } else {
             info!("Host added: {}", id.to_string());
@@ -601,7 +601,7 @@ impl HostDispatcher {
                     // On errors all session_watchers will be dropped, signaling receivers of
                     // the error.
                     if let Ok(session) = self.start_discovery().await {
-                        let _ = sender.send(session.clone());
+                        let _ = sender.send(session);
                     }
                 }
             }
@@ -1111,7 +1111,7 @@ impl HostDispatcher {
                     // On errors, sender will be dropped, signaling receivers of
                     // the error.
                     if let Ok(session) = self.start_discovery().await {
-                        let _ = sender.send(session.clone());
+                        let _ = sender.send(session);
                     }
                 }
             }
@@ -1294,7 +1294,7 @@ async fn assign_host_data(
     let data = match hd.stash().get_host_data(address.clone()).await? {
         Some(host_data) => {
             trace!("restored IRK");
-            host_data.clone()
+            host_data
         }
         None => {
             // Generate a new IRK.

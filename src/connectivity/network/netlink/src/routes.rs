@@ -752,7 +752,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                             })
                             .for_each(|message| {
                                 client.send_unicast(
-                                    message.clone().into_rtnl_new_route(sequence_number, true),
+                                    message.into_rtnl_new_route(sequence_number, true),
                                 )
                             });
                         RequestHandled::Done(Ok(()), client, completer)

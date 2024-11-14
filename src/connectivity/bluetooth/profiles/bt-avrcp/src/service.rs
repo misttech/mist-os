@@ -204,7 +204,7 @@ pub fn run_services(
     sender: mpsc::Sender<ServiceRequest>,
 ) -> Result<impl Future<Output = Result<(), Error>> + '_, Error> {
     let sender_avrcp = sender.clone();
-    let sender_test = sender.clone();
+    let sender_test = sender;
     let _ = fs
         .dir("svc")
         .add_fidl_service_at(PeerManagerExtMarker::PROTOCOL_NAME, move |stream| {

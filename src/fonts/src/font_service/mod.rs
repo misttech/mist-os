@@ -301,7 +301,7 @@ where
         family_name: fonts::FamilyName,
     ) -> Result<fonts_exp::TypefaceInfoResponse, fonts_exp::Error> {
         let family = self
-            .match_family(&UniCase::new(family_name.name.clone()))
+            .match_family(&UniCase::new(family_name.name))
             .map(|matched| matched.family)
             .ok_or(fonts_exp::Error::NotFound)?;
         let faces = family.extract_faces().map_into().collect();

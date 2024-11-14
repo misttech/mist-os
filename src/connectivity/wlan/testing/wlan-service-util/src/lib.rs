@@ -65,7 +65,7 @@ pub async fn create_iface(
     zx::Status::ok(response.0)
         .map_err(|e| return anyhow::anyhow!("Create iface returned non-OK status: {}", e))?;
 
-    match response.1.clone() {
+    match response.1 {
         Some(resp) => {
             let iface_id = resp.iface_id;
             tracing::info!("Created iface {:?}", iface_id);

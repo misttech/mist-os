@@ -422,7 +422,7 @@ impl XdgSurface {
         XdgSurface::spawn_child_view_listener(
             this,
             child_view_watcher,
-            task_queue.clone(),
+            task_queue,
             transform.value,
         );
         if let Some(view) = this.get_mut(client)?.view.clone() {
@@ -463,7 +463,7 @@ impl XdgSurface {
         );
         let view_ptr = XdgSurfaceView::new(
             flatland,
-            task_queue.clone(),
+            task_queue,
             this,
             surface_ref,
             parent_view,
@@ -1387,19 +1387,17 @@ impl XdgToplevel {
                     XdgSurface::spawn_child_view(
                         xdg_surface_ref,
                         client,
-                        flatland.clone(),
+                        flatland,
                         parent_ref,
                         offset,
                         geometry,
                     )?;
                     (None, None)
                 } else if client.take_view_provider_request() {
-                    let control_handle =
-                        XdgToplevel::spawn_view_provider(this, client, flatland.clone())?;
+                    let control_handle = XdgToplevel::spawn_view_provider(this, client, flatland)?;
                     (Some(control_handle), None)
                 } else {
-                    let view_controller_proxy =
-                        XdgToplevel::spawn_view(this, client, flatland.clone())?;
+                    let view_controller_proxy = XdgToplevel::spawn_view(this, client, flatland)?;
                     (None, Some(view_controller_proxy))
                 }
             };

@@ -208,7 +208,7 @@ impl Peer {
 
         Ok(Arc::new(Self {
             endpoint: Endpoint::Client,
-            commands: Some(command_sender.clone()),
+            commands: Some(command_sender),
             _task: Task::spawn(Peer::runner(Endpoint::Client, weak_router.clone(), async move {
                 let result = client_conn_fut.await;
                 if let Some(router) = weak_router.upgrade() {

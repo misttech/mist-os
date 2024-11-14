@@ -72,7 +72,7 @@ impl MemoryBackend {
     pub fn with_size(size: usize) -> Self {
         let size = Sector::from_bytes_round_down(size as u64).to_bytes().unwrap() as usize;
         let buffer = Rc::new(RefCell::new(vec![0; size]));
-        Self(buffer.clone())
+        Self(buffer)
     }
 }
 

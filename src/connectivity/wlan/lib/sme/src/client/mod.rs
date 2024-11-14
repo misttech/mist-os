@@ -698,7 +698,7 @@ impl ClientSme {
             }
         };
         let cmd = ConnectCommand {
-            bss: Box::new(bss_description.clone()),
+            bss: Box::new(bss_description),
             connect_txn_sink,
             protection,
             authentication,

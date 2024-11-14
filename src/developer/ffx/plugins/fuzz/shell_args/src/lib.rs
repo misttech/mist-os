@@ -160,7 +160,7 @@ pub fn valid_when(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
     let ItemStruct { attrs, ident, fields, .. } = item;
     let span = ident.span();
-    let tokens = attr.clone();
+    let tokens = attr;
     let parser = Punctuated::<TypePath, Token![,]>::parse_separated_nonempty;
     let states = parser.parse(tokens).expect("failed to parse");
     let mut conditional_exprs = Vec::new();

@@ -112,8 +112,7 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
-    let (proxy, tree_server_fut) =
-        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) = fuchsia_inspect_bench_utils::spawn_server(inspector).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
     b.iter_with_large_drop(|| loop {

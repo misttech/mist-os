@@ -416,7 +416,7 @@ impl ClientInner {
                 if let Entry::Occupied(mut o) = self.socket_read_subscriptions.entry(msg.handle) {
                     match msg.socket_message {
                         proto::SocketMessage::Data(data) => {
-                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                            if o.get_mut().unbounded_send(Ok(data)).is_err() {
                                 let _ = o.remove();
                                 self.request(
                                     ordinals::READ_SOCKET_STREAMING_STOP,
@@ -448,7 +448,7 @@ impl ClientInner {
                 if let Entry::Occupied(mut o) = self.channel_read_subscriptions.entry(msg.handle) {
                     match msg.channel_sent {
                         proto::ChannelSent::Message(data) => {
-                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                            if o.get_mut().unbounded_send(Ok(data)).is_err() {
                                 let _ = o.remove();
                                 self.request(
                                     ordinals::READ_CHANNEL_STREAMING_STOP,

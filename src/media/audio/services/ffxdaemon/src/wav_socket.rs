@@ -54,7 +54,7 @@ impl WavSocket {
             [riff_chunk_descriptor, fmt_subchunk_info, fmt_chunk, data_subchunk_info].concat();
 
         let cursor_header = Cursor::new(wav_header);
-        let reader = hound::WavReader::new(cursor_header.clone())?;
+        let reader = hound::WavReader::new(cursor_header)?;
 
         Ok(reader.spec())
     }

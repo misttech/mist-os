@@ -47,7 +47,7 @@ impl PersistServer {
         let unique_service_name =
             format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, self.0.lock().service_name);
 
-        let this = self.clone();
+        let this = self;
         fs.dir("svc").add_fidl_service_at(
             unique_service_name,
             move |mut stream: DataPersistenceRequestStream| {

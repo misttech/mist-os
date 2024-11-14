@@ -193,7 +193,7 @@ pub fn run_container_features(
         );
 
         let input_events_relay = InputEventsRelay::new();
-        input_events_relay.clone().start_relays(
+        input_events_relay.start_relays(
             &kernel,
             EventProxyMode::WakeContainer,
             touch_source_client,

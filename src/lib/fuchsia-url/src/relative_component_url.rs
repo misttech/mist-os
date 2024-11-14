@@ -22,7 +22,7 @@ impl RelativeComponentUrl {
         let package =
             RelativePackageUrl::from_parts(UrlParts { scheme, host, path, hash, resource: None })?;
         let resource = resource.ok_or(ParseError::MissingResource)?;
-        Ok(Self { package, resource: resource.to_string() })
+        Ok(Self { package, resource: resource })
     }
 
     /// Parse a relative component URL.

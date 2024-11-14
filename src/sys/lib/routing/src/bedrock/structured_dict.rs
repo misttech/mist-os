@@ -59,7 +59,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
-            T::from_dict(dict.clone())
+            T::from_dict(dict)
         })
     }
 
@@ -68,7 +68,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
-            T::from_dict(dict.clone())
+            T::from_dict(dict)
         })
     }
 
@@ -210,7 +210,7 @@ impl ComponentEnvironment {
         let Capability::Dictionary(dict) = cap else {
             unreachable!("debug entry must be a dict: {cap:?}");
         };
-        dict.clone()
+        dict
     }
 
     /// Capabilities listed in the `runners` portion of its environment.

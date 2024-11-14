@@ -47,7 +47,7 @@ impl LocalExecutor {
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        let root_scope = ScopeHandle::root(inner.clone());
+        let root_scope = ScopeHandle::root(inner);
         Executor::set_local(root_scope.clone());
         Self { ehandle: EHandle { root_scope } }
     }
@@ -157,7 +157,7 @@ impl TestExecutor {
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        let root_scope = ScopeHandle::root(inner.clone());
+        let root_scope = ScopeHandle::root(inner);
         Executor::set_local(root_scope.clone());
         Self { local: LocalExecutor { ehandle: EHandle { root_scope } } }
     }

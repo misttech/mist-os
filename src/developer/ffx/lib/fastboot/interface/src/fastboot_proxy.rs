@@ -274,7 +274,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
             Reply::Fail(s) => {
                 return Err(FastbootError::ErasePartitionFailed {
                     partition: partition_name.to_string(),
-                    message: s.to_string(),
+                    message: s,
                 })
             }
             r @ _ => Err(FastbootError::UnexpectedReply {

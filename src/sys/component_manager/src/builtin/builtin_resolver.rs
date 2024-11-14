@@ -36,7 +36,7 @@ impl Resolver for BuiltinResolver {
         let url = BuiltinUrl::parse(component_address.url())
             .map_err(|e| ResolverError::malformed_url(e))?;
         let Some(resource) = url.resource() else {
-            return Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone())));
+            return Err(ResolverError::manifest_not_found(ManifestNotFoundError(url)));
         };
         let cm = match resource {
             "elf_runner.cm" => Ok(ELF_RUNNER_CM),

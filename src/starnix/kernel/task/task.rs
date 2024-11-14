@@ -989,7 +989,7 @@ impl Task {
                     pid: self.id,
                     pgid,
                     uid,
-                    exit_info: exit_info.clone(),
+                    exit_info: exit_info,
                     // ptrace doesn't need this.
                     time_stats: TaskTimeStats::default(),
                     is_canonical: false,

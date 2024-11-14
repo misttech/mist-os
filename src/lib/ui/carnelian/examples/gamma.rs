@@ -75,7 +75,7 @@ impl Facet for GammaFacet {
             },
         })
         .chain(std::iter::once(Layer {
-            raster: raster.clone().translate(vec2(0, (size.height * 0.5) as i32)),
+            raster: raster.translate(vec2(0, (size.height * 0.5) as i32)),
             clip: None,
             style: Style {
                 fill_rule: FillRule::NonZero,

@@ -185,7 +185,7 @@ impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
     ) -> Router<Dict> {
         new_debug_only_specific_router::<Dict>(CapabilitySource::Component(ComponentSource {
             capability,
-            moniker: component.moniker.clone(),
+            moniker: component.moniker,
         }))
     }
 

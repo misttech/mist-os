@@ -103,8 +103,8 @@ fn get_temp_dir() -> Box<tempfile::TempDir> {
 impl SuperjetManifest {
     pub fn new(name: String, version: String) -> SuperjetManifest {
         SuperjetManifest {
-            name: name.to_string(),
-            version: version.to_string(),
+            name: name,
+            version: version,
             pass: false,
             artifacts: Box::new(vec![]),
             licenses: Box::new(vec![]),

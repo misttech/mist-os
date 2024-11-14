@@ -76,7 +76,7 @@ fn parse_path(path: &[u8]) -> Result<(Vec<Name>, Name)> {
 
     // Ensure there is an empty element at the beginning (as a placeholder for the root directory),
     // but remove any other empty and '.' segments.
-    let mut segments: Vec<Name> = [Name::EMPTY.clone()]
+    let mut segments: Vec<Name> = [Name::EMPTY]
         .into_iter()
         .chain(segments.into_iter().filter(|segment| !segment.is_empty() && !segment.is_dot()))
         .collect();

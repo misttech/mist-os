@@ -96,7 +96,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
             device_information: Some(new_fake_device_info()),
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
-                    keys3: Some(all_keys.clone()),
+                    keys3: Some(all_keys),
                     ..Default::default()
                 }),
                 ..Default::default()

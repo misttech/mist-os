@@ -471,7 +471,7 @@ impl TryFrom<&fidl_bredr::Information> for Information {
     fn try_from(src: &fidl_bredr::Information) -> Result<Information, Self::Error> {
         let language = match src.language.as_ref().map(String::as_str) {
             None | Some("") => return Err(Error::missing("bredr.Information.language")),
-            Some(l) => l.to_string().clone(),
+            Some(l) => l.to_string(),
         };
 
         Ok(Information {

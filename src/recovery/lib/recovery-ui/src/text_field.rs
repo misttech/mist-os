@@ -157,14 +157,12 @@ impl TextField {
         );
         builder.space(size2(BORDER_WIDTH / 2.0, BORDER_WIDTH / 2.0));
         let bg_size = size;
-        let corner: Coord =
-            Coord::from((bg_size.height) * (options.shape.clone() as i32 as f32) / 100.0);
+        let corner: Coord = Coord::from((bg_size.height) * (options.shape as i32 as f32) / 100.0);
         builder.rounded_rectangle(bg_size, corner, Color::white());
         builder.end_group(); // Border row
 
         let bg_size = bg_size.add(size2(BORDER_WIDTH, BORDER_WIDTH));
-        let corner: Coord =
-            Coord::from((bg_size.height) * (options.shape.clone() as i32 as f32) / 100.0);
+        let corner: Coord = Coord::from((bg_size.height) * (options.shape as i32 as f32) / 100.0);
         builder.rounded_rectangle(bg_size, corner, Color::new());
         builder.end_group(); // field body
         builder.end_group(); // field body column
@@ -246,7 +244,7 @@ impl TextField {
     }
 
     pub fn set_text(&mut self, text: String) {
-        self.text = text.clone();
+        self.text = text;
     }
 
     pub fn format_text(text: String, privacy: TextVisibility) -> String {

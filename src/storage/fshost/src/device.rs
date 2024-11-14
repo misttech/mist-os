@@ -255,7 +255,7 @@ impl BlockDevice {
         controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(Self {
             path: path.to_string(),
-            topological_path: topological_path.to_string(),
+            topological_path: topological_path,
             controller_proxy,
             partition_proxy,
             content_format: None,

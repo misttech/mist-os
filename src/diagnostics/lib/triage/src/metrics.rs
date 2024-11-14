@@ -389,7 +389,7 @@ impl<'a> MetricState<'a> {
                     }
                     let mut cached_value_cell = value_source.cached_value.borrow_mut();
                     *cached_value_cell = Some(resolved_value.clone());
-                    resolved_value.clone()
+                    resolved_value
                 }
             },
         }
@@ -834,7 +834,7 @@ impl<'a> MetricState<'a> {
                 .filter_map(|item| match self.apply_lambda(namespace, &lambda, &[item]) {
                     MetricValue::Bool(true) => Some(item.clone()),
                     MetricValue::Bool(false) => None,
-                    MetricValue::Problem(problem) => Some(MetricValue::Problem(problem.clone())),
+                    MetricValue::Problem(problem) => Some(MetricValue::Problem(problem)),
                     bad_type => Some(value_error(format!(
                         "Bad value {:?} from filter function should be Boolean",
                         bad_type
@@ -1061,7 +1061,7 @@ impl<'a> MetricState<'a> {
                 MetricValue::Problem(ref problem) => return MetricValue::Problem(problem.clone()),
                 _ => false,
             },
-            MetricValue::Problem(problem) => return MetricValue::Problem(problem.clone()),
+            MetricValue::Problem(problem) => return MetricValue::Problem(problem),
             _ => false,
         })
     }
@@ -1086,7 +1086,7 @@ impl<'a> MetricState<'a> {
                 MetricValue::Problem(ref problem) => return MetricValue::Problem(problem.clone()),
                 _ => false,
             },
-            MetricValue::Problem(problem) => return MetricValue::Problem(problem.clone()),
+            MetricValue::Problem(problem) => return MetricValue::Problem(problem),
             _ => false,
         })
     }

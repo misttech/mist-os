@@ -106,7 +106,7 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
         tracing::debug!(
             "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
             serial,
-            errs.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
+            errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
         );
         false
     } else {

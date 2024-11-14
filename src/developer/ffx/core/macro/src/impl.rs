@@ -7,6 +7,7 @@ use quote::quote;
 use syn::ItemStruct;
 
 pub fn ffx_command(input: ItemStruct) -> TokenStream {
+    #[allow(clippy::redundant_clone)] // false positive
     let cmd = input.ident.clone();
     quote! {
         #input

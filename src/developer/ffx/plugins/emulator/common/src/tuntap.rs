@@ -81,7 +81,7 @@ pub(crate) mod tap {
             {
                 // InterfaceAddressIterator doesn't persist once it's been iterated over, so this
                 // clone() is needed to take ownership of the data.
-                Ok(interface.clone())
+                Ok(interface)
             } else {
                 return_user_error!(format!(
                     "Couldn't find an interface named '{}'. \

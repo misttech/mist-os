@@ -214,7 +214,7 @@ impl DataType {
                         let reference = subobject.reference.ok_or_else(|| {
                             anyhow!("Missing reference for field in {}", &rust_type)
                         })?;
-                        StructFieldType::Custom { data_type: reference.clone() }
+                        StructFieldType::Custom { data_type: reference }
                     };
                     let metadata = object.metadata();
                     let description = metadata.description.clone().unwrap_or_else(|| "".into());

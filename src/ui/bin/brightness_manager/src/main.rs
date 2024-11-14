@@ -103,7 +103,7 @@ where
     ST: watch_handler::Sender<T> + 'static,
 {
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    let receiver = receiver.clone();
+    let receiver = receiver;
     fasync::Task::spawn(
         Abortable::new(
             async move {

@@ -1070,7 +1070,7 @@ impl TryInto<Filter> for FacadeArg {
 impl TryInto<ServiceInfo> for FacadeArg {
     type Error = Error;
     fn try_into(self) -> Result<ServiceInfo, Self::Error> {
-        let value = self.value.clone();
+        let value = self.value;
         let id = parse_arg!(value, as_u64, "id")?;
         let handle = ServiceHandle { value: id };
         let primary = parse_arg!(value, as_bool, "primary")?;

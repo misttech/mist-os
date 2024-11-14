@@ -19,7 +19,7 @@ pub trait ExpectWithin: Future + Sized {
         duration: zx::MonotonicDuration,
         msg: S,
     ) -> OnTimeout<Self, Box<dyn FnOnce() -> Self::Output>> {
-        let msg = msg.clone().to_string();
+        let msg = msg.to_string();
         self.on_timeout(duration.after_now(), Box::new(move || panic!("{}", msg)))
     }
 }
