@@ -12,9 +12,8 @@ use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_diagnostics::Selector;
 use flyweights::FlyStr;
 use fuchsia_sync::{RwLock, RwLockWriteGuard};
-use futures::channel::oneshot;
-use futures::prelude::*;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
@@ -55,19 +54,23 @@ impl InspectRepository {
     ) {
         // insert_inspect_artifact_container returns None when we were already tracking the
         // directory for this component. If that's the case we can return early.
-        let Some(on_closed_fut) = guard.insert_inspect_artifact_container(
+        let weak_clone = Arc::downgrade(self);
+        let identity_clone = Arc::clone(&identity);
+        let Some(cleanup_task) = guard.insert_inspect_artifact_container(
             Arc::clone(&identity),
             proxy_handle,
             remove_associated,
+            move |koid| {
+                if let Some(this) = weak_clone.upgrade() {
+                    this.on_handle_closed(koid, identity_clone);
+                }
+            },
         ) else {
+            // If we got None, it means that this was already tracked and there's nothing to do.
             return;
         };
 
-        self.scope.spawn(handle_on_closed(
-            Arc::clone(&identity),
-            Arc::downgrade(self),
-            on_closed_fut,
-        ));
+        self.scope.spawn(cleanup_task);
 
         // Let each pipeline know that a new component arrived, and allow the pipeline
         // to eagerly bucket static selectors based on that component's moniker.
@@ -133,35 +136,23 @@ impl InspectRepository {
         let guard = self.inner.write();
         self.add_inspect_artifacts(guard, Arc::clone(&component), handle, None);
     }
-}
 
-async fn handle_on_closed<E, F>(
-    identity: Arc<ComponentIdentity>,
-    repo: Weak<InspectRepository>,
-    on_closed_fut: F,
-) where
-    F: Future<Output = Result<zx::Koid, E>> + Send + 'static,
-{
-    let Ok(koid_to_remove) = on_closed_fut.await else {
-        return;
-    };
-    let Some(this) = repo.upgrade() else {
-        return;
-    };
-    // Hold the lock while we remove and update pipelines.
-    let mut guard = this.inner.write();
+    fn on_handle_closed(&self, koid_to_remove: zx::Koid, identity: Arc<ComponentIdentity>) {
+        // Hold the lock while we remove and update pipelines.
+        let mut guard = self.inner.write();
 
-    if let Some(container) = guard.diagnostics_containers.get_mut(&identity) {
-        if container.remove_handle(koid_to_remove).1 != 0 {
-            return;
+        if let Some(container) = guard.diagnostics_containers.get_mut(&identity) {
+            if container.remove_handle(koid_to_remove).1 != 0 {
+                return;
+            }
         }
-    }
 
-    guard.diagnostics_containers.remove(&identity);
+        guard.diagnostics_containers.remove(&identity);
 
-    for pipeline_weak in &this.pipelines {
-        if let Some(pipeline) = pipeline_weak.upgrade() {
-            pipeline.remove_component(&identity.moniker);
+        for pipeline_weak in &self.pipelines {
+            if let Some(pipeline) = pipeline_weak.upgrade() {
+                pipeline.remove_component(&identity.moniker);
+            }
         }
     }
 }
@@ -218,12 +209,13 @@ impl InspectRepositoryInner {
         identity: Arc<ComponentIdentity>,
         proxy_handle: InspectHandle,
         remove_associated: Option<zx::Koid>,
-    ) -> Option<oneshot::Receiver<zx::Koid>> {
+        on_closed: impl FnOnce(zx::Koid),
+    ) -> Option<impl Future<Output = ()>> {
         let mut diag_repo_entry_opt = self.diagnostics_containers.get_mut(&identity);
         match diag_repo_entry_opt {
             None => {
                 let mut inspect_container = InspectArtifactsContainer::default();
-                let fut = inspect_container.push_handle(proxy_handle);
+                let fut = inspect_container.push_handle(proxy_handle, on_closed);
                 self.diagnostics_containers.insert(identity, inspect_container);
                 fut
             }
@@ -234,7 +226,7 @@ impl InspectRepositoryInner {
                 if let Some(koid) = remove_associated {
                     artifacts_container.remove_handle(koid);
                 }
-                artifacts_container.push_handle(proxy_handle)
+                artifacts_container.push_handle(proxy_handle, on_closed)
             }
         }
     }
