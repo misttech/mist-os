@@ -16,13 +16,13 @@ namespace display {
 namespace {
 
 constexpr ImageBufferUsage kDisplayUsage = {
-    .tiling_type = kImageTilingTypeLinear,
+    .tiling_type = ImageTilingType::kLinear,
 };
 constexpr ImageBufferUsage kDisplayUsage2 = {
-    .tiling_type = kImageTilingTypeLinear,
+    .tiling_type = ImageTilingType::kLinear,
 };
 constexpr ImageBufferUsage kCaptureUsage = {
-    .tiling_type = kImageTilingTypeCapture,
+    .tiling_type = ImageTilingType::kCapture,
 };
 
 TEST(ImageBufferUsageTest, EqualityIsReflexive) {
@@ -49,7 +49,7 @@ TEST(ImageBufferUsageTest, FromFidlImageBufferUsage) {
 
   static constexpr ImageBufferUsage image_buffer_usage =
       ToImageBufferUsage(fidl_image_buffer_usage);
-  EXPECT_EQ(kImageTilingTypeCapture, image_buffer_usage.tiling_type);
+  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type);
 }
 
 TEST(ImageBufferUsageTest, FromBanjoImageBufferUsage) {
@@ -59,7 +59,7 @@ TEST(ImageBufferUsageTest, FromBanjoImageBufferUsage) {
 
   static constexpr ImageBufferUsage image_buffer_usage =
       ToImageBufferUsage(banjo_image_buffer_usage);
-  EXPECT_EQ(kImageTilingTypeCapture, image_buffer_usage.tiling_type);
+  EXPECT_EQ(ImageTilingType::kCapture, image_buffer_usage.tiling_type);
 }
 
 TEST(ImageBufferUsageTest, ToFidlImageBufferUsage) {

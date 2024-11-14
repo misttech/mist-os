@@ -31,6 +31,12 @@ class ImageTilingType {
   // and Inspect. The values are not guaranteed to have any stable semantics.
   constexpr uint32_t ValueForLogging() const;
 
+  // See [`fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR`].
+  static const ImageTilingType kLinear;
+
+  // See [`fuchsia.hardware.display.types/IMAGE_TILING_TYPE_CAPTURE`].
+  static const ImageTilingType kCapture;
+
  private:
   friend constexpr bool operator==(const ImageTilingType& lhs, const ImageTilingType& rhs);
   friend constexpr bool operator!=(const ImageTilingType& lhs, const ImageTilingType& rhs);
@@ -38,12 +44,9 @@ class ImageTilingType {
   fuchsia_hardware_display_types::wire::ImageTilingTypeIdValue tiling_type_id_;
 };
 
-// See [`fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR`].
-constexpr ImageTilingType kImageTilingTypeLinear{
-    fuchsia_hardware_display_types::wire::kImageTilingTypeLinear};
-
-// See [`fuchsia.hardware.display.types/IMAGE_TILING_TYPE_CAPTURE`].
-constexpr ImageTilingType kImageTilingTypeCapture{
+constexpr inline ImageTilingType ImageTilingType::kLinear(
+    fuchsia_hardware_display_types::wire::kImageTilingTypeLinear);
+constexpr inline ImageTilingType ImageTilingType::kCapture{
     fuchsia_hardware_display_types::wire::kImageTilingTypeCapture};
 
 constexpr bool operator==(const ImageTilingType& lhs, const ImageTilingType& rhs) {

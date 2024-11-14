@@ -153,7 +153,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
   const ImageMetadata image_metadata(request->image_metadata);
 
-  if (image_metadata.tiling_type() == kImageTilingTypeCapture) {
+  if (image_metadata.tiling_type() == ImageTilingType::kCapture) {
     zx_status_t import_status =
         ImportImageForCapture(image_metadata, ToBufferId(request->buffer_id), image_id);
     if (import_status == ZX_OK) {
@@ -175,7 +175,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 
 zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, BufferId buffer_id,
                                           ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type() != kImageTilingTypeCapture);
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() != ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -816,7 +816,7 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
 
 zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, BufferId buffer_id,
                                           ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type() == kImageTilingTypeCapture);
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() == ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 

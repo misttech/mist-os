@@ -54,7 +54,7 @@ TEST_F(ImageTest, MultipleAcquiresAllowed) {
   static constexpr ImageMetadata image_metadata({
       .width = 1024,
       .height = 600,
-      .tiling_type = kImageTilingTypeLinear,
+      .tiling_type = ImageTilingType::kLinear,
   });
   fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
 
@@ -72,7 +72,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   static constexpr ImageMetadata image_metadata({
       .width = 1024,
       .height = 600,
-      .tiling_type = kImageTilingTypeLinear,
+      .tiling_type = ImageTilingType::kLinear,
   });
   fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
   auto image_cleanup = fit::defer([image]() {

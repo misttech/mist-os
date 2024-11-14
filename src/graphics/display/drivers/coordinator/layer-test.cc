@@ -44,7 +44,7 @@ class LayerTest : public TestBase {
     static constexpr ImageMetadata image_metadata({
         .width = kDisplayWidth,
         .height = kDisplayHeight,
-        .tiling_type = kImageTilingTypeLinear,
+        .tiling_type = ImageTilingType::kLinear,
     });
     fbl::RefPtr<Image> image = fbl::AdoptRef(
         new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));

@@ -28,6 +28,7 @@ source_set("cpp") {
     "image-buffer-usage.h",
     "image-id.h",
     "image-metadata.h",
+    "image-tiling-type.cc",
     "image-tiling-type.h",
     "layer-id.h",
     "rectangle.cc",

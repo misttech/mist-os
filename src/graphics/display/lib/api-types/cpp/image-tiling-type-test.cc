@@ -17,55 +17,55 @@ namespace {
 constexpr ImageTilingType kLinear2(fuchsia_hardware_display_types::wire::kImageTilingTypeLinear);
 
 TEST(ImageTilingTypeTest, EqualityIsReflexive) {
-  EXPECT_EQ(kImageTilingTypeLinear, kImageTilingTypeLinear);
+  EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType::kLinear);
   EXPECT_EQ(kLinear2, kLinear2);
-  EXPECT_EQ(kImageTilingTypeCapture, kImageTilingTypeCapture);
+  EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType::kCapture);
 }
 
 TEST(ImageTilingTypeTest, EqualityIsSymmetric) {
-  EXPECT_EQ(kImageTilingTypeLinear, kLinear2);
-  EXPECT_EQ(kLinear2, kImageTilingTypeLinear);
+  EXPECT_EQ(ImageTilingType::kLinear, kLinear2);
+  EXPECT_EQ(kLinear2, ImageTilingType::kLinear);
 }
 
 TEST(ImageTilingTypeTest, EqualityForDifferentValues) {
-  EXPECT_NE(kImageTilingTypeLinear, kImageTilingTypeCapture);
-  EXPECT_NE(kImageTilingTypeCapture, kImageTilingTypeLinear);
-  EXPECT_NE(kLinear2, kImageTilingTypeCapture);
-  EXPECT_NE(kImageTilingTypeCapture, kLinear2);
+  EXPECT_NE(ImageTilingType::kLinear, ImageTilingType::kCapture);
+  EXPECT_NE(ImageTilingType::kCapture, ImageTilingType::kLinear);
+  EXPECT_NE(kLinear2, ImageTilingType::kCapture);
+  EXPECT_NE(ImageTilingType::kCapture, kLinear2);
 }
 
 TEST(ImageTilingTypeTest, ToBanjoImageTilingType) {
-  EXPECT_EQ(IMAGE_TILING_TYPE_LINEAR, kImageTilingTypeLinear.ToBanjo());
-  EXPECT_EQ(IMAGE_TILING_TYPE_CAPTURE, kImageTilingTypeCapture.ToBanjo());
+  EXPECT_EQ(IMAGE_TILING_TYPE_LINEAR, ImageTilingType::kLinear.ToBanjo());
+  EXPECT_EQ(IMAGE_TILING_TYPE_CAPTURE, ImageTilingType::kCapture.ToBanjo());
 }
 
 TEST(ImageTilingTypeTest, ToFidlImageTilingType) {
   EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
-            kImageTilingTypeLinear.ToFidl());
+            ImageTilingType::kLinear.ToFidl());
   EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
-            kImageTilingTypeCapture.ToFidl());
+            ImageTilingType::kCapture.ToFidl());
 }
 
 TEST(ImageTilingTypeTest, ToImageTilingTypeWithBanjoValue) {
-  EXPECT_EQ(kImageTilingTypeLinear, ImageTilingType(IMAGE_TILING_TYPE_LINEAR));
-  EXPECT_EQ(kImageTilingTypeCapture, ImageTilingType(IMAGE_TILING_TYPE_CAPTURE));
+  EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType(IMAGE_TILING_TYPE_LINEAR));
+  EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType(IMAGE_TILING_TYPE_CAPTURE));
 }
 
 TEST(ImageTilingTypeTest, ToImageTilingTypeWithFidlValue) {
-  EXPECT_EQ(kImageTilingTypeLinear,
+  EXPECT_EQ(ImageTilingType::kLinear,
             ImageTilingType(fuchsia_hardware_display_types::wire::kImageTilingTypeLinear));
-  EXPECT_EQ(kImageTilingTypeCapture,
+  EXPECT_EQ(ImageTilingType::kCapture,
             ImageTilingType(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture));
 }
 
 TEST(ImageTilingTypeTest, BanjoConversionRoundtrip) {
-  EXPECT_EQ(kImageTilingTypeLinear, ImageTilingType(kImageTilingTypeLinear.ToBanjo()));
-  EXPECT_EQ(kImageTilingTypeCapture, ImageTilingType(kImageTilingTypeCapture.ToBanjo()));
+  EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType(ImageTilingType::kLinear.ToBanjo()));
+  EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType(ImageTilingType::kCapture.ToBanjo()));
 }
 
 TEST(ImageTilingTypeTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(kImageTilingTypeLinear, ImageTilingType(kImageTilingTypeLinear.ToFidl()));
-  EXPECT_EQ(kImageTilingTypeCapture, ImageTilingType(kImageTilingTypeCapture.ToFidl()));
+  EXPECT_EQ(ImageTilingType::kLinear, ImageTilingType(ImageTilingType::kLinear.ToFidl()));
+  EXPECT_EQ(ImageTilingType::kCapture, ImageTilingType(ImageTilingType::kCapture.ToFidl()));
 }
 
 }  // namespace

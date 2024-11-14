@@ -282,7 +282,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   static constexpr display::ImageMetadata kDefaultImageMetadata({
       .width = 4,
       .height = 4,
-      .tiling_type = display::kImageTilingTypeLinear,
+      .tiling_type = display::ImageTilingType::kLinear,
   });
   PerformBlockingWork([&] {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =

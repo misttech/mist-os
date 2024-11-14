@@ -245,7 +245,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
 zx::result<display::DriverImageId> DisplayEngine::Import(
     zx::vmo vmo, const display::ImageMetadata& image_metadata, size_t offset, uint32_t pixel_size,
     uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format) {
-  if (image_metadata.tiling_type() != display::kImageTilingTypeLinear) {
+  if (image_metadata.tiling_type() != display::ImageTilingType::kLinear) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 

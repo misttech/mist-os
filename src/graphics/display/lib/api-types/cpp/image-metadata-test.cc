@@ -18,19 +18,19 @@ namespace {
 constexpr ImageMetadata kSmallDisplay({
     .width = 800,
     .height = 600,
-    .tiling_type = kImageTilingTypeLinear,
+    .tiling_type = ImageTilingType::kLinear,
 });
 
 constexpr ImageMetadata kSmallDisplay2({
     .width = 800,
     .height = 600,
-    .tiling_type = kImageTilingTypeLinear,
+    .tiling_type = ImageTilingType::kLinear,
 });
 
 constexpr ImageMetadata kSmallCaptured({
     .width = 800,
     .height = 600,
-    .tiling_type = kImageTilingTypeCapture,
+    .tiling_type = ImageTilingType::kCapture,
 });
 
 TEST(ImageMetadataTest, EqualityIsReflexive) {
@@ -48,7 +48,7 @@ TEST(ImageMetadataTest, EqualityForDifferentWidths) {
   static constexpr ImageMetadata kSmallSquareDisplay({
       .width = 600,
       .height = 600,
-      .tiling_type = kImageTilingTypeLinear,
+      .tiling_type = ImageTilingType::kLinear,
   });
   EXPECT_NE(kSmallDisplay, kSmallSquareDisplay);
   EXPECT_NE(kSmallSquareDisplay, kSmallDisplay);
@@ -58,7 +58,7 @@ TEST(ImageMetadataTest, EqualityForDifferentHeights) {
   static constexpr ImageMetadata kLargeSquareDisplay({
       .width = 800,
       .height = 800,
-      .tiling_type = kImageTilingTypeLinear,
+      .tiling_type = ImageTilingType::kLinear,
   });
   EXPECT_NE(kSmallDisplay, kLargeSquareDisplay);
   EXPECT_NE(kLargeSquareDisplay, kSmallDisplay);
@@ -73,11 +73,11 @@ TEST(ImageMetadataTest, FromDesignatedInitializer) {
   static constexpr ImageMetadata image_metadata({
       .width = 640,
       .height = 480,
-      .tiling_type = kImageTilingTypeCapture,
+      .tiling_type = ImageTilingType::kCapture,
   });
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
-  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
+  EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, FromFidlImageMetadata) {
@@ -90,7 +90,7 @@ TEST(ImageMetadataTest, FromFidlImageMetadata) {
   static constexpr ImageMetadata image_metadata(fidl_image_metadata);
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
-  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
+  EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, FromBanjoImageMetadata) {
@@ -103,14 +103,14 @@ TEST(ImageMetadataTest, FromBanjoImageMetadata) {
   static constexpr ImageMetadata image_metadata(banjo_image_metadata);
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
-  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
+  EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, ToFidlImageMetadata) {
   static constexpr ImageMetadata image_metadata({
       .width = 640,
       .height = 480,
-      .tiling_type = kImageTilingTypeCapture,
+      .tiling_type = ImageTilingType::kCapture,
   });
 
   static constexpr fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
@@ -125,7 +125,7 @@ TEST(ImageMetadataTest, ToBanjoImageMetadata) {
   static constexpr ImageMetadata image_metadata({
       .width = 640,
       .height = 480,
-      .tiling_type = kImageTilingTypeCapture,
+      .tiling_type = ImageTilingType::kCapture,
   });
 
   static constexpr image_metadata_t banjo_image_metadata = image_metadata.ToBanjo();
