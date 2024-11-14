@@ -528,7 +528,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
-  if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
+  if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryPosition on invalid layer");
     TearDown();
     return;
@@ -553,7 +553,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
-  if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
+  if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryAlpha on invalid layer");
     TearDown();
     return;
@@ -607,11 +607,6 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, request->layer_id.value);
-    TearDown();
-    return;
-  }
-  if (layer->pending_type() != LAYER_TYPE_PRIMARY) {
-    FDF_LOG(ERROR, "SetLayerImage with invalid layer type: %" PRIu32, layer->pending_type());
     TearDown();
     return;
   }
@@ -986,26 +981,27 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       ++client_composition_opcodes_count;
 
       bool invalid = false;
-      if (banjo_layer.type == LAYER_TYPE_PRIMARY) {
-        primary_layer_t* primary_layer = &banjo_layer.cfg.primary;
-        // Frame for checking that the layer's src_frame lies entirely
-        // within the source image.
+      if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
+        // Frame for checking that the layer's image_source lies entirely within
+        // the source image.
         const rect_u_t image_area = {
             .x = 0,
             .y = 0,
-            .width = primary_layer->image_metadata.width,
-            .height = primary_layer->image_metadata.height,
+            .width = banjo_layer.image_metadata.width,
+            .height = banjo_layer.image_metadata.height,
         };
-        invalid = (!OriginRectangleContains(image_area, primary_layer->image_source) ||
-                   !OriginRectangleContains(display_area, primary_layer->display_destination));
+        invalid = !OriginRectangleContains(image_area, banjo_layer.image_source);
+
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
-      } else if (banjo_layer.type == LAYER_TYPE_COLOR) {
-        // All API constraints on colors are checked in SetColorConfig().
       } else {
-        invalid = true;
+        // For now, solid color fill layers take up the entire area.
+        // SetColorLayer() will be revised to explicitly configure an area for
+        // the fill.
+        banjo_layer.display_destination = display_area;
       }
+      invalid = invalid || !OriginRectangleContains(display_area, banjo_layer.display_destination);
 
       if (invalid) {
         // Continue to the next display, since there's nothing more to check for this one.
@@ -1059,7 +1055,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
   // will cause the definition of `kAllErrors` to change as well.
   constexpr uint32_t kAllErrors =
-      CLIENT_COMPOSITION_OPCODE_USE_PRIMARY | CLIENT_COMPOSITION_OPCODE_MERGE_BASE |
+      CLIENT_COMPOSITION_OPCODE_USE_IMAGE | CLIENT_COMPOSITION_OPCODE_MERGE_BASE |
       CLIENT_COMPOSITION_OPCODE_MERGE_SRC | CLIENT_COMPOSITION_OPCODE_FRAME_SCALE |
       CLIENT_COMPOSITION_OPCODE_SRC_FRAME | CLIENT_COMPOSITION_OPCODE_TRANSFORM |
       CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION | CLIENT_COMPOSITION_OPCODE_ALPHA;
@@ -1148,7 +1144,9 @@ void Client::ApplyConfig() {
 
       display_config.current_.layer_count++;
       layers[layer_idx++] = layer->current_layer_;
-      if (layer->current_layer_.type != LAYER_TYPE_COLOR) {
+      bool is_solid_color_fill = layer->current_layer_.image_source.width == 0 ||
+                                 layer->current_layer_.image_source.height == 0;
+      if (!is_solid_color_fill) {
         if (layer->current_image() == nullptr) {
           config_missing_image = true;
         }
@@ -1900,8 +1898,8 @@ ClientProxy::~ClientProxy() {}
 // the long term, these two types should be unified.
 namespace {
 
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUsePrimary)) ==
-                  CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUseImage)) ==
+                  CLIENT_COMPOSITION_OPCODE_USE_IMAGE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeBase)) ==
                   CLIENT_COMPOSITION_OPCODE_MERGE_BASE,

@@ -37,8 +37,6 @@ namespace display {
 
 namespace {
 
-static constexpr uint32_t kInvalidLayerType = UINT32_MAX;
-
 // Removes and invokes EarlyRetire on all entries before end.
 static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedList::iterator end) {
   while (list.begin() != end) {
@@ -57,8 +55,6 @@ Layer::Layer(DriverLayerId id) {
   pending_node_.layer = this;
   current_node_.layer = this;
   current_display_id_ = kInvalidDisplayId;
-  current_layer_.type = kInvalidLayerType;
-  pending_layer_.type = kInvalidLayerType;
   is_skipped_ = false;
 }
 
@@ -124,15 +120,11 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
   current_layer_ = pending_layer_;
   config_change_ = false;
 
-  if (current_layer_.type == LAYER_TYPE_PRIMARY) {
-    if (displayed_image_) {
-      current_layer_.cfg.primary.image_handle = ToBanjoDriverImageId(displayed_image_->driver_id());
-    }
-    return;
+  if (displayed_image_) {
+    current_layer_.image_handle = ToBanjoDriverImageId(displayed_image_->driver_id());
+  } else {
+    current_layer_.image_handle = INVALID_DISPLAY_ID;
   }
-
-  ZX_DEBUG_ASSERT_MSG(false, "CheckConfig() failed to bounce invalid layer type %" PRIu32,
-                      current_layer_.type);
 }
 
 void Layer::DiscardChanges() {
@@ -206,13 +198,7 @@ bool Layer::ActivateLatestReadyImage() {
   EarlyRetireUpTo(waiting_images_, /*end=*/it);
   displayed_image_ = waiting_images_.pop_front();
 
-  if (current_layer_.type == LAYER_TYPE_PRIMARY) {
-    uint64_t handle = ToBanjoDriverImageId(displayed_image_->driver_id());
-    current_layer_.cfg.primary.image_handle = handle;
-  } else {
-    // type is validated in Client::CheckConfig, so something must be very wrong.
-    ZX_ASSERT(false);
-  }
+  current_layer_.image_handle = ToBanjoDriverImageId(displayed_image_->driver_id());
   return true;
 }
 
@@ -226,13 +212,12 @@ bool Layer::AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list) {
 }
 
 void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
-  pending_layer_.type = LAYER_TYPE_PRIMARY;
-  primary_layer_t& primary = pending_layer_.cfg.primary;
-  primary.image_metadata = ImageMetadata(image_metadata).ToBanjo();
+  pending_layer_.image_handle = INVALID_DISPLAY_ID;
+  pending_layer_.image_metadata = ImageMetadata(image_metadata).ToBanjo();
   const rect_u_t image_area = {
       .x = 0, .y = 0, .width = image_metadata.width, .height = image_metadata.height};
-  primary.image_source = image_area;
-  primary.display_destination = image_area;
+  pending_layer_.image_source = image_area;
+  pending_layer_.display_destination = image_area;
   pending_image_config_gen_++;
   pending_image_ = nullptr;
   config_change_ = true;
@@ -241,18 +226,14 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
 void Layer::SetPrimaryPosition(fhdt::wire::CoordinateTransformation image_source_transformation,
                                fuchsia_math::wire::RectU image_source,
                                fuchsia_math::wire::RectU display_destination) {
-  primary_layer_t& primary_layer = pending_layer_.cfg.primary;
-
-  primary_layer.image_source = Rectangle::From(image_source).ToBanjo();
-  primary_layer.display_destination = Rectangle::From(display_destination).ToBanjo();
-  primary_layer.image_source_transformation = static_cast<uint8_t>(image_source_transformation);
+  pending_layer_.image_source = Rectangle::From(image_source).ToBanjo();
+  pending_layer_.display_destination = Rectangle::From(display_destination).ToBanjo();
+  pending_layer_.image_source_transformation = static_cast<uint8_t>(image_source_transformation);
 
   config_change_ = true;
 }
 
 void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
-  primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
-
   static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kDisable) == ALPHA_DISABLE,
                 "Bad constant");
   static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kPremultiplied) == ALPHA_PREMULTIPLIED,
@@ -260,22 +241,25 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
   static_assert(static_cast<alpha_t>(fhdt::wire::AlphaMode::kHwMultiply) == ALPHA_HW_MULTIPLY,
                 "Bad constant");
 
-  primary_layer->alpha_mode = static_cast<alpha_t>(mode);
-  primary_layer->alpha_layer_val = val;
+  pending_layer_.alpha_mode = static_cast<alpha_t>(mode);
+  pending_layer_.alpha_layer_val = val;
 
   config_change_ = true;
 }
 
 void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
-  pending_layer_.type = LAYER_TYPE_COLOR;
-  color_layer_t* color_layer = &pending_layer_.cfg.color;
-
   // Increase the size of the static array when large color formats are introduced
-  static_assert(decltype(color.bytes)::size() == sizeof(color_layer->color.bytes));
+  static_assert(decltype(color.bytes)::size() == sizeof(pending_layer_.fallback_color.bytes));
 
   ZX_DEBUG_ASSERT(!color.format.IsUnknown());
-  color_layer->color.format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
-  std::memcpy(color_layer->color.bytes, color.bytes.data(), decltype(color.bytes)::size());
+  pending_layer_.fallback_color.format =
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
+  std::ranges::copy(color.bytes, pending_layer_.fallback_color.bytes);
+
+  pending_layer_.image_metadata = {
+      .width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR};
+  pending_layer_.image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
+  pending_layer_.display_destination = {.x = 0, .y = 0, .width = 0, .height = 0};
 
   pending_image_ = nullptr;
   config_change_ = true;
@@ -286,7 +270,7 @@ void Layer::SetImage(fbl::RefPtr<Image> image, EventId wait_event_id, EventId si
     pending_image_->DiscardAcquire();
   }
 
-  pending_image_ = image;
+  pending_image_ = std::move(image);
   pending_wait_event_id_ = wait_event_id;
   pending_signal_event_id_ = signal_event_id;
 }

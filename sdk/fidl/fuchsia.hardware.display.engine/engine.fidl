@@ -45,34 +45,45 @@ type DisplayMode = struct {
 };
 
 type Layer = struct {
-    /// z_index of the layer. See
-    /// [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`] and
-    /// [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
-    cfg LayerConfig;
-};
-
-type LayerConfig = strict union {
-    1: primary PrimaryLayer;
-    2: color ColorLayer;
-};
-
-type ColorLayer = struct {
-    /// The color to use for the layer.
-    color fuchsia.hardware.display.types.Color;
-};
-
-type PrimaryLayer = struct {
     /// The image whose pixels are drawn by this layer.
     ///
-    /// If valid, the handle must be the result of a successful call to
+    /// If valid, the image ID must be the result of a successful call to
     /// [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    ///
+    /// A valid layer definition requires that the image ID is invalid iff
+    /// `image_source` specifies an empty rectangle.
+    ///
+    /// To allow for future evolution, Layer consumers must ignore the image ID
+    /// if `image_source` specifies an empty rectangle.
     image_id ImageId;
 
     /// The arguments used to import `image_handle`.
     ///
     /// If `image_handle` is valid, the metadata must equal the argument passed
     /// to [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    ///
+    /// A valid layer definition requires that the metadata is valid if
+    /// `image_id` is a valid handle. A valid layer definition requires that
+    /// the metadata specifies an empty (0x0) image with linear tiling if
+    /// `image_source` specifies an empty rectangle.
+    ///
+    /// To allow for future evolution, Layer consumers must ignore the
+    /// image metadata if `image_source` specifies an empty rectangle.
     image_metadata fuchsia.hardware.display.types.ImageMetadata;
+
+    /// Fallback when the pixel data for the layer's image cannot be retrieved.
+    ///
+    /// A valid layer definition requires that the color is valid.
+    ///
+    /// If `image_source` specifies an empty region, the hardware is configured
+    /// to fill the layer's pixels using this color. Conceptually, the source
+    /// image's pixel data will never be available for the image.
+    ///
+    /// The hardware may also use this color as a last resort for situations
+    /// such as buffer underruns, when the pixel data for the layer's image
+    /// cannot be retrieved fast enough to meet the display connection's timing
+    /// requirements.
+    fallback_color fuchsia.hardware.display.types.Color;
 
     /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
     /// `alpha_layer_val` is ignored.
@@ -94,16 +105,26 @@ type PrimaryLayer = struct {
     /// `display_destination` must account for image dimensions changes caused
     /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
     /// would specify 300x600 pixel dimensions in `display_destination`.
+    ///
+    /// A valid layer definition requires that the transformation is the
+    /// identity transformation if `image_source` specifies an empty rectangle.
+    ///
+    /// To allow for future evolution, Layer consumers must ignore the
+    /// transformation if `image_source` specifies an empty rectangle.
     image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
 
     /// The associated image region whose pixels are drawn by the layer.
     ///
     /// The rectangle uses the Vulkan coordinate space. The origin is at the
     /// image's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
+    /// points downwards. The rectangle is empty if its size is 0x0 (width and
+    /// height are both zero).
     ///
-    /// A valid layer definition requires a valid non-empty image source
-    /// rectangle that is entirely contained within the image.
+    /// A valid layer definition requires a valid image source rectangle that is
+    /// entirely contained within the image. If the rectangle is empty, the
+    /// image ID, metadata, and source transformation are ignored, and the
+    /// hardware is configured to fill the layer's pixels using
+    /// `fallback_color`.
     ///
     /// Hardware image cropping is requested implicitly, when the source
     /// region's dimensions differ from the image's dimensions. Some display

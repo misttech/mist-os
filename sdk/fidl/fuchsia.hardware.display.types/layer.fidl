@@ -130,8 +130,8 @@ type AlphaMode = strict enum : uint8 {
 };
 
 type ClientCompositionOpcode = strict enum : uint8 {
-    /// The client should convert the corresponding layer to a primary layer.
-    CLIENT_USE_PRIMARY = 0;
+    /// The client should configure the layer to use a source image.
+    CLIENT_USE_IMAGE = 0;
     /// The client should compose all layers with CLIENT_MERGE_BASE and CLIENT_MERGE_SRC
     /// into a new, single primary layer at the CLIENT_MERGE_BASE layer's z-order. The
     /// driver must accept a fullscreen layer with the default pixel format, but may

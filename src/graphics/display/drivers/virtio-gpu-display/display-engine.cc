@@ -316,20 +316,19 @@ config_check_result_t DisplayEngine::CheckConfiguration(
   if (display_configs[0].layer_count != 1) {
     success = display_configs[0].layer_count == 0;
   } else {
-    const primary_layer_t* layer = &display_configs[0].layer_list[0].cfg.primary;
+    const layer_t& layer = display_configs[0].layer_list[0];
     const rect_u_t display_area = {
         .x = 0,
         .y = 0,
         .width = current_display_.scanout_info.geometry.width,
         .height = current_display_.scanout_info.geometry.height,
     };
-    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
-              layer->image_metadata.width == current_display_.scanout_info.geometry.width &&
-              layer->image_metadata.height == current_display_.scanout_info.geometry.height &&
-              memcmp(&layer->display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
-              memcmp(&layer->image_source, &display_area, sizeof(rect_u_t)) == 0 &&
-              display_configs[0].cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
+    success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
+              layer.image_metadata.width == current_display_.scanout_info.geometry.width &&
+              layer.image_metadata.height == current_display_.scanout_info.geometry.height &&
+              memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
+              memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0 &&
+              display_configs[0].cc_flags == 0 && layer.alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
@@ -345,8 +344,8 @@ void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t> displ
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   uint64_t handle = display_configs.empty() || display_configs[0].layer_count == 0
-                        ? 0
-                        : display_configs[0].layer_list[0].cfg.primary.image_handle;
+                        ? INVALID_DISPLAY_ID
+                        : display_configs[0].layer_list[0].image_handle;
 
   {
     fbl::AutoLock al(&flush_lock_);

@@ -334,11 +334,12 @@ bool FramebufferDisplay::IsBanjoDisplayConfigSupported(
     return false;
   }
 
-  if (banjo_display_config.layer_list[0].type != LAYER_TYPE_PRIMARY) {
+  const layer_t& banjo_layer = banjo_display_config.layer_list[0];
+  if (banjo_layer.image_source.width == 0 || banjo_layer.image_source.height == 0) {
+    // Solid color fill layers are not supported.
     return false;
   }
 
-  const primary_layer_t& banjo_layer = banjo_display_config.layer_list[0].cfg.primary;
   if (banjo_layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
     return false;
   }

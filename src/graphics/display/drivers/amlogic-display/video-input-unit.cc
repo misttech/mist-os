@@ -276,7 +276,12 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
 
 void VideoInputUnit::FlipOnVsync(const display_config_t& config,
                                  display::ConfigStamp config_stamp) {
-  auto info = reinterpret_cast<ImageInfo*>(config.layer_list[0].cfg.primary.image_handle);
+  ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.width != 0,
+                      "Solid color fill layers not supported");
+  ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.height != 0,
+                      "Solid color fill layers not supported");
+
+  auto info = reinterpret_cast<ImageInfo*>(config.layer_list[0].image_handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
     FDF_LOG(ERROR, "No table available!");
@@ -362,8 +367,9 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
 
   // This is guaranteed by DisplayEngine::CheckConfiguration().
   ZX_DEBUG_ASSERT(config.layer_count > 0);
-  ZX_DEBUG_ASSERT(config.layer_list[0].type == LAYER_TYPE_PRIMARY);
-  const primary_layer_t& primary_layer = config.layer_list[0].cfg.primary;
+  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.width != 0);
+  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.height != 0);
+  const layer_t& primary_layer = config.layer_list[0];
   if (primary_layer.alpha_mode != ALPHA_DISABLE) {
     // If a global alpha value is provided, apply it.
     if (!isnan(primary_layer.alpha_layer_val)) {

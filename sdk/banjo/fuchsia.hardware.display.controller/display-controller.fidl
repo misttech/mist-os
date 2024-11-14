@@ -234,39 +234,16 @@ type Color = struct {
     bytes array<uint8, 8>;
 };
 
-/// Equivalent to the ['fuchsia.hardware.display.engine/PrimaryLayer'] FIDL
-/// type.
-type PrimaryLayer = struct {
+/// Equivalent to the ['fuchsia.hardware.display.types/Layer'] FIDL type.
+type Layer = struct {
     image_handle uint64;
     image_metadata ImageMetadata;
+    fallback_color Color;
     alpha_mode Alpha;
     alpha_layer_val float32;
     image_source_transformation CoordinateTransformation;
     image_source RectU;
     display_destination RectU;
-};
-
-/// Equivalent to the ['fuchsia.hardware.display.engine/ColorLayer'] FIDL type.
-type ColorLayer = struct {
-    color Color;
-};
-
-/// Types of layers.
-type LayerType = strict enum : uint32 {
-    PRIMARY = 0;
-    COLOR = 1;
-};
-
-/// Equivalent to the ['fuchsia.hardware.display.engine/LayerConfig'] FIDL type.
-type LayerConfig = strict union {
-    1: primary PrimaryLayer;
-    2: color ColorLayer;
-};
-
-/// Equivalent to the ['fuchsia.hardware.display.engine/Layer'] FIDL type.
-type Layer = struct {
-    type LayerType;
-    cfg LayerConfig;
 };
 
 /// constants for display_config's mode_flags field
@@ -343,8 +320,8 @@ type ConfigCheckResult = strict enum : uint32 {
 /// Individual bit positions map to the values of the FIDL enum
 /// [`fuchsia.hardware.display.types/ClientCompositionOpcode`].
 type ClientCompositionOpcode = strict bits : uint32 {
-    /// The client should convert the corresponding layer to a primary layer.
-    USE_PRIMARY = 0x1;
+    /// The client should configure the layer to use a source image.
+    USE_IMAGE = 0x1;
     /// The client should compose all layers with MERGE_BASE and MERGE_SRC into a new,
     /// single primary layer at the MERGE_BASE layer's z-order. The driver must accept
     /// a fullscreen layer with the default pixel format, but may accept other layer

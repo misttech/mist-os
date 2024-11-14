@@ -302,7 +302,7 @@ closed protocol Coordinator {
         val float32;
     });
 
-    /// Configures the layer as a color layer with the given color.
+    /// Configures the layer as a solid color fill layer.
     ///
     /// It is illegal to call this on an invalid layer.
     strict SetLayerColorConfig(struct {

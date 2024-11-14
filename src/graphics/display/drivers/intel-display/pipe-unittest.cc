@@ -67,12 +67,10 @@ const GttRegion& GetGttImageHandle(const image_metadata_t& image_metadata, uint6
 }
 
 layer_t CreatePrimaryLayerConfig(uint64_t handle) {
-  uint32_t kWidth = 1024u;
-  uint32_t kHeight = 768u;
+  static constexpr uint32_t kWidth = 1024;
+  static constexpr uint32_t kHeight = 768;
 
-  layer_t layer;
-  layer.type = LAYER_TYPE_PRIMARY;
-  layer.cfg.primary = {
+  return layer_t{
       .image_handle = handle,
       .image_metadata =
           {
@@ -85,7 +83,6 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
       .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
   };
-  return layer;
 }
 
 }  // namespace

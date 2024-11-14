@@ -57,7 +57,6 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
-#include "src/graphics/display/lib/edid/timings.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
@@ -71,8 +70,20 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   // Go through all the display mode timings and record whether or not
   // a basic layer configuration is acceptable.
   layer_t test_layers[] = {
-      {
-          .type = LAYER_TYPE_PRIMARY,
+      // The width and height will be replaced by the code below.
+      layer_t{
+          .image_handle = INVALID_DISPLAY_ID,
+          .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+          .fallback_color =
+              {
+                  .format = static_cast<uint32_t>(fuchsia_images2::PixelFormat::kR8G8B8A8),
+                  .bytes = {0},
+              },
+          .alpha_mode = ALPHA_DISABLE,
+          .alpha_layer_val = 0.0,
+          .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
+          .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
+          .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
       },
   };
   display_config_t test_configs[] = {
@@ -106,12 +117,12 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     ZX_DEBUG_ASSERT_MSG(
         static_cast<const layer_t*>(&test_layer) == &test_configs[0].layer_list[0],
         "test_layer should be a non-const alias for the first layer in test_configs");
-    test_layer.cfg.primary.image_metadata.width = width;
-    test_layer.cfg.primary.image_metadata.height = height;
-    test_layer.cfg.primary.image_source.width = width;
-    test_layer.cfg.primary.image_source.height = height;
-    test_layer.cfg.primary.display_destination.width = width;
-    test_layer.cfg.primary.display_destination.height = height;
+    test_layer.image_metadata.width = width;
+    test_layer.image_metadata.height = height;
+    test_layer.image_source.width = width;
+    test_layer.image_source.height = height;
+    test_layer.display_destination.width = width;
+    test_layer.display_destination.height = height;
 
     display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);

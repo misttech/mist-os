@@ -399,12 +399,11 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
         FDF_LOG(WARNING, "%s: Color Correction not support. No error reported", __func__);
       }
 
-      if (display_configs[i].layer_list[0].type != LAYER_TYPE_PRIMARY) {
-        // We only support PRIMARY layer. Notify client to convert layer to
-        // primary type.
-        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+      const layer_t& layer0 = display_configs[i].layer_list[0];
+      if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
+        // Solid color fill layers are not yet supported.
+        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_IMAGE;
       } else {
-        const primary_layer_t* layer = &display_configs[i].layer_list[0].cfg.primary;
         // Scaling is allowed if destination frame match display and
         // source frame match image.
         const rect_u_t display_area = {
@@ -416,24 +415,24 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
         const rect_u_t image_area = {
             .x = 0,
             .y = 0,
-            .width = layer->image_metadata.width,
-            .height = layer->image_metadata.height,
+            .width = layer0.image_metadata.width,
+            .height = layer0.image_metadata.height,
         };
-        if (memcmp(&layer->display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+        if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
           // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
-        if (memcmp(&layer->image_source, &image_area, sizeof(rect_u_t)) != 0) {
+        if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
         }
 
-        if (layer->alpha_mode != ALPHA_DISABLE) {
+        if (layer0.alpha_mode != ALPHA_DISABLE) {
           // Alpha is not supported.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
         }
 
-        if (layer->image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+        if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
           // Transformation is not supported.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
         }
@@ -558,8 +557,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
   for (const display_config& display_config : display_configs_span) {
     if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
       if (display_config.layer_count) {
-        driver_image_id =
-            display::ToDriverImageId(display_config.layer_list[0].cfg.primary.image_handle);
+        driver_image_id = display::ToDriverImageId(display_config.layer_list[0].image_handle);
       }
       break;
     }

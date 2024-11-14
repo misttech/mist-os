@@ -497,7 +497,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const uint32_t height = display_timing.vertical_active_lines;
 
     // Make sure the layer configuration is supported.
-    const primary_layer_t& layer = display_configs[0].layer_list[0].cfg.primary;
+    const layer_t& layer = display_configs[0].layer_list[0];
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison operators.
@@ -507,8 +507,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       // we don't support pre-multiplied alpha mode
       client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
-    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
+    success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
               layer.image_metadata.width == width && layer.image_metadata.height == height &&
               memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
               memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0;
