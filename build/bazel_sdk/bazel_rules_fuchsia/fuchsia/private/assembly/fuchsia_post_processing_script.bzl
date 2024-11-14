@@ -10,11 +10,32 @@ load(
 )
 
 def _fuchsia_post_processing_script_impl(ctx):
+    args = []
+    inputs = {}
+
+    if ctx.attr.use_python:
+        py_toolchain = ctx.attr._py_toolchain[platform_common.ToolchainInfo]
+        if not py_toolchain.py3_runtime:
+            fail("A Bazel python3 runtime is required, and none was configured!")
+
+        python3_executable = py_toolchain.py3_runtime.interpreter
+        args += [
+            "-p",
+            python3_executable.basename,
+        ]
+        inputs.update({
+            file: file.basename
+            for file in py_toolchain.py3_runtime.files.to_list() + [python3_executable]
+        })
+
+    args.extend(ctx.attr.post_processing_script_args)
+    inputs.update(ctx.attr.post_processing_script_inputs)
+
     return [
         FuchsiaPostProcessingScriptInfo(
             post_processing_script_path = ctx.attr.post_processing_script_path,
-            post_processing_script_args = ctx.attr.post_processing_script_args,
-            post_processing_script_inputs = ctx.attr.post_processing_script_inputs,
+            post_processing_script_args = args,
+            post_processing_script_inputs = inputs,
         ),
     ]
 
@@ -35,6 +56,14 @@ fuchsia_post_processing_script = rule(
             doc = """Dictionary for artifacts used by post processing script.
             It will be a source -> destination map""",
             allow_files = True,
+        ),
+        "use_python": attr.bool(
+            doc = """Some post processing script requires python binary to execute the python script. Instead of making customer pass in their own python binary and runfiles, python can be provided through python toolchain.""",
+        ),
+        "_py_toolchain": attr.label(
+            default = "@rules_python//python:current_py_toolchain",
+            cfg = "exec",
+            providers = [DefaultInfo, platform_common.ToolchainInfo],
         ),
     },
 )
