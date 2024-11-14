@@ -1079,11 +1079,8 @@ fn get_position_divisor_to_mm(
     touchpad_descriptor: &touch_binding::TouchpadDeviceDescriptor,
 ) -> Result<f32, Error> {
     const EXPONENT_MILLIS: i32 = -3;
-    let divisors: Vec<_> = touchpad_descriptor
-        .contacts
-        .iter()
-        .enumerate()
-        .map(|(i, contact_descriptor)| {
+    let divisors =
+        touchpad_descriptor.contacts.iter().enumerate().map(|(i, contact_descriptor)| {
             match (contact_descriptor.x_unit, contact_descriptor.y_unit) {
                 (
                     fidl_input_report::Unit {
@@ -1126,11 +1123,10 @@ fn get_position_divisor_to_mm(
                     i, x_unit_type, y_unit_type
                 )),
             }
-        })
-        .collect();
+        });
 
     let (divisors, errors): (Vec<_>, Vec<_>) =
-        divisors.into_iter().fold((vec![], vec![]), |(mut divisors, mut errors), divisor| {
+        divisors.fold((vec![], vec![]), |(mut divisors, mut errors), divisor| {
             match divisor {
                 Ok(d) => divisors.push(d),
                 Err(e) => errors.push(e),
