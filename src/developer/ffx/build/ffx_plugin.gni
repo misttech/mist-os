@@ -352,7 +352,13 @@ template("ffx_plugin") {
                                "original_target_name",
                              ])
 
-      # make sure no fidl libraries not in the SDK are used if it's public
+      # For plugins that are not internal only (in other words, in the SDK),
+      # ensure all FIDL dependencies are available and stable. Use the
+      # "partner_internal" SDK category and greater as an approximation of this.
+      # However, note that not everything in those categories is stable.
+      # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+      # Also, there are exceptions - see https://fxbug.dev/42081073 and
+      # https://fxbug.dev/326090508.
       # This target includes all other targets defined above, so this
       # `assert_no_deps` covers all of them.
       # TODO(b/314822328): improve this logic to cascade properly
