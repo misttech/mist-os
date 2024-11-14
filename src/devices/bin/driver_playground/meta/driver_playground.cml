@@ -23,6 +23,11 @@
             ],
             from: "parent",
         },
+        {
+            directory: "dev-class-wlan-factory",
+            rights: [ "r*" ],
+            path: "/dev/class/wlan-factory",
+        },
     ],
     expose: [
         {
