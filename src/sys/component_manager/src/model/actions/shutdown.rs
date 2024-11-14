@@ -181,6 +181,7 @@ impl ShutdownJob {
         // Look for any children that have no dependents
         let mut stop_targets = vec![];
 
+        #[allow(clippy::needless_collect)] // avoid overlapping mutable and immutable borrows
         for component_ref in
             self.source_to_targets.keys().map(|key| key.clone()).collect::<Vec<_>>()
         {

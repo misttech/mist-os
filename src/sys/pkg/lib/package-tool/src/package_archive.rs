@@ -224,6 +224,7 @@ async fn populate_namespace(far_file: PathBuf, output_dir: PathBuf) -> Result<()
     let blobs_dir = output_dir.join("blobs");
     let output_dir = output_dir.join("pkg");
 
+    #[allow(clippy::needless_collect)] // avoids conflicting immutable & mutable borrows
     let far_content_paths: Vec<_> = reader.list().map(|e| e.path()).collect();
     if far_content_paths.contains(&"meta.far") {
         // Extract the meta.far from the package

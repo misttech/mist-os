@@ -203,6 +203,7 @@ impl Dict {
 
     /// Returns an iterator over the keys, in sorted order.
     pub fn keys(&self) -> impl Iterator<Item = Key> {
+        #[allow(clippy::needless_collect)] // This is needed for a 'static iterator
         let keys: Vec<_> = self.lock().entries.keys().cloned().collect();
         keys.into_iter()
     }

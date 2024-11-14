@@ -166,17 +166,14 @@ impl OwnersDb {
             metadata.shortcut_target.as_ref().map(|t| (t.clone(), metadata.path.clone()))
         }));
 
-        let rust_projects: Vec<ProjectMetadata> = rust_crates
-            .into_iter()
-            .map(|metadata| ProjectMetadata {
-                name: metadata.name,
-                path: metadata.path,
-                targets: toolchain_suffixed_targets(
-                    &metadata.canonical_target,
-                    metadata.shortcut_target.as_ref().map(String::as_str),
-                ),
-            })
-            .collect();
+        let rust_projects = rust_crates.into_iter().map(|metadata| ProjectMetadata {
+            name: metadata.name,
+            path: metadata.path,
+            targets: toolchain_suffixed_targets(
+                &metadata.canonical_target,
+                metadata.shortcut_target.as_ref().map(String::as_str),
+            ),
+        });
 
         let integration_projects = integration_manifest
             .map(|manifest| {
@@ -189,11 +186,8 @@ impl OwnersDb {
         let path_projects =
             project_paths.iter().map(|path| parse_path(&gn_graph, path)).collect::<Vec<_>>();
 
-        let projects = rust_projects
-            .into_iter()
-            .chain(integration_projects)
-            .chain(path_projects)
-            .collect::<Vec<_>>();
+        let projects =
+            rust_projects.chain(integration_projects).chain(path_projects).collect::<Vec<_>>();
 
         let overrides: BTreeMap<String, Vec<Utf8PathBuf>> = toml::de::from_str(
             &std::fs::read_to_string(&overrides)

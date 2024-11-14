@@ -10,6 +10,7 @@ config("clippy_warn_production") {
 
     "-Wclippy::clear_with_drain",
     "-Wclippy::collection_is_never_read",
+    "-Wclippy::needless_collect",
     "-Wclippy::or_fun_call",
     "-Wclippy::perf",
     "-Wclippy::unnecessary_lazy_evaluation",

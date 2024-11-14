@@ -235,6 +235,8 @@ impl RouteValidatorCapabilityProvider {
                     }
                     fsys::DeclType::Expose => {
                         let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
+
+                        #[allow(clippy::needless_collect)] // aligns the iterator type w/ above
                         let matching_requests: Vec<_> = exposes
                             .into_iter()
                             .filter_map(|(target_name, e)| {

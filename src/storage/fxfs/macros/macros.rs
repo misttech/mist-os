@@ -260,8 +260,8 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
                 .filter(|a| {
                     a.style == syn::AttrStyle::Outer && a.path().is_ident("migrate_nodefault")
                 })
-                .collect::<Vec<&syn::Attribute>>()
-                .is_empty()
+                .next()
+                .is_none()
             {
                 quote! {
                     ..Default::default()

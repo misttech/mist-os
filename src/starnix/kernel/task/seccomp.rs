@@ -678,7 +678,7 @@ impl SeccompAction {
 
     pub fn set_actions_logged(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
         let mut new_actions_logged: u16 = 0;
-        for action_res in data.fields_with(|c| c.is_ascii_whitespace()).collect::<Vec<_>>() {
+        for action_res in data.fields_with(|c| c.is_ascii_whitespace()) {
             if let Ok(action) = action_res.to_str() {
                 match action {
                     "errno" => Self::Errno(0).set_logged_bit(&mut new_actions_logged),

@@ -19,7 +19,7 @@ pub fn extend_url_path(base: &mut url::Url, add: &str) -> Result<()> {
     base.path_segments_mut()
         .map_err(|_| anyhow::anyhow!("cannot be base"))?
         .pop_if_empty()
-        .extend(add.split("/").collect::<Vec<&str>>());
+        .extend(add.split("/"));
     Ok(())
 }
 
