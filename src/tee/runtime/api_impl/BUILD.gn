@@ -46,6 +46,7 @@ rustc_library("api_impl") {
   deps = [
     ":malloc_fill_byte_zero_asan",
     ":malloc_fill_byte_zero_hwasan",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-sync",
     "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",

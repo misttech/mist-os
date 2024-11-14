@@ -5,6 +5,7 @@
 use bitflags::bitflags;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 
 pub mod binding;
@@ -64,7 +65,7 @@ macro_rules! inout_parameter {
 macro_rules! handle {
     ($name:ident, $tee_name:path) => {
         #[repr(C)]
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
         pub struct $name(u64);
 
         impl $name {
