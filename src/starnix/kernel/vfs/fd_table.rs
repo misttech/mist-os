@@ -276,6 +276,7 @@ impl FdTable {
         profile_duration!("DuplicateFd");
         // Drop the removed entry only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
+        #[allow(clippy::collection_is_never_read)]
         let _removed_entry;
         let result = {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);

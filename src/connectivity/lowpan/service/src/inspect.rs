@@ -221,6 +221,7 @@ pub async fn watch_device_changes<
     inspect_tree: Arc<LowpanServiceTree>,
     lookup: Arc<LP>,
 ) {
+    #[allow(clippy::collection_is_never_read)]
     let mut device_table: HashMap<String, Arc<Task<()>>> = HashMap::new();
     let lookup_clone = lookup.clone();
     let mut lookup_stream = HangingGetStream::new(lookup_clone, |lookup| lookup.watch_devices());

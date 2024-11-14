@@ -364,6 +364,7 @@ async fn main() -> Result<(), Error> {
     });
 
     // The AVRCP Target component is needed if it is requested and A2DP Source is requested.
+    #[allow(clippy::collection_is_never_read)]
     let mut _avrcp_target = None;
     if config.source.is_some() && config.enable_avrcp_target {
         match fuchsia_component::client::connect_to_protocol::<BinderMarker>() {

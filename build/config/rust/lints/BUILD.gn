@@ -9,6 +9,7 @@ config("clippy_warn_production") {
     # go/keep-sorted start
 
     "-Wclippy::clear_with_drain",
+    "-Wclippy::collection_is_never_read",
     "-Wclippy::or_fun_call",
     "-Wclippy::perf",
     "-Wclippy::unnecessary_lazy_evaluation",

@@ -123,6 +123,7 @@ impl StaticSquareViewAssistant {
         if self.scene_details.is_none() {
             let mut builder =
                 SceneBuilder::new().background_color(self.background_color).animated(true);
+            #[allow(clippy::collection_is_never_read)]
             let mut square = None;
             builder.group().stack().center().contents(|builder| {
                 let square_facet = StaticSquareFacet::new(self.square_color, size);

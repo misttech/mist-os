@@ -33,6 +33,7 @@ impl SessionManager {
         {
             // We must drop references to sessions whilst we're not holding the lock for
             // `open_sessions` because `Session::drop` needs to take that same lock.
+            #[allow(clippy::collection_is_never_read)]
             let mut terminated_sessions = Vec::new();
             for (_, session) in &*self.open_sessions.lock().unwrap() {
                 if let Some(session) = session.upgrade() {

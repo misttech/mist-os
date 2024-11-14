@@ -57,6 +57,7 @@ fn main() {
     // print logs and non-fatal errors directly to stdout instead.
     let mut stdout = unsafe { File::from_raw_fd(1) };
 
+    #[allow(clippy::collection_is_never_read)]
     let mut _process = None;
     let (sender, receiver) = mpsc::channel();
     if opts.spawn {

@@ -107,6 +107,7 @@ impl DirentCache {
 
     /// Set a new limit for the cache size.
     pub fn set_limit(&self, limit: usize) {
+        #[allow(clippy::collection_is_never_read)]
         let mut dropped_items;
         {
             let mut this = self.inner.lock().unwrap();
@@ -128,6 +129,7 @@ impl DirentCache {
     #[trace]
     pub fn recycle_stale_files(&self) {
         // Drop outside the lock.
+        #[allow(clippy::collection_is_never_read)]
         let mut dropped_items = Vec::new();
         {
             let mut this = self.inner.lock().unwrap();

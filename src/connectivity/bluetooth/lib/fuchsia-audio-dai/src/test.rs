@@ -128,6 +128,7 @@ async fn test_handle_dai_requests(
         ..Default::default()
     };
 
+    #[allow(clippy::collection_is_never_read)]
     let mut _rb_task = None;
     while let Some(req) = requests.next().await {
         if let Err(e) = req {

@@ -95,6 +95,7 @@ impl MediaSessionFacade {
                 .await
                 .expect("Failed to publish Player");
 
+            #[allow(clippy::collection_is_never_read)]
             let mut _player_info_change_responder = None;
             let mut sent_response = false;
 

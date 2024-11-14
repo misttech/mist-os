@@ -26,6 +26,7 @@ lazy_static! {
 async fn main() -> Result<(), Error> {
     info!("Initializing and serving inspect on servicefs");
     let mut fs = ServiceFs::new();
+    #[allow(clippy::collection_is_never_read)]
     let mut inspect_nodes = Vec::new();
     let _inspect_server_task =
         inspect_runtime::publish(&INSPECTOR, inspect_runtime::PublishOptions::default());

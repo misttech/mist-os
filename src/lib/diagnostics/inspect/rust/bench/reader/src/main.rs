@@ -136,6 +136,7 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
         fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
+    #[allow(clippy::collection_is_never_read)]
     let mut nodes = vec![];
     if filled_size > 0 {
         let ints_for_filling: i64 = filled_size / 16 - 1;
