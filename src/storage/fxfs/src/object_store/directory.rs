@@ -22,7 +22,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
-use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
+use fxfs_crypto::{Key, WrappedKeys, XtsCipher, XtsCipherSet};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -224,7 +224,7 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'_>,
         id: u128,
-    ) -> Result<Cipher, Error> {
+    ) -> Result<XtsCipher, Error> {
         let object_id = self.object_id();
         let store = self.store();
         if let Some(crypt) = store.crypt() {
@@ -295,7 +295,7 @@ impl<S: HandleOwner> Directory<S> {
                 }
                 Some(item) => bail!("Unexpected item in lookup: {item:?}"),
             }
-            Ok(Cipher::new(FSCRYPT_KEY_ID, &unwrapped_key))
+            Ok(XtsCipher::new(FSCRYPT_KEY_ID, &unwrapped_key))
         } else {
             Err(anyhow!("No crypt"))
         }
@@ -836,7 +836,7 @@ impl<S: HandleOwner> Directory<S> {
                     self.store().key_manager.merge(self.object_id(), |existing| {
                         let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
                         new.push(unwrapped_key);
-                        Arc::new(CipherSet::from(new))
+                        Arc::new(XtsCipherSet::from(new))
                     });
                 }
             })
