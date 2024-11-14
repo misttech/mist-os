@@ -46,7 +46,7 @@ class Rectangle {
   // This is not a constructor to allow designated initializer syntax. Making
   // this a constructor would introduce ambiguity when designated initializer
   // syntax is used, because `rect_u_t` has the same field names as our
-  // supported designated intializer syntax.
+  // supported designated initializer syntax.
   [[nodiscard]] static constexpr Rectangle From(const rect_u_t& banjo_rectangle);
 
   // `fidl_rectangle` must be convertible to a valid Rectangle.
@@ -54,7 +54,7 @@ class Rectangle {
   // This is not a constructor to allow designated initializer syntax. Making
   // this a constructor would introduce ambiguity when designated initializer
   // syntax is used, because `fuchsia.math/RectU` has the same field names as
-  // our supported designated intializer syntax.
+  // our supported designated initializer syntax.
   [[nodiscard]] static constexpr Rectangle From(const fuchsia_math::wire::RectU& fidl_rectangle);
 
   // Constructor that enables the designated initializer syntax.

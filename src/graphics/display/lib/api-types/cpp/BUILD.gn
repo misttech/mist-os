@@ -11,6 +11,8 @@ source_set("cpp") {
     "alpha-mode.h",
     "buffer-collection-id.h",
     "buffer-id.h",
+    "color.cc",
+    "color.h",
     "config-stamp.cc",
     "config-stamp.h",
     "display-timing.cc",
@@ -38,6 +40,7 @@ source_set("cpp") {
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -46,6 +49,7 @@ test_sources = [
   "alpha-mode-test.cc",
   "buffer-collection-id-test.cc",
   "buffer-id-test.cc",
+  "color-test.cc",
   "config-stamp-test.cc",
   "display-id-test.cc",
   "display-timing-test.cc",
@@ -73,6 +77,7 @@ group("test-deps") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/image-format",
   ]
 }
 
@@ -83,6 +88,7 @@ test("unittests") {
   visibility = [ ":*" ]
 }
 
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
 test("unittests-cxx17") {
   sources = test_sources
   output_name = "display-api-types-cpp17-tests"
@@ -94,6 +100,7 @@ test("unittests-cxx17") {
   configs += [ ":cxx17" ]
 }
 
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
 config("cxx17") {
   visibility = [ ":*" ]
   cflags_cc = [ "-std=c++17" ]
@@ -104,6 +111,7 @@ fuchsia_unittest_package("unittests-package") {
   deps = [ ":unittests" ]
 }
 
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
 fuchsia_unittest_package("unittests-cxx17-package") {
   package_name = "display-api-types-cpp17-tests"
   deps = [ ":unittests-cxx17" ]
