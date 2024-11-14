@@ -51,6 +51,7 @@ impl ToolEnv {
     factory_func!(daemon_factory_closure, DaemonProxy);
     factory_func!(try_daemon_closure, Option<DaemonProxy>);
     factory_func!(remote_factory_closure, RemoteControlProxy);
+    factory_func!(remote_factory_closure_f, FRemoteControlProxy);
     factory_func!(target_factory_closure, TargetProxy);
     factory_func!(build_info_closure, VersionInfo);
 
@@ -115,6 +116,8 @@ pub struct FakeInjector {
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<Option<DaemonProxy>>>>>>,
     remote_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<RemoteControlProxy>>>>>,
+    remote_factory_closure_f:
+        Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<FRemoteControlProxy>>>>>,
     target_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<TargetProxy>>>>>,
     is_experiment_closure: Box<dyn Fn(&str) -> Pin<Box<dyn Future<Output = bool>>>>,
@@ -130,6 +133,7 @@ impl Default for FakeInjector {
             }),
             try_daemon_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             remote_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
+            remote_factory_closure_f: Box::new(|| Box::pin(async { unimplemented!() })),
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             is_experiment_closure: Box::new(|_| Box::pin(async { unimplemented!() })),
             build_info_closure: Box::new(|| Box::pin(async { unimplemented!() })),
@@ -158,7 +162,7 @@ impl Injector for FakeInjector {
     }
 
     async fn remote_factory_fdomain(&self) -> anyhow::Result<FRemoteControlProxy> {
-        unimplemented!()
+        (self.remote_factory_closure_f)().await
     }
 
     async fn target_factory(&self) -> anyhow::Result<TargetProxy> {
