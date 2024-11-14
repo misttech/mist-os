@@ -108,6 +108,7 @@ PhysbootHandoff = _start
 
     /* enable caches so atomics and spinlocks work */
     mrs     tmp, sctlr_el1
+    and     tmp, tmp, #~(1<<19) /* Clear WXN */
     orr     tmp, tmp, #(1<<12) /* Enable icache */
     orr     tmp, tmp, #(1<<2)  /* Enable dcache/ucache */
     msr     sctlr_el1, tmp
