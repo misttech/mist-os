@@ -93,10 +93,20 @@ struct ArmSystemControlRegister : public SysRegDerivedBase<ArmSystemControlRegis
     return std::nullopt;  // Implementation-defined.
   }
 
-  DEF_BIT(57, epan);                            // EL1
-  DEF_BIT(56, enals);                           // EL1
-  DEF_BIT(55, enas0);                           // EL1
-  DEF_BIT(54, enasr);                           // EL1
+  DEF_BIT(63, tidcp);                           // EL1, EL2
+  DEF_BIT(62, spintmask);                       // EL1, EL2, EL3
+  DEF_BIT(61, nmi);                             // EL1, EL2, EL3
+  DEF_BIT(60, entp2);                           // EL1, EL2
+  DEF_BIT(59, tsco);                            // EL1, EL2, EL3
+  DEF_BIT(58, tsco0);                           // EL1, EL2
+  DEF_BIT(57, epan);                            // EL1, EL2
+  DEF_BIT(56, enals);                           // EL1, EL2
+  DEF_BIT(55, enas0);                           // EL1, EL2
+  DEF_BIT(54, enasr);                           // EL1, EL2
+  DEF_BIT(53, tme);                             // EL1, EL2, EL3
+  DEF_BIT(52, tme0);                            // EL1, EL2
+  DEF_BIT(51, tmt);                             // EL1, EL2, EL3
+  DEF_BIT(50, tmt0);                            // EL1, EL2
   DEF_FIELD(49, 46, twedel);                    // EL1
   DEF_BIT(45, tweden);                          // EL1
   DEF_BIT(44, dsbss);                           // EL1, EL2, EL3
@@ -107,9 +117,11 @@ struct ArmSystemControlRegister : public SysRegDerivedBase<ArmSystemControlRegis
   DEF_BIT(37, itfsb);                           // EL1, EL2, EL3
   DEF_BIT(36, bt);                              // EL1, EL2, EL3
   DEF_BIT(35, bt0);                             // EL1
+  DEF_BIT(33, mscen);                           // EL1, EL2
+  DEF_BIT(32, cmow);                            // EL1, EL2
   DEF_BIT(31, enia);                            // EL1, EL2, EL3
   DEF_BIT(30, enib);                            // EL1, EL2, EL3
-  DEF_BIT(29, lsmaoc);                          // EL1
+  DEF_BIT(29, lsmaoe);                          // EL1
   DEF_BIT(28, ntlsmd);                          // EL1
   DEF_BIT(27, enda);                            // EL1, EL2, EL3
   DEF_BIT(26, uci);                             // EL1

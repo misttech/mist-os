@@ -290,18 +290,20 @@ static void arm64_cpu_early_init() {
   // arch_late_init_percpu may change its mind.
   arm64_install_vbar(arm64_el1_exception);
 
-  // Set some control bits in sctlr.
-  arch::ArmSctlrEl1::Modify([](auto& sctlr) {
-    sctlr.set_uci(true)
-        .set_span(true)
-        .set_ntwe(true)
-        .set_uct(true)
-        .set_dze(true)
-        .set_sa0(true)
-        .set_sa(true)
-        .set_ntwi(false)  // Disable WFI in EL0
-        .set_a(false);    // Disable alignment checking for EL1, EL0.
-  });
+  // Set up main control bits for this cpu.
+  auto sctlr = arch::ArmSctlrEl1::Get().FromValue(0);
+  sctlr
+      .set_uci(true)   // Do not trap DC cache instructions in EL0.
+      .set_span(true)  // Do not change PSTATE.PAN on exception.
+      .set_ntwe(true)  // Do not trap WFE in EL0.
+      .set_uct(true)   // Do not trap CTR_EL0 in EL0
+      .set_dze(true)   // Do not trap DZ ZVA in EL0.
+      .set_i(true)     // Instruction cache enable.
+      .set_sa0(true)   // Stack pointer alignment in EL0.
+      .set_sa(true)    // Stack pointer alignment in EL1.
+      .set_c(true)     // Data cache enable.
+      .set_m(true);    // MMU Enable.
+  arch::ArmSctlrEl1::Write(sctlr);
   __isb(ARM_MB_SY);
 
   // Save all of the features of the cpu.
