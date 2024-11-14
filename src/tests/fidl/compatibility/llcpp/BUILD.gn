@@ -26,16 +26,16 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("impl") {
+fuchsia_component("llcpp-impl") {
   testonly = true
-  manifest = "meta/impl.cml"
+  manifest = "meta/llcpp-impl.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("llcpp") {
   testonly = true
   package_name = "fidl-compatibility-test-llcpp"
-  deps = [ ":impl" ]
+  deps = [ ":llcpp-impl" ]
 }
 
 export_fuchsia_package_to_bazel("llcpp.bazel_input") {
