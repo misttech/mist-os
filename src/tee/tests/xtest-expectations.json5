@@ -13,6 +13,7 @@
                 "regression6001",
                 "regression6002",
                 "regression6006",
+                "regression6009",
                 "regression6014",
                 "regression6015",
             ],
@@ -65,11 +66,6 @@
                 "regression4115",
                 "regression4116",
                 "regression4117",
-                "regression6003",
-                "regression6004",
-                "regression6007",
-                "regression6008",
-                "regression6009",
                 "regression6010",
                 "regression6012",
                 "regression6013",
@@ -84,10 +80,25 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/360942417): Persistent objects are stateful, and this
-                // test does not clean up this state when TEE_SeekObjectData() does not return
-                // successfully.
+                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
+                // TEE_ReadObjectData() does not successfully return.
+                "regression6003",
+
+                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
+                // TEE_WriteObjectData() does not successfully return.
+                "regression6004",
+
+                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
+                // TEE_SeekObjectData() does not successfully return.
                 "regression6005",
+
+                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
+                // TEE_TruncateObjectData() does not successfully return.
+                "regression6007",
+
+                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
+                // TEE_RenameObject() does not successfully return.
+                "regression6008",
             ],
         },
     ],

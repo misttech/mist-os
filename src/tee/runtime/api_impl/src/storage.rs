@@ -8,6 +8,7 @@
 use fuchsia_sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tee_internal::{
@@ -86,17 +87,50 @@ struct PersistentObject {
     handles: HashSet<ObjectHandle>,
 }
 
+impl PersistentObject {
+    fn size_bytes(&self) -> u32 {
+        // TODO(https://fxbug.dev/360942417): Implement me!
+        0
+    }
+
+    fn size_bits(&self) -> u32 {
+        self.size_bytes() * 8
+    }
+
+    fn get_info(&self, data_position: usize) -> ObjectInfo {
+        let all_data_flags = HandleFlags::DATA_ACCESS_READ
+            | HandleFlags::DATA_ACCESS_WRITE
+            | HandleFlags::DATA_ACCESS_WRITE_META
+            | HandleFlags::DATA_SHARE_READ
+            | HandleFlags::DATA_SHARE_WRITE;
+        let flags = self.base_flags.intersection(all_data_flags)
+            | HandleFlags::PERSISTENT
+            | HandleFlags::INITIALIZED;
+        let object_size = self.size_bits();
+        ObjectInfo {
+            object_type: self.type_,
+            max_object_size: object_size,
+            object_size,
+            object_usage: self.usage,
+            data_position: data_position,
+            data_size: self.data_size,
+            handle_flags: flags,
+        }
+    }
+}
+
 // A handle's view into a persistent object.
 //
 // TODO(https://fxbug.dev/360942417):Implement me!
 struct PersistentObjectView {
     object: Arc<Mutex<PersistentObject>>,
     flags: HandleFlags,
+    data_position: usize,
 }
 
 impl PersistentObjectView {
     fn get_info(&self) -> ObjectInfo {
-        unimplemented!();
+        self.object.lock().get_info(self.data_position)
     }
 
     // See read_object_data().
@@ -120,6 +154,12 @@ impl PersistentObjectView {
     }
 }
 
+// The state of an object enum handle.
+struct EnumState {
+    // None if in the allocated/unstarted state.
+    id: Option<Vec<u8>>,
+}
+
 // A B-tree since enumeration needs to deal in key (i.e., ID) ordering.
 //
 // Further, the key represents a separately owned copy of the ID; we do this
@@ -131,6 +171,7 @@ impl PersistentObjectView {
 type PersistentIdMap = BTreeMap<Vec<u8>, Arc<Mutex<PersistentObject>>>;
 
 type PersistentHandleMap = HashMap<ObjectHandle, Mutex<PersistentObjectView>>;
+type PersistentEnumHandleMap = HashMap<ObjectEnumHandle, Mutex<EnumState>>;
 
 // A class abstraction implementing the persistent storage interface.
 //
@@ -138,7 +179,9 @@ type PersistentHandleMap = HashMap<ObjectHandle, Mutex<PersistentObjectView>>;
 struct PersistentObjects {
     by_id: RwLock<PersistentIdMap>,
     by_handle: RwLock<PersistentHandleMap>,
+    enum_handles: RwLock<PersistentEnumHandleMap>,
     next_handle_value: AtomicU64,
+    next_enum_handle_value: AtomicU64,
 }
 
 impl PersistentObjects {
@@ -146,12 +189,10 @@ impl PersistentObjects {
         Self {
             by_id: RwLock::new(PersistentIdMap::new()),
             by_handle: RwLock::new(PersistentHandleMap::new()),
+            enum_handles: RwLock::new(HashMap::new()),
             next_handle_value: AtomicU64::new(1), // Always odd, per the described convention above
+            next_enum_handle_value: AtomicU64::new(1),
         }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.by_handle.read().is_empty()
     }
 
     fn create(
@@ -288,7 +329,7 @@ impl PersistentObjects {
         let handle = self.mint_handle();
         let inserted = object.lock().handles.insert(handle);
         debug_assert!(inserted);
-        let view = PersistentObjectView { object, flags };
+        let view = PersistentObjectView { object, flags, data_position: 0 };
         let inserted = by_handle.insert(handle, Mutex::new(view)).is_none();
         debug_assert!(inserted);
         handle
@@ -355,17 +396,36 @@ impl PersistentObjects {
 
     // See allocate_persistent_object_enumerator().
     fn allocate_enumerator(&self) -> ObjectEnumHandle {
-        ObjectEnumHandle::from_value(0)
+        let enumerator = self.mint_enumerator_handle();
+
+        let previous = self
+            .enum_handles
+            .write()
+            .insert(enumerator.clone(), Mutex::new(EnumState { id: None }));
+        debug_assert!(previous.is_none());
+        enumerator
     }
 
     // See free_persistent_object_enumerator().
     fn free_enumerator(&self, enumerator: ObjectEnumHandle) -> () {
-        unimplemented!();
+        let mut enum_handles = self.enum_handles.write();
+        match enum_handles.entry(enumerator) {
+            HashMapEntry::Occupied(entry) => {
+                let _ = entry.remove();
+            }
+            HashMapEntry::Vacant(_) => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
     }
 
     // See reset_persistent_object_enumerator().
     fn reset_enumerator(&self, enumerator: ObjectEnumHandle) -> () {
-        unimplemented!();
+        let enum_handles = self.enum_handles.read();
+        match enum_handles.get(&enumerator) {
+            Some(state) => {
+                state.lock().id = None;
+            }
+            None => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
     }
 
     // See get_next_persistent_object().
@@ -374,12 +434,41 @@ impl PersistentObjects {
         enumerator: ObjectEnumHandle,
         id_buffer: &'a mut [u8],
     ) -> TeeResult<(ObjectInfo, &'a [u8])> {
-        unimplemented!();
+        let enum_handles = self.enum_handles.read();
+        match enum_handles.get(&enumerator) {
+            Some(state) => {
+                let by_id = self.by_id.read();
+                let mut state = state.lock();
+                let next = if state.id.is_none() {
+                    by_id.first_key_value()
+                } else {
+                    // Since we're dealing with an ID-keyed B-tree, we can
+                    // straightforwardly get the first entry with an ID larger
+                    // than the current.
+                    let curr_id = state.id.as_ref().unwrap();
+                    by_id.range((Bound::Excluded(curr_id.clone()), Bound::Unbounded)).next()
+                };
+                if let Some((id, obj)) = next {
+                    assert!(id_buffer.len() >= id.len());
+                    let written = &mut id_buffer[..id.len()];
+                    written.copy_from_slice(id);
+                    state.id = Some(id.clone());
+                    Ok((obj.lock().get_info(0), written))
+                } else {
+                    Err(Error::ItemNotFound)
+                }
+            }
+            None => panic!("{enumerator:?} is not a valid enumerator handle"),
+        }
     }
 
     fn mint_handle(&self) -> ObjectHandle {
         // Per the described convention above, always odd. (Initial value is 1.)
         ObjectHandle::from_value(self.next_handle_value.fetch_add(2, Ordering::Relaxed))
+    }
+
+    fn mint_enumerator_handle(&self) -> ObjectEnumHandle {
+        ObjectEnumHandle::from_value(self.next_enum_handle_value.fetch_add(1, Ordering::Relaxed))
     }
 
     //
@@ -682,7 +771,7 @@ pub fn start_persistent_object_enumerator(
     enumerator: ObjectEnumHandle,
     storage: Storage,
 ) -> TeeResult {
-    if storage == Storage::Private && !persistent_objects().is_empty() {
+    if storage == Storage::Private {
         reset_persistent_object_enumerator(enumerator);
         Ok(())
     } else {
