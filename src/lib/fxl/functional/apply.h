@@ -5,6 +5,7 @@
 #ifndef LIB_FXL_FUNCTIONAL_APPLY_H_
 #define LIB_FXL_FUNCTIONAL_APPLY_H_
 
+#include <cstddef>
 #include <tuple>
 #include <type_traits>
 #include <utility>
