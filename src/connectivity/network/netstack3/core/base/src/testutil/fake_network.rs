@@ -428,22 +428,18 @@ where
     /// ordered by their scheduled delivery time given by the latency result
     /// provided by `links`.
     pub fn collect_frames(&mut self) {
-        let all_frames: Vec<(CtxId, Vec<(Spec::SendMeta, Vec<u8>)>)> = self
-            .contexts
-            .iter_mut()
-            .filter_map(|(n, ctx)| {
-                Spec::fake_frames(ctx).with_fake_frame_ctx_mut(|ctx| {
-                    let frames = ctx.take_frames();
-                    if frames.is_empty() {
-                        None
-                    } else {
-                        Some((n.clone(), frames))
-                    }
-                })
+        let all_frames = self.contexts.iter_mut().filter_map(|(n, ctx)| {
+            Spec::fake_frames(ctx).with_fake_frame_ctx_mut(|ctx| {
+                let frames = ctx.take_frames();
+                if frames.is_empty() {
+                    None
+                } else {
+                    Some((n.clone(), frames))
+                }
             })
-            .collect();
+        });
 
-        for (src_context, frames) in all_frames.into_iter() {
+        for (src_context, frames) in all_frames {
             for (send_meta, frame) in frames.into_iter() {
                 for (dst_context, recv_meta, latency) in self.links.map_link(src_context, send_meta)
                 {
