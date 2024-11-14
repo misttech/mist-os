@@ -255,12 +255,11 @@ zx::result<fidl::ClientEnd<fio::Directory>> OpenPkgDir() {
   if (endpoints.is_error()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  zx_status_t status =
-      fdio_open("/pkg",
-                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                      fuchsia_io::wire::OpenFlags::kRightReadable |
-                                      fuchsia_io::wire::OpenFlags::kRightExecutable),
-                endpoints->server.TakeChannel().release());
+  zx_status_t status = fdio_open3(
+      "/pkg",
+      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory |
+                            fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
+      endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -683,10 +682,10 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           completer.Reply(endpoints.take_error());
           return;
         }
-        auto flags = static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                           fio::wire::OpenFlags::kDirectory);
-        zx_status_t status = fdio_open_at(exposed_dir, expose.service_name().c_str(), flags,
-                                          endpoints->server.TakeChannel().release());
+        auto flags =
+            static_cast<uint64_t>(fio::kPermReadable | fio::wire::Flags::kProtocolDirectory);
+        zx_status_t status = fdio_open3_at(exposed_dir, expose.service_name().c_str(), flags,
+                                           endpoints->server.TakeChannel().release());
         if (status != ZX_OK) {
           completer.Reply(zx::error(status));
           return;
@@ -701,11 +700,11 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     // Connect realm_builder_exposed_dir.
-    if (zx_status_t status = fdio_open_at(
-            exposed_dir, ".",
-            static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kPosixWritable |
-                                  fio::OpenFlags::kPosixExecutable),
-            realm_builder_exposed_dir_.TakeChannel().release());
+    if (zx_status_t status =
+            fdio_open3_at(exposed_dir, ".",
+                          static_cast<uint64_t>(fio::kPermReadable | fio::Flags::kPermInheritWrite |
+                                                fio::Flags::kPermInheritExecute),
+                          realm_builder_exposed_dir_.TakeChannel().release());
         status != ZX_OK) {
       completer.Reply(zx::error(status));
       return;

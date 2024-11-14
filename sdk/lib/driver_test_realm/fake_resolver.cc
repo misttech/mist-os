@@ -280,10 +280,9 @@ class FakeComponentResolver final
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    zx_status_t status =
-        fdio_open_at(dir, std::string(path).data(),
-                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-                     file_ep->server.channel().release());
+    zx_status_t status = fdio_open3_at(dir, std::string(path).data(),
+                                       static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                                       file_ep->server.channel().release());
     if (status != ZX_OK) {
       FX_LOG_KV(ERROR, "Failed to open file.", FX_KV("file", std::string(path).c_str()));
       return zx::error(ZX_ERR_IO);
@@ -314,12 +313,11 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectDir(const char* dir) {
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  zx_status_t status =
-      fdio_open(dir,
-                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                      fuchsia_io::wire::OpenFlags::kRightReadable |
-                                      fuchsia_io::wire::OpenFlags::kRightExecutable),
-                endpoints->server.channel().release());
+  zx_status_t status = fdio_open3(
+      dir,
+      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory |
+                            fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
+      endpoints->server.channel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }
