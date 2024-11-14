@@ -4,9 +4,11 @@
 
 #include "src/devices/bus/drivers/pci/bus.h"
 
+#include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
@@ -25,8 +27,8 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
+#include "metadata.h"
 #include "src/devices/bus/drivers/pci/bridge.h"
-#include "src/devices/bus/drivers/pci/common.h"
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/device.h"
 
@@ -76,17 +78,23 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   }
 
   // The DDK owns the object if we've made it this far.
-  (void)bus.release();
+  [[maybe_unused]] void* released_ptr = bus.release();
   return ZX_OK;
 }
 
 zx_status_t Bus::Initialize() {
-  zx_status_t status;
-  if ((status = DdkAdd(ddk::DeviceAddArgs("bus")
-                           .set_flags(DEVICE_ADD_NON_BINDABLE)
-                           .set_inspect_vmo(GetInspectVmo()))) != ZX_OK) {
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("bus")
+                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                  .set_inspect_vmo(GetInspectVmo()));
+  if (status != ZX_OK) {
     zxlogf(ERROR, "failed to add bus driver: %s", zx_status_get_string(status));
     return status;
+  }
+
+  if (zx::result<PciFidl::BoardConfiguration> result =
+          ddk::GetMetadata<PciFidl::BoardConfiguration>(parent_);
+      result.is_ok()) {
+    board_config_ = std::move(result.value());
   }
 
   // Stash the ops/ctx pointers for the pciroot protocol so we can pass
@@ -330,7 +338,7 @@ zx_status_t Bus::ConfigureLegacyIrqs() {
     uint8_t pin = device.config()->Read(Config::kInterruptPin);
     // If a device has no pin configured in the InterruptPin register then it
     // has no legacy interrupt. PCI Local Bus Spec v3 Section 2.2.6.
-    if (pin == 0) {
+    if (pin == 0 && board_config_.use_intx_workaround().has_value()) {
       pin = 1;  // TODO(365837900): Re-add 'continue' here when crosvm Interrupt Pin is populated.
     }
 
@@ -397,7 +405,8 @@ Bus::~Bus() {
 }
 
 void Bus::StartIrqWorker() {
-  std::thread worker(LegacyIrqWorker, std::ref(legacy_irq_port_), &devices_lock_, &shared_irqs_);
+  std::thread worker(LegacyIrqWorker, std::ref(legacy_irq_port_), &devices_lock_, &shared_irqs_,
+                     &board_config_);
   irq_thread_ = std::move(worker);
 }
 
@@ -406,7 +415,8 @@ zx_status_t Bus::StopIrqWorker() {
   return legacy_irq_port_.queue(&packet);
 }
 
-void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map) {
+void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map,
+                          const PciFidl::BoardConfiguration* board_config) {
   zxlogf(TRACE, "IRQ worker started");
   zx_port_packet_t packet = {};
   zx_status_t status = ZX_OK;
@@ -435,7 +445,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
       for (auto& device : list) {
         fbl::AutoLock device_lock(device.dev_lock());
         config::Status status = {.value = device.config()->Read(Config::kStatus)};
-        if (status.interrupt_status()) {
+        if (status.interrupt_status() || board_config->use_intx_workaround()) {
           // Trigger the virtual interrupt the device driver is using by proxy.
           zx_status_t signal_status = device.SignalLegacyIrq(packet.interrupt.timestamp);
           if (signal_status != ZX_OK) {
@@ -451,7 +461,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
           // no way to re-enable it without changing IRQ modes.
           auto& irqs = device.irqs();
           bool disable_irq = true;
-          if (irqs.mode == fuchsia_hardware_pci::InterruptMode::kLegacyNoack) {
+          if (irqs.mode == PciFidl::InterruptMode::kLegacyNoack) {
             irqs.irqs_in_period++;
             if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
               irqs.legacy_irq_period_start = packet.interrupt.timestamp;

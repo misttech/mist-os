@@ -2,7 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
@@ -18,75 +25,118 @@
 #include <cstddef>
 #include <memory>
 
+#include <ddktl/metadata_server.h>
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/bus.h"
-#include "src/devices/bus/drivers/pci/test/fakes/fake_ecam.h"
+#include "src/devices/bus/drivers/pci/metadata.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 #include "test_helpers.h"
 
 namespace pci {
 
-class PciBusTests : public ::testing::Test {
+class IncomingNamespace {
  public:
-  // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
-  PciBusTests() : pciroot_(0, 2, /*is_extended=*/true), parent_(MockDevice::FakeRootParent()) {
-    parent_->AddProtocol(ZX_PROTOCOL_PCIROOT, pciroot_.proto()->ops, pciroot_.proto()->ctx);
+  using MetadataType = fuchsia_hardware_pci::BoardConfiguration;
+  void Init(fidl::ServerEnd<fuchsia_io::Directory> outgoing_server) {
+    ASSERT_OK(metadata_server_.Serve(outgoing_, async_get_default_dispatcher()));
+    ASSERT_OK(outgoing_.Serve(std::move(outgoing_server)));
   }
 
- protected:
-  zx_device_t* parent() { return parent_.get(); }
-  // Sets up 5 devices, including two under a bridge.
-  uint32_t SetupTopology() {
-    uint8_t idx = 1;
-    auto& ecam = pciroot_.ecam();
-    ecam.get_device({0, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
-        PCI_HEADER_TYPE_MULTI_FN);
-    ecam.get_device({0, 0, 1})->set_vendor_id(0x8086).set_device_id(idx++);
-    ecam.get_bridge({0, 1, 0})
-        ->set_vendor_id(0x8086)
-        .set_device_id(idx++)
-        .set_header_type(PCI_HEADER_TYPE_PCI_BRIDGE)
-        .set_io_base(0x10)
-        .set_io_limit(0x0FFF)
-        .set_memory_base(0x1000)
-        .set_memory_limit(0xFFFFFFFF)
-        .set_secondary_bus_number(1);
-    ecam.get_device({1, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
-        PCI_HEADER_TYPE_MULTI_FN);
-    ecam.get_device({1, 0, 1})->set_vendor_id(0x8086).set_device_id(idx);
-    return idx;
+  void SetBoardConfig(const fuchsia_hardware_pci::BoardConfiguration& board_config) {
+    metadata_server_.SetMetadata(board_config);
   }
-
-  zx::interrupt AddLegacyIrqToBus(uint8_t vector) {
-    zx::interrupt interrupt;
-    ZX_ASSERT(zx::interrupt::create(*zx::unowned_resource(ZX_HANDLE_INVALID), vector,
-                                    ZX_INTERRUPT_VIRTUAL, &interrupt) == ZX_OK);
-    pciroot_.legacy_irqs().push_back(
-        pci_legacy_irq_t{.interrupt = interrupt.get(), .vector = vector});
-
-    return interrupt;
-  }
-
-  void AddRoutingEntryToBus(std::optional<uint8_t> p_dev, std::optional<uint8_t> p_func,
-                            uint8_t dev_id, uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-    pciroot_.routing_entries().push_back(pci_irq_routing_entry_t{
-        .port_device_id = (p_dev) ? *p_dev : static_cast<uint8_t>(PCI_IRQ_ROUTING_NO_PARENT),
-        .port_function_id = (p_func) ? *p_func : static_cast<uint8_t>(PCI_IRQ_ROUTING_NO_PARENT),
-        .device_id = dev_id,
-        .pins = {a, b, c, d}});
-  }
-
-  void SetUp() final { pciroot_.ecam().reset(); }
-  auto& pciroot() { return pciroot_; }
 
  private:
-  FakePciroot pciroot_;
-  std::shared_ptr<MockDevice> parent_;
+  ddk::MetadataServer<MetadataType> metadata_server_;
+  component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
 };
+
+// TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
+class PciBusTests : public ::gtest::TestLoopFixture {
+ protected:
+  void SetUp() final {
+    pciroot_.emplace(0, 2, /*is_extended=*/true);
+    parent_ = MockDevice::FakeRootParent();
+    ASSERT_OK(incoming_loop_.StartThread("incoming-namespace"));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    incoming_namespace_.SyncCall(&IncomingNamespace::Init, std::move(endpoints->server));
+
+    parent_->AddProtocol(ZX_PROTOCOL_PCIROOT, pciroot_->proto()->ops, pciroot_->proto()->ctx);
+    parent_->AddFidlService(fuchsia_hardware_pci::kMetadataTypeName, std::move(endpoints->client),
+                            "default");
+  }
+
+  void TearDown() final {
+    parent_.reset();
+    pciroot_.reset();
+    incoming_namespace_.reset();
+  }
+
+  zx_device_t* parent() { return parent_.get(); }
+  // Sets up 5 devices, including two under a bridge.
+  uint32_t SetupTopology();
+  zx::interrupt AddLegacyIrqToBus(uint8_t vector);
+  void AddRoutingEntryToBus(std::optional<uint8_t> p_dev, std::optional<uint8_t> p_func,
+                            uint8_t dev_id, uint8_t a, uint8_t b, uint8_t c, uint8_t d);
+  void SetBoardConfiguration(fuchsia_hardware_pci::BoardConfiguration board_config);
+  FakePciroot& pciroot() { return pciroot_.value(); }
+
+ private:
+  std::optional<FakePciroot> pciroot_;
+  std::shared_ptr<MockDevice> parent_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_namespace_{
+      incoming_loop_.dispatcher(), std::in_place};
+};
+
+uint32_t PciBusTests::SetupTopology() {
+  uint8_t idx = 1;
+  auto& ecam = pciroot_->ecam();
+  ecam.get_device({0, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
+      PCI_HEADER_TYPE_MULTI_FN);
+  ecam.get_device({0, 0, 1})->set_vendor_id(0x8086).set_device_id(idx++);
+  ecam.get_bridge({0, 1, 0})
+      ->set_vendor_id(0x8086)
+      .set_device_id(idx++)
+      .set_header_type(PCI_HEADER_TYPE_PCI_BRIDGE)
+      .set_io_base(0x10)
+      .set_io_limit(0x0FFF)
+      .set_memory_base(0x1000)
+      .set_memory_limit(0xFFFFFFFF)
+      .set_secondary_bus_number(1);
+  ecam.get_device({1, 0, 0})->set_vendor_id(0x8086).set_device_id(idx++).set_header_type(
+      PCI_HEADER_TYPE_MULTI_FN);
+  ecam.get_device({1, 0, 1})->set_vendor_id(0x8086).set_device_id(idx);
+  return idx;
+}
+
+zx::interrupt PciBusTests::AddLegacyIrqToBus(uint8_t vector) {
+  zx::interrupt interrupt;
+  ZX_ASSERT(zx::interrupt::create(*zx::unowned_resource(ZX_HANDLE_INVALID), vector,
+                                  ZX_INTERRUPT_VIRTUAL, &interrupt) == ZX_OK);
+  pciroot().legacy_irqs().push_back(
+      pci_legacy_irq_t{.interrupt = interrupt.get(), .vector = vector});
+
+  return interrupt;
+}
+
+void PciBusTests::AddRoutingEntryToBus(std::optional<uint8_t> p_dev, std::optional<uint8_t> p_func,
+                                       uint8_t dev_id, uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+  pciroot().routing_entries().push_back(pci_irq_routing_entry_t{
+      .port_device_id = (p_dev) ? *p_dev : static_cast<uint8_t>(PCI_IRQ_ROUTING_NO_PARENT),
+      .port_function_id = (p_func) ? *p_func : static_cast<uint8_t>(PCI_IRQ_ROUTING_NO_PARENT),
+      .device_id = dev_id,
+      .pins = {a, b, c, d}});
+}
+
+void PciBusTests::SetBoardConfiguration(fuchsia_hardware_pci::BoardConfiguration board_config) {
+  incoming_namespace_.SyncCall(&IncomingNamespace::SetBoardConfig, board_config);
+}
 
 // An encapsulated pci::Bus to allow inspection of some internal state.
 class TestBus : public ::pci_testing::InspectHelper, public pci::Bus {
@@ -94,8 +144,11 @@ class TestBus : public ::pci_testing::InspectHelper, public pci::Bus {
   TestBus(zx_device_t* parent, const pciroot_protocol_t* pciroot, const pci_platform_info_t info,
           std::optional<fdf::MmioBuffer> ecam)
       : pci::Bus(parent, pciroot, info, std::move(ecam)) {}
+  virtual ~TestBus() = default;
 
   pci::DeviceTree& Devices() { return devices(); }
+
+  const fuchsia_hardware_pci::BoardConfiguration& GetBoardConfiguration() { return board_config(); }
 
   size_t GetDeviceCount() {
     fbl::AutoLock _(devices_lock());
@@ -230,7 +283,8 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // use it if the device id is 0x1 and it uses pin B.
   uint32_t vector = 0xA;
   zx::interrupt interrupt = AddLegacyIrqToBus(vector);
-  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
+  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0,
+                       /*a=*/vector,
                        /*b=*/vector, /*c=*/0, /*d=*/0);
   // Have the routing table target device 0, pin B. This is configured in
   // SetupTopology for the device itself.
@@ -294,7 +348,8 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   // Route pin A to vector 16.
   uint8_t vector = 0x10;
   zx::interrupt bus_interrupt = AddLegacyIrqToBus(vector);
-  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
+  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0,
+                       /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
                                              pciroot().ecam().mmio());
@@ -354,7 +409,8 @@ TEST_F(PciBusTests, Inspect) {
   pciroot().acpi_devices().push_back({0x0, 0x0, 0x1});
   uint8_t vector = 0x10;
   [[maybe_unused]] zx::interrupt bus_interrupt = AddLegacyIrqToBus(vector);
-  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
+  AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0,
+                       /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
                                              pciroot().ecam().mmio());
@@ -379,6 +435,24 @@ TEST_F(PciBusTests, Inspect) {
   EXPECT_NE(
       bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kEcam.Data().data()),
       nullptr);
+  [[maybe_unused]] auto* bus = owned_bus.release();
+}
+
+TEST_F(PciBusTests, MetadataEmpty) {
+  auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
+                                             pciroot().ecam().mmio());
+  ASSERT_OK(owned_bus->Initialize());
+  EXPECT_TRUE(owned_bus->GetBoardConfiguration().IsEmpty());
+  [[maybe_unused]] auto* bus = owned_bus.release();
+}
+
+TEST_F(PciBusTests, MetadataPopulated) {
+  SetBoardConfiguration({{PciFidl::UseIntxWorkaroundType()}});
+  auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
+                                             pciroot().ecam().mmio());
+  ASSERT_OK(owned_bus->Initialize());
+  EXPECT_FALSE(owned_bus->GetBoardConfiguration().IsEmpty());
+  EXPECT_TRUE(owned_bus->GetBoardConfiguration().use_intx_workaround().has_value());
   [[maybe_unused]] auto* bus = owned_bus.release();
 }
 

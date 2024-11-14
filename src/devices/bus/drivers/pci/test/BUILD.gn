@@ -26,13 +26,19 @@ test("pci-unit") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/inspect/testing/cpp",
+    "//src/devices/bus/drivers/pci:metadata",
     "//src/devices/bus/drivers/pci:user_pci",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-msi",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/inspect",
