@@ -8,6 +8,7 @@ group("drivers") {
     "drivers/acpi-arm64",
     "drivers/astro",
     "drivers/astro/post-init",
+    "drivers/crosvm:package",
     "drivers/integration-test",
     "drivers/machina",
     "drivers/nelson",

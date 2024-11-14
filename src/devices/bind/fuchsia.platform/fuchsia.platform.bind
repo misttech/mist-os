@@ -15,6 +15,7 @@ extend uint fuchsia.BIND_PROTOCOL {
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
   GENERIC = 0x0,
   QEMU = 0x01,
+  CROSVM = 0x02,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
@@ -52,6 +53,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   GENERIC = 0x0,
   QEMU = 0x1,
+  CROSVM = 0x2,
 };
 
 uint DRIVER_FRAMEWORK_VERSION;

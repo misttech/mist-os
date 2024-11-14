@@ -34,9 +34,9 @@ if (target_cpu == "x64") {
     forward_variables_from(common_arguments, "*")
 
     hardware_info = {
-      name = "qemu-arm64"
-      product_id = 1
-      vendor_id = 1
+      name = "crosvm"
+      product_id = 2
+      vendor_id = 2
       revision = 1
     }
   }
@@ -67,10 +67,9 @@ board_input_bundle("main_bundle") {
   } else if (target_cpu == "arm64") {
     drivers += [
       {
-        # TODO: Update to pkvm specific board or board configuration
-        package_target = "//src/devices/board/drivers/qemu-arm64:package"
+        package_target = "//src/devices/board/drivers/crosvm:package"
         package_set = "bootfs"
-        driver_components = [ "meta/qemu-arm64.cm" ]
+        driver_components = [ "meta/crosvm.cml" ]
       },
     ]
   } else {
