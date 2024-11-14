@@ -22,7 +22,7 @@ use selinux::{
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
-use starnix_logging::{log_debug, log_error, log_warn, track_stub};
+use starnix_logging::{log_debug, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -772,21 +772,24 @@ where
 
 /// Returns the `SecurityId` that should be used for SELinux access control checks against `fs_node`.
 fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
-    if let Some(sid) = get_cached_sid(&fs_node) {
+    let maybe_sid = get_cached_sid(&fs_node);
+    if let Some(sid) = maybe_sid {
         return sid;
     }
 
+    // We should never reach here, but for now enforce it (see above) in debug builds.
     let info = fs_node.info();
     if fs_node.fs().name() == "anon" {
         track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
     } else {
-        log_error!(
+        panic!(
             "Unlabeled FsNode@{} of class {:?} in {}",
             info.ino,
             file_class_from_file_mode(info.mode),
             fs_node.fs().name()
         );
     }
+
     SecurityId::initial(InitialSid::Unlabeled)
 }
 
