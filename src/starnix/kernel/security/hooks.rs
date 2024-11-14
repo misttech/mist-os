@@ -342,20 +342,21 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 /// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {
     profile_duration!("security.hooks.task_alloc_for_kernel");
-    TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
+    TaskState(selinux_hooks::TaskAttrs::for_kernel().into())
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
 /// Corresponds to the `task_alloc()` LSM hook.
 pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     profile_duration!("security.hooks.task_alloc");
-    TaskState {
-        attrs: if_selinux_else(
+    TaskState(
+        if_selinux_else(
             task,
             |_| selinux_hooks::task::task_alloc(&task, clone_flags),
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
-        ),
-    }
+        )
+        .into(),
+    )
 }
 
 /// Labels an [`crate::vfs::FsNode`], by attaching a pseudo-label to the `fs_node`, which allows
@@ -378,8 +379,8 @@ pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_
 /// performed by `set_procattr()`.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
     profile_duration!("security.hooks.task_for_context");
-    Ok(TaskState {
-        attrs: if_selinux_else(
+    Ok(TaskState(
+        if_selinux_else(
             task,
             |security_server| {
                 Ok(selinux_hooks::TaskAttrs::for_sid(
@@ -389,8 +390,9 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
                 ))
             },
             || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
-        )?,
-    })
+        )?
+        .into(),
+    ))
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -1030,11 +1032,11 @@ mod tests {
             let target_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
-            assert!(current_task.read().security_state.attrs.current_sid != target_sid);
+            assert!(current_task.security_state.lock().current_sid != target_sid);
 
-            let before_hook_sid = current_task.read().security_state.attrs.current_sid;
+            let before_hook_sid = current_task.security_state.lock().current_sid;
             update_state_on_exec(current_task, &elf_state);
-            assert_eq!(current_task.read().security_state.attrs.current_sid, before_hook_sid);
+            assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid);
         })
     }
 
@@ -1043,12 +1045,12 @@ mod tests {
         spawn_kernel_with_selinux_and_run(|_locked, current_task, _security_server| {
             // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
             // in the system.
-            let initial_state = current_task.read().security_state.attrs.clone();
+            let initial_state = current_task.security_state.lock().clone();
             let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
             assert_ne!(elf_sid, initial_state.current_sid);
             update_state_on_exec(current_task, &elf_state);
-            assert_eq!(current_task.read().security_state.attrs, initial_state);
+            assert_eq!(*current_task.security_state.lock(), initial_state);
         })
     }
 
@@ -1058,14 +1060,14 @@ mod tests {
             |_locked, current_task, security_server| {
                 security_server.set_enforcing(false);
                 let initial_state = selinux_hooks::TaskAttrs::for_kernel();
-                current_task.write().security_state.attrs = initial_state.clone();
+                *current_task.security_state.lock() = initial_state.clone();
                 let elf_sid = security_server
                     .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
                 assert_ne!(elf_sid, initial_state.current_sid);
                 update_state_on_exec(current_task, &elf_state);
-                assert_eq!(current_task.read().security_state.attrs.current_sid, elf_sid);
+                assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },
         )
     }
@@ -1600,11 +1602,11 @@ mod tests {
 
                 // Clear the "exec" context with a write containing a single null octet.
                 assert_eq!(set_procattr(current_task, ProcAttr::Exec, b"\0"), Ok(()));
-                assert_eq!(current_task.read().security_state.attrs.exec_sid, None);
+                assert_eq!(current_task.security_state.lock().exec_sid, None);
 
                 // Clear the "fscreate" context with a write containing a single newline.
                 assert_eq!(set_procattr(current_task, ProcAttr::FsCreate, b"\x0a"), Ok(()));
-                assert_eq!(current_task.read().security_state.attrs.fscreate_sid, None);
+                assert_eq!(current_task.security_state.lock().fscreate_sid, None);
             },
         )
     }

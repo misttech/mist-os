@@ -385,9 +385,6 @@ pub struct TaskMutableState {
 
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
-
-    /// The Linux Security Modules state for this thread group.
-    pub security_state: security::TaskState,
 }
 
 impl TaskMutableState {
@@ -939,6 +936,9 @@ pub struct Task {
     // The pid directory, so it doesn't have to be generated and thrown away on every access.
     // See https://fxbug.dev/291962828 for details.
     pub proc_pid_directory_cache: Mutex<Option<FsNodeHandle>>,
+
+    /// The Linux Security Modules state for this thread group.
+    pub security_state: security::TaskState,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -1092,13 +1092,13 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
-                security_state,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
             logging_span: OnceCell::new(),
             trace_syscalls: AtomicBool::new(false),
             proc_pid_directory_cache: Mutex::new(None),
+            security_state,
         };
         #[cfg(any(test, debug_assertions))]
         {

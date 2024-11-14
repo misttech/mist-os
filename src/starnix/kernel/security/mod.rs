@@ -29,8 +29,14 @@ pub struct KernelState {
 
 /// Opaque structure encapsulating security state for a `ThreadGroup`.
 #[derive(Debug)]
-pub struct TaskState {
-    attrs: selinux_hooks::TaskAttrs,
+pub struct TaskState(Mutex<selinux_hooks::TaskAttrs>);
+
+impl TaskState {
+    pub(in crate::security) fn lock(
+        &self,
+    ) -> starnix_sync::MutexGuard<'_, selinux_hooks::TaskAttrs> {
+        self.0.lock()
+    }
 }
 
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.

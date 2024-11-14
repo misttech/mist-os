@@ -237,7 +237,7 @@ pub(super) fn fs_node_init_on_create(
 
     // If the creating task's "fscreate" attribute is set then it overrides the normal process
     // for labeling new files.
-    if let Some(fscreate_sid) = current_task.read().security_state.attrs.fscreate_sid.clone() {
+    if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid.clone() {
         set_cached_sid(new_node, fscreate_sid);
         return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
     }
@@ -254,7 +254,7 @@ pub(super) fn fs_node_init_on_create(
     // (or None if this circumstance is such that there's no xattr to persist).
     let (sid, xattr) = match label.scheme {
         FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
-            let current_task_sid = current_task.read().security_state.attrs.current_sid;
+            let current_task_sid = current_task.security_state.lock().current_sid;
             if fs_use_type == FsUseType::Task {
                 // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
                 // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
@@ -297,7 +297,7 @@ fn may_create(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let (current_sid, fscreate_sid) = {
-        let attrs = &current_task.read().security_state.attrs;
+        let attrs = &current_task.security_state.lock();
         (attrs.current_sid, attrs.fscreate_sid)
     };
 
@@ -354,7 +354,7 @@ fn may_link(
     existing_node: &FsNode,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
     let file_sid = fs_node_effective_sid(existing_node);
     let file_class = file_class_from_file_mode(existing_node.info().mode)?;
@@ -383,7 +383,7 @@ fn may_unlink_or_rmdir(
     operation: UnlinkKind,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
 
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
@@ -494,7 +494,7 @@ pub(super) fn check_fs_node_rename_access(
     replaced_node: Option<&FsNode>,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let old_parent_sid = fs_node_effective_sid(old_parent);
 
     check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::Search)?;
@@ -551,7 +551,7 @@ pub(super) fn check_fs_node_read_link_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     todo_check_permission!(
@@ -571,7 +571,7 @@ pub(super) fn check_fs_node_setxattr_access(
     _value: &FsStr,
     _op: XattrOp,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -588,7 +588,7 @@ pub(super) fn check_fs_node_getxattr_access(
     fs_node: &FsNode,
     _name: &FsStr,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -604,7 +604,7 @@ pub(super) fn check_fs_node_listxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -623,7 +623,7 @@ pub(super) fn check_fs_node_removexattr_access(
 ) -> Result<(), Errno> {
     // TODO: https://fxbug.dev/364568818 - Verify the correct permission check here; is removing a
     // security.* attribute even allowed?
-    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let current_sid = current_task.security_state.lock().current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     check_permission(
@@ -726,7 +726,7 @@ where
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
-        let task_sid = current_task.read().security_state.attrs.current_sid;
+        let task_sid = current_task.security_state.lock().current_sid;
         let old_sid = fs_node_effective_sid(fs_node);
         let file_class = file_class_from_file_mode(fs_node.info().mode)?;
         let permission_check = security_server.as_permission_check();
@@ -938,7 +938,7 @@ where
 
 /// Returns the security state for a new file object created by `current_task`.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    FileObjectState { _sid: current_task.read().security_state.attrs.current_sid }
+    FileObjectState { _sid: current_task.security_state.lock().current_sid }
 }
 
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
@@ -971,7 +971,7 @@ pub(super) fn selinuxfs_check_access(
     current_task: &CurrentTask,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    let source_sid = current_task.read().security_state.attrs.current_sid;
+    let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = SecurityId::initial(InitialSid::Security);
     let permission_check = security_server.as_permission_check();
     check_permission(&permission_check, source_sid, target_sid, permission)
@@ -1108,7 +1108,7 @@ pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
     match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
         FsNodeLabel::FromTask { weak_task } => {
-            weak_task.upgrade().map(|t| t.read().security_state.attrs.current_sid)
+            weak_task.upgrade().map(|t| t.security_state.lock().current_sid)
         }
         FsNodeLabel::Uninitialized => None,
     }
