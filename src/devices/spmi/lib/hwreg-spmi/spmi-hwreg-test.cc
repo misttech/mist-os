@@ -36,6 +36,9 @@ class SpmiHwregTest : public testing::Test {
   fidl::ClientEnd<fuchsia_hardware_spmi::Device> TakeSpmiClient() {
     return std::move(spmi_client_);
   }
+  fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device> BorrowSpmiClient() {
+    return spmi_client_.borrow();
+  }
 
  private:
   fdf_testing::DriverRuntime driver_runtime_;
@@ -65,6 +68,30 @@ TEST_F(SpmiHwregTest, Write) {
   mock_spmi().SyncCall(
       [](mock_spmi::MockSpmi* spmi) { spmi->ExpectExtendedRegisterWriteLong(0xAB, {0x8A}); });
   EXPECT_TRUE(dut.WriteTo(TakeSpmiClient()).is_ok());
+
+  mock_spmi().SyncCall(&mock_spmi::MockSpmi::VerifyAndClear);
+}
+
+TEST_F(SpmiHwregTest, UnownedRead) {
+  mock_spmi().SyncCall(
+      [](mock_spmi::MockSpmi* spmi) { spmi->ExpectExtendedRegisterReadLong(0xAB, 1, {0x8A}); });
+
+  auto dut = DummySpmiRegister::Get().FromValue(0).ReadFrom(BorrowSpmiClient());
+  EXPECT_TRUE(dut.is_ok());
+  EXPECT_EQ(dut->test_bit(), 1);
+  EXPECT_EQ(dut->test_field(), 0xA);
+
+  mock_spmi().SyncCall(&mock_spmi::MockSpmi::VerifyAndClear);
+}
+
+TEST_F(SpmiHwregTest, UnownedWrite) {
+  auto dut = DummySpmiRegister::Get().FromValue(0);
+  dut.set_test_bit(1);
+  dut.set_test_field(0xA);
+
+  mock_spmi().SyncCall(
+      [](mock_spmi::MockSpmi* spmi) { spmi->ExpectExtendedRegisterWriteLong(0xAB, {0x8A}); });
+  EXPECT_TRUE(dut.WriteTo(BorrowSpmiClient()).is_ok());
 
   mock_spmi().SyncCall(&mock_spmi::MockSpmi::VerifyAndClear);
 }

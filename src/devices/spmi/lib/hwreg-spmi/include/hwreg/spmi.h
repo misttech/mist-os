@@ -105,6 +105,11 @@ class SpmiRegisterBase : public RegisterBase<DerivedType, IntType, PrinterState>
   using RegisterBaseType = RegisterBase<DerivedType, IntType, PrinterState>;
 
   zx::result<DerivedType> ReadFrom(const fidl::ClientEnd<fuchsia_hardware_spmi::Device>& client) {
+    return ReadFrom(client.borrow());
+  }
+
+  zx::result<DerivedType> ReadFrom(
+      const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
     uint32_t addr = RegisterBaseType::reg_addr();
 
     auto response = fidl::WireCall(client)->ExtendedRegisterReadLong(addr, sizeof(IntType));
@@ -126,6 +131,10 @@ class SpmiRegisterBase : public RegisterBase<DerivedType, IntType, PrinterState>
   }
 
   zx::result<> WriteTo(const fidl::ClientEnd<fuchsia_hardware_spmi::Device>& client) {
+    return WriteTo(client.borrow());
+  }
+
+  zx::result<> WriteTo(const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
     uint32_t addr = RegisterBaseType::reg_addr();
     IntType value = RegisterBaseType::reg_value();
 
@@ -171,6 +180,11 @@ class SpmiRegisterAddr : public RegisterAddr<RegType> {
   RegType ReadFrom(T* reg_io) = delete;
 
   zx::result<RegType> ReadFrom(const fidl::ClientEnd<fuchsia_hardware_spmi::Device>& client) {
+    return ReadFrom(client.borrow());
+  }
+
+  zx::result<RegType> ReadFrom(
+      const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
     RegType reg;
     reg.set_reg_addr(RegisterAddr<RegType>::addr());
     return reg.ReadFrom(client);
@@ -188,6 +202,11 @@ class SpmiRegisterArray {
 
   zx::result<SpmiRegisterArray> ReadFrom(
       const fidl::ClientEnd<fuchsia_hardware_spmi::Device>& client) {
+    return ReadFrom(client.borrow());
+  }
+
+  zx::result<SpmiRegisterArray> ReadFrom(
+      const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
     uint32_t address = base_address_;
     size_t size = regs_.size();
     auto data = regs_.data();
@@ -217,6 +236,10 @@ class SpmiRegisterArray {
   }
 
   zx::result<> WriteTo(const fidl::ClientEnd<fuchsia_hardware_spmi::Device>& client) {
+    return WriteTo(client.borrow());
+  }
+
+  zx::result<> WriteTo(const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
     uint32_t address = base_address_;
     size_t size = regs_.size();
     auto data = regs_.data();
