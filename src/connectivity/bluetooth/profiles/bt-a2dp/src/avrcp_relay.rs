@@ -285,15 +285,15 @@ impl AvrcpRelay {
                         match res {
                             Ok(Ok(players)) => {
                                 debug!(%peer_id, "Media players: {players:?}");
-                                let valid_players: Vec<&avrcp::MediaPlayerItem> = players.iter().filter_map(|p| {
+                                let mut valid_players = players.iter().filter_map(|p| {
                                     // Return player if and only if it's in active playback status.
                                     use avrcp::PlaybackStatus::*;
                                     match p.playback_status {
                                         Some(Stopped) | Some(Error) | None => None,
                                         _ => Some(p),
                                     }
-                                }).collect();
-                                if valid_players.len() == 0 {
+                                });
+                                if valid_players.next().is_none() {
                                     last_player_status.player_state = sessions2::PlayerState::Idle;
                                     player_status_updated = true;
                                 }

@@ -190,10 +190,8 @@ impl ServiceRecord {
         attributes.push(protocol_to_attribute(&protocol));
 
         // The service class identifiers.
-        let svc_ids_list: Vec<bredr::ServiceClassProfileIdentifier> =
-            self.svc_ids.iter().cloned().collect();
         let svc_ids_sequence =
-            svc_ids_list.into_iter().map(|id| Some(Box::new(Uuid::from(id).into()))).collect();
+            self.svc_ids.iter().cloned().map(|id| Some(Box::new(Uuid::from(id).into()))).collect();
         attributes.push(bredr::Attribute {
             id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
             element: Some(bredr::DataElement::Sequence(svc_ids_sequence)),

@@ -178,10 +178,8 @@ impl MasConfig {
                 let DataElement::Uint8(raw_val) = a.element else {
                     return None;
                 };
-                let supported: Vec<Result<MessageType, MapError>> =
-                    MessageType::from_bits(raw_val).collect();
                 let supported: HashSet<MessageType> =
-                    supported.into_iter().filter_map(|r| r.ok()).collect();
+                    MessageType::from_bits(raw_val).filter_map(|r| r.ok()).collect();
                 Some(supported)
             })
             .ok_or(MapError::InvalidSdp(ServiceRecordItem::SupportedMessageTypes))?;
