@@ -10,7 +10,6 @@ use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fs_management::filesystem::{Filesystem, ServingSingleVolumeFilesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::{Blobfs, F2fs, Fxfs, Minfs};
-use fuchsia_fs::directory::clone_no_describe;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -82,7 +81,7 @@ impl FsRealmState {
             }
         };
         let fs = filesystem.serve().await?;
-        let node = clone_no_describe(fs.root(), Some(fio::OpenFlags::CLONE_SAME_RIGHTS))?;
+        let node = fuchsia_fs::directory::clone(fs.root())?;
         self.mnt.add_entry(mount_name, vfs::remote::remote_dir(node))?;
         locked_running_filesystems.insert(mount_name.to_string(), fs);
         Ok(())

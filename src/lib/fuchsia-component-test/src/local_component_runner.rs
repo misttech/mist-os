@@ -180,7 +180,7 @@ impl LocalComponentHandles {
                 directory_name
             )
         })?;
-        fuchsia_fs::directory::clone_no_describe(&dir_proxy, None).context("clone")
+        fuchsia_fs::directory::clone(&dir_proxy).context("clone")
     }
 }
 

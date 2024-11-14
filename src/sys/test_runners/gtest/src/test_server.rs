@@ -235,14 +235,13 @@ impl TestServer {
     }
 
     fn test_data_namespace(&self) -> Result<fproc::NameInfo, IoError> {
-        let client_channnel =
-            fuchsia_fs::directory::clone_no_describe(&self.output_dir_proxy, None)
-                .context("clone")
-                .map_err(IoError::CloneProxy)?
-                .into_channel()
-                .map_err(|_| FidlError::ProxyToChannel)
-                .unwrap()
-                .into_zx_channel();
+        let client_channnel = fuchsia_fs::directory::clone(&self.output_dir_proxy)
+            .context("clone")
+            .map_err(IoError::CloneProxy)?
+            .into_channel()
+            .map_err(|_| FidlError::ProxyToChannel)
+            .unwrap()
+            .into_zx_channel();
 
         Ok(fproc::NameInfo { path: "/test_data".to_owned(), directory: client_channnel.into() })
     }

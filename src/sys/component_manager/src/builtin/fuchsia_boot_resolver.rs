@@ -378,14 +378,10 @@ impl FuchsiaBootPackageResolver {
             .hash_for_package(&package_path)
             .ok_or(fpkg::ResolveError::PackageNotFound)?;
 
-        let blob_proxy = fuchsia_fs::directory::clone_no_describe(&self.boot_blob_storage, None)
-            .map_err(|e| {
-                tracing::warn!(
-                    "Creating duplicate connection to /boot/blob directory failed: {:?}",
-                    e
-                );
-                fpkg::ResolveError::Internal
-            })?;
+        let blob_proxy = fuchsia_fs::directory::clone(&self.boot_blob_storage).map_err(|e| {
+            tracing::warn!("Creating duplicate connection to /boot/blob directory failed: {:?}", e);
+            fpkg::ResolveError::Internal
+        })?;
 
         let () = package_directory::serve(
             // scope is used to spawn an async task, which will continue until all features complete.

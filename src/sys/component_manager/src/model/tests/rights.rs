@@ -84,8 +84,8 @@ impl FrameworkCapability for MockFrameworkDirectory {
         _scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
-            .expect("failed to clone test dir");
+        let test_dir_proxy =
+            fuchsia_fs::directory::clone(&self.test_dir_proxy).expect("failed to clone test dir");
         Box::new(MockFrameworkDirectoryProvider { test_dir_proxy })
     }
 }
@@ -114,8 +114,8 @@ async fn framework_directory_rights() {
         ),
     ];
     let test = RoutingTest::new("a", components).await;
-    let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&test.test_dir_proxy, None)
-        .expect("failed to clone test dir");
+    let test_dir_proxy =
+        fuchsia_fs::directory::clone(&test.test_dir_proxy).expect("failed to clone test dir");
     let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
     test.model.context().add_framework_capability(directory_host).await;
     test.check_use(vec!["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
@@ -151,8 +151,8 @@ async fn framework_directory_incompatible_rights() {
         ),
     ];
     let test = RoutingTest::new("a", components).await;
-    let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&test.test_dir_proxy, None)
-        .expect("failed to clone test dir");
+    let test_dir_proxy =
+        fuchsia_fs::directory::clone(&test.test_dir_proxy).expect("failed to clone test dir");
     let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
     test.model.context().add_framework_capability(directory_host).await;
     test.check_use(

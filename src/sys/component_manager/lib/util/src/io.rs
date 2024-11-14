@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::clone_no_describe;
+use fuchsia_fs::directory::clone;
 use std::path::PathBuf;
 
 // TODO(https://fxbug.dev/42176573): We should probably preserve the original error messages
 // instead of dropping them.
 pub fn clone_dir(dir: Option<&fio::DirectoryProxy>) -> Option<fio::DirectoryProxy> {
-    dir.and_then(|d| clone_no_describe(d, None).ok())
+    dir.and_then(|d| clone(d).ok())
 }
 
 /// Fallible conversion from [`PathBuf`] to [`vfs::path::Path`].

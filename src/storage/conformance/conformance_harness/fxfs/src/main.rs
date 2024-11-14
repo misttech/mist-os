@@ -102,12 +102,9 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                 )
                 .await
                 .unwrap();
-                add_entries(
-                    fuchsia_fs::directory::clone_no_describe(&dir, None).expect("clone failed"),
-                    contents,
-                )
-                .await
-                .expect("add_entries failed");
+                add_entries(fuchsia_fs::directory::clone(&dir).expect("clone failed"), contents)
+                    .await
+                    .expect("add_entries failed");
                 dir.open3(".", flags, &Default::default(), object_request.into_channel().into())
                     .unwrap();
             }

@@ -807,9 +807,8 @@ impl RoutingTestModel for RoutingTest {
                 )
                 .await;
 
-                let storage_dir =
-                    fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
-                        .expect("failed to clone test_dir_proxy");
+                let storage_dir = fuchsia_fs::directory::clone(&self.test_dir_proxy)
+                    .expect("failed to clone test_dir_proxy");
                 capability_util::check_file_in_storage(
                     storage_subdir.clone(),
                     storage_relation.clone(),

@@ -2767,8 +2767,7 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("create_symlink failed");
 
-            let root = fuchsia_fs::directory::clone_no_describe(root, None)
-                .expect("clone_no_describe failed");
+            let root = fuchsia_fs::directory::clone(root).expect("clone failed");
 
             fasync::unblock(|| {
                 let root: std::os::fd::OwnedFd =
@@ -2817,8 +2816,7 @@ mod tests {
             let namespace = fdio::Namespace::installed().expect("Unable to get namespace");
             static COUNTER: AtomicU64 = AtomicU64::new(0);
             let path = format!("/test_symlink_stat.{}", COUNTER.fetch_add(1, Ordering::Relaxed));
-            let root = fuchsia_fs::directory::clone_no_describe(root, None)
-                .expect("clone_no_describe failed");
+            let root = fuchsia_fs::directory::clone(root).expect("clone failed");
             namespace
                 .bind(&path, ClientEnd::new(root.into_channel().unwrap().into_zx_channel()))
                 .expect("bind failed");

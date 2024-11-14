@@ -9,9 +9,7 @@ use anyhow::{anyhow, format_err, Error, Result};
 use async_trait::async_trait;
 use fidl::endpoints::{create_endpoints, ClientEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::{
-    clone_no_describe, open_directory_async, open_file_async, readdir, DirEntry,
-};
+use fuchsia_fs::directory::{open_directory_async, open_file_async, readdir, DirEntry};
 use fuchsia_fs::file::{close, read, read_to_string, write};
 use futures::lock::Mutex;
 use std::path::{Path, PathBuf};
@@ -458,7 +456,7 @@ impl Directory for RemoteDirectory {
     }
 
     fn clone(&self) -> Result<Self> {
-        let proxy = clone_no_describe(&self.proxy, Some(fio::OpenFlags::RIGHT_READABLE))?;
+        let proxy = open_directory_async(&self.proxy, ".", fio::PERM_READABLE)?;
         Ok(Self { path: self.path.clone(), proxy, readdir_mutex: Mutex::new(()) })
     }
 }

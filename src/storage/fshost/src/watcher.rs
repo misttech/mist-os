@@ -111,13 +111,13 @@ impl WatchSource for DirSource {
         let watcher = fuchsia_fs::directory::Watcher::new(&self.dir)
             .await
             .with_context(|| format!("Failed to watch dir"))?;
-        let dir = Arc::new(fuchsia_fs::directory::clone_no_describe(&self.dir, None)?);
+        let dir = Arc::new(fuchsia_fs::directory::clone(&self.dir)?);
         let suffix = self.suffix.clone();
         Ok(Box::pin(common_filters(watcher).filter_map(move |mut filename| {
             let dir = dir.clone();
             let suffix = suffix.clone();
             async move {
-                let dir_clone = fuchsia_fs::directory::clone_no_describe(&dir, None)
+                let dir_clone = fuchsia_fs::directory::clone(&dir)
                     .map_err(|err| tracing::warn!(?err, "Failed to clone dir"))
                     .ok()?;
                 if let Some(suffix) = &suffix {

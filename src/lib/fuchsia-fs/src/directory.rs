@@ -308,25 +308,6 @@ pub fn clone_onto(
     directory.clone2(ServerEnd::new(request.into_channel())).map_err(CloneError::SendCloneRequest)
 }
 
-// TODO(https://fxbug.dev/324111518): Transition callers of the below functions to `clone` and
-// remove them when no longer required.
-
-/// [DEPRECATED - Use `clone` instead.]
-///
-/// Opens a new connection to the given directory using `flags` if provided, or
-/// `fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS` otherwise.
-pub fn clone_no_describe(
-    dir: &fio::DirectoryProxy,
-    flags: Option<fio::OpenFlags>,
-) -> Result<fio::DirectoryProxy, CloneError> {
-    let (client_end, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(CloneError::CreateProxy)?;
-    let flags = flags.unwrap_or(fio::OpenFlags::CLONE_SAME_RIGHTS);
-    dir.clone(flags, ServerEnd::new(server_end.into_channel()))
-        .map_err(CloneError::SendCloneRequest)?;
-    Ok(client_end)
-}
-
 /// Gracefully closes the directory proxy from the remote end.
 pub async fn close(dir: fio::DirectoryProxy) -> Result<(), CloseError> {
     let result = dir.close().await.map_err(CloseError::SendCloseRequest)?;
@@ -1052,36 +1033,6 @@ mod tests {
         assert_matches!(open_node(&pkg, "fake", fio::PERM_READABLE).await, Err(_));
     }
 
-    // clone_no_describe
-
-    #[fasync::run_singlethreaded(test)]
-    async fn clone_no_describe_no_flags_same_rights() {
-        let (dir, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-
-        clone_no_describe(&dir, None).unwrap();
-
-        assert_matches!(
-            stream.next().await,
-            Some(Ok(fio::DirectoryRequest::Clone { flags: fio::OpenFlags::CLONE_SAME_RIGHTS, .. }))
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn clone_no_describe_flags_passed_through() {
-        let (dir, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-
-        const FLAGS: fio::OpenFlags = fio::OpenFlags::DIRECTORY;
-
-        clone_no_describe(&dir, Some(FLAGS)).unwrap();
-
-        assert_matches!(
-            stream.next().await,
-            Some(Ok(fio::DirectoryRequest::Clone { flags: FLAGS, .. }))
-        );
-    }
-
     // create_randomly_named_file
 
     #[fasync::run_singlethreaded(test)]
@@ -1343,7 +1294,7 @@ mod tests {
         // run twice to check that seek offset is properly reset before reading the directory
         for _ in 0..2 {
             let (tx, rx) = oneshot::channel();
-            let clone_dir = clone_no_describe(&dir, None).expect("clone dir");
+            let clone_dir = clone(&dir).expect("clone dir");
             fasync::Task::spawn(async move {
                 let entries = readdir_recursive(&clone_dir, None)
                     .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()

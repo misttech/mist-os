@@ -341,7 +341,7 @@ impl Client {
         // from concurrent calls to list_known_blobs on this object, or on clones of this object,
         // or other clones of the DirectoryProxy this object was made from), create a new
         // connection which will have its own index.
-        let private_connection = fuchsia_fs::directory::clone_no_describe(&self.dir, None)?;
+        let private_connection = fuchsia_fs::directory::clone(&self.dir)?;
         fuchsia_fs::directory::readdir(&private_connection)
             .await
             .map_err(BlobfsError::ReadDir)?

@@ -143,7 +143,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                 move |handles: LocalComponentHandles| {
                     expose_mock_paver(
                         handles,
-                        fuchsia_fs::directory::clone_no_describe(&paver_dir_proxy, None).unwrap(),
+                        fuchsia_fs::directory::clone(&paver_dir_proxy).unwrap(),
                     )
                     .boxed()
                 },

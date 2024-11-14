@@ -49,8 +49,7 @@ impl OutDir {
         self.add_entry(
             "/data".parse().unwrap(),
             remote_dir(
-                fuchsia_fs::directory::clone_no_describe(&test_dir_proxy, None)
-                    .expect("could not clone directory"),
+                fuchsia_fs::directory::clone(&test_dir_proxy).expect("could not clone directory"),
             ),
         );
     }
