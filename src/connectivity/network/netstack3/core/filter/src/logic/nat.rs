@@ -497,7 +497,7 @@ where
     } else {
         // NAT has not yet been configured for this connection; traverse the installed
         // NAT routines in order to configure NAT.
-        let verdict = match (&mut *conn, direction) {
+        let (verdict, exclusive) = match (&mut *conn, direction) {
             (Connection::Exclusive(_), ConnectionDirection::Reply) => {
                 // This is the first packet in the flow (hence the connection being exclusive),
                 // yet the packet is determined to be in the "reply" direction. This means that
@@ -509,7 +509,7 @@ where
                 // Handle this by just configuring the connection not to be NATed. It does not
                 // make sense to NAT a self-connected flow since the original and reply
                 // directions are indistinguishable.
-                Verdict::Accept(NatConfigurationResult::DoNotNat).into()
+                (Verdict::Accept(NatConfigurationResult::DoNotNat).into(), true)
             }
             (Connection::Shared(_), _) => {
                 // TODO(https://fxbug.dev/371017876): once we cache the packet's tuple and/or
@@ -527,7 +527,7 @@ where
                 // This can result in some connections not having both source and destination
                 // NAT configured by the time they're finalized. To handle this, just configure
                 // the connection not to be NATed.
-                Verdict::Accept(NatConfigurationResult::DoNotNat).into()
+                (Verdict::Accept(NatConfigurationResult::DoNotNat).into(), false)
             }
             (Connection::Exclusive(conn), ConnectionDirection::Original) => {
                 let verdict = configure_nat::<N, _, _, _, _>(
@@ -543,7 +543,7 @@ where
                 // packet does not match any NAT rules, in order to ensure that source ports for
                 // locally-generated traffic do not clash with ports used by existing NATed
                 // connections (such as for forwarded masqueraded traffic).
-                if matches!(verdict.accept(), Some(&NatConfigurationResult::DoNotNat))
+                let verdict = if matches!(verdict.accept(), Some(&NatConfigurationResult::DoNotNat))
                     && N::NAT_TYPE == NatType::Source
                 {
                     configure_snat_port(
@@ -556,7 +556,8 @@ where
                     .into()
                 } else {
                     verdict
-                }
+                };
+                (verdict, true)
             }
         };
 
@@ -577,9 +578,16 @@ where
         if let Some(should_nat) = new_nat_config {
             conn.set_nat_config(N::NAT_TYPE, direction, should_nat).unwrap_or_else(
                 |(value, nat_type)| {
-                    unreachable!(
-                        "{nat_type:?} NAT should not have been configured yet, but found {value:?}"
-                    )
+                    // We can only assert that NAT has not been configured yet if we are configuring
+                    // NAT on an exclusive connection. If the connection has already been inserted
+                    // in the table and we are holding a shared reference to it, we could race with
+                    // another thread also configuring NAT for the connection.
+                    if exclusive {
+                        unreachable!(
+                            "{nat_type:?} NAT should not have been configured yet, but found \
+                            {value:?}"
+                        );
+                    }
                 },
             );
             should_nat
