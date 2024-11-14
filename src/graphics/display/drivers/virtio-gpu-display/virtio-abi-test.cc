@@ -4,6 +4,7 @@
 
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
+#include <cstddef>
 #include <type_traits>
 
 namespace virtio_abi {
