@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import List, Optional, Text, Tuple
+from typing import Any, List, Optional, Text, Tuple
 
 import ffxtestcase
 from honeydew.errors import FfxCommandError
@@ -91,7 +91,7 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
 
     def _run_strict_ffx(
         self, cmd: List[str], target: Optional[str] = None
-    ) -> str:
+    ) -> Any:
         ssh_args = self._get_ssh_key_information()
         all_args = [
             "--strict",
@@ -104,7 +104,7 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         if target is not None:
             all_args += ["-t", target]
         all_args += cmd
-        return self.run_ffx(all_args)
+        return json.loads(self.run_ffx(all_args))
 
     def test_target_echo_no_start_daemon(self) -> None:
         """Test `ffx --strict target echo` does not affect daemon state."""
@@ -117,9 +117,8 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
             ],
             f"{self.dut_ssh_address}",
         )
-        output_json = json.loads(output)
 
-        asserts.assert_equal(output_json, {"message": "From a Test"})
+        asserts.assert_equal(output, {"message": "From a Test"})
         with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
@@ -165,6 +164,21 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
                     "The command should not require a target",
                 )
                 raise
+
+    def test_target_list_strict(self) -> None:
+        """Test `ffx --strict target list` does not affect daemon state."""
+        self._get_ssh_key_information()
+        output = self._run_strict_ffx(
+            [
+                "target",
+                "list",
+                self.dut_name,
+            ],
+            None,
+        )
+        asserts.assert_equal(output[0]["rcs_state"], "Y")
+        with asserts.assert_raises(FfxCommandError):
+            self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
 
 if __name__ == "__main__":
