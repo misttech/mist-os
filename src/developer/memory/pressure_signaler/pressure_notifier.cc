@@ -13,27 +13,27 @@ namespace pressure_signaler {
 namespace {
 
 // Convert monitor::Level to the Level type signalled by the fuchsia.memorypressure service.
-zx::result<fuchsia::memorypressure::Level> ConvertToMemoryPressureServiceLevel(Level level) {
+zx::result<fuchsia_memorypressure::Level> ConvertToMemoryPressureServiceLevel(Level level) {
   switch (level) {
     case Level::kCritical:
-      return zx::ok(fuchsia::memorypressure::Level::CRITICAL);
+      return zx::ok(fuchsia_memorypressure::Level::kCritical);
     case Level::kWarning:
-      return zx::ok(fuchsia::memorypressure::Level::WARNING);
+      return zx::ok(fuchsia_memorypressure::Level::kWarning);
     case Level::kNormal:
-      return zx::ok(fuchsia::memorypressure::Level::NORMAL);
+      return zx::ok(fuchsia_memorypressure::Level::kNormal);
     default:
       return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 }
 
 // Convert from the Level type signalled by the fuchsia.memorypressure service to monitor::Level.
-Level ConvertFromMemoryPressureServiceLevel(fuchsia::memorypressure::Level level) {
+Level ConvertFromMemoryPressureServiceLevel(fuchsia_memorypressure::Level level) {
   switch (level) {
-    case fuchsia::memorypressure::Level::CRITICAL:
+    case fuchsia_memorypressure::Level::kCritical:
       return Level::kCritical;
-    case fuchsia::memorypressure::Level::WARNING:
+    case fuchsia_memorypressure::Level::kWarning:
       return Level::kWarning;
-    case fuchsia::memorypressure::Level::NORMAL:
+    case fuchsia_memorypressure::Level::kNormal:
       return Level::kNormal;
   }
 }
@@ -50,9 +50,8 @@ PressureNotifier::PressureNotifier(bool watch_for_changes,
       context_(context),
       observer_(watch_for_changes, this),
       send_critical_pressure_crash_reports_(send_critical_pressure_crash_reports) {
-  if (context) {
-    context->outgoing()->AddPublicService(bindings_.GetHandler(this));
-  }
+  FX_CHECK(dispatcher);
+  FX_CHECK(context);
 }
 
 void PressureNotifier::Notify() {
@@ -96,31 +95,32 @@ void PressureNotifier::PostLevelChange() {
   }
 }
 
-void PressureNotifier::DebugNotify(fuchsia::memorypressure::Level level) const {
+void PressureNotifier::DebugNotify(fuchsia_memorypressure::Level level) const {
   FX_LOGS(INFO) << "Simulating memory pressure level "
                 << kLevelNames[ConvertFromMemoryPressureServiceLevel(level)];
   for (auto& watcher : watchers_) {
-    watcher->proxy->OnLevelChanged(level, []() {});
+    watcher->proxy.value()->OnLevelChanged({{.level = level}}).Then([](auto) {});
   }
 }
 
 void PressureNotifier::NotifyWatcher(WatcherState* watcher, Level level) {
   // We should already have set |pending_callback| when the notification (call to NotifyWatcher())
   // was posted, to prevent removing |WatcherState| from |watchers_| in the error handler.
-  ZX_DEBUG_ASSERT(watcher->pending_callback);
+  ZX_ASSERT(watcher->pending_callback);
 
   // We should not be notifying a watcher if |needs_free| is set - indicating that a delayed free is
   // required. This can only happen if there was a pending callback when we tried to release the
   // watcher. No new notifications can be sent out while there is a pending callback. And when the
   // callback is invoked, the |WatcherState| is removed from the |watchers_| vector, so we won't
   // post any new notifications after that.
-  ZX_DEBUG_ASSERT(!watcher->needs_free);
+  ZX_ASSERT(!watcher->needs_free);
 
   watcher->level_sent = level;
   auto level_or_error = ConvertToMemoryPressureServiceLevel(level);
-  ZX_DEBUG_ASSERT(level_or_error.is_ok());
-  watcher->proxy->OnLevelChanged(level_or_error.value(),
-                                 [watcher, this]() { OnLevelChangedCallback(watcher); });
+  ZX_ASSERT(level_or_error.is_ok());
+  watcher->proxy.value()
+      ->OnLevelChanged({{.level = level_or_error.value()}})
+      .Then([watcher, this](auto) { OnLevelChangedCallback(watcher); });
 }
 
 void PressureNotifier::OnLevelChangedCallback(WatcherState* watcher) {
@@ -131,7 +131,7 @@ void PressureNotifier::OnLevelChangedCallback(WatcherState* watcher) {
   // callbacks, and no new notifications (since a new notification is posted only if there is no
   // pending callback).
   if (watcher->needs_free) {
-    ReleaseWatcher(watcher->proxy.get());
+    ReleaseWatcher(watcher);
     return;
   }
 
@@ -151,24 +151,22 @@ void PressureNotifier::OnLevelChangedCallback(WatcherState* watcher) {
   }
 }
 
-void PressureNotifier::RegisterWatcher(
-    fidl::InterfaceHandle<fuchsia::memorypressure::Watcher> watcher) {
-  fuchsia::memorypressure::WatcherPtr watcher_proxy = watcher.Bind();
-  fuchsia::memorypressure::Watcher* proxy_raw_ptr = watcher_proxy.get();
-  watcher_proxy.set_error_handler(
-      [this, proxy_raw_ptr](zx_status_t status) { ReleaseWatcher(proxy_raw_ptr); });
-
+void PressureNotifier::RegisterWatcher(RegisterWatcherRequest& request,
+                                       RegisterWatcherCompleter::Sync& completer) {
   Level current_level = observer_.GetCurrentLevelForWatcher();
-  watchers_.emplace_back(std::make_unique<WatcherState>(
-      WatcherState{std::move(watcher_proxy), current_level, false, false}));
+  // Create the watcher's state, which will hold the client and its handler.
+  auto& watcher = watchers_.emplace_back(std::make_unique<WatcherState>(current_level, this));
+
+  watcher->proxy = fidl::Client<fuchsia_memorypressure::Watcher>(
+      std::move(request.watcher()), provider_dispatcher_, watcher.get());
 
   // Set |pending_callback| and notify the current level.
-  watchers_.back()->pending_callback = true;
-  NotifyWatcher(watchers_.back().get(), current_level);
+  watcher->pending_callback = true;
+  NotifyWatcher(watcher.get(), current_level);
 }
 
-void PressureNotifier::ReleaseWatcher(fuchsia::memorypressure::Watcher* watcher) {
-  auto predicate = [watcher](const auto& target) { return target->proxy.get() == watcher; };
+void PressureNotifier::ReleaseWatcher(WatcherState* watcher) {
+  auto predicate = [watcher](const auto& target) { return target.get() == watcher; };
   auto watcher_to_free = std::find_if(watchers_.begin(), watchers_.end(), predicate);
   if (watcher_to_free == watchers_.end()) {
     // Not found.

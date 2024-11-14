@@ -34,7 +34,7 @@ source_set("lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_hlcpp",
+    "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_cpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
   ]
 }
@@ -44,6 +44,7 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
            ":lib",
+           "//sdk/lib/component/outgoing/cpp:cpp",
            "//sdk/lib/syslog/cpp",
          ] + _common_deps
 }

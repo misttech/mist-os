@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <filesystem>
@@ -21,15 +22,42 @@ bool SendCriticalMemoryPressureCrashReports() {
 }  // namespace
 
 int main(int argc, const char** argv) {
+  FX_LOGS(DEBUG) << argv[0] << ": starting";
+
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
+
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the outgoing directory from startup info: "
+                   << result.status_string();
+    return -1;
+  }
+
   std::unique_ptr<sys::ComponentContext> context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  FX_LOGS(DEBUG) << argv[0] << ": starting";
-  pressure_signaler::PressureNotifier notifier{/* watch_for_changes = */ true,
-                                               SendCriticalMemoryPressureCrashReports(),
-                                               context.get(), loop.dispatcher()};
-  pressure_signaler::MemoryDebugger debugger{context.get(), &notifier};
+  auto notifier = std::make_unique<pressure_signaler::PressureNotifier>(
+      /* watch_for_changes = */ true, SendCriticalMemoryPressureCrashReports(), context.get(),
+      dispatcher);
+  auto debugger = std::make_unique<pressure_signaler::MemoryDebugger>(notifier.get());
+
+  result = outgoing.AddProtocol<fuchsia_memorypressure::Provider>(std::move(notifier));
+
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the fuchsia.memorypressure::Provider protocol: "
+                   << result.status_string();
+    return -1;
+  }
+
+  result = outgoing.AddProtocol<fuchsia_memory_debug::MemoryPressure>(std::move(debugger));
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve the fuchsia.memory.debug::MemoryPressure protocol: "
+                   << result.status_string();
+    return -1;
+  }
+
   loop.Run();
   FX_LOGS(DEBUG) << argv[0] << ": exiting";
 
