@@ -78,12 +78,6 @@
             to: [ "#kernel" ],
         },
         {
-            protocol: [ "fuchsia.fxfs.CryptManagement" ],
-            from: "parent",
-            to: [ "#container" ],
-            availability: "optional",
-        },
-        {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: [
@@ -91,11 +85,6 @@
                 "#kernel",
                 "#test-system-activity-governor",
             ],
-        },
-        {
-            storage: "data",
-            from: "parent",
-            to: [ "#container" ],
         },
         {
             protocol: [

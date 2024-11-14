@@ -24,7 +24,7 @@ template("storage_starnix_benchmarks_component") {
     test_type = "starnix"
     deps = [
       ":storage-starnix-benchmarks-bin",
-      "//src/starnix/tests:starnix_test",
+      "//src/starnix/tests:starnix_benchmark",
     ]
     manifest = "${invoker.manifest}"
   }
