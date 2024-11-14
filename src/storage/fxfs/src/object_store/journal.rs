@@ -46,7 +46,7 @@ use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
     lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37, MutationV38,
-    MutationV40, MutationV41, ObjectStoreMutation, Options, Transaction, TxnMutation,
+    MutationV40, MutationV41, MutationV43, ObjectStoreMutation, Options, Transaction, TxnMutation,
     TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
@@ -112,16 +112,17 @@ pub struct JournalCheckpointV32 {
     pub version: Version,
 }
 
-pub type JournalRecord = JournalRecordV42;
+pub type JournalRecord = JournalRecordV43;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecordV42 {
+pub enum JournalRecordV43 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
     // allocator.
-    Mutation { object_id: u64, mutation: MutationV41 },
+    Mutation { object_id: u64, mutation: MutationV43 },
     // Commits records in the transaction.
     Commit,
     // Discard all mutations with offsets greater than or equal to the given offset.
@@ -143,6 +144,17 @@ pub enum JournalRecordV42 {
     // extents, we only check the checksums for a block if it has been written to for the first
     // time since the last flush, because otherwise we can't roll it back anyway so it doesn't
     // matter. For copy-on-write extents, the bool is always true.
+    DataChecksums(Range<u64>, ChecksumsV38, bool),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(JournalRecordV43)]
+pub enum JournalRecordV42 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV41 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
     DataChecksums(Range<u64>, ChecksumsV38, bool),
 }
 

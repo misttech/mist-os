@@ -452,9 +452,14 @@ impl<S: HandleOwner> Directory<S> {
         }
         let res = if self.wrapping_key_id.lock().unwrap().is_some() {
             let encrypted_name = self.get_encrypted_name(name, false).await?;
+            // TODO(b/377400611): casefold_hash.
             self.store()
                 .tree()
-                .find(&ObjectKey::encrypted_child(self.object_id(), encrypted_name))
+                .find(&ObjectKey::encrypted_child(
+                    self.object_id(),
+                    encrypted_name,
+                    /*casefold_hash=*/ 0,
+                ))
                 .await?
         } else {
             self.store()
@@ -508,10 +513,15 @@ impl<S: HandleOwner> Directory<S> {
         .await?;
         if self.wrapping_key_id.lock().unwrap().is_some() {
             let encrypted_name = self.get_encrypted_name(name, true).await?;
+            // TODO(b/377400611): casefold_hash.
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::encrypted_child(self.object_id(), encrypted_name),
+                    ObjectKey::encrypted_child(
+                        self.object_id(),
+                        encrypted_name,
+                        /* casefold_hash =*/ 0,
+                    ),
                     ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
                 ),
             );
@@ -549,10 +559,15 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         if self.wrapping_key_id.lock().unwrap().is_some() {
             let encrypted_name = self.get_encrypted_name(name, true).await?;
+            // TODO(b/377400611): casefold_hash.
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::encrypted_child(self.object_id(), encrypted_name),
+                    ObjectKey::encrypted_child(
+                        self.object_id(),
+                        encrypted_name,
+                        /*casefold_hash= */ 0,
+                    ),
                     ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
                 ),
             );
@@ -1001,8 +1016,13 @@ impl<S: HandleOwner> Directory<S> {
         from: Vec<u8>,
     ) -> Result<EncryptedDirectoryIterator<'a, 'b>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+        // TODO(b/377400611): Support casefold.
         let mut iter = merger
-            .query(Query::FullRange(&ObjectKey::encrypted_child(self.object_id(), from)))
+            .query(Query::FullRange(&ObjectKey::encrypted_child(
+                self.object_id(),
+                from,
+                /*casefold =*/ 0,
+            )))
             .await?;
 
         // Skip deleted entries.
@@ -1044,7 +1064,7 @@ impl EncryptedDirectoryIterator<'_, '_> {
     pub fn get(&self) -> Option<(Vec<u8>, u64, &ObjectDescriptor)> {
         match self.iter.get() {
             Some(ItemRef {
-                key: ObjectKey { object_id: oid, data: ObjectKeyData::EncryptedChild { name } },
+                key: ObjectKey { object_id: oid, data: ObjectKeyData::EncryptedChild { name, .. } },
                 value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
                 ..
             }) if *oid == self.object_id => Some((name.clone(), *object_id, object_descriptor)),
@@ -1136,10 +1156,15 @@ pub async fn replace_child<'a, S: HandleOwner>(
                 // Renames only work on unlocked encrypted directories. Fail rename if src is
                 // locked.
                 let encrypted_src_name = src_dir.get_encrypted_name(src_name, true).await?;
+                // TODO(b/377400611): casefold hash
                 transaction.add(
                     store_id,
                     Mutation::replace_or_insert_object(
-                        ObjectKey::encrypted_child(src_dir.object_id(), encrypted_src_name),
+                        ObjectKey::encrypted_child(
+                            src_dir.object_id(),
+                            encrypted_src_name,
+                            /*casefold_hash=*/ 0,
+                        ),
                         ObjectValue::None,
                     ),
                 );
@@ -1242,10 +1267,15 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             .get_encrypted_name(dst.1, !matches!(new_value, ObjectValue::None))
             .await
             .context("Failed to get encrypted name")?;
+        // TODO(b/377400611): Casefold hash
         transaction.add(
             store_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::encrypted_child(dst.0.object_id(), encrypted_dst_name),
+                ObjectKey::encrypted_child(
+                    dst.0.object_id(),
+                    encrypted_dst_name,
+                    /*casefold_hash=*/ 0,
+                ),
                 new_value,
             ),
         );
