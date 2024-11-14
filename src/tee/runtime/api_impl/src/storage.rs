@@ -5,7 +5,8 @@
 // TODO(https://fxbug.dev/360942417): Remove.
 #![allow(unused_variables)]
 
-use fuchsia_sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use fuchsia_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::cmp::min;
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
@@ -14,7 +15,7 @@ use std::sync::Arc;
 use tee_internal::{
     Attribute, AttributeId, BufferOrValue, Error, HandleFlags, MemRef, ObjectEnumHandle,
     ObjectHandle, ObjectInfo, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
-    OBJECT_ID_MAX_LEN,
+    DATA_MAX_POSITION, OBJECT_ID_MAX_LEN,
 };
 
 static PERSISTENT_OBJECTS: Mutex<Option<Arc<PersistentObjects>>> = Mutex::new(None);
@@ -76,9 +77,7 @@ struct PersistentObject {
     usage: Usage,
     base_flags: HandleFlags,
     attributes: AttributeSet,
-    #[allow(dead_code)] // TODO(https://fxbug.dev/360942417): Use me!
     data: zx::Vmo,
-    #[allow(dead_code)] // TODO(https://fxbug.dev/360942417): Use me!
     data_size: usize,
     id: Vec<u8>,
 
@@ -134,23 +133,66 @@ impl PersistentObjectView {
     }
 
     // See read_object_data().
-    fn read_data<'a>(&self, buffer: &mut [u8]) -> TeeResult<&'a [u8]> {
-        unimplemented!();
+    fn read_data<'a>(&mut self, buffer: &'a mut [u8]) -> TeeResult<&'a [u8]> {
+        let obj = self.object.lock();
+        let read_size = min(obj.data_size - self.data_position, buffer.len());
+        let written = &mut buffer[..read_size];
+        if read_size > 0 {
+            obj.data.read(written, self.data_position as u64).unwrap();
+        }
+        self.data_position += read_size;
+        Ok(written)
     }
 
     // See write_object_data().
-    fn write_data(&self, data: &[u8]) -> TeeResult {
-        unimplemented!();
+    fn write_data(&mut self, data: &[u8]) -> TeeResult {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let mut obj = self.object.lock();
+        let write_end = self.data_position + data.len();
+
+        if write_end > DATA_MAX_POSITION {
+            return Err(Error::Overflow);
+        }
+        if write_end > obj.data_size {
+            obj.data.set_size(write_end as u64).unwrap();
+            obj.data_size = write_end;
+        }
+        obj.data.write(data, self.data_position as u64).unwrap();
+        self.data_position = write_end;
+        Ok(())
     }
 
     // See truncate_object_data().
     fn truncate_data(&self, size: usize) -> TeeResult {
-        unimplemented!();
+        let mut obj = self.object.lock();
+
+        // It's okay to set the size past the position in either direction.
+        // However, the spec does not actually cover the case where the
+        // provided size is is larger than DATA_MAX_POSITION. Since any
+        // part of the data stream past that would be inaccessible; it
+        // should be sensible and harmless to not exceed that in resizing.
+        let size = min(size, DATA_MAX_POSITION);
+        obj.data.set_size(size as u64).unwrap();
+        obj.data_size = size;
+        Ok(())
     }
 
     // See seek_object_data().
-    fn seek_data(&self, offset: isize, whence: Whence) -> TeeResult {
-        unimplemented!();
+    fn seek_data(&mut self, offset: isize, whence: Whence) -> TeeResult {
+        let start = match whence {
+            Whence::DataSeekCur => self.data_position,
+            Whence::DataSeekEnd => self.object.lock().data_size,
+            Whence::DataSeekSet => 0,
+        };
+        let new_position = start.saturating_add_signed(offset);
+        if new_position > DATA_MAX_POSITION {
+            Err(Error::Overflow)
+        } else {
+            self.data_position = new_position;
+            Ok(())
+        }
     }
 }
 
@@ -388,10 +430,17 @@ impl PersistentObjects {
         unimplemented!();
     }
 
-    // Returns a locked view into the open object corresponding to `handle`,
-    // panicking if the handle is invalid.
-    fn get(&self, handle: ObjectHandle) -> MutexGuard<'_, PersistentObjectView> {
-        unimplemented!();
+    // Given a handle, passes the associated object view into a provided
+    // callback, panicking if the handle is invalid.
+    fn operate<F, R>(&self, handle: ObjectHandle, callback: F) -> R
+    where
+        F: FnOnce(&mut PersistentObjectView) -> R,
+    {
+        let by_handle = self.by_handle.read();
+        let view =
+            by_handle.get(&handle).unwrap_or_else(|| panic!("{handle:?} is not a valid handle"));
+        let mut view = view.lock();
+        callback(&mut view)
     }
 
     // See allocate_persistent_object_enumerator().
@@ -508,7 +557,7 @@ pub fn get_object_info(object: ObjectHandle) -> ObjectInfo {
     if is_transient_handle(object) {
         unimplemented!();
     }
-    persistent_objects().get(object).get_info()
+    persistent_objects().operate(object, |view| view.get_info())
 }
 
 /// Restricts the usage of an open object handle.
@@ -519,10 +568,10 @@ pub fn restrict_object_usage(object: ObjectHandle, usage: Usage) {
         unimplemented!();
     }
 
-    let objects = persistent_objects();
-    let view = objects.get(object);
-    let mut obj = view.object.lock();
-    obj.usage = obj.usage.intersection(usage);
+    persistent_objects().operate(object, |view| {
+        let mut obj = view.object.lock();
+        obj.usage = obj.usage.intersection(usage);
+    })
 }
 
 /// Encapsulates an error of get_object_buffer_attribute(), which includes the
@@ -558,7 +607,9 @@ pub fn get_object_buffer_attribute<'a>(
     let attr = if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects().get(object).object.lock().attributes.get(attribute_id).ok_or(NOT_FOUND)
+        persistent_objects().operate(object, |view| {
+            view.object.lock().attributes.get(attribute_id).ok_or(NOT_FOUND)
+        })
     }?;
 
     let bytes = attr.as_memory_reference().as_slice();
@@ -587,13 +638,9 @@ pub fn get_object_value_attribute(
     let attr = if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects()
-            .get(object)
-            .object
-            .lock()
-            .attributes
-            .get(attribute_id)
-            .ok_or(Error::ItemNotFound)
+        persistent_objects().operate(object, |view| {
+            view.object.lock().attributes.get(attribute_id).ok_or(Error::ItemNotFound)
+        })
     }?;
     Ok(attr.as_value().clone())
 }
@@ -647,10 +694,10 @@ pub fn copy_object_attributes(src: ObjectHandle, dest: ObjectHandle) -> TeeResul
     let (_, _, _) = if is_transient_handle(src) {
         unimplemented!()
     } else {
-        let objects = persistent_objects();
-        let view = objects.get(src);
-        let obj = view.object.lock();
-        (obj.type_, obj.usage, obj.attributes)
+        persistent_objects().operate(src, |view| {
+            let obj = view.object.lock();
+            (obj.type_, obj.usage, obj.attributes)
+        })
     };
     unimplemented!()
 }
@@ -712,9 +759,10 @@ pub fn create_persistent_object(
     let (type_, usage, attrs) = if attribute_src.is_null() {
         (Type::Data, Usage::default(), AttributeSet::new())
     } else if is_persistent_handle(attribute_src) {
-        let view = objects.get(attribute_src);
-        let obj = view.object.lock();
-        (obj.type_, obj.usage, obj.attributes)
+        persistent_objects().operate(attribute_src, |view| {
+            let obj = view.object.lock();
+            (obj.type_, obj.usage, obj.attributes)
+        })
     } else {
         unimplemented!();
     };
@@ -799,7 +847,7 @@ pub fn get_next_persistent_object<'a>(
 /// Panics if `object` is invalid or does not have read access.
 pub fn read_object_data<'a>(object: ObjectHandle, buffer: &'a mut [u8]) -> TeeResult<&'a [u8]> {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).read_data(buffer)
+    persistent_objects().operate(object, |view| view.read_data(buffer))
 }
 
 /// Writes the provided data to the object's data stream at the handle's
@@ -814,7 +862,7 @@ pub fn read_object_data<'a>(object: ObjectHandle, buffer: &'a mut [u8]) -> TeeRe
 /// Panics if `object` is invalid or does not have write access.
 pub fn write_object_data(object: ObjectHandle, buffer: &[u8]) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).write_data(buffer)
+    persistent_objects().operate(object, |view| view.write_data(buffer))
 }
 
 /// Truncates or zero-extends the object's data stream to provided size.
@@ -825,7 +873,7 @@ pub fn write_object_data(object: ObjectHandle, buffer: &[u8]) -> TeeResult {
 /// Panics if `object` is invalid or does not have write access.
 pub fn truncate_object_data(object: ObjectHandle, size: usize) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).truncate_data(size)
+    persistent_objects().operate(object, |view| view.truncate_data(size))
 }
 
 /// Updates the handle's data positition, seeking at an offset from a
@@ -837,7 +885,7 @@ pub fn truncate_object_data(object: ObjectHandle, size: usize) -> TeeResult {
 /// Panics if `object` is invalid.
 pub fn seek_data_object(object: ObjectHandle, offset: isize, whence: Whence) -> TeeResult {
     assert!(is_persistent_handle(object));
-    persistent_objects().get(object).seek_data(offset, whence)
+    persistent_objects().operate(object, |view| view.seek_data(offset, whence))
 }
 
 // TODO(https://fxbug.dev/376093162): Add PersistentObjects testing.

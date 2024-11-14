@@ -362,6 +362,7 @@ handle!(SessionContext, usize);
 //
 
 pub const OBJECT_ID_MAX_LEN: usize = binding::TEE_OBJECT_ID_MAX_LEN as usize;
+pub const DATA_MAX_POSITION: usize = binding::TEE_DATA_MAX_POSITION as usize;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
