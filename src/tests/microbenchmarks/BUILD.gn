@@ -281,8 +281,8 @@ if (host_os == "linux" && !is_asan) {
 
     manifest = "meta/starnix_microbenchmarks.cml"
     component_name = "starnix_microbenchmarks"
+
     deps = [ ":no_op_executable_in_test_dir($host_toolchain_for_target_arch)" ]
-    is_starnix_benchmark = true
     test_type = "starnix"
   }
 

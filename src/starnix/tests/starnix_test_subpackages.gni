@@ -8,7 +8,6 @@ starnix_test_subpackages = [
   "//src/starnix/kernel:starnix_kernel_package",
   "//src/starnix/runner:starnix_package",
   "//src/starnix/tests:netstack_package",
-  "//src/storage/fxfs/test-fxfs:test-fxfs-package",
   "//src/connectivity/network/tun/network-tun",
   "//src/media/audio/services/device_registry/testing:stub_adr_pkg",
   "//src/power/testing/fake-hrtimer:package",

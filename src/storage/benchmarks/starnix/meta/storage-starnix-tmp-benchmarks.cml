@@ -4,7 +4,7 @@
 {
     include: [
         "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
-        "//src/starnix/tests/starnix_benchmark.shard.cml",
+        "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {
         binary: "data/tests/storage-starnix-benchmarks",
