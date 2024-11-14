@@ -16,9 +16,7 @@
 ///
 /// UTC time is distributed by the system. Clients that need to obtain UTC time
 /// should use the standard libraries provided by their runtime.
-// TODO(https://fxbug.dev/365558387): Either remove the dependency from CTF
-// tests and uncomment this line or make this library stable.
-// @available(added=HEAD)
+@available(added=HEAD)
 library fuchsia.time.external;
 using zx;
 
