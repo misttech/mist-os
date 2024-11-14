@@ -473,7 +473,10 @@ impl File for FxFile {
         length: u64,
         _mode: fio::AllocateMode,
     ) -> Result<(), Status> {
-        self.handle.allocate(offset..(offset + length)).await.map_err(map_to_status)
+        // NB: FILE_BIG is used so the error converts to EFBIG when passed through starnix, which
+        // is the required error code when the requested range is larger than the file size.
+        let range = offset..offset.checked_add(length).ok_or(Status::FILE_BIG)?;
+        self.handle.allocate(range).await.map_err(map_to_status)
     }
 
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {

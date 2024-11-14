@@ -2762,4 +2762,112 @@ mod tests {
 
         fixture.close().await;
     }
+
+    #[fuchsia::test]
+    async fn test_allocate_unaligned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        file.allocate(20, 100, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(120));
+
+        let page_size = zx::system_get_page_size() as u64;
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(page_size));
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocate_unaligned_prewritten_data() {
+        // Test to confirm that 1. unaligned allocate works on existing extents, and 2. if the size
+        // is updated, any data between the old and new size is properly zeroed.
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let write_data = (0..20).cycle().take(100).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            100,
+        );
+        assert_eq!(
+            file.write_at(&write_data, 100).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            100,
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.resize(100).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(100));
+
+        file.allocate(0, 150, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let (_, attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(attrs.content_size, Some(150));
+
+        assert_eq!(
+            file.read_at(100, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            write_data,
+        );
+        assert_eq!(
+            file.read_at(50, 100).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            vec![0; 50],
+        );
+
+        fixture.close().await;
+    }
 }

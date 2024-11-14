@@ -468,13 +468,20 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// range is beyond the end of the file, the file size is updated.
     pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
         debug_assert!(range.start < range.end);
-        debug_assert_eq!(range.start % self.block_size(), 0);
-        debug_assert_eq!(range.end % self.block_size(), 0);
+
+        // It's not required that callers of allocate use block aligned ranges, but we need to make
+        // the extents block aligned. Luckily, fallocate in posix is allowed to allocate more than
+        // what was asked for for block alignment purposes. We just need to make sure that the size
+        // of the file is still the non-block-aligned end of the range if the size was changed.
+        let mut new_range = range.clone();
+        new_range.start = round_down(new_range.start, self.block_size());
+        // NB: FxfsError::TooBig turns into EFBIG when passed through starnix, which is the
+        // required error code when the requested range is larger than the file size.
+        new_range.end = round_up(new_range.end, self.block_size()).ok_or(FxfsError::TooBig)?;
 
         let mut transaction = self.new_transaction().await?;
         let mut to_allocate = Vec::new();
         let mut to_switch = Vec::new();
-        let mut new_range = range.clone();
         let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         {
@@ -601,7 +608,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         // (either sparse zero or allocated zero). On the other hand, if we don't update the size
         // in the first transaction, overwrite extents may be written past the end of the file
         // which is an fsck error.
-        let new_size = std::cmp::max(new_range.end, self.get_size());
+        //
+        // The potential new size needs to be the non-block-aligned range end - we round up to the
+        // nearest block size for the actual allocation, but shouldn't do that for the file size.
+        let new_size = std::cmp::max(range.end, self.get_size());
         // Make sure the mutation that flips the has_overwrite_extents advisory flag is in the
         // first transaction, in case we split transactions. This makes it okay to only replay the
         // first transaction if power loss occurs - the file will be in an unusual state, but not
