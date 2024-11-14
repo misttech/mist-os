@@ -65,16 +65,7 @@ class DisplayManager {
     default_display_ = std::move(display);
   }
 
-  // TODO(https://fxbug.dev/42156567): we may want to have multiple clients of this, so a single
-  // setter that stomps previous callbacks may not be what we want.
-  using VsyncCallback =
-      fit::function<void(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
-                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp)>;
-  void SetVsyncCallback(VsyncCallback callback);
-
  private:
-  VsyncCallback vsync_callback_;
-
   void OnDisplaysChanged(std::vector<fuchsia_hardware_display::Info> added,
                          std::vector<fuchsia_hardware_display_types::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);

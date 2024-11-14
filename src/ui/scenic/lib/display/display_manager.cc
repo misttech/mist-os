@@ -166,13 +166,6 @@ void DisplayManager::OnClientOwnershipChange(bool has_ownership) {
   }
 }
 
-void DisplayManager::SetVsyncCallback(VsyncCallback callback) {
-  FX_DCHECK(!(static_cast<bool>(callback) && static_cast<bool>(vsync_callback_)))
-      << "cannot stomp vsync callback.";
-
-  vsync_callback_ = std::move(callback);
-}
-
 void DisplayManager::OnVsync(fuchsia_hardware_display_types::DisplayId display_id,
                              zx::time timestamp,
                              fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
@@ -180,10 +173,6 @@ void DisplayManager::OnVsync(fuchsia_hardware_display_types::DisplayId display_i
   if (cookie.value() != fuchsia_hardware_display_types::kInvalidDispId) {
     [[maybe_unused]] fit::result<fidl::OneWayStatus> acknowledge_vsync_result =
         (*default_display_coordinator_)->AcknowledgeVsync(cookie.value());
-  }
-
-  if (vsync_callback_) {
-    vsync_callback_(display_id, timestamp, applied_config_stamp);
   }
 
   if (!default_display_) {
