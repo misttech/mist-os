@@ -1830,3 +1830,77 @@ async fn interface_removal_remove_routes_in_all_tables<I: FidlRouteAdminIpExt + 
     .await
     .expect("should succeed");
 }
+
+// This is a regression test for: https://fxbug.dev/377979929. This test makes sure racing route
+// table and route set removal won't cause crashes.
+#[netstack_test]
+#[variant(I, Ip)]
+async fn concurrent_route_table_and_route_set_removal<I: FidlRouteAdminIpExt + FidlRouteIpExt>(
+    name: &str,
+) {
+    const ITERATIONS: usize = 55;
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let TestSetup {
+        realm,
+        network: _network,
+        interface,
+        route_table: _,
+        global_route_table: _,
+        state,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+    let _routes = fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+        .await
+        .expect("collect routes should succeed");
+
+    let route_to_add =
+        test_route::<I>(&interface, fnet_routes::SpecifiedMetric::ExplicitMetric(10));
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+
+    for _ in 0..ITERATIONS {
+        let user_route_table =
+            fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+                .expect("create new user table");
+        let user_table_id = fnet_routes_ext::admin::get_table_id::<I>(&user_route_table)
+            .await
+            .expect("get table id");
+        let route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
+            .expect("failed to create a new user route set");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+
+        assert!(fnet_routes_ext::admin::add_route::<I>(
+            &route_set,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error")
+        .expect("add route"));
+        // Drop both of the channels and make sure netstack3 doesn't explode.
+        drop((user_route_table, route_set));
+
+        assert_matches!(
+            routes_stream.next().await,
+            Some(Ok(fnet_routes_ext::Event::Added(fnet_routes_ext::InstalledRoute{
+                route, table_id, effective_properties: _,
+            }))) if route == route_to_add && table_id == user_table_id);
+        assert_matches!(
+            routes_stream.next().await,
+            Some(Ok(fnet_routes_ext::Event::Removed(fnet_routes_ext::InstalledRoute{
+                route, table_id, effective_properties: _,
+            }))) if route == route_to_add && table_id == user_table_id);
+        // TODO(https://fxbug.dev/378951090): There is a delay in the exception handling for
+        // multithreaded programs, to make sure this test actually fails when the netstack
+        // panics, we need to make the test run longer than 5 seconds (100ms * 55 = 5.5s).
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}

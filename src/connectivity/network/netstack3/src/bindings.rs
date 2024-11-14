@@ -1493,7 +1493,6 @@ impl NetstackSeed {
                         Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
                             Ipv4,
                             routes::admin::MainRouteTable,
-                            _,
                         >(
                             rs,
                             route_spawner.clone(),
@@ -1503,7 +1502,6 @@ impl NetstackSeed {
                         Service::RoutesAdminV6(rs) => routes::admin::serve_route_table::<
                             Ipv6,
                             routes::admin::MainRouteTable,
-                            _,
                         >(
                             rs,
                             route_spawner.clone(),
