@@ -15,6 +15,8 @@ source_set("cpp") {
     "color.h",
     "config-stamp.cc",
     "config-stamp.h",
+    "coordinate-transformation.cc",
+    "coordinate-transformation.h",
     "display-timing.cc",
     "display-timing.h",
     "driver-buffer-collection-id.h",
@@ -30,8 +32,6 @@ source_set("cpp") {
     "layer-id.h",
     "rectangle.cc",
     "rectangle.h",
-    "transform.cc",
-    "transform.h",
     "vsync-ack-cookie.h",
   ]
   public_deps = [
@@ -51,6 +51,7 @@ test_sources = [
   "buffer-id-test.cc",
   "color-test.cc",
   "config-stamp-test.cc",
+  "coordinate-transformation-test.cc",
   "display-id-test.cc",
   "display-timing-test.cc",
   "driver-buffer-collection-id-test.cc",
@@ -65,7 +66,6 @@ test_sources = [
   "image-tiling-type-test.cc",
   "layer-id-test.cc",
   "rectangle-test.cc",
-  "transform-test.cc",
   "vsync-ack-cookie-test.cc",
 ]
 

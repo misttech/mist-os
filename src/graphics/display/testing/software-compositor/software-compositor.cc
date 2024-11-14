@@ -82,7 +82,7 @@ void SoftwareCompositor::CompositeImage(const InputImage& input_image,
 
   // TODO(https://fxbug.dev/42075534): Currently image transformation is not supported.
   // Callers must guarantee that the image to draw is not rotated nor flipped.
-  ZX_ASSERT(composition_properties.transform == ::display::Transform::kIdentity);
+  ZX_ASSERT(composition_properties.transform == display::CoordinateTransformation::kIdentity);
 
   const ::display::Rectangle& image_source = composition_properties.image_source;
   const ::display::Rectangle& canvas_destination = composition_properties.canvas_destination;
