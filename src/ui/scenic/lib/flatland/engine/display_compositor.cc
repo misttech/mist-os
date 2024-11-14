@@ -554,8 +554,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
-                        /*wait_id*/ kInvalidEventId,
-                        /*signal_id*/ kInvalidEventId);
+                        /*wait_id*/ kInvalidEventId);
       } else {
         return false;
       }
@@ -647,8 +646,7 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId&
 void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId& layer_id,
                                         const ImageRect& rectangle,
                                         const allocation::ImageMetadata& image,
-                                        const scenic_impl::DisplayEventId& wait_id,
-                                        const scenic_impl::DisplayEventId& signal_id) {
+                                        const scenic_impl::DisplayEventId& wait_id) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyLayerImage");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());
@@ -700,7 +698,7 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId&
           .layer_id = layer_id,
           .image_id = image_id,
           .wait_event_id = wait_id,
-          .signal_event_id = signal_id,
+          .signal_event_id = kInvalidEventId,
       }});
   FX_DCHECK(set_layer_image_result.is_ok())
       << "Failed to call FIDL SetLayerImage method: " << set_layer_image_result.error_value();
@@ -839,7 +837,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     const fuchsia_hardware_display::LayerId layer = display_engine_data.layers[0];
     SetDisplayLayers(render_data.display_id, {layer});
     ApplyLayerImage(layer, {glm::vec2(0), glm::vec2(render_target.width, render_target.height)},
-                    render_target, event_data.wait_id, /*signal_id*/ kInvalidEventId);
+                    render_target, event_data.wait_id);
 
     // We are being opportunistic and skipping the costly CheckConfig() call at this stage, because
     // we know that gpu composited layers work and there is no fallback case beyond this. See

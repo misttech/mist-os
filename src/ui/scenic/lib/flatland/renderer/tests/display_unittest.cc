@@ -98,6 +98,28 @@ class DisplayTest : public gtest::RealLoopFixture {
     return layer_id;
   }
 
+  // Wait until a vsync is received with a stamp that is >= `target_stamp`.  Return ZX_ERR_TIMED_OUT
+  // if no such vsync is received before `timeout` elapses.
+  zx::result<> WaitForVsync(fuchsia_hardware_display_types::ConfigStamp target_stamp,
+                            zx::duration timeout) {
+    std::optional<fuchsia_hardware_display_types::ConfigStamp> received_stamp;
+    display_manager_->default_display()->SetVsyncCallback(
+        [&](zx::time, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+          received_stamp = applied_config_stamp;
+        });
+
+    bool success = RunLoopWithTimeoutOrUntil(
+        [&]() { return received_stamp && received_stamp.value().value() >= target_stamp.value(); },
+        timeout);
+
+    display_manager_->default_display()->SetVsyncCallback(nullptr);
+
+    if (success) {
+      return zx::ok();
+    }
+    return zx::error(ZX_ERR_TIMED_OUT);
+  }
+
   std::unique_ptr<async::Executor> executor_;
   std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
@@ -308,19 +330,14 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       << "Failed to call FIDL ReleaseBufferCollection: " << release_result.error_value();
 
   // Create the events used by the display.
-  zx::event display_wait_fence, display_signal_fence;
+  zx::event display_wait_fence;
   auto status = zx::event::create(0, &display_wait_fence);
-  status |= zx::event::create(0, &display_signal_fence);
   EXPECT_EQ(status, ZX_OK);
 
   // Import the above events to the display.
   scenic_impl::DisplayEventId display_wait_event_id =
       scenic_impl::ImportEvent(*display_coordinator, display_wait_fence);
-  scenic_impl::DisplayEventId display_signal_event_id =
-      scenic_impl::ImportEvent(*display_coordinator, display_signal_fence);
   EXPECT_NE(display_wait_event_id.value(), fuchsia_hardware_display_types::kInvalidDispId);
-  EXPECT_NE(display_signal_event_id.value(), fuchsia_hardware_display_types::kInvalidDispId);
-  EXPECT_NE(display_wait_event_id.value(), display_signal_event_id.value());
 
   // Set the layer image and apply the config.
   const fit::result<fidl::OneWayStatus> set_layer_primary_config_result =
@@ -341,7 +358,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
               .layer_id = layer_id,
               .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[0]),
               .wait_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
-              .signal_event_id = display_signal_event_id,
+              .signal_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
           }});
   EXPECT_TRUE(set_layer_image_result.is_ok())
       << "Failed to call FIDL SetLayerImage: " << set_layer_image_result.error_value();
@@ -354,14 +371,21 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_TRUE(check_config_result.is_ok())
       << "Failed to call FIDL CheckConfig: " << check_config_result.error_value();
 
-  const fit::result<fidl::OneWayStatus> apply_config_result = (*display_coordinator)->ApplyConfig();
-  EXPECT_TRUE(apply_config_result.is_ok())
-      << "Failed to call FIDL ApplyConfig: " << apply_config_result.error_value();
+  const fuchsia_hardware_display_types::ConfigStamp kFirstConfigStamp(11);
+  {
+    fuchsia_hardware_display::CoordinatorApplyConfig3Request request;
+    request.stamp(kFirstConfigStamp);
 
-  // Attempt to wait here...this should time out because the event has not yet been signaled.
-  status =
-      display_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)), nullptr);
-  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+    const fit::result<fidl::OneWayStatus> result =
+        (*display_coordinator)->ApplyConfig3(std::move(request));
+    EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ApplyConfig3: " << result.error_value();
+  }
+
+  // Wait for the first Vsync.  This should arrive because there is no wait fence to block
+  // application of the config.
+  zx::result vsync_result = WaitForVsync(kFirstConfigStamp, zx::msec(3000));
+  EXPECT_TRUE(vsync_result.is_ok())
+      << "first WaitForVsync() failed with status: " << vsync_result.status_string();
 
   // Set the layer image again, to the second image, so that our first call to SetLayerImage()
   // above will signal.
@@ -383,23 +407,30 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       << "Failed to call FIDL CheckConfig: " << check_config_result2.error_value();
   EXPECT_EQ(check_config_result2.value().res(), fuchsia_hardware_display_types::ConfigResult::kOk);
 
-  const fit::result<fidl::OneWayStatus> apply_config_result2 =
-      (*display_coordinator)->ApplyConfig();
-  EXPECT_TRUE(apply_config_result2.is_ok())
-      << "Failed to call FIDL ApplyConfig: " << apply_config_result2.error_value();
+  const fuchsia_hardware_display_types::ConfigStamp kSecondConfigStamp(22);
+  {
+    fuchsia_hardware_display::CoordinatorApplyConfig3Request request;
+    request.stamp(kSecondConfigStamp);
 
-  // Attempt to wait again, this should also time out because we haven't signaled our wait fence.
-  status =
-      display_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)), nullptr);
-  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+    const fit::result<fidl::OneWayStatus> result =
+        (*display_coordinator)->ApplyConfig3(std::move(request));
+    EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ApplyConfig3: " << result.error_value();
+  }
+
+  // Wait for the second Vsync.  This won't come, because the display coordinator will block on the
+  // wait fence.
+  vsync_result = WaitForVsync(kSecondConfigStamp, zx::msec(3000));
+  EXPECT_TRUE(vsync_result.is_error() && vsync_result.status_value() == ZX_ERR_TIMED_OUT)
+      << "second WaitForVsync() unexpected status: " << vsync_result.status_string();
 
   // Now we signal wait on the second layer.
   display_wait_fence.signal(0, ZX_EVENT_SIGNALED);
 
-  // Now we wait for the display to signal again, and this time it should go through.
-  status =
-      display_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)), nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  // Now we that the wait fence has been signaled, we should receive a vsync corresponding to the
+  // second config.
+  vsync_result = WaitForVsync(kSecondConfigStamp, zx::msec(3000));
+  EXPECT_TRUE(vsync_result.is_ok())
+      << "final WaitForVsync() failed with status: " << vsync_result.status_string();
 }
 
 }  // namespace
