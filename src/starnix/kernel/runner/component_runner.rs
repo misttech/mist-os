@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{run_component_features, MountAction};
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail, Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner::{
@@ -98,23 +98,31 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
-                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-                        system_task,
-                        &dir_proxy,
-                        &dir_path,
-                        mount_seclabel,
-                    )?;
+                    mount_record
+                        .lock()
+                        .mount_remote(
+                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            system_task,
+                            &dir_proxy,
+                            &dir_path,
+                            mount_seclabel,
+                        )
+                        .with_context(|| format!("failed to mount_remote on path {}", &dir_path))?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
-                        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-                        system_task,
-                        &dir_proxy,
-                        &format!("{component_path}/{dir_path}"),
-                        mount_seclabel,
-                    )?;
+                    mount_record
+                        .lock()
+                        .mount_remote(
+                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+                            system_task,
+                            &dir_proxy,
+                            &format!("{component_path}/{dir_path}"),
+                            mount_seclabel,
+                        )
+                        .with_context(|| {
+                            format!("failed to mount_remote on path {component_path}/{dir_path}")
+                        })?;
                     if dir_path == "/pkg" {
                         maybe_pkg = Some(dir_proxy);
                     }
