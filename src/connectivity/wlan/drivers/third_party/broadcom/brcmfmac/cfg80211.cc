@@ -4415,13 +4415,6 @@ std::vector<zx_status_t> brcmf_if_set_keys_req(
   return statuslist;
 }
 
-void brcmf_if_del_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDelKeysRequest* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->keylist().count());
-
-  BRCMF_ERR("Unimplemented");
-}
-
 static void brcmf_send_eapol_confirm(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req,
     zx_status_t result) {

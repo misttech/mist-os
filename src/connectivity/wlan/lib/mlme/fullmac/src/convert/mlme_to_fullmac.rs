@@ -203,28 +203,6 @@ pub fn convert_set_keys_request(
     Ok(fidl_fullmac::WlanFullmacImplSetKeysRequest { keylist: Some(keylist), ..Default::default() })
 }
 
-pub fn convert_delete_keys_request(
-    req: fidl_mlme::DeleteKeysRequest,
-) -> Result<fidl_fullmac::WlanFullmacImplDelKeysRequest> {
-    const MAX_NUM_KEYS: usize = fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize;
-    if req.keylist.len() > MAX_NUM_KEYS {
-        bail!(
-            "DeleteKeysRequest keylist len ({}) exceeds allowed maximum ({})",
-            req.keylist.len(),
-            MAX_NUM_KEYS
-        );
-    }
-    let keylist: Vec<_> = req
-        .keylist
-        .iter()
-        .map(|descriptor: &fidl_mlme::DeleteKeyDescriptor| {
-            convert_delete_key_descriptor(*descriptor)
-        })
-        .collect();
-
-    Ok(fidl_fullmac::WlanFullmacImplDelKeysRequest { keylist: Some(keylist), ..Default::default() })
-}
-
 pub fn convert_eapol_request(
     req: fidl_mlme::EapolRequest,
 ) -> fidl_fullmac::WlanFullmacImplEapolTxRequest {
@@ -509,30 +487,6 @@ mod tests {
             ],
         };
         assert!(convert_set_keys_request(&mlme).is_err());
-    }
-
-    #[test]
-    fn test_convert_delete_keys_request() {
-        let mlme = fidl_mlme::DeleteKeysRequest { keylist: vec![fake_delete_key_descriptor(); 2] };
-
-        let fullmac = convert_delete_keys_request(mlme).unwrap();
-        assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
-
-        let keylist = fullmac.keylist.unwrap();
-        for key in &keylist[0..2] {
-            assert_eq!(key, &convert_delete_key_descriptor(fake_delete_key_descriptor()));
-        }
-    }
-
-    #[test]
-    fn test_convert_delete_keys_request_keylist_too_long() {
-        let mlme = fidl_mlme::DeleteKeysRequest {
-            keylist: vec![
-                fake_delete_key_descriptor();
-                fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize + 1
-            ],
-        };
-        assert!(convert_delete_keys_request(mlme).is_err());
     }
 
     //

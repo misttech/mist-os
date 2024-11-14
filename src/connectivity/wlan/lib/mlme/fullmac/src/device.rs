@@ -39,7 +39,6 @@ pub trait DeviceOps {
         &self,
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
-    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()>;
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
     fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
     fn get_iface_histogram_stats(
@@ -185,11 +184,6 @@ impl DeviceOps for FullmacDevice {
             .set_keys(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on SetKeysReq")
     }
-    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
-        self.fullmac_impl_sync_proxy
-            .del_keys(&req, zx::MonotonicInstant::INFINITE)
-            .context("FIDL Error on DelKeysReq")
-    }
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
             .eapol_tx(&req, zx::MonotonicInstant::INFINITE)
@@ -270,7 +264,6 @@ pub mod test_utils {
         StartBss { req: fidl_fullmac::WlanFullmacImplStartBssRequest },
         StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
-        DelKeys { req: fidl_fullmac::WlanFullmacImplDelKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
@@ -486,10 +479,6 @@ pub mod test_utils {
                     Ok(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: vec![0i32; num_keys] })
                 }
             }
-        }
-        fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::DelKeys { req });
-            Ok(())
         }
         fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::EapolTx { req });

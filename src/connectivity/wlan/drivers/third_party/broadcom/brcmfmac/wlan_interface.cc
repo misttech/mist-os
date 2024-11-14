@@ -456,14 +456,6 @@ void WlanInterface::SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& 
   completer.Reply(resp);
 }
 
-void WlanInterface::DelKeys(DelKeysRequestView request, DelKeysCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_del_keys_req(wdev_->netdev, request);
-  }
-  completer.Reply();
-}
-
 void WlanInterface::EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ != nullptr) {

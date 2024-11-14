@@ -653,14 +653,16 @@ closed protocol WlanFullmacImpl {
     strict StopBss(table {
         1: ssid ieee80211.CSsid;
     }) -> ();
+    /// Sets security keys for a connection. This is typically called after a successful key
+    /// exchange.
+    ///
+    /// Note that the platform assumes that the driver will automatically delete keys on a
+    /// disconnect or key rotation.
     strict SetKeys(table {
         1: keylist vector<fuchsia.wlan.common.WlanKeyConfig>:WLAN_MAX_KEYLIST_SIZE;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
-    strict DelKeys(table {
-        1: keylist vector<DeleteKeyDescriptor>:WLAN_MAX_KEYLIST_SIZE;
-    }) -> ();
     strict EapolTx(table {
         1: src_addr ieee80211.MacAddr;
         2: dst_addr ieee80211.MacAddr;
