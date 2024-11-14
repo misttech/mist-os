@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use async_io::Async;
 use fuchsia_async::Task;
 use futures_util::future::FutureExt;
-use futures_util::io::AsyncReadExt;
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
 use signal_hook::low_level::pipe;
-use std::os::unix::net::UnixStream;
+use tokio::io::AsyncReadExt;
+use tokio::net::UnixStream;
 
 use crate::debug_agent::DebugAgentSocket;
 
@@ -26,13 +25,13 @@ pub async fn forward_to_agent(socket: DebugAgentSocket) -> Result<()> {
     // async_net::UnixStream to force the use of std::os::unix::UnixStream,
     // which implements IntoRawFd - a requirement for the pipe::register
     // calls below.
-    let (mut sigterm_receiver, sigterm_sender) = Async::<UnixStream>::pair()?;
-    let (mut sigint_receiver, sigint_sender) = Async::<UnixStream>::pair()?;
+    let (mut sigterm_receiver, sigterm_sender) = UnixStream::pair()?;
+    let (mut sigint_receiver, sigint_sender) = UnixStream::pair()?;
 
     // Note: This does not remove the non-blocking nature of Async from the
     // UnixStream objects or file descriptors.
-    pipe::register(SIGTERM, sigterm_sender.into_inner()?)?;
-    pipe::register(SIGINT, sigint_sender.into_inner()?)?;
+    pipe::register(SIGTERM, sigterm_sender.into_std()?)?;
+    pipe::register(SIGINT, sigint_sender.into_std()?)?;
 
     let _forward_task = fuchsia_async::Task::local(async move {
         loop {
