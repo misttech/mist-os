@@ -8,7 +8,7 @@
 
 #include <functional>
 
-namespace usb_endpoint::internal {
+namespace usb::internal {
 
 namespace {
 
@@ -28,7 +28,7 @@ zx::result<std::optional<uint64_t>> GetMappedKey(
 
 }  // namespace
 
-UsbEndpointBase::~UsbEndpointBase() {
+EndpointClientBase::~EndpointClientBase() {
   // Note that VMOs should be unpinned when returned from drivers!
   while (auto req = free_reqs_.Remove()) {
     auto status = DeleteRequest(std::move(*req));
@@ -40,7 +40,7 @@ UsbEndpointBase::~UsbEndpointBase() {
   ZX_DEBUG_ASSERT(vmo_mapped_addrs_.empty());
 }
 
-zx_status_t UsbEndpointBase::Unmap(const fuchsia_hardware_usb_request::BufferRegion& buffer) {
+zx_status_t EndpointClientBase::Unmap(const fuchsia_hardware_usb_request::BufferRegion& buffer) {
   auto key = GetMappedKey(*buffer.buffer());
   if (key.is_error()) {
     return key.error_value();
@@ -63,8 +63,8 @@ zx_status_t UsbEndpointBase::Unmap(const fuchsia_hardware_usb_request::BufferReg
   return ZX_OK;
 }
 
-size_t UsbEndpointBase::AddRequests(size_t req_count, size_t size,
-                                    fuchsia_hardware_usb_request::Buffer::Tag type) {
+size_t EndpointClientBase::AddRequests(size_t req_count, size_t size,
+                                       fuchsia_hardware_usb_request::Buffer::Tag type) {
   switch (type) {
     case fuchsia_hardware_usb_request::Buffer::Tag::kVmoId:
       return RegisterVmos(req_count, size);
@@ -78,7 +78,7 @@ size_t UsbEndpointBase::AddRequests(size_t req_count, size_t size,
   }
 }
 
-zx_status_t UsbEndpointBase::DeleteRequest(usb::FidlRequest&& request) {
+zx_status_t EndpointClientBase::DeleteRequest(usb::FidlRequest&& request) {
   zx_status_t ret_status = ZX_OK;
   for (auto& d : *request->data()) {
     auto status = Unmap(d);
@@ -107,7 +107,7 @@ zx_status_t UsbEndpointBase::DeleteRequest(usb::FidlRequest&& request) {
   return ret_status;
 }
 
-size_t UsbEndpointBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
+size_t EndpointClientBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   for (uint32_t i = 0; i < vmo_count; i++) {
     vmo_info.emplace_back(
@@ -147,7 +147,7 @@ size_t UsbEndpointBase::RegisterVmos(size_t vmo_count, size_t vmo_size) {
   return actual;
 }
 
-zx::result<std::optional<usb::MappedVmo>> UsbEndpointBase::get_mapped(
+zx::result<std::optional<usb::MappedVmo>> EndpointClientBase::get_mapped(
     const fuchsia_hardware_usb_request::Buffer& buffer) {
   auto key = GetMappedKey(buffer);
   if (key.is_error()) {
@@ -160,4 +160,4 @@ zx::result<std::optional<usb::MappedVmo>> UsbEndpointBase::get_mapped(
   return zx::ok(vmo_mapped_addrs_.at(*key.value()));
 }
 
-}  // namespace usb_endpoint::internal
+}  // namespace usb::internal

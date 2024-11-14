@@ -35,7 +35,7 @@ class UsbXhci;
 class DeviceState;
 
 // Endpoints are 1:1 with TransferRing.
-class Endpoint : public usb_endpoint::UsbEndpoint {
+class Endpoint : public usb::EndpointServer {
  public:
   Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address);
   // DeInits the transfer ring.
@@ -45,7 +45,7 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
   zx_status_t Init(EventRing* event_ring, fdf::MmioBuffer* mmio);
 
   // fuchsia_hardware_usb_new.Endpoint protocol implementation. RegisterVmos/UnregisterVmos are
-  // defined by usb_endpoint::UsbEndpoint.
+  // defined by usb::EndpointServer.
   void GetInfo(GetInfoCompleter::Sync& completer) override {
     completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
   }
@@ -56,10 +56,10 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
   TransferRing& transfer_ring() { return transfer_ring_; }
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
-  void QueueRequest(usb_endpoint::RequestVariant request);
+  void QueueRequest(usb::RequestVariant request);
 
  private:
-  // In addition to usb_endpoint::UsbEndpoint::OnUnbound, calls CancelAll and DisableEndpoint.
+  // In addition to usb::EndpointServer::OnUnbound, calls CancelAll and DisableEndpoint.
   void OnUnbound(fidl::UnbindInfo info,
                  fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) override;
 
@@ -110,7 +110,7 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
   };
 
   // Helper functions for ControlRequestQueue
-  void ControlRequestQueue(usb_endpoint::RequestVariant request);
+  void ControlRequestQueue(usb::RequestVariant request);
   zx_status_t ControlRequestAllocationPhase(UsbRequestState* state);
   zx_status_t ControlRequestStatusPhase(UsbRequestState* state);
   zx_status_t ControlRequestDataPhase(UsbRequestState* state);
@@ -118,7 +118,7 @@ class Endpoint : public usb_endpoint::UsbEndpoint {
   void ControlRequestCommit(UsbRequestState* state);
 
   // Helper functions for NormalRequestQueue
-  void NormalRequestQueue(usb_endpoint::RequestVariant request);
+  void NormalRequestQueue(usb::RequestVariant request);
   zx_status_t WaitForIsochronousReady(uint64_t target_frame);
   zx_status_t StartNormalTransaction(UsbRequestState* state, uint8_t interrupter_target);
   zx_status_t ContinueNormalTransaction(UsbRequestState* state);

@@ -11,11 +11,11 @@
 
 namespace {
 
-class FakeEndpoint : public usb_endpoint::UsbEndpoint {
+class FakeEndpoint : public usb::EndpointServer {
  public:
   FakeEndpoint(const zx::bti& bti, uint8_t ep_addr,
                fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server)
-      : usb_endpoint::UsbEndpoint(bti, ep_addr) {
+      : usb::EndpointServer(bti, ep_addr) {
     loop_.StartThread("fake-endpoint-loop");
     Connect(loop_.dispatcher(), std::move(server));
   }
@@ -35,7 +35,7 @@ class FakeEndpoint : public usb_endpoint::UsbEndpoint {
  private:
   void OnUnbound(fidl::UnbindInfo info,
                  fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) override {
-    usb_endpoint::UsbEndpoint::OnUnbound(info, std::move(server_end));
+    usb::EndpointServer::OnUnbound(info, std::move(server_end));
     sync_completion_signal(&unbound_);
   }
 
@@ -103,7 +103,7 @@ TEST_F(UsbEndpointServerTest, RegisterVmosTest) {
       .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(8))
       .offset(0)
       .size(32);
-  auto req_var = usb_endpoint::RequestVariant(usb::FidlRequest(std::move(tmp_req)));
+  auto req_var = usb::RequestVariant(usb::FidlRequest(std::move(tmp_req)));
   auto iters = ep_->get_iter(req_var, zx_system_get_page_size());
   ASSERT_TRUE(iters.is_ok());
   EXPECT_EQ(iters->size(), 1);
@@ -139,7 +139,7 @@ TEST_F(UsbEndpointServerTest, RegisterMultipleVmosTest) {
       .buffer(fuchsia_hardware_usb_request::Buffer::WithVmoId(5))
       .offset(0)
       .size(16);
-  auto req_var = usb_endpoint::RequestVariant(usb::FidlRequest(std::move(tmp_req)));
+  auto req_var = usb::RequestVariant(usb::FidlRequest(std::move(tmp_req)));
   auto iters = ep_->get_iter(req_var, zx_system_get_page_size());
   ASSERT_TRUE(iters.is_ok());
   EXPECT_EQ(iters->size(), 2);
@@ -202,7 +202,9 @@ TEST_F(UsbEndpointServerTest, UnboundTest) {
   VerifyRegisteredVmos(1);
 
   // Trigger unbind
-  { auto unused = std::move(client_); }
+  {
+    auto unused = std::move(client_);
+  }
 
   sync_completion_wait(&ep_->unbound_, zx::time::infinite().get());
   VerifyRegisteredVmos(0);

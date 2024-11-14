@@ -136,10 +136,9 @@ class Dwc2 : public Dwc2Type,
   }
   // clang-format on
 
-  class Endpoint : public usb_endpoint::UsbEndpoint {
+  class Endpoint : public usb::EndpointServer {
    public:
-    Endpoint(uint8_t ep_num, Dwc2* dwc2)
-        : usb_endpoint::UsbEndpoint(dwc2->bti_, ep_num), dwc2_(dwc2) {
+    Endpoint(uint8_t ep_num, Dwc2* dwc2) : usb::EndpointServer(dwc2->bti_, ep_num), dwc2_(dwc2) {
       loop_.StartThread("dwc2-enpdoint-loop");
     }
 
@@ -154,15 +153,15 @@ class Dwc2 : public Dwc2Type,
       completer.Reply(fit::ok());
     }
 
-    void QueueRequest(usb_endpoint::RequestVariant request);
+    void QueueRequest(usb::RequestVariant request);
     void CancelAll();
 
     async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
     // Requests waiting to be processed.
-    std::queue<usb_endpoint::RequestVariant> queued_reqs __TA_GUARDED(lock);
+    std::queue<usb::RequestVariant> queued_reqs __TA_GUARDED(lock);
     // Request currently being processed.
-    std::optional<usb_endpoint::RequestVariant> current_req __TA_GUARDED(lock);
+    std::optional<usb::RequestVariant> current_req __TA_GUARDED(lock);
 
     // Values for current USB request
     uint32_t req_offset = 0;

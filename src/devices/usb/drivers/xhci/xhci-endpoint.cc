@@ -11,7 +11,7 @@
 namespace usb_xhci {
 
 Endpoint::Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address)
-    : usb_endpoint::UsbEndpoint(hci->bti(), address), hci_(hci), device_id_(device_id) {
+    : usb::EndpointServer(hci->bti(), address), hci_(hci), device_id_(device_id) {
   loop_.StartThread("endpoint-thread");
 }
 
@@ -49,7 +49,7 @@ void Endpoint::OnUnbound(fidl::UnbindInfo info,
     }
   }
 
-  usb_endpoint::UsbEndpoint::OnUnbound(info, std::move(server_end));
+  usb::EndpointServer::OnUnbound(info, std::move(server_end));
 }
 
 void Endpoint::QueueRequests(QueueRequestsRequest& request,
@@ -70,7 +70,7 @@ void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
   completer.Reply(fit::ok());
 }
 
-void Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
+void Endpoint::QueueRequest(usb::RequestVariant request) {
   if (!hci_->Running()) {
     RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(request));
     return;
@@ -88,7 +88,7 @@ void Endpoint::QueueRequest(usb_endpoint::RequestVariant request) {
   NormalRequestQueue(std::move(request));
 }
 
-void Endpoint::ControlRequestQueue(usb_endpoint::RequestVariant request) {
+void Endpoint::ControlRequestQueue(usb::RequestVariant request) {
   fbl::AutoLock transaction_lock(&hci_->GetDeviceState()[device_id_]->transaction_lock());
   if (hci_->GetDeviceState()[device_id_]->IsDisconnecting()) {
     // Device is disconnecting. Release lock because we no longer will be using device_state,
@@ -319,7 +319,7 @@ void Endpoint::ControlRequestCommit(UsbRequestState* state) {
   transfer_ring_.CommitTransaction(state->transaction);
 }
 
-void Endpoint::NormalRequestQueue(usb_endpoint::RequestVariant request) {
+void Endpoint::NormalRequestQueue(usb::RequestVariant request) {
   UsbRequestState pending_transfer;
   uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(ep_addr()) - 1);
   fbl::AutoLock transaction_lock(&hci_->GetDeviceState()[device_id_]->transaction_lock());

@@ -354,8 +354,8 @@ class UsbAudioStream final : public UsbAudioStreamBase,
   inspect::UintArray supported_bits_per_sample_;
   inspect::StringArray supported_sample_formats_;
 
-  usb_endpoint::UsbEndpoint<UsbAudioStream> ep_{::usb::EndpointType::ISOCHRONOUS, this,
-                                                std::mem_fn(&UsbAudioStream::RequestComplete)};
+  ::usb::EndpointClient<UsbAudioStream> ep_{::usb::EndpointType::ISOCHRONOUS, this,
+                                            std::mem_fn(&UsbAudioStream::RequestComplete)};
 };
 
 }  // namespace usb

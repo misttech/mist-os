@@ -19,20 +19,20 @@
 #include <fbl/mutex.h>
 #include <usb/request-fidl.h>
 
-namespace usb_endpoint {
+namespace usb {
 
 namespace internal {
 
-// UsbEndpointBase is self contained helps manage common functionality for the client side of
-// `fuchsia_hardware_usb_endpoint::Endpoint` without needing any references outside. UsbEndpointBase
-// should only be inherited by UsbEndpoint and should not be used independently. One of the largest
-// uses of UsbEndpointBase is managing mapped VMOs.
-class UsbEndpointBase {
+// EndpointClientBase is self contained helps manage common functionality for the client side of
+// `fuchsia_hardware_usb_endpoint::Endpoint` without needing any references outside.
+// EndpointClientBase should only be inherited by EndpointClient and should not be used
+// independently. One of the largest uses of EndpointClientBase is managing mapped VMOs.
+class EndpointClientBase {
  public:
-  explicit UsbEndpointBase(usb::EndpointType ep_type) : ep_type_(ep_type) {}
-  // Upon destruction, UsbEndpointBase ensures that all allocated requests have been freed and
+  explicit EndpointClientBase(usb::EndpointType ep_type) : ep_type_(ep_type) {}
+  // Upon destruction, EndpointClientBase ensures that all allocated requests have been freed and
   // unmaps VMOs.
-  ~UsbEndpointBase();
+  ~EndpointClientBase();
 
   // Only allow access to client_. Generally this should only be used to call GetInfo,
   // QueueRequests, and CancelAll, where RegisterVmos and UnregisterVmos will be called accordingly
@@ -42,8 +42,8 @@ class UsbEndpointBase {
   // Helper functions that manage access to the request pool. Buffer regions of a request will be
   // mapped upon addition to the pool. If mapping upon addition is not desired, one may use
   // fuchsia_hardware_usb_request::Buffer::Tag::kData types or manage its own requests (i.e. not
-  // using a pool). Note that all functions specified in UsbEndpoint expect that the requests have
-  // been previously mapped and the mapped addresses are saved and managed by UsbEndpoint.
+  // using a pool). Note that all functions specified in EndpointClient expect that the requests
+  // have been previously mapped and the mapped addresses are saved and managed by EndpointClient.
   size_t AddRequests(size_t req_count, size_t size, fuchsia_hardware_usb_request::Buffer::Tag type);
   std::optional<usb::FidlRequest> GetRequest() { return free_reqs_.Get(); }
   void PutRequest(usb::FidlRequest&& request) { free_reqs_.Put(std::move(request)); }
@@ -77,7 +77,7 @@ class UsbEndpointBase {
   }
 
  protected:
-  // client_: protected so UsbEndpoint can access it in Init()
+  // client_: protected so EndpointClient can access it in Init()
   fidl::SharedClient<fuchsia_hardware_usb_endpoint::Endpoint> client_;
 
  private:
@@ -108,14 +108,14 @@ class UsbEndpointBase {
 
 }  // namespace internal
 
-// UsbEndpoint helps manage common functionality for the client side of
-// `fuchsia_hardware_usb_endpoint::Endpoint`. Most notably, UsbEndpoint binds a client to make calls
-// such as `QueueRequest` and `RegisterVmos` and implements the corresponding
+// EndpointClient helps manage common functionality for the client side of
+// `fuchsia_hardware_usb_endpoint::Endpoint`. Most notably, EndpointClient binds a client to make
+// calls such as `QueueRequest` and `RegisterVmos` and implements the corresponding
 // `fidl::AsyncEventHandler<fuchsia_hardware_usb_endpoint::Endpoint>` required to handle
-// `OnCompletion` events. UsbEndpoint is templated on `DeviceType` which should have a `void
+// `OnCompletion` events. EndpointClient is templated on `DeviceType` which should have a `void
 // (fuchsia_hardware_usb_endpoint::Completion)` function, which will be called for each completion
-// event received. All other common functionality implemented by UsbEndpoint are described in detail
-// in the `UsbEndpointBase` class, which UsbEndpoint inherits from.
+// event received. All other common functionality implemented by EndpointClient are described in
+// detail in the `EndpointClientBase` class, which EndpointClient inherits from.
 //
 // Example Usage:
 //   class SampleDeviceType {
@@ -123,18 +123,18 @@ class UsbEndpointBase {
 //    private:
 //     void RequestComplete(fuchsia_hardware_usb_endpoint::Completion completion);
 //
-//     usb_endpoint::UsbEndpoint<SampleDeviceType> ep_{usb_endpoint::EndpointType::BULK, this,
+//     usb_endpoint::EndpointClient<SampleDeviceType> ep_{usb_endpoint::EndpointType::BULK, this,
 //                                                     std::mem_fn(&SampleDeviceType::RequestComplete)};
 //   };
 template <class DeviceType>
-class UsbEndpoint : public internal::UsbEndpointBase,
-                    public fidl::AsyncEventHandler<fuchsia_hardware_usb_endpoint::Endpoint> {
+class EndpointClient : public internal::EndpointClientBase,
+                       public fidl::AsyncEventHandler<fuchsia_hardware_usb_endpoint::Endpoint> {
  public:
   using OnCompletionFuncType =
       std::__mem_fn<void (DeviceType::*)(fuchsia_hardware_usb_endpoint::Completion)>;
 
-  UsbEndpoint(usb::EndpointType ep_type, DeviceType* device, OnCompletionFuncType on_completion)
-      : internal::UsbEndpointBase(ep_type), device_(device), on_completion_(on_completion) {}
+  EndpointClient(usb::EndpointType ep_type, DeviceType* device, OnCompletionFuncType on_completion)
+      : internal::EndpointClientBase(ep_type), device_(device), on_completion_(on_completion) {}
 
   // Init is templated on `ProtocolType`, which declares `ConnectToEndpoint(uint8_t ep_addr,
   // fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint>)`--either `fuchsia_hardware_usb::Usb`
@@ -159,7 +159,7 @@ class UsbEndpoint : public internal::UsbEndpointBase,
 
  private:
   // device_: pointer to device implementing on_completion_. Should not and will not outlive
-  // UsbEndpoint if UsbEndpoint is declared as a member of device_ as in the example above.
+  // EndpointClient if EndpointClient is declared as a member of device_ as in the example above.
   DeviceType* device_;
   // on_completion_: member function of device_ that is called for each request completed.
   OnCompletionFuncType on_completion_;
@@ -167,8 +167,8 @@ class UsbEndpoint : public internal::UsbEndpointBase,
 
 template <class DeviceType>
 template <typename ProtocolType>
-zx_status_t UsbEndpoint<DeviceType>::Init(uint8_t ep_addr, fidl::ClientEnd<ProtocolType>& client,
-                                          async_dispatcher_t* dispatcher) {
+zx_status_t EndpointClient<DeviceType>::Init(uint8_t ep_addr, fidl::ClientEnd<ProtocolType>& client,
+                                             async_dispatcher_t* dispatcher) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_endpoint::Endpoint>();
   if (endpoints.is_error()) {
     zxlogf(ERROR, "Creating endpoint error: %s", zx_status_get_string(endpoints.status_value()));
@@ -189,6 +189,6 @@ zx_status_t UsbEndpoint<DeviceType>::Init(uint8_t ep_addr, fidl::ClientEnd<Proto
   return ZX_OK;
 }
 
-}  // namespace usb_endpoint
+}  // namespace usb
 
 #endif  // SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_CLIENT_H_

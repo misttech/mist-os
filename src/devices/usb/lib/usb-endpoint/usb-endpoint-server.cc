@@ -8,7 +8,7 @@
 
 #include <variant>
 
-namespace usb_endpoint {
+namespace usb {
 
 namespace {
 
@@ -28,8 +28,8 @@ ddk::PhysIter phys_iter(uint64_t* phys_list, size_t phys_count, zx_off_t length,
 
 }  // namespace
 
-zx::result<std::vector<ddk::PhysIter>> UsbEndpoint::get_iter(RequestVariant& req,
-                                                             size_t max_length) const {
+zx::result<std::vector<ddk::PhysIter>> EndpointServer::get_iter(RequestVariant& req,
+                                                                size_t max_length) const {
   std::vector<ddk::PhysIter> iters;
   if (std::holds_alternative<usb::BorrowedRequest<void>>(req)) {
     iters.push_back(std::get<usb::BorrowedRequest<void>>(req).phys_iter(max_length));
@@ -56,14 +56,14 @@ zx::result<std::vector<ddk::PhysIter>> UsbEndpoint::get_iter(RequestVariant& req
   return zx::success(std::move(iters));
 }
 
-void UsbEndpoint::Connect(async_dispatcher_t* dispatcher,
-                          fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
+void EndpointServer::Connect(async_dispatcher_t* dispatcher,
+                             fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
   binding_ref_.emplace(fidl::BindServer(dispatcher, std::move(server_end), this,
-                                        std::mem_fn(&UsbEndpoint::OnUnbound)));
+                                        std::mem_fn(&EndpointServer::OnUnbound)));
 }
 
-void UsbEndpoint::OnUnbound(fidl::UnbindInfo info,
-                            fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
+void EndpointServer::OnUnbound(
+    fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
   // Unregister VMOs
   auto registered_vmos = std::move(registered_vmos_);
   for (auto& [id, vmo] : registered_vmos) {
@@ -83,8 +83,8 @@ void UsbEndpoint::OnUnbound(fidl::UnbindInfo info,
   }
 }
 
-void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
-                               RegisterVmosCompleter::Sync& completer) {
+void EndpointServer::RegisterVmos(RegisterVmosRequest& request,
+                                  RegisterVmosCompleter::Sync& completer) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoHandle> vmos;
   for (const auto& info : request.vmo_ids()) {
     ZX_ASSERT(info.id());
@@ -129,8 +129,8 @@ void UsbEndpoint::RegisterVmos(RegisterVmosRequest& request,
   completer.Reply({std::move(vmos)});
 }
 
-void UsbEndpoint::UnregisterVmos(UnregisterVmosRequest& request,
-                                 UnregisterVmosCompleter::Sync& completer) {
+void EndpointServer::UnregisterVmos(UnregisterVmosRequest& request,
+                                    UnregisterVmosCompleter::Sync& completer) {
   std::vector<zx_status_t> errors;
   std::vector<uint64_t> failed_vmo_ids;
   for (const auto& id : request.vmo_ids()) {
@@ -153,7 +153,7 @@ void UsbEndpoint::UnregisterVmos(UnregisterVmosRequest& request,
   completer.Reply({std::move(failed_vmo_ids), std::move(errors)});
 }
 
-void UsbEndpoint::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {
+void EndpointServer::RequestComplete(zx_status_t status, size_t actual, RequestVariant request) {
   if (std::holds_alternative<usb::BorrowedRequest<void>>(request)) {
     std::get<usb::BorrowedRequest<void>>(request).Complete(status, actual);
     return;
@@ -179,4 +179,4 @@ void UsbEndpoint::RequestComplete(zx_status_t status, size_t actual, RequestVari
   }
 }
 
-}  // namespace usb_endpoint
+}  // namespace usb

@@ -255,7 +255,7 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
 }
 
 zx_status_t UsbAdbDevice::InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
-                                           usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep) {
+                                           usb::EndpointClient<UsbAdbDevice>& ep) {
   ep.PutRequest(usb::FidlRequest(std::move(req)));
   fbl::AutoLock _(&lock_);
   // Return without adding the request to the pool during shutdown.
@@ -445,7 +445,7 @@ void UsbAdbDevice::DdkSuspend(ddk::SuspendTxn txn) {
 
 zx_status_t UsbAdbDevice::InitEndpoint(
     fidl::ClientEnd<fuchsia_hardware_usb_function::UsbFunction>& client, uint8_t direction,
-    uint8_t* ep_addrs, usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep, uint32_t req_count) {
+    uint8_t* ep_addrs, usb::EndpointClient<UsbAdbDevice>& ep, uint32_t req_count) {
   auto status = function_.AllocEp(direction, ep_addrs);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_function_alloc_ep failed - %d.", status);
