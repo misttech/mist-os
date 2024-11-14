@@ -189,6 +189,16 @@ if (target_cpu == "arm64") {
     bazel_inputs_from_gn = bazel_inputs
   }
 
+  bazel_product_bundle("product_bundle.qemu-arm64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.qemu-arm64"
+    bazel_product_image_target = ":image.qemu-arm64"
+    bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
+    bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
   bazel_product_bundle("product_bundle.vim3") {
     testonly = true
     allow_eng_platform_bundle_use = true

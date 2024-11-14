@@ -22,6 +22,7 @@ target_cpu = "arm64"
 
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/qemu-arm64"
+bazel_product_bundle_board = "qemu-arm64"
 
 board_name = "qemu-arm64"
 add_qemu_to_build_archives = true

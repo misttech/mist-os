@@ -208,6 +208,7 @@ fuchsia_product_configuration(
         ("x64", "x64", ""),
         ("x64", "x64", "_reduced_perf_variation"),
         ("arm64", "arm64", ""),
+        ("qemu-arm64", "arm64", ""),
         ("vim3", "arm64", ""),
         ("vim3", "arm64", "_reduced_perf_variation"),
     ]

@@ -22,6 +22,11 @@ fuchsia_prebuilt_board_configuration(
 )
 
 fuchsia_prebuilt_board_configuration(
+    name = "qemu-arm64",
+    directory = "@gn_targets//boards/qemu-arm64",
+)
+
+fuchsia_prebuilt_board_configuration(
     name = "vim3",
     directory = "@gn_targets//boards/vim3",
 )

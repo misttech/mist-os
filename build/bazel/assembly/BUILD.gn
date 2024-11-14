@@ -167,6 +167,16 @@ verify_assembly_configs("verify_assembly_configs") {
       },
     ]
   }
+  if (_partitions_config_label_no_toolchain == "//boards/partitions:default") {
+    partitions_configs += [
+      {
+        name = "default_partitions_config"
+        gn_target = "//boards/partitions:default"
+        bazel_target =
+            "//build/bazel/assembly/partitions_configurations:default"
+      },
+    ]
+  }
 }
 
 if (is_host) {

@@ -154,3 +154,13 @@ fuchsia_partitions_configuration(
     hardware_revision = "pkvm-arm64",
     partitions = [],
 )
+
+fuchsia_partitions_configuration(
+    name = "default",
+    hardware_revision = "",
+)
+
+alias(
+    name = "qemu-arm64",
+    actual = ":default",
+)
