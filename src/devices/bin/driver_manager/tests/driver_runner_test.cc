@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.io/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/defer.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/testing/cpp/inspect.h>
@@ -434,8 +435,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
 TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   FakeDriverIndex driver_index(
       dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
-        if (args.has_properties() && args.properties()[0].key.is_int_value() &&
-            args.properties()[0].key.int_value() == 0x1985 &&
+        if (args.has_properties() && args.properties()[0].key.is_string_value() &&
+            args.properties()[0].key.string_value().get() == "second_node_prop" &&
             args.properties()[0].value.is_int_value() &&
             args.properties()[0].value.int_value() == 0x2301
 
@@ -463,10 +464,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
       .properties =
           {
               {
-                  fdfw::NodeProperty({
-                      .key = fdfw::NodePropertyKey::WithIntValue(0x1985),
-                      .value = fdfw::NodePropertyValue::WithIntValue(0x2301),
-                  }),
+                  fdf::MakeProperty("second_node_prop", 0x2301u),
               },
           },
   });

@@ -5,7 +5,7 @@
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/driver_server.h": "17c85eba7936dca6062c1282013d0c25",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/start_args.h": "cf2aaa8429f36135faa61ff8b8a7051f",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/symbols.h": "06029d38f97dd00c5edbb6bd47201834",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/node_add_args.h": "ae2819c1c0b62a5198aa452db575ae3b",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/node_add_args.h": "fc704c3fd0348d9a33435f036685b4b6",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/prepare_stop_completer.h": "e2f0b1c4d88a7f7a0e44ec3a3b8b2715",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/start_completer.h": "8e7d8cd41d133f1d9e1e63007317e3fa"
 }

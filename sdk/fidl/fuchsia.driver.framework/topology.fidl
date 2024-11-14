@@ -49,7 +49,9 @@ type NodeSymbol = table {
 };
 
 type NodePropertyKey = strict union {
+    /// Integer-based keys are no longer supported. Use |string_value| instead.
     1: int_value NodePropertyKeyUint;
+
     2: string_value NodePropertyKeyString;
 };
 
@@ -63,7 +65,8 @@ type NodePropertyValue = flexible union {
 /// Definition of a property for a node. A property is commonly used to match a
 /// node to a driver for driver binding.
 type NodeProperty = struct {
-    /// Key for the property.
+    /// Key for the property. Integer-based keys are no longer supported. The NodePropertyKey
+    /// must be a string value.
     key NodePropertyKey;
 
     /// Value for the property.
@@ -256,6 +259,10 @@ type NodeError = flexible enum {
     /// The node is in the process of unbinding all of its children.
     @available(added=20)
     UNBIND_CHILDREN_IN_PROGRESS = 11;
+
+    /// The Node contains unsupported arguments, such as deprecated property keys or offers.
+    @available(added=NEXT)
+    UNSUPPORTED_ARGS = 12;
 };
 
 /// Protocol through which a driver manages a node that it is bound to.

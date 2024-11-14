@@ -851,15 +851,26 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   if (args.offers().has_value()) {
     LOGF(ERROR, "Failed to add Node '%.*s', offers() is no longer supported.",
          static_cast<int>(name.size()), name.data());
-    return fit::as_error(fdf::wire::NodeError::kInternal);
+    return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
   }
 
   auto& fdf_offers = args.offers2();
   std::vector<fuchsia_driver_framework::NodeProperty> properties;
   const auto& arg_properties = args.properties();
   if (arg_properties.has_value()) {
+    // Verify that there are no integer-based keys.
+    for (auto& property : arg_properties.value()) {
+      if (property.key().Which() == fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
+        LOGF(ERROR,
+             "Failed to add Node '%.*s'. Found integer-based key %zu which is no longer supported.",
+             static_cast<int>(name.size()), name.data(), property.key().int_value().value());
+        return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
+      }
+    }
+
     properties = arg_properties.value();
   }
+
   if (fdf_offers.has_value()) {
     size_t n = 0;
     if (fdf_offers.has_value()) {

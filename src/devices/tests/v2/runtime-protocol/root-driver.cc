@@ -14,6 +14,7 @@
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -79,10 +80,8 @@ class RootDriver : public fdf::DriverBase,
     auto offer = fdf::MakeOffer2<ft::Service>(kChildName);
 
     // Set the properties of the node that a driver will bind to.
-    auto property = fdf::NodeProperty{
-        {.key = fdf::NodePropertyKey::WithIntValue(1 /* BIND_PROTOCOL */),
-         .value = fdf::NodePropertyValue::WithIntValue(bind_fuchsia_test::BIND_PROTOCOL_DEVICE)}};
-
+    auto property =
+        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE);
     auto args = fdf::NodeAddArgs{{
         .name = std::string(kChildName),
         .properties = std::vector{std::move(property)},

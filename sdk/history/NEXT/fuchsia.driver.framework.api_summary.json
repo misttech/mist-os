@@ -784,6 +784,11 @@
         "value": "11"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.UNSUPPORTED_ARGS",
+        "value": "12"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.driver.framework/NodeError",
         "strictness": "flexible",

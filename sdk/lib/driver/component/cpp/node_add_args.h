@@ -105,14 +105,6 @@ inline fuchsia_driver_framework::NodeProperty MakeProperty(std::string_view key,
 }
 
 inline fuchsia_driver_framework::wire::NodeProperty MakeProperty(fidl::AnyArena& arena,
-                                                                 uint32_t key, uint32_t value) {
-  return fuchsia_driver_framework::wire::NodeProperty{
-      .key = fuchsia_driver_framework::wire::NodePropertyKey::WithIntValue(key),
-      .value = fuchsia_driver_framework::wire::NodePropertyValue::WithIntValue(value),
-  };
-}
-
-inline fuchsia_driver_framework::wire::NodeProperty MakeProperty(fidl::AnyArena& arena,
                                                                  std::string_view key,
                                                                  std::string_view value) {
   return fuchsia_driver_framework::wire::NodeProperty{

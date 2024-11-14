@@ -10,12 +10,17 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 class TestRealm final : public fidl::testing::WireTestBase<fuchsia_component::Realm> {
  public:
@@ -364,14 +369,11 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
 TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   const char* kParent1Name = "parent-1";
   const std::vector<fuchsia_driver_framework::NodeProperty> kParent1NodeProperties{
-      fuchsia_driver_framework::NodeProperty(
-          fuchsia_driver_framework::NodePropertyKey::WithIntValue(1),
-          fuchsia_driver_framework::NodePropertyValue::WithIntValue(2))};
+      fdf::MakeProperty("test-key-1", 2u)};
   const char* kParent2Name = "parent-2";
   const std::vector<fuchsia_driver_framework::NodeProperty> kParent2NodeProperties{
-      fuchsia_driver_framework::NodeProperty(
-          fuchsia_driver_framework::NodePropertyKey::WithStringValue("test-key"),
-          fuchsia_driver_framework::NodePropertyValue::WithStringValue("test-value"))};
+      fdf::MakeProperty("test-key-2", "test=value")};
+
   auto parent_1 = CreateNode(kParent1Name);
   parent_1->SetNonCompositeProperties(kParent1NodeProperties);
   auto parent_2 = CreateNode(kParent2Name);
@@ -389,9 +391,9 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   ASSERT_EQ(1ul, primary_parent_node_properties->size());
 
   const auto& primary_parent_node_property_1 = primary_parent_node_properties.value()[0];
-  ASSERT_TRUE(primary_parent_node_property_1.key.is_int_value());
-  ASSERT_EQ(kParent1NodeProperties[0].key().int_value().value(),
-            primary_parent_node_property_1.key.int_value());
+  ASSERT_TRUE(primary_parent_node_property_1.key.is_string_value());
+  ASSERT_EQ(kParent1NodeProperties[0].key().string_value().value(),
+            primary_parent_node_property_1.key.string_value().get());
   ASSERT_TRUE(primary_parent_node_property_1.value.is_int_value());
   ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
             primary_parent_node_property_1.value.int_value());
@@ -402,9 +404,9 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   ASSERT_EQ(1ul, parent_1_node_properties->size());
 
   const auto& parent_1_node_property_1 = parent_1_node_properties.value()[0];
-  ASSERT_TRUE(parent_1_node_property_1.key.is_int_value());
-  ASSERT_EQ(kParent1NodeProperties[0].key().int_value().value(),
-            parent_1_node_property_1.key.int_value());
+  ASSERT_TRUE(parent_1_node_property_1.key.is_string_value());
+  ASSERT_EQ(kParent1NodeProperties[0].key().string_value().value(),
+            parent_1_node_property_1.key.string_value().get());
   ASSERT_TRUE(parent_1_node_property_1.value.is_int_value());
   ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
             parent_1_node_property_1.value.int_value());
