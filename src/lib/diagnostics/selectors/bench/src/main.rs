@@ -28,18 +28,39 @@ fn make_repeated_cases(name: &'static str, base: &'static str, repeats: Vec<usiz
     ret
 }
 
-fn make_selector_cases(name: &'static str, base: &'static str, repeats: Vec<usize>) -> Vec<Case> {
+fn make_selector_cases(
+    case_name: &'static str,
+    base: &'static str,
+    tree_name: Option<&'static str>,
+    repeats: Vec<usize>,
+) -> Vec<Case> {
     let mut ret = vec![];
     for r in repeats {
-        let segment = vec![base]
+        let segment_count = if tree_name.is_some() { 3 } else { r };
+        let mut segment = vec![base]
             .iter()
             .cycle()
-            .take(r)
+            .take(segment_count)
             .map(|s| s.to_string())
             .collect::<Vec<String>>()
             .join("/");
-        let val = vec![segment.clone(), segment, base.to_string()].join(":");
-        ret.push(Case { name, val });
+
+        let component_selector = segment.clone();
+        if let Some(n) = tree_name {
+            let name_set = [n]
+                .iter()
+                .cycle()
+                .enumerate()
+                .map(|(i, s)| format!(r#"name="{s}{i}""#))
+                .take(r - 1)
+                .collect::<Vec<String>>()
+                .join(",");
+
+            segment = format!(r#"[{name_set}, name="{n}"]{segment}"#);
+        }
+
+        let val = vec![component_selector, segment, base.to_string()].join(":");
+        ret.push(Case { name: case_name, val });
     }
     ret
 }
@@ -74,9 +95,10 @@ fn bench_sanitize_string_for_selectors() -> criterion::Benchmark {
 fn bench_parse_selector() -> criterion::Benchmark {
     let cases: Vec<Case> = vec![]
         .into_iter()
-        .chain(make_selector_cases("no_wildcard", "abcd", vec![2, 64]).into_iter())
-        .chain(make_selector_cases("with_wildcard", "*ab*", vec![2, 64]).into_iter())
-        .chain(make_selector_cases("with_escaped", "ab\\:", vec![2, 64]).into_iter())
+        .chain(make_selector_cases("no_wildcard", "abcd", None, vec![2, 64]).into_iter())
+        .chain(make_selector_cases("with_wildcard", "*ab*", None, vec![2, 64]).into_iter())
+        .chain(make_selector_cases("with_escaped", "ab\\:", None, vec![2, 64]).into_iter())
+        .chain(make_selector_cases("with_tree_name", "abcd", Some("foo"), vec![2, 64]).into_iter())
         .collect();
 
     let mut bench = criterion::Benchmark::new("parse_selector/empty", move |b| {
