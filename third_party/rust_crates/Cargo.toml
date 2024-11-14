@@ -169,6 +169,7 @@ pest_derive = "2.7.8"
 pin-project = "1.0.11"
 pin-project-lite = "0.2.13"
 png = "0.14" # saved for future use
+pretty = "0.5.2"
 pretty_assertions = "1.2.1"
 prettytable-rs = "0.8.0"
 proptest = "1.5.0"
@@ -260,7 +261,6 @@ getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
-pretty = "0.5.2"
 rust_icu_common = { version = "5.0.0", default-features = false, features = ["renaming"] }
 rust_icu_sys = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ucal = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }

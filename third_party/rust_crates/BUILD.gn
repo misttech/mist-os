@@ -652,10 +652,8 @@ group("png") {
   public_deps = [ ":png-v0_14_0" ]
 }
 
-if (current_os == "fuchsia") {
-  group("pretty") {
-    public_deps = [ ":pretty-v0_5_2" ]
-  }
+group("pretty") {
+  public_deps = [ ":pretty-v0_5_2" ]
 }
 
 group("pretty_assertions") {
