@@ -86,7 +86,6 @@ class ArpTest : public SimTest {
   void Tx(const std::vector<uint8_t>& ethFrame);
 
   // Interface management
-  void SetMulticastPromisc(bool enable);
   void StartAndStopSoftAP();
 
   // Simulation of client associating to a SoftAP interface
@@ -135,11 +134,6 @@ void ArpTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp) 
 void ArpTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
   sim_ifc_.test_ = this;
-}
-
-void ArpTest::SetMulticastPromisc(bool enable) {
-  auto result = sim_ifc_.client_.buffer(sim_ifc_.test_arena_)->SetMulticastPromisc(enable);
-  EXPECT_TRUE(result.ok());
 }
 
 void ArpTest::TxAuthandAssocReq() {
@@ -205,8 +199,7 @@ void ArpTest::StartAndStopSoftAP() {
   softap_ifc.StopSoftAp();
 }
 
-// Verify that an ARP frame received by an AP interface is not offloaded, even after multicast
-// promiscuous mode is enabled.
+// Verify that an ARP frame received by an AP interface is not offloaded.
 TEST_F(ArpTest, SoftApArpOffload) {
   Init();
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kAp, &sim_ifc_, kOurMac), ZX_OK);
@@ -219,8 +212,6 @@ TEST_F(ArpTest, SoftApArpOffload) {
   // Send an ARP frame that we expect to be received
   ScheduleArpFrameTx(zx::sec(3), true);
   ScheduleNonArpFrameTx(zx::sec(4));
-
-  env_->ScheduleNotification(std::bind(&ArpTest::SetMulticastPromisc, this, true), zx::sec(5));
 
   // Send an ARP frame that we expect to be received
   ScheduleArpFrameTx(zx::sec(6), true);
@@ -243,8 +234,8 @@ TEST_F(ArpTest, SoftApArpOffload) {
   });
 }
 
-// On a client interface, we expect no ARP frames to be offloaded to firmware, regardless of
-// the multicast promiscuous setting, since SoftAP feature disables ARP offload by default.
+// On a client interface, we expect no ARP frames to be offloaded to firmware, since SoftAP feature
+// disables ARP offload by default.
 TEST_F(ArpTest, ClientArpOffload) {
   Init();
 
@@ -260,8 +251,6 @@ TEST_F(ArpTest, ClientArpOffload) {
   // Send an ARP frame that we expect to receive (not get offloaded)
   ScheduleArpFrameTx(zx::sec(2), false);
   ScheduleNonArpFrameTx(zx::sec(3));
-
-  env_->ScheduleNotification(std::bind(&ArpTest::SetMulticastPromisc, this, true), zx::sec(4));
 
   // Send another ARP frame that we expect to receive (not get offloaded)
   ScheduleArpFrameTx(zx::sec(5), false);
@@ -325,8 +314,8 @@ TEST_F(ArpTest, SoftAPStartStopDoesNotAffectArpOl) {
   });
 }
 
-// On a client interface, we expect all ARP frames to be offloaded to firmware, regardless of
-// the multicast promiscuous setting, when SoftAP feature is not available.
+// On a client interface, we expect all ARP frames to be offloaded to firmware when SoftAP feature
+// is not available.
 TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   Init();
 
@@ -347,8 +336,6 @@ TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   // Send an ARP frame that we expect to be offloaded
   ScheduleArpFrameTx(zx::sec(2), false);
   ScheduleNonArpFrameTx(zx::sec(3));
-
-  env_->ScheduleNotification(std::bind(&ArpTest::SetMulticastPromisc, this, true), zx::sec(4));
 
   // Send an ARP frame that we expect to be offloaded
   ScheduleArpFrameTx(zx::sec(5), false);

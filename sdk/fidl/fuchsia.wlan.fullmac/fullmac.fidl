@@ -684,11 +684,6 @@ closed protocol WlanFullmacImpl {
     }) -> ();
     strict WmmStatusReq() -> ();
 
-    // Configuration operations
-    strict SetMulticastPromisc(struct {
-        enable bool;
-    }) -> () error zx.Status;
-
     // Notify the interface whether it's online or offline. For client interfaces the online status
     // changes based on such things as being associated/disassociated with an AP. For encrypted
     // connections, the interface is considered online after the key exchange completes successfully,

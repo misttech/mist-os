@@ -307,8 +307,6 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     bridge_client_->GetIfaceHistogramStats().Then(
         ForwardResult<WlanFullmacImpl::GetIfaceHistogramStats>(completer.ToAsync()));
   }
-  void SetMulticastPromisc(SetMulticastPromiscRequest& request,
-                           SetMulticastPromiscCompleter::Sync& completer) override {}
   void SaeHandshakeResp(SaeHandshakeRespRequest& request,
                         SaeHandshakeRespCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();

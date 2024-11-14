@@ -515,15 +515,6 @@ void SimInterface::StopSoftAp() {
   ZX_ASSERT(result.ok());
 }
 
-zx_status_t SimInterface::SetMulticastPromisc(bool enable) {
-  auto result = client_.buffer(test_arena_)->SetMulticastPromisc(enable);
-  ZX_ASSERT(result.ok());
-  if (result->is_error()) {
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
 SimTest::SimTest() : test_arena_(fdf::Arena('T')) {
   env_ = std::make_unique<simulation::Environment>();
   env_->AddStation(this);

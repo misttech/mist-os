@@ -500,22 +500,6 @@ void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync
   }
 }
 
-void WlanInterface::SetMulticastPromisc(SetMulticastPromiscRequestView request,
-                                        SetMulticastPromiscCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ == nullptr) {
-    completer.ReplyError(ZX_ERR_BAD_STATE);
-    return;
-  }
-  bool enable = request->enable;
-  zx_status_t status = brcmf_if_set_multicast_promisc(wdev_->netdev, enable);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
-}
-
 void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request,
                                      SaeHandshakeRespCompleter::Sync& completer) {
   const fuchsia_wlan_fullmac::wire::WlanFullmacSaeHandshakeResp resp = request->resp;

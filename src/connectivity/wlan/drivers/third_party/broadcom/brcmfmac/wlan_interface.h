@@ -101,8 +101,6 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override;
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override;
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override;
-  void SetMulticastPromisc(SetMulticastPromiscRequestView request,
-                           SetMulticastPromiscCompleter::Sync& completer) override;
   void SaeHandshakeResp(SaeHandshakeRespRequestView request,
                         SaeHandshakeRespCompleter::Sync& completer) override;
   void SaeFrameTx(SaeFrameTxRequestView request, SaeFrameTxCompleter::Sync& completer) override;
