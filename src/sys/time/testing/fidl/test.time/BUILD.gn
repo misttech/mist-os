@@ -7,6 +7,11 @@ import("//build/fidl/fidl.gni")
 fidl("fidl") {
   name = "test.time"
   testonly = true
+
+  # TODO(https://fxbug.dev/365558387): Uncomment this line when making the
+  # related change in `time_source_control.test.fidl`.
+  # versioned = "fuchsia:HEAD"
+
   sources = [ "time_source_control.test.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
 }

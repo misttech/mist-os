@@ -8,6 +8,10 @@ fidl("fidl") {
   name = "test.time.realm"
   testonly = true
 
+  # TODO(https://fxbug.dev/365558387): Uncomment this line when making the
+  # related change in `realm_factory.test.fidl`.
+  # versioned = "fuchsia:HEAD"
+
   sources = [
     "push_source_puppet.test.fidl",
     "realm_factory.test.fidl",

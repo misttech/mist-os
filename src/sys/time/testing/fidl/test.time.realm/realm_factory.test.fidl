@@ -10,6 +10,9 @@
 /// The realm is created by calling `RealmFactory.CreateRealm`, which allows
 /// configuring some realm parameters. Refer to the appropriate docs below for
 /// details.
+// TODO(https://fxbug.dev/365558387): Either remove the dependency from CTF
+// tests and uncomment this line or make this library stable.
+// @available(platform="fuchsia", added=HEAD)
 library test.time.realm;
 
 using fuchsia.io;
