@@ -244,11 +244,8 @@ async fn create_realm_instance(
                         &name,
                         move |mock_handles: LocalComponentHandles| {
                             futures::future::ready(
-                                dir.clone(
-                                    fio::OpenFlags::CLONE_SAME_RIGHTS,
-                                    mock_handles.outgoing_dir.into_channel().into(),
-                                )
-                                .context("cloning directory for mock handles"),
+                                dir.clone2(mock_handles.outgoing_dir.into_channel().into())
+                                    .context("cloning directory for mock handles"),
                             )
                             // The lifetime of the mock child component is tied
                             // to that of this future. Make the future never
