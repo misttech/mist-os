@@ -28,10 +28,7 @@ rustc_library("crypto") {
     "src/ff1.rs",
     "src/lib.rs",
   ]
-  test_deps = [
-    "//third_party/rust_crates:hex",
-    "//third_party/rust_crates:rand",
-  ]
+  test_deps = [ "//third_party/rust_crates:rand" ]
   visibility = [ "//src/storage/fxfs/*" ]
 
   # Default optimizations are for size, but that has a noticeable impact on speed.

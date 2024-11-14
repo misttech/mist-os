@@ -19,7 +19,7 @@ use crate::object_store::{
     SetExtendedAttributeMode, StoreObjectHandle,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fxfs_crypto::{Key, WrappedKeys, XtsCipher, XtsCipherSet};
@@ -483,7 +483,7 @@ impl<S: HandleOwner> Directory<S> {
         let mut name_bytes = name.to_string().into_bytes();
         match self.get_fscrypt_key().await? {
             Some(key) => {
-                key.encrypt_filename(self.object_id(), &mut name_bytes)?;
+                key.encrypt_filename(&mut name_bytes)?;
                 Ok(name_bytes)
             }
             None => {
@@ -492,9 +492,7 @@ impl<S: HandleOwner> Directory<S> {
                     // however, catches this error earlier and generates the appropriate Linux code.
                     Err(anyhow!(FxfsError::NoKey))
                 } else {
-                    Ok(BASE64_URL_SAFE_NO_PAD
-                        .decode(name_bytes)
-                        .map_err(|_| FxfsError::NotFound)?)
+                    Ok(BASE64_STANDARD.decode(name_bytes).map_err(|_| FxfsError::NotFound)?)
                 }
             }
         }
@@ -1322,7 +1320,7 @@ mod tests {
         StoreObjectHandle,
     };
     use assert_matches::assert_matches;
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::engine::Engine as _;
     use fidl_fuchsia_io as fio;
     use fxfs_crypto::Crypt;
@@ -1683,9 +1681,9 @@ mod tests {
             while let Some((name_bytes, object_id, object_descriptor)) = iter.get() {
                 assert!(matches!(object_descriptor, ObjectDescriptor::Directory));
                 if object_id == dst_oid {
-                    encrypted_dst_name = Some(BASE64_URL_SAFE_NO_PAD.encode(name_bytes));
+                    encrypted_dst_name = Some(BASE64_STANDARD.encode(name_bytes));
                 } else if object_id == src_oid {
-                    encrypted_src_name = Some(BASE64_URL_SAFE_NO_PAD.encode(name_bytes));
+                    encrypted_src_name = Some(BASE64_STANDARD.encode(name_bytes));
                 }
                 iter.advance().await.expect("iter advance failed");
             }
