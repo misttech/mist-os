@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::dict::{EntryUpdate, UpdateNotifierRetention};
 use crate::fidl::registry::{self, try_from_handle_in_registry};
 use crate::{Capability, ConversionError, Dict, RemotableCapability, RemoteError};
 use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use std::sync::Arc;
+use futures::channel::oneshot;
+use futures::FutureExt;
+use std::sync::{Arc, Mutex, Weak};
+use tracing::warn;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::helper::{AlreadyExists, DirectlyMutable};
+use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
 use vfs::name::Name;
@@ -55,29 +59,96 @@ impl RemotableCapability for Dict {
         self,
         scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        let dir = pfs::simple();
-        for (key, value) in self.enumerate() {
-            let Ok(value) = value else {
-                continue;
+        let directory = pfs::simple();
+        let weak_dir: Weak<pfs::Simple> = Arc::downgrade(&directory);
+        let (error_sender, error_receiver) = oneshot::channel();
+        let error_sender = Mutex::new(Some(error_sender));
+        // `register_update_notifier` calls the closure with any existing entries before returning,
+        // so there won't be a race with us returning this directory and the entries being added to
+        // it.
+        self.register_update_notifier(Box::new(move |update: EntryUpdate<'_>| {
+            let Some(directory) = weak_dir.upgrade() else {
+                return UpdateNotifierRetention::Drop_;
             };
-            let remote: Arc<dyn DirectoryEntry> = match value {
-                value => value.try_into_directory_entry(scope.clone()).map_err(|err| {
-                    ConversionError::Nested { key: key.to_string(), err: Box::new(err) }
-                })?,
-            };
-            let key: Name = key.to_string().try_into()?;
-            match dir.add_entry_impl(key, remote, false) {
-                Ok(()) => {}
-                Err(AlreadyExists) => {
-                    unreachable!("Dict items should be unique");
+            match update {
+                EntryUpdate::Add(key, Capability::Directory(d)) => {
+                    let name = Name::try_from(key.to_string())
+                        .expect("cm_types::Name is always a valid vfs Name");
+                    directory
+                        .add_entry_impl(name, d.clone().into_remote(), false)
+                        .expect("dictionary values must be unique");
                 }
+                EntryUpdate::Add(key, value) => {
+                    let value = match value.try_clone() {
+                        Ok(value) => value,
+                        Err(_err) => {
+                            if let Some(error_sender) = error_sender.lock().unwrap().take() {
+                                let _ = error_sender.send(ConversionError::NotSupported);
+                            } else {
+                                warn!(
+                                    "unable to add uncloneable capability type from dictionary to \
+                                    directory"
+                                );
+                            }
+                            return UpdateNotifierRetention::Retain;
+                        }
+                    };
+                    let dir_entry = match value.try_into_directory_entry(scope.clone()) {
+                        Ok(dir_entry) => dir_entry,
+                        Err(err) => {
+                            if let Some(error_sender) = error_sender.lock().unwrap().take() {
+                                let _ = error_sender.send(err);
+                            } else {
+                                warn!(
+                                    "value in dictionary cannot be converted to directory entry: \
+                                    {err:?}"
+                                )
+                            }
+                            return UpdateNotifierRetention::Retain;
+                        }
+                    };
+                    let name = Name::try_from(key.to_string())
+                        .expect("cm_types::Name is always a valid vfs Name");
+                    directory
+                        .add_entry_impl(name, dir_entry, false)
+                        .expect("dictionary values must be unique")
+                }
+                EntryUpdate::Remove(key) => {
+                    let name = Name::try_from(key.to_string())
+                        .expect("cm_types::Name is always a valid vfs Name");
+                    let _ = directory.remove_entry_impl(name, false);
+                }
+                EntryUpdate::Idle => (),
             }
-        }
+            UpdateNotifierRetention::Retain
+        }));
+        let _self_clone = self.clone();
         let not_found = self.lock().not_found.clone();
-        dir.clone().set_not_found_handler(Box::new(move |path| {
+        directory.clone().set_not_found_handler(Box::new(move |path| {
+            // We hold a reference to the dictionary in this closure to solve an ownership problem.
+            // In `try_into_directory_entry` we return a `pfs::Simple` that provides a directory
+            // projection of a dictionary. The directory is live-updated, so that as items are
+            // added to or removed from the dictionary the directory contents are updated to match.
+            //
+            // The live-updating semantics introduce a problem: when all references to a dictionary
+            // reach the end of their lifetime and the dictionary is dropped, all entries in the
+            // dictionary are marked as removed. This means if one creates a dictionary, adds
+            // entries to it, turns it into a directory, and drops the only dictionary reference,
+            // then the directory is immediately emptied of all of its contents.
+            //
+            // Ideally at least one reference to the dictionary would be kept alive as long as the
+            // directory exists. We accomplish that by giving the directory ownership over a
+            // reference to the dictionary here.
+            let _self_clone = &_self_clone;
+
             not_found(path);
         }));
-        Ok(dir)
+        if let Some(Ok(error)) = error_receiver.now_or_never() {
+            // We encountered an error processing the initial contents of this dictionary. Let's
+            // return that instead of the directory we've created.
+            return Err(error);
+        }
+        Ok(directory)
     }
 }
 
@@ -93,6 +164,7 @@ mod tests {
     };
     use fidl::handle::{Channel, HandleBased, Status};
     use fuchsia_fs::directory;
+    use futures::StreamExt;
     use lazy_static::lazy_static;
     use test_util::Counter;
     use vfs::directory::entry::{
@@ -974,7 +1046,7 @@ mod tests {
         let scope = ExecutionScope::new();
         assert_matches!(
             dict.try_into_directory_entry(scope).err(),
-            Some(ConversionError::Nested { .. })
+            Some(ConversionError::NotSupported)
         );
     }
 
@@ -1124,5 +1196,165 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[fuchsia::test]
+    async fn live_update_add_nodes() {
+        let dict = Dict::new();
+        let scope = ExecutionScope::new();
+        let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
+        let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
+            .unwrap()
+            .into_proxy()
+            .unwrap();
+        let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
+            .await
+            .expect("failed to create watcher");
+
+        // Assert that the directory is empty, because the dictionary is empty.
+        assert_eq!(fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(), vec![]);
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::EXISTING,
+                filename: ".".into(),
+            })),
+        );
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::IDLE,
+                filename: "".into(),
+            })),
+        );
+
+        // Add an item to the dictionary, and assert that the projected directory contains the
+        // added item.
+        let fs = pseudo_directory! {};
+        let directory = Directory::from(serve_vfs_dir(fs));
+        dict.insert("a".parse().unwrap(), Capability::Directory(directory.clone()))
+            .expect("dict entry already exists");
+
+        assert_eq!(
+            fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
+            vec![directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Directory },]
+        );
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::ADD_FILE,
+                filename: "a".into(),
+            })),
+        );
+
+        // Add an item to the dictionary, and assert that the projected directory contains the
+        // added item.
+        dict.insert("b".parse().unwrap(), Capability::Directory(directory))
+            .expect("dict entry already exists");
+        let mut readdir_results = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
+        readdir_results.sort_by(|entry_1, entry_2| entry_1.name.cmp(&entry_2.name));
+        assert_eq!(
+            readdir_results,
+            vec![
+                directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Directory },
+            ]
+        );
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::ADD_FILE,
+                filename: "b".into(),
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    async fn live_update_remove_nodes() {
+        let dict = Dict::new();
+        let fs = pseudo_directory! {};
+        let directory = Directory::from(serve_vfs_dir(fs));
+        dict.insert("a".parse().unwrap(), Capability::Directory(directory.clone()))
+            .expect("dict entry already exists");
+        dict.insert("b".parse().unwrap(), Capability::Directory(directory.clone()))
+            .expect("dict entry already exists");
+        dict.insert("c".parse().unwrap(), Capability::Directory(directory.clone()))
+            .expect("dict entry already exists");
+
+        let scope = ExecutionScope::new();
+        let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
+        let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
+            .unwrap()
+            .into_proxy()
+            .unwrap();
+        let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
+            .await
+            .expect("failed to create watcher");
+
+        // The dictionary already had three entries in it when the directory proxy was created, so
+        // we should see those in the directory. We check both readdir and via the watcher API.
+        let mut readdir_results = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
+        readdir_results.sort_by(|entry_1, entry_2| entry_1.name.cmp(&entry_2.name));
+        assert_eq!(
+            readdir_results,
+            vec![
+                directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Directory },
+                directory::DirEntry { name: "c".to_string(), kind: fio::DirentType::Directory },
+            ]
+        );
+        let mut existing_files = vec![];
+        loop {
+            match watcher.next().await {
+                Some(Ok(fuchsia_fs::directory::WatchMessage { event, filename }))
+                    if event == fuchsia_fs::directory::WatchEvent::EXISTING =>
+                {
+                    existing_files.push(filename)
+                }
+                Some(Ok(fuchsia_fs::directory::WatchMessage { event, filename: _ }))
+                    if event == fuchsia_fs::directory::WatchEvent::IDLE =>
+                {
+                    break
+                }
+                other_message => panic!("unexpected message: {:?}", other_message),
+            }
+        }
+        existing_files.sort();
+        let expected_files: Vec<std::path::PathBuf> =
+            vec![".".into(), "a".into(), "b".into(), "c".into()];
+        assert_eq!(existing_files, expected_files,);
+
+        // Remove each entry from the dictionary, and observe the directory watcher API inform us
+        // that it has been removed.
+        let _ = dict.remove(&"a".parse().unwrap()).expect("capability was not in dictionary");
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::REMOVE_FILE,
+                filename: "a".into(),
+            })),
+        );
+
+        let _ = dict.remove(&"b".parse().unwrap()).expect("capability was not in dictionary");
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::REMOVE_FILE,
+                filename: "b".into(),
+            })),
+        );
+
+        let _ = dict.remove(&"c".parse().unwrap()).expect("capability was not in dictionary");
+        assert_eq!(
+            watcher.next().await,
+            Some(Ok(fuchsia_fs::directory::WatchMessage {
+                event: fuchsia_fs::directory::WatchEvent::REMOVE_FILE,
+                filename: "c".into(),
+            })),
+        );
+
+        // At this point there are no entries left in the dictionary, so the directory should be
+        // empty too.
+        assert_eq!(fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(), vec![],);
     }
 }

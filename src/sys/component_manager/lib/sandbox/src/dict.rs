@@ -25,8 +25,8 @@ pub(crate) struct DictInner {
     /// The contents of the [Dict].
     pub(crate) entries: BTreeMap<Key, Capability>,
 
-    /// When an external request tries to access a non-existent entry,
-    /// this closure will be invoked with the name of the entry.
+    /// When an external request tries to access a non-existent entry, this closure will be invoked
+    /// with the name of the entry.
     #[derivative(Debug = "ignore")]
     // Currently this is only used on target, but it's compatible with host.
     #[allow(dead_code)]
@@ -38,6 +38,10 @@ pub(crate) struct DictInner {
     #[cfg(target_os = "fuchsia")]
     #[derivative(Debug = "ignore")]
     task_group: Option<fasync::TaskGroup>,
+
+    /// Functions that will be invoked whenever the contents of this dictionary changes.
+    #[derivative(Debug = "ignore")]
+    update_notifiers: Vec<UpdateNotifierFn>,
 }
 
 impl CapabilityBound for Dict {
@@ -45,6 +49,40 @@ impl CapabilityBound for Dict {
         "Dictionary"
     }
 }
+
+impl Drop for DictInner {
+    fn drop(&mut self) {
+        // When this dictionary doesn't exist anymore, then neither do its entries (or at least
+        // these references of them). Notify anyone listening that all of the entries have been
+        // removed.
+        let keys = self.entries.keys().cloned().collect::<Vec<_>>();
+        for key in keys {
+            self.call_update_notifiers(EntryUpdate::Remove(&key))
+        }
+    }
+}
+
+/// Represents a change to a dictionary, where an entry is either added or removed.
+#[derive(Debug, Copy, Clone)]
+pub enum EntryUpdate<'a> {
+    Add(&'a Key, &'a Capability),
+    Remove(&'a Key),
+    Idle,
+}
+
+/// Represents whether an update notifier should be retained and thus continue to be called for
+/// future updates, or if it should be dropped and no longer be called.
+pub enum UpdateNotifierRetention {
+    Retain,
+    Drop_,
+}
+
+/// A function that will be called when the contents of a dictionary changes. Note that this
+/// function will be called while the internal dictionary structure is locked, so it must not
+/// interact with the dictionary on which it is registered. It shouldn't even hold a strong
+/// reference to the dictionary it's registered on, as that'll create a cycle and make LSAN sad.
+pub type UpdateNotifierFn =
+    Box<dyn for<'a> FnMut(EntryUpdate<'a>) -> UpdateNotifierRetention + Sync + Send>;
 
 impl Default for Dict {
     fn default() -> Self {
@@ -54,6 +92,7 @@ impl Default for Dict {
                 not_found: Arc::new(|_key: &str| {}),
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
+                update_notifiers: vec![],
             })),
         }
     }
@@ -74,6 +113,7 @@ impl Dict {
                 not_found: Arc::new(not_found),
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
+                update_notifiers: vec![],
             })),
         }
     }
@@ -82,33 +122,63 @@ impl Dict {
         self.inner.lock().unwrap()
     }
 
-    /// Inserts an entry, mapping `key` to `capability`. If an entry already
-    /// exists at `key`, a `fsandbox::DictionaryError::AlreadyExists` will be
-    /// returned.
+    /// Registers a new update notifier function with this dictionary. The function will be called
+    /// whenever an entry is added to or removed from this dictionary. The function will be
+    /// immediately called with an `EntryUpdate::Add` value for any entries already in this
+    /// dictionary.
+    ///
+    /// Note that this function will be called while the internal dictionary structure is locked,
+    /// so it must not interact with the dictionary on which it is registered. It shouldn't even
+    /// hold a strong reference to the dictionary it's registered on, as that'll create a cycle and
+    /// make LSAN sad.
+    pub fn register_update_notifier(&self, mut notifier_fn: UpdateNotifierFn) {
+        let mut guard = self.lock();
+        for (key, value) in guard.entries.iter() {
+            if let UpdateNotifierRetention::Drop_ = (notifier_fn)(EntryUpdate::Add(key, value)) {
+                // The notifier has signaled that it doesn't want to process any more updates.
+                return;
+            }
+        }
+        if let UpdateNotifierRetention::Retain = (notifier_fn)(EntryUpdate::Idle) {
+            guard.update_notifiers.push(notifier_fn);
+        }
+    }
+
+    /// Inserts an entry, mapping `key` to `capability`. If an entry already exists at `key`, a
+    /// `fsandbox::DictionaryError::AlreadyExists` will be returned.
     pub fn insert(
         &self,
         key: Key,
         capability: Capability,
     ) -> Result<(), fsandbox::CapabilityStoreError> {
         let mut this = self.lock();
+        if this.entries.contains_key(&key) {
+            this.call_update_notifiers(EntryUpdate::Remove(&key));
+        }
+        this.call_update_notifiers(EntryUpdate::Add(&key, &capability));
         match this.entries.insert(key, capability) {
             Some(_) => Err(fsandbox::CapabilityStoreError::ItemAlreadyExists),
             None => Ok(()),
         }
     }
 
-    /// Returns a clone of the capability associated with `key`. If there is no
-    /// entry for `key`, `None` is returned.
+    /// Returns a clone of the capability associated with `key`. If there is no entry for `key`,
+    /// `None` is returned.
     ///
     /// If the value could not be cloned, returns an error.
     pub fn get(&self, key: &Key) -> Result<Option<Capability>, ()> {
         self.lock().entries.get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
     }
 
-    /// Removes `key` from the entries, returning the capability at `key` if the
-    /// key was already in the entries.
+    /// Removes `key` from the entries, returning the capability at `key` if the key was already in
+    /// the entries.
     pub fn remove(&self, key: &Key) -> Option<Capability> {
-        self.lock().entries.remove(key)
+        let mut this = self.lock();
+        let result = this.entries.remove(key);
+        if result.is_some() {
+            this.call_update_notifiers(EntryUpdate::Remove(&key))
+        }
+        result
     }
 
     /// Returns an iterator over a clone of the entries, sorted by key.
@@ -141,6 +211,10 @@ impl Dict {
     pub fn drain(&self) -> impl Iterator<Item = (Key, Capability)> {
         let entries = {
             let mut this = self.lock();
+            let keys = this.entries.keys().cloned().collect::<Vec<_>>();
+            for key in keys {
+                this.call_update_notifiers(EntryUpdate::Remove(&key))
+            }
             std::mem::replace(&mut this.entries, BTreeMap::new())
         };
         entries.into_iter()
@@ -179,5 +253,18 @@ impl DictInner {
     #[cfg(target_os = "fuchsia")]
     pub(crate) fn tasks(&mut self) -> &mut fasync::TaskGroup {
         self.task_group.get_or_insert_with(|| fasync::TaskGroup::new())
+    }
+
+    /// Calls the update notifiers registered on this dictionary with the given update. Any
+    /// notifiers that signal that they should be dropped will be removed from
+    /// `self.update_notifiers.
+    fn call_update_notifiers<'a>(&'a mut self, update: EntryUpdate<'a>) {
+        let mut retained_notifier_fns = vec![];
+        for mut notifier_fn in self.update_notifiers.drain(..) {
+            if let UpdateNotifierRetention::Retain = (notifier_fn)(update) {
+                retained_notifier_fns.push(notifier_fn)
+            }
+        }
+        self.update_notifiers = retained_notifier_fns
     }
 }
