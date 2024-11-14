@@ -8,7 +8,11 @@ use crate::common::{node_property_key_to_string, node_property_value_to_string};
 use anyhow::{anyhow, Result};
 use args::ListDevicesCommand;
 use fuchsia_driver_dev::Device;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_driver_development as fdd};
+use itertools::Itertools;
+use {
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_framework as fdf,
+};
 
 trait DevicePrinter {
     fn print(&self) -> Result<()>;
@@ -41,6 +45,42 @@ impl DevicePrinter for Device {
                 "Driver",
                 self.0.bound_driver_url.as_deref().unwrap_or("None")
             );
+        }
+
+        if let Some(ref bus_topology) = self.0.bus_topology {
+            if !bus_topology.is_empty() {
+                println!("\n{0: <9} {1: <9} {2}", "Bus Type", "Stability", "Address",);
+            }
+            for segment in bus_topology {
+                let address = match &segment.address {
+                    Some(fdf::DeviceAddress::IntValue(val)) => format!("{val:02X}"),
+                    Some(fdf::DeviceAddress::ArrayIntValue(val)) => {
+                        val.iter().map(|v| format!("{v:02X}")).join(":")
+                    }
+                    Some(fdf::DeviceAddress::CharIntValue(val)) => val.to_string(),
+                    Some(fdf::DeviceAddress::ArrayCharIntValue(val)) => {
+                        val.iter().map(|v| v.to_string()).join(":")
+                    }
+                    Some(fdf::DeviceAddress::StringValue(val)) => val.to_string(),
+                    None => "None".to_string(),
+                    _ => "Unknown".to_string(),
+                };
+                println!(
+                    "{0: <9} {1: <9} {2}",
+                    segment
+                        .bus
+                        .map(|s| format!("{s:?}").to_uppercase())
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    segment
+                        .address_stability
+                        .map(|s| format!("{s:?}"))
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    address,
+                );
+            }
+            if !bus_topology.is_empty() {
+                println!("");
+            }
         }
 
         if let Some(ref node_property_list) = self.0.node_property_list {
