@@ -125,6 +125,11 @@ build-metrics-read-config || __successfully_read_config="$?"
 
 readonly _upload_script=build/rbe/upload_reproxy_logs.sh
 
+trace_prefix=()
+if [[ -o xtrace ]]; then
+  trace_prefix=("$SHELL" -x)
+fi
+
 case "$action" in
   -h|--help)
     usage
@@ -160,7 +165,7 @@ case "$action" in
     # be generated in advance.  This includes building protoc.
     _setup_script=build/rbe/proto/refresh.sh
     echo "Fetching and generating necessary protobuf code (may take a few minutes)."
-    "${FUCHSIA_DIR}"/"$_setup_script" > /dev/null || {
+    "${trace_prefix[@]}" "${FUCHSIA_DIR}"/"$_setup_script" || {
       fx-error "Re-run $_setup_script manually to look for errors."
       exit 1
     }
@@ -187,7 +192,7 @@ case "$action" in
 
   login)
     echo "Logging in to upload metrics and logs to BQ."
-    "$_upload_script" --auth-only
+    "${trace_prefix[@]}" "$_upload_script" --auth-only
     exit "$?"
     ;;
 
@@ -197,7 +202,7 @@ case "$action" in
     # the logs and metrics files are always being produced.
     # Scan for log dirs where build/rbe/fuchsia-reproxy-wrap.sh produces them.
     _logs_dir="${FUCHSIA_DIR}"/out/.reproxy_logs
-    "$_upload_script" "${action_args[@]}" "$_logs_dir"/*/reproxy.*
+    "${trace_prefix[@]}" "$_upload_script" "${action_args[@]}" "$_logs_dir"/*/reproxy.*
     exit 0
     ;;
 
