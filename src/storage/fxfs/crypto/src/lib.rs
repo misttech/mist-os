@@ -28,6 +28,9 @@ pub mod ff1;
 
 pub const KEY_SIZE: usize = 256 / 8;
 pub const WRAPPED_KEY_SIZE: usize = KEY_SIZE + 16;
+// TODO(https://fxbug.dev/375700939): Support different padding sizes based on SET_ENCRYPTION_POLICY
+// flags.
+pub const FSCRYPT_PADDING: usize = 16;
 
 // Fxfs will always use a block size >= 512 bytes, so we just assume a sector size of 512 bytes,
 // which will work fine even if a different block size is used by Fxfs or the underlying device.
@@ -286,27 +289,18 @@ impl Key {
     }
 
     /// Encrypts the filename contained in `buffer`.
-    /// TODO(https://fxbug.dev/356896315): Implement encryption for filenames.
-    pub fn encrypt_filename(&self, buffer: &mut Vec<u8>) -> Result<(), Error> {
-        // Pad the buffer such that its length is a multiple of 32.
-        if buffer.len() % 32 != 0 {
-            let remainder = 32 - (buffer.len() % 32);
-            for _ in 1..=remainder {
-                buffer.push(0);
-            }
-        }
-        for byte in buffer {
-            *byte = *byte + 1;
-        }
+    pub fn encrypt_filename(&self, object_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        // Pad the buffer such that its length is a multiple of FSCRYPT_PADDING.
+        buffer.resize(buffer.len().next_multiple_of(FSCRYPT_PADDING), 0);
+        let cipher = self.key();
+        cipher.encrypt_with_backend(CbcEncryptProcessor::new(Tweak(object_id as u128), buffer));
         Ok(())
     }
 
     /// Decrypts the filename contained in `buffer`.
-    /// TODO(https://fxbug.dev/356896315): Implement decryption for filenames.
-    pub fn decrypt_filename(&self, buffer: &mut Vec<u8>) -> Result<(), Error> {
-        for byte in &mut *buffer {
-            *byte = *byte - 1;
-        }
+    pub fn decrypt_filename(&self, object_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        let cipher = self.key();
+        cipher.decrypt_with_backend(CbcDecryptProcessor::new(Tweak(object_id as u128), buffer));
         // Remove the padding
         if let Some(i) = buffer.iter().rposition(|x| *x != 0) {
             let new_len = i + 1;
@@ -465,6 +459,69 @@ assert_cfg!(target_endian = "little");
 #[repr(C)]
 struct Tweak(u128);
 
+pub fn xor_in_place(a: &mut [u8], b: &[u8]) {
+    for (b1, b2) in a.iter_mut().zip(b.iter()) {
+        *b1 ^= *b2;
+    }
+}
+
+// To be used with encrypt_with_backend.
+struct CbcEncryptProcessor<'a> {
+    tweak: Tweak,
+    data: &'a mut [u8],
+}
+
+impl<'a> CbcEncryptProcessor<'a> {
+    fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
+        Self { tweak, data }
+    }
+}
+
+impl BlockSizeUser for CbcEncryptProcessor<'_> {
+    type BlockSize = U16;
+}
+
+impl BlockClosure for CbcEncryptProcessor<'_> {
+    fn call<B: BlockBackend<BlockSize = Self::BlockSize>>(self, backend: &mut B) {
+        let Self { mut tweak, data } = self;
+        for block in data.chunks_exact_mut(16) {
+            xor_in_place(block, &tweak.0.to_le_bytes());
+            let chunk: &mut GenericArray<u8, _> = GenericArray::from_mut_slice(block);
+            backend.proc_block(InOut::from(chunk));
+            tweak.0 = u128::from_le_bytes(block.try_into().unwrap())
+        }
+    }
+}
+
+// To be used with decrypt_with_backend.
+struct CbcDecryptProcessor<'a> {
+    tweak: Tweak,
+    data: &'a mut [u8],
+}
+
+impl<'a> CbcDecryptProcessor<'a> {
+    fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
+        Self { tweak, data }
+    }
+}
+
+impl BlockSizeUser for CbcDecryptProcessor<'_> {
+    type BlockSize = U16;
+}
+
+impl BlockClosure for CbcDecryptProcessor<'_> {
+    fn call<B: BlockBackend<BlockSize = Self::BlockSize>>(self, backend: &mut B) {
+        let Self { mut tweak, data } = self;
+        for block in data.chunks_exact_mut(16) {
+            let ciphertext = block.to_vec();
+            let chunk = GenericArray::from_mut_slice(block);
+            backend.proc_block(InOut::from(chunk));
+            xor_in_place(block, &tweak.0.to_le_bytes());
+            tweak.0 = u128::from_le_bytes(ciphertext.try_into().unwrap());
+        }
+    }
+}
+
 // To be used with encrypt|decrypt_with_backend.
 struct XtsProcessor<'a> {
     tweak: Tweak,
@@ -507,6 +564,8 @@ impl BlockClosure for XtsProcessor<'_> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{Key, XtsCipher, XtsCipherSet};
+
     use super::{StreamCipher, UnwrappedKey};
 
     #[test]
@@ -536,5 +595,40 @@ mod tests {
         xor_fn(&mut c1, &c2);
         xor_fn(&mut p1, &p2);
         assert_ne!(c1, p1);
+    }
+
+    /// Output produced via:
+    /// echo -n filename > in.txt ; truncate -s 16 in.txt
+    /// openssl aes-256-cbc -e -iv 02000000000000000000000000000000 -nosalt -K 1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b -in in.txt -out out.txt -nopad
+    /// hexdump out.txt -e "16/1 \"%02x\" \"\n\"" -v
+    #[test]
+    fn test_encrypt_filename() {
+        let raw_key_hex = "1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b";
+        let raw_key_bytes: [u8; 32] =
+            hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
+        let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
+        let cipher_set = XtsCipherSet::from(vec![XtsCipher::new(0, &unwrapped_key)]);
+        let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
+        let object_id = 2;
+        let mut text = "filename".to_string().as_bytes().to_vec();
+        key.encrypt_filename(object_id, &mut text).expect("encrypt filename failed");
+        assert_eq!(text, hex::decode("52d56369103a39b3ea1e09c85dd51546").expect("decode failed"));
+    }
+
+    /// Output produced via:
+    /// openssl aes-256-cbc -d -iv 02000000000000000000000000000000 -nosalt -K 1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b -in out.txt -out in.txt
+    /// cat in.txt
+    #[test]
+    fn test_decrypt_filename() {
+        let raw_key_hex = "1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b";
+        let raw_key_bytes: [u8; 32] =
+            hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
+        let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
+        let cipher_set = XtsCipherSet::from(vec![XtsCipher::new(0, &unwrapped_key)]);
+        let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
+        let object_id = 2;
+        let mut text = hex::decode("52d56369103a39b3ea1e09c85dd51546").expect("decode failed");
+        key.decrypt_filename(object_id, &mut text).expect("encrypt filename failed");
+        assert_eq!(text, "filename".to_string().as_bytes().to_vec());
     }
 }

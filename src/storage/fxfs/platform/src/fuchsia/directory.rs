@@ -9,7 +9,7 @@ use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
@@ -894,10 +894,11 @@ impl VfsDirectory for FxDirectory {
                 };
                 let mut name_bytes_mut = name_bytes.clone();
                 let name = if let Some(key) = &key {
-                    key.decrypt_filename(&mut name_bytes_mut).map_err(map_to_status)?;
+                    key.decrypt_filename(self.object_id(), &mut name_bytes_mut)
+                        .map_err(map_to_status)?;
                     String::from_utf8(name_bytes_mut).map_err(|_| Err(zx::Status::BAD_STATE))?
                 } else {
-                    BASE64_STANDARD.encode(name_bytes_mut)
+                    BASE64_URL_SAFE_NO_PAD.encode(name_bytes_mut)
                 };
 
                 let info = EntryInfo::new(object_id, entry_type);
@@ -1025,13 +1026,14 @@ mod tests {
         open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
-    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
     use base64::engine::Engine as _;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::StreamExt;
     use fxfs::object_store::Timestamp;
+    use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
     use rand::Rng;
     use std::os::fd::AsRawFd;
@@ -1779,7 +1781,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -1803,7 +1805,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -1895,7 +1897,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::File)
             }
@@ -2057,7 +2059,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2072,7 +2074,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -2151,7 +2153,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(!entry.name.contains("fee"));
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2249,7 +2251,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2264,11 +2266,92 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
         close_dir_checked(Arc::try_unwrap(encrypted_dir).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_encrypted_filename_does_not_have_slashes() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        for _ in 0..100 {
+            let one_char = || CHARSET[rand::thread_rng().gen_range(0..CHARSET.len())] as char;
+            let filename: String = std::iter::repeat_with(one_char).take(100).collect();
+            let dir = open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+                &filename,
+            )
+            .await;
+            close_dir_checked(dir).await;
+        }
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                assert!(!entry.name.contains("/"));
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
     }
@@ -2333,7 +2416,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::File)
             }
@@ -2427,7 +2510,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2445,7 +2528,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 assert!(entry.kind == DirentKind::Directory)
             }
             count += 1;
@@ -2525,7 +2608,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.len() >= 32);
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
                 encrypted_name = entry.name;
                 assert!(entry.kind == DirentKind::Directory)
             }
@@ -2533,7 +2616,7 @@ mod tests {
 
         let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
         zx::Status::ok(status).expect("get_token failed");
-        let new_encrypted_name = BASE64_STANDARD.encode("new_encrypted_name");
+        let new_encrypted_name = BASE64_URL_SAFE_NO_PAD.encode("new_encrypted_name");
         parent
             .rename(&encrypted_name, zx::Event::from(dst_token.unwrap()), &new_encrypted_name)
             .await
