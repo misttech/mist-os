@@ -809,8 +809,7 @@ impl SelectorExt for Moniker {
         &self,
         selector: &ComponentSelector,
     ) -> Result<bool, anyhow::Error> {
-        let s = SegmentIterator::from(self).collect::<Vec<_>>();
-        match_moniker_against_component_selector(s.into_iter(), selector)
+        match_moniker_against_component_selector(SegmentIterator::from(self), selector)
     }
 
     fn sanitized(&self) -> String {
