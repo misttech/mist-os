@@ -61,10 +61,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_roam_result_indication(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::AuthInd { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::AuthInd { payload, responder } => {
             responder.send().context("Failed to respond to AuthInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::AuthInd {
-                ind: fullmac_to_mlme::convert_authenticate_indication(resp),
+                ind: fullmac_to_mlme::convert_authenticate_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::DeauthConf { payload, responder } => {

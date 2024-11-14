@@ -274,9 +274,10 @@ async fn test_remote_client_connected_open() {
     let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
     fullmac_driver
         .ifc_proxy
-        .auth_ind(&fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: remote_sta_address.clone(),
-            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
+        .auth_ind(&fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some(remote_sta_address.clone()),
+            auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
+            ..Default::default()
         })
         .await
         .expect("Could not send AuthInd");

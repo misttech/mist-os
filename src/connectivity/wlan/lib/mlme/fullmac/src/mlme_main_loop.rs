@@ -1288,9 +1288,10 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let auth_ind = fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: [1u8; 6],
-            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
+        let auth_ind = fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.auth_ind(&auth_ind)),

@@ -307,25 +307,27 @@ pub fn convert_roam_result_indication(
 }
 
 pub fn convert_authenticate_indication(
-    ind: fidl_fullmac::WlanFullmacAuthInd,
-) -> fidl_mlme::AuthenticateIndication {
+    ind: fidl_fullmac::WlanFullmacImplIfcAuthIndRequest,
+) -> Result<fidl_mlme::AuthenticateIndication> {
     use fidl_fullmac::WlanAuthType;
-    fidl_mlme::AuthenticateIndication {
-        peer_sta_address: ind.peer_sta_address,
+    Ok(fidl_mlme::AuthenticateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
         auth_type: match ind.auth_type {
-            WlanAuthType::OpenSystem => fidl_mlme::AuthenticationTypes::OpenSystem,
-            WlanAuthType::SharedKey => fidl_mlme::AuthenticationTypes::SharedKey,
-            WlanAuthType::FastBssTransition => fidl_mlme::AuthenticationTypes::FastBssTransition,
-            WlanAuthType::Sae => fidl_mlme::AuthenticationTypes::Sae,
+            Some(WlanAuthType::OpenSystem) => fidl_mlme::AuthenticationTypes::OpenSystem,
+            Some(WlanAuthType::SharedKey) => fidl_mlme::AuthenticationTypes::SharedKey,
+            Some(WlanAuthType::FastBssTransition) => {
+                fidl_mlme::AuthenticationTypes::FastBssTransition
+            }
+            Some(WlanAuthType::Sae) => fidl_mlme::AuthenticationTypes::Sae,
             _ => {
                 warn!(
                     "Invalid auth type {}, defaulting to AuthenticationTypes::OpenSystem",
-                    ind.auth_type.into_primitive()
+                    ind.auth_type.expect("missing auth type").into_primitive()
                 );
                 fidl_mlme::AuthenticationTypes::OpenSystem
             }
         },
-    }
+    })
 }
 
 pub fn convert_deauthenticate_confirm(
@@ -772,12 +774,13 @@ mod tests {
 
     #[test]
     fn test_convert_authenticate_indication_with_unknown_auth_type_defaults_to_open_system() {
-        let fullmac = fidl_fullmac::WlanFullmacAuthInd {
-            peer_sta_address: [8; 6],
-            auth_type: fidl_fullmac::WlanAuthType::from_primitive_allow_unknown(100),
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcAuthIndRequest {
+            peer_sta_address: Some([8; 6]),
+            auth_type: Some(fidl_fullmac::WlanAuthType::from_primitive_allow_unknown(100)),
+            ..Default::default()
         };
         assert_eq!(
-            convert_authenticate_indication(fullmac),
+            convert_authenticate_indication(fullmac).unwrap(),
             fidl_mlme::AuthenticateIndication {
                 peer_sta_address: [8; 6],
                 auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,

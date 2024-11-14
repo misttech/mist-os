@@ -199,7 +199,8 @@ void SimInterface::RoamResultInd(RoamResultIndRequestView request,
 
 void SimInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
-  stats_.auth_indications.push_back(request->resp);
+  auto auth_ind = fidl::ToNatural(*request);
+  stats_.auth_indications.push_back(auth_ind);
   completer.Reply();
 }
 

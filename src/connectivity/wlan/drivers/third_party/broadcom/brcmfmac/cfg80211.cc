@@ -6644,40 +6644,26 @@ static zx_status_t brcmf_process_auth_ind_event(struct brcmf_if* ifp,
       BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping auth ind callback");
       return ZX_OK;
     }
-    fuchsia_wlan_fullmac_wire::WlanFullmacAuthInd auth_ind_params = {};
-    const char* auth_type;
-
-    memcpy(auth_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
-    // We always authenticate as an open system for WPA
-    auth_ind_params.auth_type = fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem;
-    switch (auth_ind_params.auth_type) {
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem:
-        auth_type = "open";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey:
-        auth_type = "shared key";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kFastBssTransition:
-        auth_type = "fast bss transition";
-        break;
-      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSae:
-        auth_type = "SAE";
-        break;
-      default:
-        auth_type = "unknown";
-    }
-    BRCMF_IFDBG(WLANIF, ndev, "Sending auth indication to SME. type: %s", auth_type);
-#if !defined(NDEBUG)
-    BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC,
-                FMT_MAC_ARGS(auth_ind_params.peer_sta_address));
-#endif /* !defined(NDEBUG) */
-
     auto arena = fdf::Arena::Create(0, 0);
     if (arena.is_error()) {
       BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
       return ZX_ERR_INTERNAL;
     }
-    auto result = ndev->if_proto.buffer(*arena)->AuthInd(auth_ind_params);
+    fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+    memcpy(peer_sta_address.data(), e->addr, ETH_ALEN);
+    auto auth_ind_builder =
+        fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAuthIndRequest::Builder(*arena)
+            // We always authenticate as an open system for WPA
+            .auth_type(fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)
+            .peer_sta_address(peer_sta_address)
+            .Build();
+
+    BRCMF_IFDBG(WLANIF, ndev, "Sending auth indication to SME. type: open");
+#if !defined(NDEBUG)
+    BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(peer_sta_address.data()));
+#endif /* !defined(NDEBUG) */
+
+    auto result = ndev->if_proto.buffer(*arena)->AuthInd(auth_ind_builder);
     if (!result.ok()) {
       BRCMF_ERR("Failed to send auth ind result.status: %s", result.status_string());
       return ZX_ERR_INTERNAL;
