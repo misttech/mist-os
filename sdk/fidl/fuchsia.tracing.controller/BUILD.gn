@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.tracing.controller") {
+  sdk_category = "partner"
+  stable = true
+  sdk_area = "Diagnostics"
   sources = [ "trace_controller.fidl" ]
 
   public_deps = [

@@ -353,6 +353,7 @@ fidl_library://fidl/fuchsia.system.state (unstable)
 fidl_library://fidl/fuchsia.test
 fidl_library://fidl/fuchsia.thermal
 fidl_library://fidl/fuchsia.tracing
+fidl_library://fidl/fuchsia.tracing.controller
 fidl_library://fidl/fuchsia.tracing.perfetto
 fidl_library://fidl/fuchsia.tracing.provider
 fidl_library://fidl/fuchsia.ui.activity

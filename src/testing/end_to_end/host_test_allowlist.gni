@@ -26,11 +26,7 @@ wlan_fidls_allowlist = [
 # entries in the list.
 #
 # TODO(https://fxbug.dev/326090508): Add these to the SDK or remove usage.
-host_test_fidl_allowlist =
-    [
-      # Used by Fuchsia Controller
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx",
-
-      # Used by Honeydew's Fuchsia Controller Tracing affordance
-      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
-    ] + wlan_fidls_allowlist
+host_test_fidl_allowlist = [
+                             # Used by Fuchsia Controller
+                             "//src/developer/ffx/fidl:fuchsia.developer.ffx",
+                           ] + wlan_fidls_allowlist
