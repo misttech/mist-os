@@ -13,9 +13,8 @@ driver_bind_rules("bind") {
   deps = [ "//src/lib/ddktl/tests/metadata-server-test:metadata_server_test_bind_library" ]
 }
 
-fuchsia_cc_driver("driver") {
+source_set("driver_source") {
   testonly = true
-  output_name = "metadata_retriever_test_driver"
   sources = [
     "metadata_retriever_test_device.cc",
     "metadata_retriever_test_device.h",
@@ -32,6 +31,12 @@ fuchsia_cc_driver("driver") {
     "//src/lib/ddktl",
     "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:fuchsia.hardware.test_cpp",
   ]
+}
+
+fuchsia_cc_driver("driver") {
+  testonly = true
+  output_name = "metadata_retriever_test_driver"
+  deps = [ ":driver_source" ]
 }
 
 fuchsia_driver_component("component") {

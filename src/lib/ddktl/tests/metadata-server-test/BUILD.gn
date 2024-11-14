@@ -9,7 +9,10 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":metadata_server_test" ]
+  deps = [
+    ":metadata_server_mock_ddk_test_package",
+    ":metadata_server_test_package",
+  ]
 }
 
 group("drivers") {
@@ -27,9 +30,8 @@ bind_library("metadata_server_test_bind_library") {
   public_deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-test("metadata-server-test") {
+test("metadata_server_test") {
   testonly = true
-  output_name = "metadata_server_test"
   sources = [ "metadata_server_test.cc" ]
 
   deps = [
@@ -42,7 +44,7 @@ test("metadata-server-test") {
   ]
 }
 
-fuchsia_unittest_package("metadata_server_test") {
+fuchsia_unittest_package("metadata_server_test_package") {
   test_specs = {
     # Allow error logging for when `MetadataServer::GetMetadata()` fails.
     log_settings = {
@@ -51,9 +53,34 @@ fuchsia_unittest_package("metadata_server_test") {
   }
 
   deps = [
-    ":metadata-server-test",
+    ":metadata_server_test",
     "metadata-forwarder-test-driver:component",
     "metadata-retriever-test-driver:component",
     "metadata-sender-test-driver:component",
   ]
+}
+
+test("metadata_server_mock_ddk_test") {
+  testonly = true
+  sources = [ "mock_ddk_test.cc" ]
+
+  deps = [
+    "fuchsia.hardware.test:fuchsia.hardware.test_cpp",
+    "metadata-retriever-test-driver:driver_source",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/ddktl",
+    "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:metadata",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+  ]
+}
+
+fuchsia_unittest_package("metadata_server_mock_ddk_test_package") {
+  deps = [ ":metadata_server_mock_ddk_test" ]
 }

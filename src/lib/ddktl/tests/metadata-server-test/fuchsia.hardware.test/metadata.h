@@ -13,12 +13,12 @@ namespace ddk {
 
 template <>
 struct ObjectDetails<fuchsia_hardware_test::Metadata> {
-  inline static const char* Name = fuchsia_hardware_test::kMetadataService;
+  inline static const char* Name = fuchsia_hardware_test::kMetadataTypeName;
 };
 
 template <>
 struct ObjectDetails<fuchsia_hardware_test::wire::Metadata> {
-  inline static const char* Name = fuchsia_hardware_test::kMetadataService;
+  inline static const char* Name = fuchsia_hardware_test::kMetadataTypeName;
 };
 
 }  // namespace ddk
