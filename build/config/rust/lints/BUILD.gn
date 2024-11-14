@@ -14,6 +14,7 @@ config("clippy_warn_production") {
     "-Wclippy::or_fun_call",
     "-Wclippy::perf",
     "-Wclippy::redundant_clone",
+    "-Wclippy::set_contains_or_insert",
     "-Wclippy::unnecessary_lazy_evaluation",
 
     # go/keep-sorted end
