@@ -502,8 +502,7 @@ impl types::ScannedCandidate {
             .get_recent(fasync::MonotonicInstant::now() - RECENT_DISCONNECT_WINDOW)
             .iter()
             .filter(|d| d.connection_uptime < SHORT_CONNECT_DURATION)
-            .collect::<Vec<_>>()
-            .len()
+            .count()
     }
 
     pub fn saved_security_type_to_string(&self) -> String {
