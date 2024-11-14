@@ -210,19 +210,19 @@ impl WrappedKeys {
 }
 
 #[derive(Clone, Debug)]
-pub struct XtsCipher {
+pub struct Cipher {
     id: u64,
     // This is None if the key isn't present.
     cipher: Option<Aes256>,
 }
 
-impl XtsCipher {
+impl Cipher {
     pub fn new(id: u64, key: &UnwrappedKey) -> Self {
         Self { id, cipher: Some(Aes256::new(GenericArray::from_slice(key.key()))) }
     }
 
     pub fn unavailable(id: u64) -> Self {
-        XtsCipher { id, cipher: None }
+        Cipher { id, cipher: None }
     }
 
     pub fn key(&self) -> Option<&Aes256> {
@@ -232,8 +232,8 @@ impl XtsCipher {
 
 /// References a specific key in the cipher set.
 pub struct Key {
-    keys: Arc<XtsCipherSet>,
-    // Index in the XtsCipherSet array for the key.
+    keys: Arc<CipherSet>,
+    // Index in the CipherSet array for the key.
     index: usize,
 }
 
@@ -311,31 +311,31 @@ impl Key {
 }
 
 #[derive(Clone, Debug)]
-pub struct XtsCipherSet(Vec<XtsCipher>);
+pub struct CipherSet(Vec<Cipher>);
 
-impl From<Vec<XtsCipher>> for XtsCipherSet {
-    fn from(value: Vec<XtsCipher>) -> Self {
+impl From<Vec<Cipher>> for CipherSet {
+    fn from(value: Vec<Cipher>) -> Self {
         Self(value)
     }
 }
 
-impl XtsCipherSet {
+impl CipherSet {
     pub fn new(keys: &UnwrappedKeys) -> Self {
         Self(
             keys.iter()
                 .map(|(id, k)| match k {
-                    Some(k) => XtsCipher::new(*id, k),
-                    None => XtsCipher::unavailable(*id),
+                    Some(k) => Cipher::new(*id, k),
+                    None => Cipher::unavailable(*id),
                 })
                 .collect(),
         )
     }
 
-    pub fn ciphers(&self) -> &[XtsCipher] {
+    pub fn ciphers(&self) -> &[Cipher] {
         &self.0
     }
 
-    pub fn cipher(&self, id: u64) -> Option<(usize, &XtsCipher)> {
+    pub fn cipher(&self, id: u64) -> Option<(usize, &Cipher)> {
         self.0.iter().enumerate().find(|(_, x)| x.id == id)
     }
 
@@ -564,7 +564,7 @@ impl BlockClosure for XtsProcessor<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Key, XtsCipher, XtsCipherSet};
+    use crate::{Cipher, CipherSet, Key};
 
     use super::{StreamCipher, UnwrappedKey};
 
@@ -607,7 +607,7 @@ mod tests {
         let raw_key_bytes: [u8; 32] =
             hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
         let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
-        let cipher_set = XtsCipherSet::from(vec![XtsCipher::new(0, &unwrapped_key)]);
+        let cipher_set = CipherSet::from(vec![Cipher::new(0, &unwrapped_key)]);
         let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
         let object_id = 2;
         let mut text = "filename".to_string().as_bytes().to_vec();
@@ -624,7 +624,7 @@ mod tests {
         let raw_key_bytes: [u8; 32] =
             hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
         let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
-        let cipher_set = XtsCipherSet::from(vec![XtsCipher::new(0, &unwrapped_key)]);
+        let cipher_set = CipherSet::from(vec![Cipher::new(0, &unwrapped_key)]);
         let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
         let object_id = 2;
         let mut text = hex::decode("52d56369103a39b3ea1e09c85dd51546").expect("decode failed");
