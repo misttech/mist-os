@@ -471,9 +471,12 @@ remote_cmd_prefix+=(
   --exec_root "$exec_root"
   --cfg "$cfg"
 
+  # LINT.IfChange(compile_cfg)
   # for C++
   --labels=type=compile,compiler=clang,lang=cpp
   --canonicalize_working_dir=true
+  --exec_timeout=10m
+  # LINT.ThenChange(/build/rbe/cxx_remote_wrapper.py:compile_cfg)
 
   # Need to expand possible empty arrays as "${arr[@]+"${arr[@]}"}"
   # https://stackoverflow.com/questions/7577052/bash-empty-array-expansion-with-set-u

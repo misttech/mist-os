@@ -308,8 +308,11 @@ class CxxRemoteAction(object):
             *self.command_line_output_dirs,
         ]
         remote_options = [
+            # LINT.IfChange(compile_cfg)
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
+            "--exec_timeout=10m",
+            # LINT.ThenChange(/build/rbe/reclient_cxx.sh:compile_cfg)
         ] + self._main_remote_options  # allow forwarded options to override defaults
 
         # The output file is inferred automatically by rewrapper in C++ mode,
