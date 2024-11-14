@@ -6,6 +6,7 @@ library fuchsia.hardware.display.engine;
 using fuchsia.hardware.display.types;
 using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
+using fuchsia.math;
 using fuchsia.sysmem2;
 using zx;
 
@@ -43,6 +44,88 @@ type DisplayMode = struct {
     flags ModeFlag;
 };
 
+type Layer = struct {
+    /// z_index of the layer. See
+    /// [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`] and
+    /// [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
+    cfg LayerConfig;
+};
+
+type LayerConfig = strict union {
+    1: primary PrimaryLayer;
+    2: color ColorLayer;
+};
+
+type ColorLayer = struct {
+    /// The color to use for the layer.
+    color fuchsia.hardware.display.types.Color;
+};
+
+type PrimaryLayer = struct {
+    /// The image whose pixels are drawn by this layer.
+    ///
+    /// If valid, the handle must be the result of a successful call to
+    /// [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    image_id ImageId;
+
+    /// The arguments used to import `image_handle`.
+    ///
+    /// If `image_handle` is valid, the metadata must equal the argument passed
+    /// to [`fuchsia.hardware.display.engine/Engine.ImportImage`].
+    image_metadata fuchsia.hardware.display.types.ImageMetadata;
+
+    /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
+    /// `alpha_layer_val` is ignored.
+    ///
+    /// If `alpha_mode` is `AlphaMode.PREMULTIPLIED` or `HW_MULTIPLY`, the
+    /// alpha used when blending is determined by the product of
+    /// `alpha_layer_val` and any per-pixel alpha.
+    ///
+    /// Additionally, if `alpha_mode` is `AlphaMode.PREMULTIPLIED`, then the
+    /// hardware must premultiply the color channel with `alpha_layer_val`
+    /// before blending.
+    ///
+    /// `alpha_layer_val` must be in the range [0, 1].
+    alpha_mode fuchsia.hardware.display.types.AlphaMode;
+    alpha_layer_val float32;
+
+    /// Applied to the input image pixels specified by `image_source`.
+    ///
+    /// `display_destination` must account for image dimensions changes caused
+    /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
+    /// would specify 300x600 pixel dimensions in `display_destination`.
+    image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
+
+    /// The associated image region whose pixels are drawn by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// image's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty image source
+    /// rectangle that is entirely contained within the image.
+    ///
+    /// Hardware image cropping is requested implicitly, when the source
+    /// region's dimensions differ from the image's dimensions. Some display
+    /// hardware may not support cropping.
+    image_source fuchsia.math.RectU;
+
+    /// The display image (composited output) region occupied by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// display's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty display destination
+    /// rectangle that is entirely contained within the display.
+    ///
+    /// Hardware image scaling is requested implicitly, when the output region's
+    /// dimensions differ from the dimensions of `image_source`. Some display
+    /// hardware may not support scaling. All display hardware has limitations
+    /// in scaling support.
+    display_destination fuchsia.math.RectU;
+};
+
 type DisplayConfig = struct {
     /// the display id to which the configuration applies
     display_id uint64;
@@ -60,7 +143,7 @@ type DisplayConfig = struct {
     cc_coefficients array<array<float32, 3>, 3>;
     cc_postoffsets array<float32, 3>;
 
-    layer vector<fuchsia.hardware.display.types.Layer>:MAX;
+    layer vector<Layer>:MAX;
 };
 
 // An E-EDID can contain up to 256 data blocks, each of which contains 128

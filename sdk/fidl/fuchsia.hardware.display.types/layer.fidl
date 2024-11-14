@@ -4,7 +4,6 @@
 library fuchsia.hardware.display.types;
 
 using fuchsia.images2;
-using fuchsia.math;
 
 /// Transformations that can be applied by display hardware to input images.
 ///
@@ -158,61 +157,6 @@ type ClientCompositionOpcode = strict enum : uint8 {
     CLIENT_ALPHA = 7;
 };
 
-type PrimaryLayer = struct {
-    image_metadata ImageMetadata;
-
-    /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
-    /// `alpha_layer_val` is ignored.
-    ///
-    /// If `alpha_mode` is `AlphaMode.PREMULTIPLIED` or `HW_MULTIPLY`, the
-    /// alpha used when blending is determined by the product of
-    /// `alpha_layer_val` and any per-pixel alpha.
-    ///
-    /// Additionally, if `alpha_mode` is `AlphaMode.PREMULTIPLIED`, then the
-    /// hardware must premultiply the color channel with `alpha_layer_val`
-    /// before blending.
-    ///
-    /// `alpha_layer_val` must be in the range [0, 1].
-    alpha_mode AlphaMode;
-    alpha_layer_val float32;
-
-    /// Applied to the input image pixels specified by `image_source`.
-    ///
-    /// `display_destination` must account for image dimensions changes caused
-    /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
-    /// would specify 300x600 pixel dimensions in `display_destination`.
-    image_source_transformation CoordinateTransformation;
-
-    /// The associated image region whose pixels are drawn by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// image's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
-    ///
-    /// A valid layer definition requires a valid non-empty image source
-    /// rectangle that is entirely contained within the image.
-    ///
-    /// Hardware image cropping is requested implicitly, when the source
-    /// region's dimensions differ from the image's dimensions. Some display
-    /// hardware may not support cropping.
-    image_source fuchsia.math.RectU;
-
-    /// The display image (composited output) region occupied by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// display's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
-    ///
-    /// A valid layer definition requires a valid non-empty display destination
-    /// rectangle that is entirely contained within the display.
-    ///
-    /// Hardware image scaling is requested implicitly, when the output region's
-    /// dimensions differ from the dimensions of `image_source`. Some display
-    /// hardware may not support scaling. All display hardware has limitations
-    /// in scaling support.
-    display_destination fuchsia.math.RectU;
-};
-
 /// A color constant.
 type Color = struct {
     /// The format of pixel data stored in `bytes`.
@@ -234,21 +178,4 @@ type Color = struct {
     // familiar with has pixel processing pipelines that support 4 color
     // channels (3 color channels plus one alpha channel), and operate with
     // precisions of 10-12 bits per channel.
-};
-
-type ColorLayer = struct {
-    /// The color to use for the layer.
-    color Color;
-};
-
-type LayerConfig = strict union {
-    1: primary PrimaryLayer;
-    2: color ColorLayer;
-};
-
-type Layer = struct {
-    /// z_index of the layer. See
-    /// [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`] and
-    /// [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
-    cfg LayerConfig;
 };
