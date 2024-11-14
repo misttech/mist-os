@@ -10,7 +10,7 @@ Profile duration summary for `puppet`:
     ├── 62.393%: FirstNestedDuration, 1000x
     │       cpu: 358.745ms, queue: 0.009ms, faulting: 0.000ms, contended: 0.000ms, wall: 359.149ms
     │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:41:25
-    │   ├── 99.698%: LeafDuration, 1000x
+    │   ├── 99.698%: Fuchsia.LeafDuration, 1000x
     │   │       cpu: 357.660ms, queue: 0.009ms, faulting: 0.000ms, contended: 0.000ms, wall: 358.109ms
     │   │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
     │   └── 0.302%: BELOW_THRESHOLD
@@ -18,7 +18,7 @@ Profile duration summary for `puppet`:
     ├── 18.700%: SecondNestedDuration, 100x
     │       cpu: 107.521ms, queue: 0.008ms, faulting: 0.000ms, contended: 0.000ms, wall: 107.570ms
     │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:45:25
-    │   ├── 99.763%: LeafDuration, 300x
+    │   ├── 99.763%: Blue.LeafDuration, 300x
     │   │       cpu: 107.267ms, queue: 0.008ms, faulting: 0.000ms, contended: 0.000ms, wall: 107.406ms
     │   │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
     │   └── 0.237%: BELOW_THRESHOLD
@@ -26,7 +26,7 @@ Profile duration summary for `puppet`:
     ├── 12.468%: ThirdNestedDuration, 100x
     │       cpu: 71.685ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 71.725ms
     │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:51:41
-    │   ├── 99.740%: LeafDuration, 200x
+    │   ├── 99.740%: Green.LeafDuration, 200x
     │   │       cpu: 71.498ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 71.587ms
     │   │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
     │   └── 0.260%: BELOW_THRESHOLD
@@ -34,7 +34,7 @@ Profile duration summary for `puppet`:
     ├── 6.237%: FourthNestedDuration, 100x
     │       cpu: 35.862ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 35.901ms
     │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:54:31
-    │   ├── 99.686%: LeafDuration, 100x
+    │   ├── 99.686%: Red.LeafDuration, 100x
     │   │       cpu: 35.750ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 35.793ms
     │   │       source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
     │   └── 0.314%: BELOW_THRESHOLD
@@ -45,7 +45,39 @@ Profile duration summary for `puppet`:
 
 Rolled up leaf durations:
 
-99.513%: LeafDuration, 1600x
-    cpu: 572.174ms, queue: 0.017ms, faulting: 0.000ms, contended: 0.000ms, wall: 572.896ms
+62.204%: Fuchsia.LeafDuration, 1000x
+    cpu: 357.660ms, queue: 0.009ms, faulting: 0.000ms, contended: 0.000ms, wall: 358.109ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+18.656%: Blue.LeafDuration, 300x
+    cpu: 107.267ms, queue: 0.008ms, faulting: 0.000ms, contended: 0.000ms, wall: 107.406ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+12.435%: Green.LeafDuration, 200x
+    cpu: 71.498ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 71.587ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+6.218%: Red.LeafDuration, 100x
+    cpu: 35.750ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 35.793ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+Custom rollup: Fuchsia Leaves
+
+62.204%: Fuchsia.LeafDuration, 1000x
+    cpu: 357.660ms, queue: 0.009ms, faulting: 0.000ms, contended: 0.000ms, wall: 358.109ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+Custom rollup: RGB Leaves
+
+18.656%: Blue.LeafDuration, 300x
+    cpu: 107.267ms, queue: 0.008ms, faulting: 0.000ms, contended: 0.000ms, wall: 107.406ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+12.435%: Green.LeafDuration, 200x
+    cpu: 71.498ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 71.587ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
+
+6.218%: Red.LeafDuration, 100x
+    cpu: 35.750ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 35.793ms
     source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
 

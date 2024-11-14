@@ -103,6 +103,10 @@ compiled_action("generate_self_report_text") {
     rebase_path(_json_snapshot, root_build_dir),
     "--output",
     rebase_path(_text_report_output, root_build_dir),
+    "--add-rollup",
+    "Fuchsia Leaves=Fuchsia",
+    "--add-rollup",
+    "RGB Leaves=Red,Green,Blue",
   ]
 }
 
