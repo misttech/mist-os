@@ -83,7 +83,10 @@ class ScratchAllocator {
       ZX_ASSERT(*log_);
       zx::vmo vmo;
       Do(zx::vmo::create(size, 0, &vmo), "allocate");
-      Do(vmar_->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &mapping_), "map");
+      Do(vmo.op_range(ZX_VMO_OP_COMMIT, 0, size, nullptr, 0), "commit");
+      Do(vmar_->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_MAP_RANGE, 0, vmo, 0, size,
+                    &mapping_),
+         "map");
       Do(vmo.set_property(ZX_PROP_NAME, kScratchVmoName, sizeof(kScratchVmoName) - 1), "name");
     }
 
