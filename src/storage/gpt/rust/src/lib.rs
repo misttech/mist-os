@@ -182,6 +182,12 @@ struct TransactionState {
     next_id: u64,
 }
 
+impl Default for TransactionState {
+    fn default() -> Self {
+        Self { pending_id: u64::MAX, next_id: 0 }
+    }
+}
+
 /// Manages a connection to a GPT-formatted block device.
 pub struct Gpt {
     client: Arc<RemoteBlockClient>,
@@ -246,10 +252,7 @@ impl Gpt {
             client,
             header,
             partitions,
-            transaction_state: Arc::new(Mutex::new(TransactionState {
-                pending_id: u64::MAX,
-                next_id: 0,
-            })),
+            transaction_state: Arc::new(Mutex::new(TransactionState::default())),
         };
         if restore_primary {
             tracing::info!("Restoring primary metadata from backup!");
@@ -270,6 +273,29 @@ impl Gpt {
                 .await
                 .context("Failed to restore primary metadata")?;
         }
+        Ok(this)
+    }
+
+    /// Formats `client` as a new GPT with `partitions`.  Overwrites any existing GPT on the block
+    /// device.
+    pub async fn format(
+        client: Arc<RemoteBlockClient>,
+        partitions: Vec<PartitionInfo>,
+    ) -> Result<Self, Error> {
+        let header = format::Header::new(
+            client.block_count(),
+            client.block_size(),
+            partitions.len() as u32,
+        )?;
+        let mut this = Self {
+            client,
+            header,
+            partitions: BTreeMap::new(),
+            transaction_state: Arc::new(Mutex::new(TransactionState::default())),
+        };
+        let mut transaction = this.create_transaction().unwrap();
+        transaction.partitions = partitions;
+        this.commit_transaction(transaction).await?;
         Ok(this)
     }
 
@@ -404,14 +430,13 @@ impl Drop for Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::Gpt;
+    use crate::{Gpt, Guid, PartitionInfo};
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::{FakeServer, FakeServerOptions};
-    use fidl_fuchsia_hardware_block_volume as fvolume;
-    use futures::FutureExt as _;
-    use gpt_testing::{format_gpt, Guid, PartitionInfo};
     use std::ops::Range;
     use std::sync::Arc;
+    use zx::HandleBased;
+    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn load_unformatted_gpt() {
@@ -420,36 +445,28 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect_err("load should fail");
-            }.fuse() => {},
-        );
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::open(client).await.expect_err("load should fail");
     }
 
     #[fuchsia::test]
     async fn load_formatted_empty_gpt() {
         let vmo = zx::Vmo::create(4096).unwrap();
-        format_gpt(&vmo, 512, vec![]);
         let server = Arc::new(FakeServer::from_vmo(512, vmo));
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-            }.fuse() => {},
-        );
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), vec![]).await.expect("format failed");
+        Gpt::open(client).await.expect("load should succeed");
     }
 
     #[fuchsia::test]
@@ -459,9 +476,17 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let vmo = zx::Vmo::create(6 * 4096).unwrap();
-        format_gpt(
-            &vmo,
-            4096,
+        let server = Arc::new(FakeServer::from_vmo(4096, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -470,27 +495,16 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(4096, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                assert_eq!(manager.header.first_usable, 3);
-                assert_eq!(manager.header.last_usable, 3);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.start_block, 3);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        )
+        .await
+        .expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        assert_eq!(manager.header.first_usable, 3);
+        assert_eq!(manager.header.last_usable, 3);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.start_block, 3);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -501,9 +515,17 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -512,28 +534,17 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, "part");
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        )
+        .await
+        .expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, "part");
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -545,9 +556,17 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![
                 PartitionInfo {
                     label: PART_1_NAME.to_string(),
@@ -566,34 +585,23 @@ mod tests {
                     flags: 0,
                 },
             ],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let partition = manager.partitions().get(&1).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&2).is_none());
-            }.fuse() => {},
-        );
+        )
+        .await
+        .expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let partition = manager.partitions().get(&1).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&2).is_none());
     }
 
     #[fuchsia::test]
@@ -603,9 +611,17 @@ mod tests {
         const PART_NAME: &str = "part\0extrastuff";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -614,24 +630,13 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                // The name should have everything after the first nul byte stripped.
-                assert_eq!(partition.label, "part");
-            }.fuse() => {},
-        );
+        )
+        .await
+        .expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        // The name should have everything after the first nul byte stripped.
+        assert_eq!(partition.label, "part");
     }
 
     #[fuchsia::test]
@@ -641,9 +646,17 @@ mod tests {
         const PART_NAME: &str = "";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -652,23 +665,12 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, "");
-            }.fuse() => {},
-        );
+        )
+        .await
+        .expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, "");
     }
 
     #[fuchsia::test]
@@ -680,9 +682,18 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![
                 PartitionInfo {
                     label: PART_1_NAME.to_string(),
@@ -701,37 +712,25 @@ mod tests {
                     flags: 0,
                 },
             ],
-        );
+        )
+        .await
+        .expect("format failed");
         // Clobber the primary header.  The backup should allow the GPT to be used.
-        vmo.write(&[0xffu8; 512], 512).unwrap();
-
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let partition = manager.partitions().get(&1).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&2).is_none());
-            }.fuse() => {},
-        );
+        client.write_at(BufferSlice::Memory(&[0xffu8; 512]), 512).await.unwrap();
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let partition = manager.partitions().get(&1).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&2).is_none());
     }
 
     #[fuchsia::test]
@@ -743,9 +742,18 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![
                 PartitionInfo {
                     label: PART_1_NAME.to_string(),
@@ -764,95 +772,73 @@ mod tests {
                     flags: 0,
                 },
             ],
-        );
+        )
+        .await
+        .expect("format failed");
         // Clobber the primary partition table.  The backup should allow the GPT to be used.
-        vmo.write(&[0xffu8; 512], 1024).unwrap();
-
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
-
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let partition = manager.partitions().get(&1).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&2).is_none());
-            }.fuse() => {},
-        );
+        client.write_at(BufferSlice::Memory(&[0xffu8; 512]), 1024).await.unwrap();
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let partition = manager.partitions().get(&1).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&2).is_none());
     }
 
     #[fuchsia::test]
     async fn drop_transaction() {
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(&vmo, 512, vec![]);
         let server = Arc::new(FakeServer::from_vmo(512, vmo));
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                {
-                    let _transaction = manager.create_transaction().unwrap();
-                    assert!(manager.create_transaction().is_none());
-                }
-                let _transaction =
-                    manager.create_transaction().expect("Transaction dropped but not available");
-            }.fuse() => {},
-        );
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), vec![]).await.expect("format failed");
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        {
+            let _transaction = manager.create_transaction().unwrap();
+            assert!(manager.create_transaction().is_none());
+        }
+        let _transaction =
+            manager.create_transaction().expect("Transaction dropped but not available");
     }
 
     #[fuchsia::test]
     async fn commit_empty_transaction() {
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(&vmo, 512, vec![]);
         let server = Arc::new(FakeServer::from_vmo(512, vmo));
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let transaction = manager.create_transaction().unwrap();
-                manager.commit_transaction(transaction).await.expect("Commit failed");
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), vec![]).await.expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let transaction = manager.create_transaction().unwrap();
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 0);
-                assert!(manager.partitions().is_empty());
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 0);
-                assert!(manager.partitions().is_empty());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 0);
+        assert!(manager.partitions().is_empty());
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 0);
+        assert!(manager.partitions().is_empty());
     }
 
     #[fuchsia::test]
@@ -864,9 +850,17 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_1_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -875,54 +869,41 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 1);
+        transaction.partitions.push(crate::PartitionInfo {
+            label: PART_2_NAME.to_string(),
+            type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
+            instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
+            start_block: 7,
+            num_blocks: 1,
+            flags: 0,
+        });
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                assert_eq!(transaction.partitions.len(), 1);
-                transaction.partitions.push(crate::PartitionInfo {
-                    label: PART_2_NAME.to_string(),
-                    type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 7,
-                    num_blocks: 1,
-                    flags: 0,
-                });
-                manager.commit_transaction(transaction).await.expect("Commit failed");
-
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 2);
-                assert!(manager.partitions().get(&2).is_none());
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 2);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let partition = manager.partitions().get(&1).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&2).is_none());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 2);
+        assert!(manager.partitions().get(&2).is_none());
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 2);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let partition = manager.partitions().get(&1).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&2).is_none());
     }
 
     #[fuchsia::test]
@@ -932,9 +913,17 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -943,35 +932,22 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 1);
+        transaction.partitions.clear();
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                assert_eq!(transaction.partitions.len(), 1);
-                transaction.partitions.clear();
-                manager.commit_transaction(transaction).await.expect("Commit failed");
-
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 0);
-                assert!(manager.partitions().get(&0).is_none());
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 0);
-                assert!(manager.partitions().get(&0).is_none());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 0);
+        assert!(manager.partitions().get(&0).is_none());
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 0);
+        assert!(manager.partitions().get(&0).is_none());
     }
 
     #[fuchsia::test]
@@ -983,9 +959,17 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_1_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -994,61 +978,56 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 1);
+        transaction.partitions[0] = crate::PartitionInfo {
+            label: PART_2_NAME.to_string(),
+            type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
+            instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
+            start_block: 7,
+            num_blocks: 1,
+            flags: 0,
+        };
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                assert_eq!(transaction.partitions.len(), 1);
-                transaction.partitions[0] = crate::PartitionInfo {
-                    label: PART_2_NAME.to_string(),
-                    type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 7,
-                    num_blocks: 1,
-                    flags: 0,
-                };
-                manager.commit_transaction(transaction).await.expect("Commit failed");
-
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
     async fn grow_partition_table_in_transaction() {
         let vmo = zx::Vmo::create(1024 * 1024).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: "part".to_string(),
                 type_guid: Guid::from_bytes([1u8; 16]),
@@ -1057,50 +1036,37 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        assert_eq!(manager.header().num_parts, 1);
+        assert_eq!(manager.header().first_usable, 3);
+        let mut transaction = manager.create_transaction().unwrap();
+        transaction.partitions.resize(128, crate::PartitionInfo::nil());
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                assert_eq!(manager.header().num_parts, 1);
-                assert_eq!(manager.header().first_usable, 3);
-                let mut transaction = manager.create_transaction().unwrap();
-                transaction.partitions.resize(128, crate::PartitionInfo::nil());
-                manager.commit_transaction(transaction).await.expect("Commit failed");
-
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 128);
-                assert_eq!(manager.header().first_usable, 34);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, "part");
-                assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
-                assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
-                assert_eq!(partition.start_block, 34);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 128);
-                assert_eq!(manager.header().first_usable, 34);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, "part");
-                assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
-                assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
-                assert_eq!(partition.start_block, 34);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 128);
+        assert_eq!(manager.header().first_usable, 34);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, "part");
+        assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
+        assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
+        assert_eq!(partition.start_block, 34);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 128);
+        assert_eq!(manager.header().first_usable, 34);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, "part");
+        assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
+        assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
+        assert_eq!(partition.start_block, 34);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -1117,38 +1083,32 @@ mod tests {
                 flags: 0,
             });
         }
-        format_gpt(&vmo, 512, partitions);
         let server = Arc::new(FakeServer::from_vmo(512, vmo));
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                assert_eq!(manager.header().num_parts, 128);
-                assert_eq!(manager.header().first_usable, 34);
-                let mut transaction = manager.create_transaction().unwrap();
-                transaction.partitions.clear();
-                manager.commit_transaction(transaction).await.expect("Commit failed");
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), partitions).await.expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        assert_eq!(manager.header().num_parts, 128);
+        assert_eq!(manager.header().first_usable, 34);
+        let mut transaction = manager.create_transaction().unwrap();
+        transaction.partitions.clear();
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                // Check state before and after a reload, to ensure both the in-memory and on-disk
-                // representation match.
-                assert_eq!(manager.header().num_parts, 0);
-                assert_eq!(manager.header().first_usable, 2);
-                assert!(manager.partitions().get(&0).is_none());
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 0);
-                assert_eq!(manager.header().first_usable, 2);
-                assert!(manager.partitions().get(&0).is_none());
-            }.fuse() => {},
-        );
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 0);
+        assert_eq!(manager.header().first_usable, 2);
+        assert!(manager.partitions().get(&0).is_none());
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 0);
+        assert_eq!(manager.header().first_usable, 2);
+        assert!(manager.partitions().get(&0).is_none());
     }
 
     #[fuchsia::test]
@@ -1158,9 +1118,17 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -1169,47 +1137,33 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 1);
+        // This overlaps with the GPT metadata, so is invalid.
+        transaction.partitions[0].start_block = 0;
+        manager.commit_transaction(transaction).await.expect_err("Commit should have failed");
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                assert_eq!(transaction.partitions.len(), 1);
-                // This overlaps with the GPT metadata, so is invalid.
-                transaction.partitions[0].start_block = 0;
-                manager
-                    .commit_transaction(transaction).await.expect_err("Commit should have failed");
-
-                // Ensure nothing changed. Check state before and after a reload, to ensure both the
-                // in-memory and on-disk representation match.
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-            }.fuse() => {},
-        );
+        // Ensure nothing changed. Check state before and after a reload, to ensure both the
+        // in-memory and on-disk representation match.
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
     }
 
     /// An Observer that discards all writes overlapping its range (specified in bytes, not blocks).
@@ -1248,18 +1202,6 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
-            vec![PartitionInfo {
-                label: PART_1_NAME.to_string(),
-                type_guid: Guid::from_bytes(PART_TYPE_GUID),
-                instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
-                start_block: 4,
-                num_blocks: 1,
-                flags: 0,
-            }],
-        );
         let server = Arc::new(FakeServer::from(FakeServerOptions {
             vmo: Some(vmo),
             block_size: 512,
@@ -1272,43 +1214,50 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                transaction.partitions.push(crate::PartitionInfo {
-                    label: PART_2_NAME.to_string(),
-                    type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 7,
-                    num_blocks: 1,
-                    flags: 0,
-                });
-                manager.commit_transaction(transaction).await.expect("Commit failed");
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
+            vec![PartitionInfo {
+                label: PART_1_NAME.to_string(),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
+                start_block: 4,
+                num_blocks: 1,
+                flags: 0,
+            }],
+        )
+        .await
+        .expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        transaction.partitions.push(crate::PartitionInfo {
+            label: PART_2_NAME.to_string(),
+            type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
+            instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
+            start_block: 7,
+            num_blocks: 1,
+            flags: 0,
+        });
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 2);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                let partition = manager.partitions().get(&1).expect("No entry found");
-                assert_eq!(partition.label, PART_2_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
-                assert_eq!(partition.start_block, 7);
-                assert_eq!(partition.num_blocks, 1);
-            }.fuse() => {},
-        );
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 2);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        let partition = manager.partitions().get(&1).expect("No entry found");
+        assert_eq!(partition.label, PART_2_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
+        assert_eq!(partition.start_block, 7);
+        assert_eq!(partition.num_blocks, 1);
     }
 
     #[fuchsia::test]
@@ -1320,18 +1269,31 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
-            vec![PartitionInfo {
-                label: PART_1_NAME.to_string(),
-                type_guid: Guid::from_bytes(PART_TYPE_GUID),
-                instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
-                start_block: 4,
-                num_blocks: 1,
-                flags: 0,
-            }],
-        );
+        let vmo_dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        {
+            let (client, server_end) =
+                fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+            let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
+            let _task = fasync::Task::spawn(async move {
+                server.serve(server_end.into_stream().unwrap()).await
+            });
+            let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+            Gpt::format(
+                client.clone(),
+                vec![PartitionInfo {
+                    label: PART_1_NAME.to_string(),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                    flags: 0,
+                }],
+            )
+            .await
+            .expect("format failed");
+        }
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
         let server = Arc::new(FakeServer::from(FakeServerOptions {
             vmo: Some(vmo),
             block_size: 512,
@@ -1341,41 +1303,33 @@ mod tests {
             })),
             ..Default::default()
         }));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                transaction.partitions.push(crate::PartitionInfo {
-                    label: PART_2_NAME.to_string(),
-                    type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 7,
-                    num_blocks: 1,
-                    flags: 0,
-                });
-                manager.commit_transaction(transaction).await.expect("Commit failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        transaction.partitions.push(crate::PartitionInfo {
+            label: PART_2_NAME.to_string(),
+            type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
+            instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
+            start_block: 7,
+            num_blocks: 1,
+            flags: 0,
+        });
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -1387,18 +1341,31 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
-            vec![PartitionInfo {
-                label: PART_1_NAME.to_string(),
-                type_guid: Guid::from_bytes(PART_TYPE_GUID),
-                instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
-                start_block: 4,
-                num_blocks: 1,
-                flags: 0,
-            }],
-        );
+        let vmo_dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        {
+            let (client, server_end) =
+                fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+            let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
+            let _task = fasync::Task::spawn(async move {
+                server.serve(server_end.into_stream().unwrap()).await
+            });
+            let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+            Gpt::format(
+                client.clone(),
+                vec![PartitionInfo {
+                    label: PART_1_NAME.to_string(),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                    flags: 0,
+                }],
+            )
+            .await
+            .expect("format failed");
+        }
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
         let server = Arc::new(FakeServer::from(FakeServerOptions {
             vmo: Some(vmo),
             block_size: 512,
@@ -1408,41 +1375,33 @@ mod tests {
             })),
             ..Default::default()
         }));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let mut transaction = manager.create_transaction().unwrap();
-                transaction.partitions.push(crate::PartitionInfo {
-                    label: PART_2_NAME.to_string(),
-                    type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 7,
-                    num_blocks: 1,
-                    flags: 0,
-                });
-                manager.commit_transaction(transaction).await.expect("Commit failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        transaction.partitions.push(crate::PartitionInfo {
+            label: PART_2_NAME.to_string(),
+            type_guid: crate::Guid::from_bytes(PART_TYPE_GUID),
+            instance_guid: crate::Guid::from_bytes(PART_INSTANCE_2_GUID),
+            start_block: 7,
+            num_blocks: 1,
+            flags: 0,
+        });
+        manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = Gpt::open(manager.take_client())
-                    .await
-                    .expect("reload should succeed");
-                assert_eq!(manager.header().num_parts, 1);
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, PART_1_NAME);
-                assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
-                assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
-                assert_eq!(partition.start_block, 4);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 1);
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, PART_1_NAME);
+        assert_eq!(partition.type_guid.to_bytes(), PART_TYPE_GUID);
+        assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_1_GUID);
+        assert_eq!(partition.start_block, 4);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -1452,9 +1411,17 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        format_gpt(
-            &vmo,
-            512,
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(
+            client.clone(),
             vec![PartitionInfo {
                 label: PART_NAME.to_string(),
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
@@ -1463,31 +1430,19 @@ mod tests {
                 num_blocks: 1,
                 flags: 0,
             }],
-        );
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
-        let (client, server_end) =
-            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+        )
+        .await
+        .expect("format failed");
+        let mut old_metadata = vec![0u8; 2048];
+        client.read_at(MutableBufferSlice::Memory(&mut old_metadata[..]), 0).await.unwrap();
+        let mut buffer = vec![0u8; 2048];
+        client.write_at(BufferSlice::Memory(&buffer[..]), 0).await.unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
-                let mut old_metadata = vec![0u8; 2048];
-                client.read_at(MutableBufferSlice::Memory(&mut old_metadata[..]), 0).await.unwrap();
-                let mut buffer = vec![0u8; 2048];
-                client.write_at(BufferSlice::Memory(&buffer[..]), 0).await.unwrap();
+        let manager = Gpt::open(client).await.expect("load should succeed");
+        let client = manager.take_client();
 
-                let manager = Gpt::open(client)
-                    .await
-                    .expect("load should succeed");
-                let client = manager.take_client();
-
-                client.read_at(MutableBufferSlice::Memory(&mut buffer[..]), 0).await.unwrap();
-                assert_eq!(old_metadata, buffer);
-            }.fuse() => {},
-        );
+        client.read_at(MutableBufferSlice::Memory(&mut buffer[..]), 0).await.unwrap();
+        assert_eq!(old_metadata, buffer);
     }
 
     #[fuchsia::test]
@@ -1497,23 +1452,19 @@ mod tests {
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                let partition = manager.partitions().get(&0).expect("No entry found");
-                assert_eq!(partition.label, "ext");
-                assert_eq!(partition.type_guid.to_string(),
-                    "0fc63daf-8483-4772-8e79-3d69d8477de4");
-                assert_eq!(partition.start_block, 8);
-                assert_eq!(partition.num_blocks, 1);
-                assert!(manager.partitions().get(&1).is_none());
-            }.fuse() => {},
-        );
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
+            .await
+            .expect("load should succeed");
+        let partition = manager.partitions().get(&0).expect("No entry found");
+        assert_eq!(partition.label, "ext");
+        assert_eq!(partition.type_guid.to_string(), "0fc63daf-8483-4772-8e79-3d69d8477de4");
+        assert_eq!(partition.start_block, 8);
+        assert_eq!(partition.num_blocks, 1);
+        assert!(manager.partitions().get(&1).is_none());
     }
 
     #[fuchsia::test]
@@ -1571,23 +1522,20 @@ mod tests {
             },
         ];
 
-        futures::select!(
-            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
-                unreachable!();
-            },
-            _ = async {
-                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
-                    .await
-                    .expect("load should succeed");
-                for i in 0..EXPECTED_PARTITIONS.len() as u32 {
-                    let partition = manager.partitions().get(&i).expect("No entry found");
-                    let expected = &EXPECTED_PARTITIONS[i as usize];
-                    assert_eq!(partition.label, expected.label);
-                    assert_eq!(partition.type_guid.to_string(), expected.type_guid);
-                    assert_eq!(partition.start_block, expected.blocks.start);
-                    assert_eq!(partition.num_blocks, expected.blocks.end - expected.blocks.start);
-                }
-            }.fuse() => {},
-        );
+        let _task =
+            fasync::Task::spawn(
+                async move { server.serve(server_end.into_stream().unwrap()).await },
+            );
+        let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
+            .await
+            .expect("load should succeed");
+        for i in 0..EXPECTED_PARTITIONS.len() as u32 {
+            let partition = manager.partitions().get(&i).expect("No entry found");
+            let expected = &EXPECTED_PARTITIONS[i as usize];
+            assert_eq!(partition.label, expected.label);
+            assert_eq!(partition.type_guid.to_string(), expected.type_guid);
+            assert_eq!(partition.start_block, expected.blocks.start);
+            assert_eq!(partition.num_blocks, expected.blocks.end - expected.blocks.start);
+        }
     }
 }

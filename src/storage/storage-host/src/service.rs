@@ -268,17 +268,42 @@ impl StorageHostService {
 #[cfg(test)]
 mod tests {
     use super::StorageHostService;
+    use block_client::RemoteBlockClient;
     use fake_block_server::FakeServer;
     use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::FutureExt as _;
-    use gpt_testing::{format_gpt, Guid, PartitionInfo};
+    use gpt::{Gpt, Guid, PartitionInfo};
+    use std::sync::Arc;
     use {
         fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
         fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
     };
+
+    async fn setup_server(
+        block_size: u32,
+        block_count: u64,
+        partitions: Vec<PartitionInfo>,
+    ) -> Arc<FakeServer> {
+        let vmo = zx::Vmo::create(block_size as u64 * block_count).unwrap();
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        {
+            let (block_client, block_server) =
+                fidl::endpoints::create_proxy::<fblock::BlockMarker>().unwrap();
+            let volume_stream = fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(
+                block_server.into_channel(),
+            )
+            .into_stream()
+            .unwrap();
+            let server_clone = server.clone();
+            let _task = fasync::Task::spawn(async move { server_clone.serve(volume_stream).await });
+            let client = Arc::new(RemoteBlockClient::new(block_client).await.unwrap());
+            Gpt::format(client, partitions).await.unwrap();
+        }
+        server
+    }
 
     #[fuchsia::test]
     async fn lifecycle() {
@@ -334,10 +359,9 @@ mod tests {
             },
             async {
                 // Block device
-                let vmo = zx::Vmo::create(4096).unwrap();
-                format_gpt(
-                    &vmo,
+                let server = setup_server(
                     512,
+                    8,
                     vec![PartitionInfo {
                         label: "part".to_string(),
                         type_guid: Guid::from_bytes([0xabu8; 16]),
@@ -346,8 +370,9 @@ mod tests {
                         num_blocks: 1,
                         flags: 0,
                     }],
-                );
-                let _ = FakeServer::from_vmo(512, vmo).serve(volume_stream).await;
+                )
+                .await;
+                let _ = server.serve(volume_stream).await;
             }
             .fuse(),
         );
@@ -442,10 +467,9 @@ mod tests {
             },
             async {
                 // Block device
-                let vmo = zx::Vmo::create(8192).unwrap();
-                format_gpt(
-                    &vmo,
+                let server = setup_server(
                     512,
+                    16,
                     vec![PartitionInfo {
                         label: "part".to_string(),
                         type_guid: Guid::from_bytes([0xabu8; 16]),
@@ -454,8 +478,9 @@ mod tests {
                         num_blocks: 1,
                         flags: 0,
                     }],
-                );
-                let _ = FakeServer::from_vmo(512, vmo).serve(volume_stream).await;
+                )
+                .await;
+                let _ = server.serve(volume_stream).await;
             }
             .fuse(),
         );

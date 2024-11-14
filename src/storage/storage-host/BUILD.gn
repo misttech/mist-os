@@ -32,7 +32,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/storage/gpt/rust:gpt_testing",
     "//src/storage/lib/block_server:fake_block_server",
   ]
   sources = [
