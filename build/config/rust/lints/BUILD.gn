@@ -7,8 +7,8 @@ config("clippy_warn_production") {
   # Use -W instead of -D to treat as a warning while iterating.
   rustflags = [
     # go/keep-sorted start
-    "-Wclippy::expect_fun_call",
     "-Wclippy::or_fun_call",
+    "-Wclippy::perf",
     "-Wclippy::unnecessary_lazy_evaluation",
 
     # go/keep-sorted end
