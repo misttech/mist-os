@@ -8,7 +8,7 @@ use crate::object_store::{FSCRYPT_KEY_ID, VOLUME_DATA_KEY_ID};
 use anyhow::Error;
 use event_listener::Event;
 use futures::TryFutureExt;
-use fxfs_crypto::{Crypt, FindKeyResult, Key, UnwrappedKeys, WrappedKeys, XtsCipherSet};
+use fxfs_crypto::{CipherSet, Crypt, FindKeyResult, Key, UnwrappedKeys, WrappedKeys};
 use scopeguard::ScopeGuard;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::Entry;
@@ -102,7 +102,7 @@ pub struct KeyManager {
 }
 
 struct Inner {
-    keys: Cache<Arc<XtsCipherSet>>,
+    keys: Cache<Arc<CipherSet>>,
     unwrapping: BTreeMap<u64, Arc<UnwrapResult>>,
     purge_task: Option<fasync::Task<()>>,
 }
@@ -147,7 +147,7 @@ impl UnwrapResult {
         inner: &Arc<Mutex<Inner>>,
         object_id: u64,
         permanent: bool,
-        result: Result<Option<Arc<XtsCipherSet>>, zx::Status>,
+        result: Result<Option<Arc<CipherSet>>, zx::Status>,
     ) -> bool {
         let mut guard = inner.lock().unwrap();
         // SAFETY: Safe because we hold the lock on `inner`.
@@ -240,7 +240,7 @@ impl KeyManager {
         wrapped_keys: &mut Option<impl Future<Output = Result<WrappedKeys, Error>>>,
         permanent: bool,
         force: bool,
-    ) -> Result<Arc<XtsCipherSet>, Error> {
+    ) -> Result<Arc<CipherSet>, Error> {
         let inner = self.inner.clone();
         let mut unwrap_result;
 
@@ -427,7 +427,7 @@ impl KeyManager {
     pub fn merge(
         &self,
         object_id: u64,
-        merge: impl FnOnce(Option<&Arc<XtsCipherSet>>) -> Arc<XtsCipherSet>,
+        merge: impl FnOnce(Option<&Arc<CipherSet>>) -> Arc<CipherSet>,
     ) {
         let mut inner = self.inner.lock().unwrap();
         inner.keys.merge(object_id, merge);
@@ -467,17 +467,17 @@ impl KeyManager {
 }
 
 pub trait ToCipherSet {
-    fn to_cipher_set(self) -> Arc<XtsCipherSet>;
+    fn to_cipher_set(self) -> Arc<CipherSet>;
 }
 
 impl ToCipherSet for &UnwrappedKeys {
-    fn to_cipher_set(self) -> Arc<XtsCipherSet> {
-        Arc::new(XtsCipherSet::new(self))
+    fn to_cipher_set(self) -> Arc<CipherSet> {
+        Arc::new(CipherSet::new(self))
     }
 }
 
-impl ToCipherSet for Arc<XtsCipherSet> {
-    fn to_cipher_set(self) -> Arc<XtsCipherSet> {
+impl ToCipherSet for Arc<CipherSet> {
+    fn to_cipher_set(self) -> Arc<CipherSet> {
         self
     }
 }
@@ -501,7 +501,7 @@ mod tests {
     use futures::channel::oneshot;
     use futures::join;
     use fxfs_crypto::{
-        Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys, XtsCipherSet,
+        CipherSet, Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys,
         KEY_SIZE, WRAPPED_KEY_SIZE,
     };
     use std::future::pending;
@@ -517,12 +517,10 @@ mod tests {
 
     fn cipher_text(counter: u8) -> Vec<u8> {
         let mut text = PLAIN_TEXT.to_vec();
-        to_result(
-            Arc::new(XtsCipherSet::new(&vec![(0, Some(unwrapped_key(counter)))])).find_key(0),
-        )
-        .unwrap()
-        .encrypt(0, &mut text)
-        .expect("encrypt failed");
+        to_result(Arc::new(CipherSet::new(&vec![(0, Some(unwrapped_key(counter)))])).find_key(0))
+            .unwrap()
+            .encrypt(0, &mut text)
+            .expect("encrypt failed");
         text
     }
 

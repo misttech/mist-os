@@ -28,7 +28,7 @@ use assert_matches::assert_matches;
 use bit_vec::BitVec;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
-use fxfs_crypto::{FindKeyResult, Key, KeyPurpose, XtsCipher, XtsCipherSet};
+use fxfs_crypto::{Cipher, CipherSet, FindKeyResult, Key, KeyPurpose};
 use fxfs_trace::trace;
 use static_assertions::const_assert;
 use std::cmp::min;
@@ -694,14 +694,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let (key, unwrapped_key) = crypt.create_key(self.object_id, KeyPurpose::Data).await?;
 
         // Merge in unwrapped_key.
-        unwrapped_keys.push(XtsCipher::new(VOLUME_DATA_KEY_ID, &unwrapped_key));
-        let unwrapped_keys = Arc::new(XtsCipherSet::from(unwrapped_keys));
+        unwrapped_keys.push(Cipher::new(VOLUME_DATA_KEY_ID, &unwrapped_key));
+        let unwrapped_keys = Arc::new(CipherSet::from(unwrapped_keys));
 
         // Arrange for the key to be added to the cache when (and if) the transaction
         // commits.
         struct UnwrappedKeys {
             object_id: u64,
-            new_keys: Arc<XtsCipherSet>,
+            new_keys: Arc<CipherSet>,
         }
 
         impl AssociatedObject for UnwrappedKeys {
