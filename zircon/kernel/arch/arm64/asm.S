@@ -135,6 +135,16 @@ FUNCTION(arm64_elX_to_el1)
     mov x9, CPACR_EL1_FPEN
     msr cpacr_el1, x9
 
+    // Set EL1 to 64bit.
+    mov x9, HCR_EL2_RW
+    msr hcr_el2, x9
+
+    // Make sure MPIDR_EL1 and MIDR_EL1 are set correctly.
+    mrs x9, mpidr_el1
+    msr vmpidr_el2, x9
+    mrs x9, midr_el1
+    msr vpidr_el2, x9
+
     // Check whether the GIC system registers are supported.
     mrs x9, id_aa64pfr0_el1
     and x9, x9, ID_AA64PFR0_EL1_GIC
@@ -150,10 +160,6 @@ FUNCTION(arm64_elX_to_el1)
     msr ICH_HCR_EL2, xzr
 
 .Lno_gic_sr:
-    // Set EL1 to 64bit.
-    mov x9, HCR_EL2_RW
-    msr hcr_el2, x9
-
     // Set the return address and exception level.
     adr x9, .Ltarget
     msr elr_el2, x9
