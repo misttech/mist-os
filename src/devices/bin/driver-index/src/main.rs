@@ -57,19 +57,24 @@ fn log_error(err: anyhow::Error) -> anyhow::Error {
     err
 }
 
-fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) -> Rc<Indexer> {
-    if !config.enable_driver_load_fuzzer {
+fn create_and_setup_index(
+    boot_drivers: Vec<ResolvedDriver>,
+    enable_driver_load_fuzzer: bool,
+    delay_fallback_until_base_drivers_indexed: bool,
+    driver_load_fuzzer_max_delay_ms: i64,
+) -> Rc<Indexer> {
+    if !enable_driver_load_fuzzer {
         return Rc::new(Indexer::new(
             boot_drivers,
             BaseRepo::NotResolved,
-            config.delay_fallback_until_base_drivers_indexed,
+            delay_fallback_until_base_drivers_indexed,
         ));
     }
 
     let indexer = Rc::new(Indexer::new(
         vec![],
         BaseRepo::NotResolved,
-        config.delay_fallback_until_base_drivers_indexed,
+        delay_fallback_until_base_drivers_indexed,
     ));
 
     // TODO(https://fxbug.dev/42076984): Pass in a seed from the input, if available.
@@ -79,7 +84,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         Session::new(
             sender,
             boot_drivers,
-            zx::MonotonicDuration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            zx::MonotonicDuration::from_millis(driver_load_fuzzer_max_delay_ms),
             None,
         ),
     );
@@ -327,9 +332,9 @@ async fn run_index_server_with_timeout(
 async fn run_load_base_drivers(
     should_load_base_drivers: bool,
     index: &Rc<Indexer>,
-    config: Config,
+    base_drivers: &Vec<String>,
     eager_drivers: HashSet<cm_types::Url>,
-    disabled_drivers: HashSet<cm_types::Url>,
+    disabled_drivers: &HashSet<cm_types::Url>,
 ) -> Result<()> {
     if should_load_base_drivers {
         let base_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
@@ -338,10 +343,10 @@ async fn run_load_base_drivers(
         .context("Failed to connect to base component resolver")?;
         let res = load_base_drivers(
             index.clone(),
-            &config.base_drivers,
+            &base_drivers,
             &base_resolver,
             &eager_drivers,
-            &disabled_drivers,
+            disabled_drivers,
         )
         .await
         .context("Error loading base packages")
@@ -528,21 +533,34 @@ async fn main() -> Result<()> {
     )
     .context("Failed to connect to boot resolver")?;
 
+    let (boot_driver_list, base_driver_list) = {
+        // We only provide empty vectors for these in the driver test realm when the
+        // fuchsia.driver.test.DriverLists protocol is available to provide these to us dynamically.
+        if config.boot_drivers.is_empty() && config.base_drivers.is_empty() {
+            let test_driver_lists =
+                client::connect_to_protocol::<fidl_fuchsia_driver_test::DriverListsMarker>()
+                    .context("Failed to connect to driver test DriverLists protocol.")?;
+            test_driver_lists
+                .get_driver_lists()
+                .await?
+                .map_err(|e| anyhow!("Failed to get_driver_lists {:?}", e))?
+        } else {
+            (config.boot_drivers, config.base_drivers)
+        }
+    };
+
     let boot_repo_resume = resumed_state.as_ref().and_then(|s| s.boot_repo.clone());
     let boot_drivers = match boot_repo_resume {
         Some(boot_repo) => {
             tracing::info!("loading boot drivers from escrow.");
             boot_repo
         }
-        None => load_boot_drivers(
-            &config.boot_drivers,
-            &boot_resolver,
-            &eager_drivers,
-            &disabled_drivers,
-        )
-        .await
-        .context("Failed to load boot drivers")
-        .map_err(log_error)?,
+        None => {
+            load_boot_drivers(&boot_driver_list, &boot_resolver, &eager_drivers, &disabled_drivers)
+                .await
+                .context("Failed to load boot drivers")
+                .map_err(log_error)?
+        }
     };
 
     let mut should_load_base_drivers = true;
@@ -560,7 +578,12 @@ async fn main() -> Result<()> {
         fasync::MonotonicDuration::INFINITE
     };
 
-    let index = create_and_setup_index(boot_drivers, &config);
+    let index = create_and_setup_index(
+        boot_drivers,
+        config.enable_driver_load_fuzzer,
+        config.delay_fallback_until_base_drivers_indexed,
+        config.driver_load_fuzzer_max_delay_ms,
+    );
     if let Some(resume_state) = resumed_state {
         let base_loaded = apply_state(resume_state, index.clone());
         if base_loaded {
@@ -578,9 +601,9 @@ async fn main() -> Result<()> {
         run_load_base_drivers(
             should_load_base_drivers,
             &index,
-            config,
+            &base_driver_list,
             eager_drivers,
-            disabled_drivers,
+            &disabled_drivers,
         ),
         run_driver_index(
             &index,

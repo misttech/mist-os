@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.pkg/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/clone.h>
@@ -19,18 +20,66 @@
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <format>
 #include <fstream>
+#include <list>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
+#include <fbl/unique_fd.h>
+#include <rapidjson/document.h>
+#include <src/lib/files/directory.h>
+#include <src/lib/files/file.h>
+
 namespace {
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenPkgDir() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  zx_status_t status = fdio_open3(
+      "/pkg",
+      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory |
+                            fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
+      endpoints->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(std::move(endpoints->client));
+}
+
+struct ClientListEntry {
+  fidl::ClientEnd<fuchsia_io::Directory> client;
+  std::string url_prefix;
+  std::string pkg_name;
+};
+
+struct BootAndBaseConfigResult {
+  std::vector<std::string> boot_drivers;
+  std::vector<std::string> base_drivers;
+};
+
+class DriverLists : public fidl::WireServer<fuchsia_driver_test::DriverLists> {
+ public:
+  explicit DriverLists(BootAndBaseConfigResult lists) : lists_(std::move(lists)) {}
+  void GetDriverLists(GetDriverListsCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.ReplySuccess(fidl::ToWire(arena, lists_.boot_drivers),
+                           fidl::ToWire(arena, lists_.base_drivers));
+  }
+
+ private:
+  BootAndBaseConfigResult lists_;
+};
 
 class FakeComponentResolver final
     : public fidl::WireServer<fuchsia_component_resolution::Resolver> {
  public:
   explicit FakeComponentResolver(fidl::ClientEnd<fuchsia_io::Directory> boot_dir,
-                                 fidl::ClientEnd<fuchsia_io::Directory> base_dir)
-      : boot_dir_(std::move(boot_dir)), base_dir_(std::move(base_dir)) {}
+                                 fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir)
+      : boot_dir_(std::move(boot_dir)), test_pkg_dir_(std::move(test_pkg_dir)) {}
 
  private:
   void handle_unknown_method(
@@ -81,15 +130,14 @@ class FakeComponentResolver final
       // Remove the "#"
       relative_path.remove_prefix(1);
 
-      // This is in the test package. Get it from the dtr and set dir_to_use.
-      auto test_pkg_dir = fidl::WireCall(*internal_client)->GetTestPackage();
-      if (!test_pkg_dir.ok() || test_pkg_dir.value().is_error()) {
-        FX_LOG_KV(ERROR, "Failed to get resolution context.");
+      zx::result<fidl::ClientEnd<fuchsia_io::Directory>> dir_clone_result =
+          component::Clone(test_pkg_dir_);
+      if (dir_clone_result.is_error()) {
+        FX_LOG_KV(ERROR, "Failed to clone directory.");
         completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
         return;
       }
-
-      dir_to_use = std::move(test_pkg_dir->value()->test_pkg_dir);
+      dir_to_use = std::move(dir_clone_result.value());
     } else {
       // Legacy resolver logic:
       // Looks at the prefix to determine which directory to look in (pkg or
@@ -104,7 +152,7 @@ class FakeComponentResolver final
       if (is_boot) {
         dir_clone_result = component::Clone(boot_dir_);
       } else {
-        dir_clone_result = component::Clone(base_dir_);
+        dir_clone_result = OpenPkgDir();
       }
 
       if (dir_clone_result.is_error()) {
@@ -263,7 +311,7 @@ class FakeComponentResolver final
 
     fidl::Arena arena;
     auto result = fidl::WireCall(*resolver)->ResolveWithContext(
-        fidl::StringView(arena, relative_path), resolution_context.value().value()->context);
+        fidl::StringView(arena, relative_path), *resolution_context.value().value()->context.get());
     if (!result.ok() || result.value().is_error()) {
       FX_LOG_KV(ERROR, "Failed to resolve.");
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
@@ -305,24 +353,191 @@ class FakeComponentResolver final
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> boot_dir_;
-  fidl::ClientEnd<fuchsia_io::Directory> base_dir_;
+  fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir_;
 };
 
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectDir(const char* dir) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  zx_status_t status = fdio_open3(
-      dir,
-      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory |
-                            fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable),
-      endpoints->server.channel().release());
-  if (status != ZX_OK) {
-    return zx::error(status);
+zx::result<std::list<ClientListEntry>> MakeClientList(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> boot_drivers_dir,
+    fidl::UnownedClientEnd<fuchsia_io::Directory> test_pkg_dir,
+    const std::optional<fuchsia_component_resolution::Context>& test_resolution_context) {
+  std::list<ClientListEntry> client_list;
+
+  zx::result cloned_boot_drivers_dir = component::Clone(boot_drivers_dir);
+  if (cloned_boot_drivers_dir.is_error()) {
+    FX_LOG_KV(ERROR, "Unable to clone dir");
+    return zx::error(ZX_ERR_IO);
   }
 
-  return zx::ok(std::move(endpoints->client));
+  client_list.emplace_back(ClientListEntry{
+      *std::move(cloned_boot_drivers_dir),
+      "fuchsia-boot:///",
+      "dtr",
+  });
+
+  if (test_pkg_dir.is_valid()) {
+    zx::result cloned_test_pkg_dir = component::Clone(test_pkg_dir);
+    if (cloned_test_pkg_dir.is_error()) {
+      FX_LOG_KV(ERROR, "Unable to clone dir");
+      return zx::error(ZX_ERR_IO);
+    }
+
+    // Add the test package itself.
+    client_list.emplace_back(ClientListEntry{
+        *std::move(cloned_test_pkg_dir),
+        "dtr-test-pkg://fuchsia.com/",
+        "",
+    });
+
+    // Need to clone again to use in fdio_fd_create.
+    cloned_test_pkg_dir = component::Clone(test_pkg_dir);
+    if (cloned_test_pkg_dir.is_error()) {
+      FX_LOG_KV(ERROR, "Unable to clone dir");
+      return zx::error(ZX_ERR_IO);
+    }
+    fbl::unique_fd dir_fd;
+    zx_status_t status =
+        fdio_fd_create(cloned_test_pkg_dir->TakeHandle().release(), dir_fd.reset_and_get_address());
+    if (status != ZX_OK) {
+      FX_LOG_KV(ERROR, "Failed to turn dir into fd");
+      return zx::error(ZX_ERR_IO);
+    }
+
+    if (files::IsFileAt(dir_fd.get(), "meta/fuchsia.pkg/subpackages")) {
+      // Read off the subpackages that exist in the test package.
+      std::string result;
+      files::ReadFileToStringAt(dir_fd.get(), "meta/fuchsia.pkg/subpackages", &result);
+      rapidjson::Document subpackages_doc;
+      subpackages_doc.Parse(result.c_str());
+      auto& subpackages = subpackages_doc["subpackages"];
+      std::vector<std::string> subpackage_names;
+      subpackage_names.reserve(subpackages.MemberCount());
+      for (rapidjson::Value::ConstMemberIterator itr = subpackages.MemberBegin();
+           itr != subpackages.MemberEnd(); ++itr) {
+        subpackage_names.push_back(itr->name.GetString());
+      }
+
+      if (!subpackage_names.empty()) {
+        // Resolve the subpackage using the context.
+        auto resolver = component::Connect<fuchsia_pkg::PackageResolver>(
+            "/svc/fuchsia.pkg.PackageResolver-hermetic");
+        if (resolver.is_error()) {
+          FX_LOG_KV(ERROR, "Failed to connect to resolver protocol.",
+                    FX_KV("error", zx_status_get_string(resolver.error_value())));
+          return resolver.take_error();
+        }
+        if (!test_resolution_context.has_value()) {
+          FX_LOG_KV(
+              WARNING,
+              "Subpackages exist in this package but a resolution context was not provided with the test_component. Skipping.");
+        } else {
+          fidl::Arena arena;
+          fuchsia_pkg::wire::ResolutionContext converted_context(
+              {.bytes = fidl::ToWire(arena, test_resolution_context->bytes())});
+
+          // Add the subpackages of the test package into the list.
+          for (auto& subpackage_name : subpackage_names) {
+            auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+            auto resolve_result = fidl::WireCall(*resolver)->ResolveWithContext(
+                fidl::StringView(arena, subpackage_name), converted_context, std::move(server));
+            if (!resolve_result.ok() || resolve_result->is_error()) {
+              FX_LOG_KV(ERROR, "Failed to resolve_with_context in the test package.",
+                        FX_KV("error", resolve_result.FormatDescription().c_str()));
+              return zx::error(ZX_ERR_INTERNAL);
+            }
+
+            client_list.emplace_back(ClientListEntry{
+                std::move(client),
+                "dtr-test-pkg://fuchsia.com/",
+                subpackage_name,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return zx::ok(std::move(client_list));
+}
+
+zx::result<BootAndBaseConfigResult> ConstructBootAndBaseConfig(
+    std::list<ClientListEntry> client_list,
+    const std::unordered_set<std::string>& boot_driver_components) {
+  std::unordered_set<std::string> inserted;
+  std::vector<std::string> boot_drivers;
+  std::vector<std::string> base_drivers;
+
+  for (auto& [dir, url_prefix, pkg_name] : client_list) {
+    // Check each manifest to see if it uses the driver runner.
+    fbl::unique_fd dir_fd;
+    zx_status_t status = fdio_fd_create(dir.TakeHandle().release(), dir_fd.reset_and_get_address());
+    if (status != ZX_OK) {
+      FX_LOG_KV(ERROR, "Failed to turn dir into fd");
+      return zx::error(ZX_ERR_IO);
+    }
+
+    std::vector<std::string> manifests;
+    if (!files::ReadDirContentsAt(dir_fd.get(), "meta", &manifests)) {
+      FX_LOG_KV(WARNING, "Unable to read dir contents.", FX_KV("url_prefix", url_prefix),
+                FX_KV("pkg_name", pkg_name));
+      continue;
+    }
+
+    for (const auto& manifest : manifests) {
+      std::string manifest_path = "meta/" + manifest;
+      if (!files::IsFileAt(dir_fd.get(), manifest_path) ||
+          !cpp20::ends_with(std::string_view(manifest), ".cm")) {
+        continue;
+      }
+      std::vector<uint8_t> manifest_bytes;
+      if (!files::ReadFileToVectorAt(dir_fd.get(), manifest_path, &manifest_bytes)) {
+        FX_LOG_KV(ERROR, "Unable to read file contents for", FX_KV("manifest", manifest_path));
+        return zx::error(ZX_ERR_IO);
+      }
+      fit::result component = fidl::Unpersist<fuchsia_component_decl::Component>(manifest_bytes);
+      if (component.is_error()) {
+        FX_LOG_KV(ERROR, "Unable to unpersist component manifest",
+                  FX_KV("manifest", manifest_path));
+        return zx::error(ZX_ERR_IO);
+      }
+      if (!component->program() || !component->program()->runner() ||
+          *component->program()->runner() != "driver") {
+        continue;
+      }
+
+      // Construct the url entry from the pieces provided in the list entry.
+      std::string entry = std::format("{}{}#meta/{}", url_prefix, pkg_name, manifest);
+
+      // Protect against duplicate drivers. Only add the driver if it is unique.
+      if (inserted.insert(std::format("{}", manifest)).second) {
+        // Add to corresponding list.
+        if (entry.starts_with("fuchsia-boot:///") ||
+            boot_driver_components.find(manifest) != boot_driver_components.end()) {
+          boot_drivers.push_back(entry);
+        } else {
+          base_drivers.push_back(entry);
+        }
+      }
+    }
+  }
+
+  return zx::ok(BootAndBaseConfigResult{
+      .boot_drivers = std::move(boot_drivers),
+      .base_drivers = std::move(base_drivers),
+  });
+}
+
+zx::result<BootAndBaseConfigResult> SetupLists(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> boot_dir,
+    fidl::UnownedClientEnd<fuchsia_io::Directory> test_pkg_dir,
+    const std::optional<fuchsia_component_resolution::Context>& test_resolution_context,
+    const std::unordered_set<std::string>& boot_driver_components_set) {
+  auto client_list = MakeClientList(boot_dir, test_pkg_dir, test_resolution_context);
+
+  if (client_list.is_error()) {
+    return client_list.take_error();
+  }
+
+  return ConstructBootAndBaseConfig(*std::move(client_list), boot_driver_components_set);
 }
 
 }  // namespace
@@ -330,26 +545,67 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectDir(const char* dir) {
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
+  auto internal_client = component::Connect<fuchsia_driver_test::Internal>();
+  if (internal_client.is_error()) {
+    FX_LOG_KV(ERROR, "Failed to connect to internal protocol.");
+    return internal_client.status_value();
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> boot_dir;
+  auto boot_result = fidl::WireCall(*internal_client)->GetBootDirectory();
+  if (!boot_result.ok() || boot_result->is_error() || !boot_result->value()->boot_dir.is_valid()) {
+    zx::result self_pkg = OpenPkgDir();
+    if (self_pkg.is_error()) {
+      return self_pkg.status_value();
+    }
+    boot_dir = std::move(self_pkg.value());
+  } else {
+    boot_dir = std::move(boot_result->value()->boot_dir);
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir;
+  std::optional<fuchsia_component_resolution::Context> test_resolution_context;
+  auto test_pkg_result = fidl::WireCall(*internal_client)->GetTestPackage();
+  if (test_pkg_result.ok() && test_pkg_result->is_ok() &&
+      test_pkg_result->value()->test_pkg_dir.is_valid()) {
+    test_pkg_dir = std::move(test_pkg_result->value()->test_pkg_dir);
+
+    auto test_res_context_result = fidl::WireCall(*internal_client)->GetTestResolutionContext();
+    if (test_res_context_result.ok() && test_res_context_result->is_ok() &&
+        test_res_context_result->value()->context) {
+      test_resolution_context.emplace(
+          fidl::ToNatural(*test_res_context_result->value()->context.get()));
+    }
+  }
+
+  std::unordered_set<std::string> boot_driver_components_set;
+  auto boot_overrides_result = fidl::WireCall(*internal_client)->GetBootDriverOverrides();
+  if (boot_overrides_result.ok() && boot_overrides_result->is_ok() &&
+      !boot_overrides_result->value()->boot_overrides.empty()) {
+    for (auto override : boot_overrides_result->value()->boot_overrides) {
+      boot_driver_components_set.emplace(override.get());
+    }
+  }
+
+  // Only index pkg if only one of boot or pkg was overridden.
+  zx::result<BootAndBaseConfigResult> list_setup =
+      SetupLists(boot_dir, test_pkg_dir, test_resolution_context, boot_driver_components_set);
+  if (list_setup.is_error()) {
+    return list_setup.status_value();
+  }
+
   component::OutgoingDirectory outgoing(loop.dispatcher());
   zx::result<> serve_result = outgoing.ServeFromStartupInfo();
   if (serve_result.is_error()) {
     return serve_result.status_value();
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_boot_result = ConnectDir("/boot");
-  if (connect_boot_result.is_error()) {
-    return connect_boot_result.status_value();
-  }
+  // Server up driver lists.
+  zx::result<> add_protocol_result = outgoing.AddProtocol<fuchsia_driver_test::DriverLists>(
+      std::make_unique<DriverLists>(std::move(list_setup.value())));
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_base_result =
-      ConnectDir("/base_drivers");
-  if (connect_base_result.is_error()) {
-    return connect_base_result.status_value();
-  }
-
-  zx::result<> add_protocol_result = outgoing.AddProtocol<fuchsia_component_resolution::Resolver>(
-      std::make_unique<FakeComponentResolver>(std::move(connect_boot_result.value()),
-                                              std::move(connect_base_result.value())));
+  add_protocol_result = outgoing.AddProtocol<fuchsia_component_resolution::Resolver>(
+      std::make_unique<FakeComponentResolver>(std::move(boot_dir), std::move(test_pkg_dir)));
   if (add_protocol_result.is_error()) {
     return add_protocol_result.status_value();
   }

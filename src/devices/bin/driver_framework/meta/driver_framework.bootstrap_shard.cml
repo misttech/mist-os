@@ -380,6 +380,12 @@
             to: "#boot-drivers",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.driver.test.DriverLists",
+            from: "void",
+            to: "#driver_index",
+            availability: "optional",
+        },
     ],
     expose: [
         {

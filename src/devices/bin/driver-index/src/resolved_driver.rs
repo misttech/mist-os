@@ -27,6 +27,21 @@ pub enum DriverPackageType {
     Universe = 3,
 }
 
+impl From<fdf::DriverPackageType> for DriverPackageType {
+    fn from(value: fdf::DriverPackageType) -> DriverPackageType {
+        match value {
+            fdf::DriverPackageType::Boot => DriverPackageType::Boot,
+            fdf::DriverPackageType::Base => DriverPackageType::Base,
+            fdf::DriverPackageType::Cached => DriverPackageType::Cached,
+            fdf::DriverPackageType::Universe => DriverPackageType::Universe,
+            _ => {
+                tracing::warn!("Unknown driver package type {:?}, defaulting to boot.", value);
+                DriverPackageType::Boot
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DeviceCategoryDef {
     pub category: Option<String>,

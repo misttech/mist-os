@@ -73,6 +73,12 @@
             ],
         },
         {
+            protocol: "fuchsia.driver.test.DriverLists",
+            from: "void",
+            to: "#driver-index",
+            availability: "optional",
+        },
+        {
             directory: "system",
             from: "parent",
             to: [ "#driver-manager" ],

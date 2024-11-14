@@ -100,7 +100,10 @@
     // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     offer: [
         {
-            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            protocol: [
+                "fuchsia.component.resolution.Resolver-hermetic",
+                "fuchsia.pkg.PackageResolver-hermetic",
+            ],
             from: "parent",
             to: "#realm_builder",
         },

@@ -11,6 +11,7 @@
         binary: "bin/fake_resolver",
     },
     capabilities: [
+        { protocol: "fuchsia.driver.test.DriverLists" },
         {
             protocol: "fuchsia.component.resolution.Resolver-base",
             path: "/svc/fuchsia.component.resolution.Resolver",
@@ -37,19 +38,12 @@
         },
     ],
     use: [
-        {
-            directory: "boot",
-            rights: [ "rx*" ],
-            path: "/boot",
-        },
-        {
-            directory: "base_drivers",
-            rights: [ "rx*" ],
-            path: "/base_drivers",
-        },
-
-        // Use the test manager's hermetic resolver to service test-pkg-resolver requests.
+        // Use the test manager's hermetic resolver to find subpackages and service resolver
+        // requests in the test realm.
         { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
+        { protocol: "fuchsia.pkg.PackageResolver-hermetic" },
+
+        // Uses this to get access to the boot and base directories the test wants to use.
         { protocol: "fuchsia.driver.test.Internal" },
     ],
     expose: [
@@ -63,6 +57,10 @@
         },
         {
             resolver: "test-pkg-resolver",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.driver.test.DriverLists",
             from: "self",
         },
         {

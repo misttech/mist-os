@@ -125,6 +125,15 @@
             protocol: "fuchsia.component.sandbox.CapabilityStore",
             from: "framework",
         },
+        // TODO(https://fxbug.dev/377372443): Remove this when we can route the configs through
+        // dictionary.
+        // This is available if running under the driver test realm. It can be used
+        // to provide the boot and base driver lists dynamically if the config capabilities
+        // 'fuchsia.driver.BootDrivers' and 'fuchsia.driver.BaseDrivers' are both empty.
+        {
+            protocol: "fuchsia.driver.test.DriverLists",
+            availability: "optional",
+        },
     ],
     expose: [
         {
