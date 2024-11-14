@@ -494,7 +494,11 @@ fn build_environment(
         };
         match dict_to_insert_to.insert_capability(&target_name, router.into()) {
             Ok(()) => (),
-            Err(e) => warn!("failed to add {} {} to environment: {e:?}", cap_type, target_name),
+            Err(_e) => {
+                // The only reason this will happen is if we're shadowing something else in the
+                // environment. `insert_capability` will still insert the new capability when it
+                // returns an error, so we can safely ignore this.
+            }
         }
     }
     environment
