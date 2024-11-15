@@ -413,10 +413,6 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
         metadata.data(), metadata.size()));
   }
 
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
-    completer.Reply(fidl::StringView::FromExternal("SHOULD_NOT_BE_USED"));
-  }
-
  private:
   std::unordered_map<uint32_t, MockProtocol> banjo_protocols_;
 };

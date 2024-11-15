@@ -107,7 +107,7 @@ class TiTca6408aTest : public zxtest::Test {
           incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
 
-      incoming->device_server_.Init("pdev", "");
+      incoming->device_server_.Initialize("pdev");
 
       // Serve fake_i2c_.
       auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_i2c::Service>(

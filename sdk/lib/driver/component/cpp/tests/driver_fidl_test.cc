@@ -111,7 +111,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
       outgoing_ptr = &test_env->incoming_directory();
     });
     device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
-      device_server->Init(component::kDefaultInstance);
+      device_server->Initialize(component::kDefaultInstance);
       EXPECT_EQ(ZX_OK, device_server->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                             outgoing_ptr));
     });

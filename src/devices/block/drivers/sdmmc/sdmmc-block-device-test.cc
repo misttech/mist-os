@@ -432,7 +432,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
 
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
-      incoming->device_server.Init("default", "");
+      incoming->device_server.Initialize("default");
       // Serve metadata.
       ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(),
                                                     metadata->size()));

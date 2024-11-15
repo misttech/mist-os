@@ -244,7 +244,7 @@ class Environment {
                 pdev_server_.GetInstanceHandler(dispatcher), instance_name);
     ZX_ASSERT(add_service_result.is_ok());
 
-    compat_server_.Init("default", "topo");
+    compat_server_.Initialize("default");
     if (metadata.has_value()) {
       compat_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata.value(),
                                  sizeof(metadata.value()));

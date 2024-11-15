@@ -83,7 +83,7 @@ class Environment : public fdf_testing::Environment {
       return zx::error(metadata.error_value().status());
     }
 
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     zx_status_t status =
         device_server_.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(), metadata->size());
     if (status != ZX_OK) {

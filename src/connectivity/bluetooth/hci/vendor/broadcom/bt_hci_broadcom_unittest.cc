@@ -169,7 +169,7 @@ class TestEnvironment : fdf_testing::Environment {
     result = to_driver_vfs.AddService<fhbt::HciService>(transport_device_.GetHciInstanceHandler());
     EXPECT_TRUE(result.is_ok());
 
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     EXPECT_EQ(ZX_OK, device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                           &to_driver_vfs));
     return zx::ok();

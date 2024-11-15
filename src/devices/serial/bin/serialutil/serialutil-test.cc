@@ -83,7 +83,7 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
 
 struct SerialTestEnvironment : public fdf_testing::Environment {
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
 
     zx_status_t status =
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);

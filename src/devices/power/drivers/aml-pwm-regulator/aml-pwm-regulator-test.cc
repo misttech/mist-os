@@ -158,7 +158,7 @@ class AmlPwmRegulatorTest : public zxtest::Test {
           incoming->test_env.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
 
-      incoming->compat_server.Init("pdev", "");
+      incoming->compat_server.Initialize("pdev");
 
       // Setup metadata.
       fuchsia_hardware_vreg::VregMetadata metadata_vreg = {};

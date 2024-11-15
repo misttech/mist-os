@@ -151,7 +151,7 @@ class FakeSystemActivityGovernor
 class ButtonsTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init(component::kDefaultInstance, "");
+    device_server_.Initialize(component::kDefaultInstance);
     device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
 
     // Serve fake GPIO servers.

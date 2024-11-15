@@ -51,7 +51,7 @@ class FakeAdcServer : public fidl::Server<fuchsia_hardware_adc::Device> {
 class TestEnv : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init(component::kDefaultInstance, "");
+    device_server_.Initialize(component::kDefaultInstance);
     // Serve metadata.
     auto func_types = std::vector<fuchsia_input_report::ConsumerControlButton>{
         fuchsia_input_report::ConsumerControlButton::kFunction};

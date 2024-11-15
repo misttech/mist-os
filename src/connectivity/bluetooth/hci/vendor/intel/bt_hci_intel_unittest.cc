@@ -198,7 +198,7 @@ class TestEnvironment : public fdf_testing::Environment {
         to_driver_vfs.AddService<fhbt::HciService>(bt_hci_server_.GetHciInstanceHandler());
     EXPECT_TRUE(result.is_ok());
 
-    device_server_.Init(component::kDefaultInstance, {}, std::nullopt, std::move(banjo_config));
+    device_server_.Initialize(component::kDefaultInstance, std::nullopt, std::move(banjo_config));
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }

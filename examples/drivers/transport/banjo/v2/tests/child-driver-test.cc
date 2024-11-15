@@ -45,7 +45,7 @@ class FakeParentBanjoServer : public ddk::MiscProtocol<FakeParentBanjoServer, dd
 class BanjoTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Init("default", "", std::nullopt, banjo_server_.GetBanjoConfig());
+    device_server_.Initialize("default", std::nullopt, banjo_server_.GetBanjoConfig());
     ZX_ASSERT(device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    &to_driver_vfs) == ZX_OK);
     return zx::ok();

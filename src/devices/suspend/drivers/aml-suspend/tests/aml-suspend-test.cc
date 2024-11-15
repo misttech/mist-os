@@ -67,7 +67,7 @@ class TestEnvironmentWrapper : public fdf_testing::Environment {
       return pdev_result.take_error();
     }
 
-    compat_server_.Init("default", "topo");
+    compat_server_.Initialize("default");
     zx_status_t status =
         compat_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
     return zx::make_result(status);

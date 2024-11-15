@@ -33,7 +33,7 @@ class Environment : public fdf_testing::Environment {
         pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
     EXPECT_TRUE(result.is_ok());
 
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
   }

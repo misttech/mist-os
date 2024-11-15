@@ -13,11 +13,6 @@ type Metadata = resource struct {
 
 /// This API communicates with the DFv1 parent device.
 closed protocol Device {
-    /// Get this device's topological path that it is exporting in /dev.
-    strict GetTopologicalPath() -> (struct {
-        path string:MAX;
-    });
-
     /// Get all of the metadata associated with this device.
     strict GetMetadata() -> (resource struct {
         metadata vector<Metadata>:MAX;

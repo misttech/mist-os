@@ -248,7 +248,7 @@ class FakePci : public pci::FakePciProtocol {
 class TestFixtureEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& outgoing) override {
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     zx_status_t status =
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &outgoing);
     if (status != ZX_OK) {

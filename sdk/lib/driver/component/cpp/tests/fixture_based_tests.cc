@@ -54,7 +54,7 @@ class FixtureBasedTestEnvironment : public fdf_testing::Environment {
         driver_proto_server_.GetInstanceHandler());
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    device_server_.Init(component::kDefaultInstance, "root");
+    device_server_.Initialize(component::kDefaultInstance);
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }
