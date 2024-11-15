@@ -15,41 +15,13 @@
 #include <ddk/metadata/clock.h>
 #include <ddktl/device.h>
 
-class ClockImplProxy {
- public:
-  static zx::result<ClockImplProxy> Create(const std::shared_ptr<fdf::Namespace>& incoming);
-
-  explicit ClockImplProxy(ddk::ClockImplProtocolClient clock_banjo) : clock_banjo_(clock_banjo) {}
-
-  explicit ClockImplProxy(fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
-      : clock_fidl_(std::move(clock_fidl)) {}
-
-  ClockImplProxy(ddk::ClockImplProtocolClient clock_banjo,
-                 fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl)
-      : clock_banjo_(clock_banjo), clock_fidl_(std::move(clock_fidl)) {}
-
-  zx_status_t Enable(uint32_t id) const;
-  zx_status_t Disable(uint32_t id) const;
-  zx_status_t IsEnabled(uint32_t id, bool* out_enabled) const;
-  zx_status_t SetRate(uint32_t id, uint64_t hz) const;
-  zx_status_t QuerySupportedRate(uint32_t id, uint64_t hz, uint64_t* out_hz) const;
-  zx_status_t GetRate(uint32_t id, uint64_t* out_hz) const;
-  zx_status_t SetInput(uint32_t id, uint32_t idx) const;
-  zx_status_t GetNumInputs(uint32_t id, uint32_t* out_n) const;
-  zx_status_t GetInput(uint32_t id, uint32_t* out_index) const;
-
- private:
-  ddk::ClockImplProtocolClient clock_banjo_;
-  fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl_;
-};
-
 class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
  public:
   using AddChildCallback = fit::callback<zx_status_t(
       std::string_view, const fuchsia_driver_framework::NodePropertyVector&,
       const std::vector<fuchsia_driver_framework::Offer>&)>;
 
-  ClockDevice(uint32_t id, ClockImplProxy clock_impl) : clock_(std::move(clock_impl)), id_(id) {}
+  explicit ClockDevice(uint32_t id) : id_(id) {}
 
   zx_status_t Init(const std::shared_ptr<fdf::Namespace>& incoming,
                    const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
@@ -72,9 +44,10 @@ class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Clock> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  ClockImplProxy clock_;
+  fdf::Arena arena_{'CLOC'};
+  fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_;
   const uint32_t id_;
-  std::optional<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> child_node_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_node_;
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
 };
@@ -89,8 +62,9 @@ class ClockDriver : public fdf::DriverBase {
   zx::result<> Start() override;
 
  private:
-  zx_status_t ConfigureClocks(const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
-                              const ClockImplProxy& clock);
+  static zx_status_t ConfigureClocks(
+      const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
+      fdf::ClientEnd<fuchsia_hardware_clockimpl::ClockImpl> clock_impl);
 
   zx_status_t CreateClockDevices();
 
