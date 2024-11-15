@@ -1083,7 +1083,9 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            // TODO: https://fxbug.dev/379153786 - Don't audit permissive types, to reduce log
+            // overload in tests, until "dontaudit" is available.
+            PermissionCheckResult { permit: true, audit: false }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1104,7 +1106,9 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            // TODO: https://fxbug.dev/379153786 - Don't audit permissive types, to reduce log
+            // overload in tests, until "dontaudit" is available.
+            PermissionCheckResult { permit: true, audit: false }
         );
         assert_eq!(
             permission_check.has_permission(
