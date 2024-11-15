@@ -28,10 +28,7 @@ async fn test_symlink() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -84,7 +81,7 @@ async fn test_fsverity_enabled() {
     close_file_checked(file).await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+    root.clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(move || {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -161,7 +158,7 @@ async fn test_not_fsverity_enabled() {
     close_file_checked(file).await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+    root.clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(move || {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -386,10 +383,7 @@ async fn test_xattr_symlink() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -626,10 +620,7 @@ async fn test_get_set_attributes_node() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -682,10 +673,7 @@ async fn test_open3() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -785,10 +773,7 @@ async fn test_open3_symlink() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -820,10 +805,7 @@ async fn test_open3_file_protocol_flags() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -866,10 +848,7 @@ async fn test_open3_create_attributes() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -927,10 +906,7 @@ async fn test_open3_rights() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -999,10 +975,7 @@ async fn test_open3_node() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    fixture.root().clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -1071,9 +1044,7 @@ async fn test_casefold() {
     .await;
 
     let (dir_client, dir_server) = zx::Channel::create();
-    test_directory
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
+    test_directory.clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(move || {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
@@ -1134,7 +1105,7 @@ async fn test_open3_selinux_context_attr() {
     let root = fixture.root();
 
     let (dir_client, dir_server) = zx::Channel::create();
-    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+    root.clone2(dir_server.into()).expect("clone failed");
 
     fasync::unblock(move || {
         const CONTEXT_STRING: &str = "context";

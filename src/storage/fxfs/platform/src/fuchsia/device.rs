@@ -510,8 +510,7 @@ mod tests {
             file.resize(2 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
             let () = file.close().await.expect("FIDL error").expect("close error");
             let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
-                .expect("clone error");
+            root.clone2(server.into_channel().into()).expect("clone error");
             BlockConnector(client, "block_device")
         };
 
@@ -771,8 +770,7 @@ mod tests {
             file.resize(5 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
             let () = file.close().await.expect("FIDL error").expect("close error");
             let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
-                .expect("clone error");
+            root.clone2(server.into_channel().into()).expect("clone error");
             BlockConnector(client, "block_device")
         };
 

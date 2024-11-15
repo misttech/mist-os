@@ -88,10 +88,9 @@ zx::result<FvmPartition> CreateFvmPartition(const std::string& device_path, size
   auto endpoints = fidl::CreateEndpoints<fio::Directory>();
   if (endpoints.is_error())
     return endpoints.take_error();
-  if (fidl::OneWayStatus status =
-          fidl::WireCall<fuchsia_io::Directory>(volume->ExportRoot())
-              ->Clone(fio::OpenFlags::kCloneSameRights,
-                      fidl::ServerEnd<fio::Node>(endpoints->server.TakeChannel()));
+  if (fidl::OneWayStatus status = fidl::WireCall<fuchsia_io::Directory>(volume->ExportRoot())
+                                      ->Clone2(fidl::ServerEnd<fuchsia_unknown::Cloneable>(
+                                          endpoints->server.TakeChannel()));
       !status.ok()) {
     return zx::error(status.status());
   }
