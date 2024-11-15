@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::*;
-use crate::parser::{self, ParsingError, RequireEscapedColons, VerboseError};
+use crate::parser::{self, ParsingError, RequireEscaped, VerboseError};
 use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
@@ -72,7 +72,7 @@ pub fn parse_tree_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = parser::consuming_tree_selector::<E>(unparsed_tree_selector)?;
+    let result = parser::standalone_tree_selector::<E>(unparsed_tree_selector)?;
     Ok(result.into())
 }
 
@@ -85,7 +85,7 @@ where
 {
     let result = parser::consuming_component_selector::<E>(
         unparsed_component_selector,
-        RequireEscapedColons::Yes,
+        RequireEscaped::COLONS,
     )?;
     Ok(result.into())
 }
@@ -98,7 +98,7 @@ where
 {
     let result = parser::consuming_component_selector::<E>(
         unparsed_component_selector,
-        RequireEscapedColons::No,
+        RequireEscaped::empty(),
     )?;
     Ok(result.into())
 }

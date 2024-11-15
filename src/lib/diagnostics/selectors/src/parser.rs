@@ -5,6 +5,7 @@
 use crate::error::ParseError;
 use crate::types::*;
 use crate::validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt};
+use bitflags::bitflags;
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, none_of, one_of};
@@ -16,11 +17,12 @@ use nom::IResult;
 
 const ALL_TREE_NAMES_SELECTED_SYMBOL: &str = "...";
 
-#[derive(Default)]
-pub enum RequireEscapedColons {
-    #[default]
-    Yes,
-    No,
+bitflags! {
+    pub struct RequireEscaped: u8 {
+        const NONE = 0;
+        const COLONS = 1;
+        const WHITESPACE = 2;
+    }
 }
 
 /// Recognizes 0 or more spaces or tabs.
@@ -101,60 +103,73 @@ fn parse_quote_sensitive_separator(input: &str, sep: char) -> Vec<&str> {
     result
 }
 
-/// Parses a tree selector, which is a node selector and an optional property selector.
-pub fn tree_selector<'a, E>(input: &'a str) -> IResult<&'a str, TreeSelector<'a>, E>
+/// Returns the parser for a tree selector, which is a node selector and an optional property selector.
+fn tree_selector<'a, E>(
+    // this can't be determined from the input to the resulting parser, because this function is
+    // used on both whole selector strings and strings that are only tree selectors
+    required_escapes: RequireEscaped,
+) -> impl FnMut(&'a str) -> IResult<&'a str, TreeSelector<'a>, E>
 where
     E: NomParseError<&'a str>,
 {
-    let mut esc = escaped(none_of(":/\\ \t\n"), '\\', one_of("* \t/:\\"));
+    move |input| {
+        let mut esc = if required_escapes.intersects(RequireEscaped::WHITESPACE) {
+            escaped(none_of(":/\\ \t\n"), '\\', one_of("* \t/:\\"))
+        } else {
+            escaped(none_of(":/\\\t\n"), '\\', one_of("* \t/:\\"))
+        };
 
-    let (rest, unparsed_name_list) = extract_conjoined_names::<E>(input).unwrap_or((input, None));
+        let (rest, unparsed_name_list) =
+            extract_conjoined_names::<E>(input).unwrap_or((input, None));
 
-    let tree_names = if unparsed_name_list == Some(ALL_TREE_NAMES_SELECTED_SYMBOL) {
-        Some(TreeNames::All)
-    } else {
-        // because of strict requirements around using quotation marks and the context of
-        // list brackets, not that much stuff needs to be escaped. Note that `"` is both
-        // an allowed normal character and an escaped character because at the time this
-        // parser is applied, wrapper quotes have not been stripped
-        let mut name_escapes = escaped(none_of(r#"*\"#), '\\', one_of(r#""*"#));
-        unparsed_name_list
-            .map(|names: &str| {
-                parse_quote_sensitive_separator(names, ',')
-                    .into_iter()
-                    .map(|name| {
-                        let (_, (_, value)) =
-                            spaced(separated_pair(tag("name"), tag("="), &mut name_escapes))(name)?;
-                        Ok(extract_from_quotes(value))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .transpose()?
-            .map(|value| value.into())
-    };
+        let tree_names = if unparsed_name_list == Some(ALL_TREE_NAMES_SELECTED_SYMBOL) {
+            Some(TreeNames::All)
+        } else {
+            // because of strict requirements around using quotation marks and the context of
+            // list brackets, not that much stuff needs to be escaped. Note that `"` is both
+            // an allowed normal character and an escaped character because at the time this
+            // parser is applied, wrapper quotes have not been stripped
+            let mut name_escapes = escaped(none_of(r#"*\"#), '\\', one_of(r#""*"#));
+            unparsed_name_list
+                .map(|names: &str| {
+                    parse_quote_sensitive_separator(names, ',')
+                        .into_iter()
+                        .map(|name| {
+                            let (_, (_, value)) =
+                                spaced(separated_pair(tag("name"), tag("="), &mut name_escapes))(
+                                    name,
+                                )?;
+                            Ok(extract_from_quotes(value))
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?
+                .map(|value| value.into())
+        };
 
-    let (rest, node_segments) = separated_list1(tag("/"), &mut esc)(rest)?;
-    let (rest, property_segment) = if peek::<&str, _, E, _>(tag(":"))(rest).is_ok() {
-        let (rest, _) = tag(":")(rest)?;
-        let (rest, property) = verify(esc, |value: &str| !value.is_empty())(rest)?;
-        (rest, Some(property))
-    } else {
-        (rest, None)
-    };
-    Ok((
-        rest,
-        TreeSelector {
-            node: node_segments.into_iter().map(|value| value.into()).collect(),
-            property: property_segment.map(|value| value.into()),
-            tree_names,
-        },
-    ))
+        let (rest, node_segments) = separated_list1(tag("/"), &mut esc)(rest)?;
+        let (rest, property_segment) = if peek::<&str, _, E, _>(tag(":"))(rest).is_ok() {
+            let (rest, _) = tag(":")(rest)?;
+            let (rest, property) = verify(esc, |value: &str| !value.is_empty())(rest)?;
+            (rest, Some(property))
+        } else {
+            (rest, None)
+        };
+        Ok((
+            rest,
+            TreeSelector {
+                node: node_segments.into_iter().map(|value| value.into()).collect(),
+                property: property_segment.map(|value| value.into()),
+                tree_names,
+            },
+        ))
+    }
 }
 
 /// Returns the parser for a component selector. The parser accepts unescaped depending on the
 /// the argument `escape_colons`.
 fn component_selector<'a, E>(
-    require_escape_colons: RequireEscapedColons,
+    required_escapes: RequireEscaped,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, ComponentSelector<'a>, E>
 where
     E: NomParseError<&'a str>,
@@ -177,7 +192,7 @@ where
     }
 
     move |input| {
-        if matches!(require_escape_colons, RequireEscapedColons::Yes) {
+        if required_escapes.intersects(RequireEscaped::COLONS) {
             inner_component_selector(
                 recognize(escaped(
                     alt((
@@ -234,8 +249,13 @@ fn core_selector<'a, E>(
 where
     E: NomParseError<&'a str>,
 {
-    let (rest, (component, _, tree)) =
-        tuple((component_selector(RequireEscapedColons::Yes), tag(":"), tree_selector))(input)?;
+    let required_tree_escape =
+        if input.starts_with('"') { RequireEscaped::empty() } else { RequireEscaped::WHITESPACE };
+    let (rest, (component, _, tree)) = tuple((
+        component_selector(RequireEscaped::COLONS),
+        tag(":"),
+        tree_selector(required_tree_escape),
+    ))(extract_from_quotes(input))?;
     Ok((rest, (component, tree)))
 }
 
@@ -308,15 +328,17 @@ where
     }
 }
 
-/// Parses the input into a `ComponentSelector` ignoring any whitespace around the component
+/// Parses the input into a `TreeSelector` ignoring any whitespace around the component
 /// selector.
-pub fn consuming_tree_selector<'a, E>(input: &'a str) -> Result<TreeSelector<'a>, ParseError>
+pub fn standalone_tree_selector<'a, E>(input: &'a str) -> Result<TreeSelector<'a>, ParseError>
 where
     E: ParsingError<'a>,
 {
+    let required_tree_escape =
+        if input.starts_with('"') { RequireEscaped::empty() } else { RequireEscaped::WHITESPACE };
     let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
-        pair(spaced(tree_selector), multispace0),
-    )(input);
+        pair(spaced(tree_selector(required_tree_escape)), multispace0),
+    )(extract_from_quotes(input));
     match result {
         Ok((_, (tree_selector, _))) => {
             tree_selector.validate()?;
@@ -331,13 +353,13 @@ where
 /// selector.
 pub fn consuming_component_selector<'a, E>(
     input: &'a str,
-    require_escape_colons: RequireEscapedColons,
+    required_escapes: RequireEscaped,
 ) -> Result<ComponentSelector<'a>, ParseError>
 where
     E: ParsingError<'a>,
 {
     let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
-        pair(spaced(component_selector(require_escape_colons)), multispace0),
+        pair(spaced(component_selector(required_escapes)), multispace0),
     )(input);
     match result {
         Ok((_, (component_selector, _))) => {
@@ -438,7 +460,7 @@ mod tests {
 
         for (test_string, expected_segments) in test_vector {
             let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
-                RequireEscapedColons::Yes,
+                RequireEscaped::COLONS,
             )(test_string)
             .unwrap();
             assert_eq!(
@@ -450,7 +472,7 @@ mod tests {
             // Component selectors can start with `/`
             let test_moniker_string = format!("/{test_string}");
             let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
-                RequireEscapedColons::Yes,
+                RequireEscaped::COLONS,
             )(&test_moniker_string)
             .unwrap();
             assert_eq!(
@@ -462,7 +484,7 @@ mod tests {
             // Component selectors can start with `./`
             let test_moniker_string = format!("./{test_string}");
             let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
-                RequireEscapedColons::Yes,
+                RequireEscaped::COLONS,
             )(&test_moniker_string)
             .unwrap();
             assert_eq!(
@@ -474,7 +496,7 @@ mod tests {
             // We can also accept component selectors without escaping
             let test_moniker_string = test_string.replace("\\:", ":");
             let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
-                RequireEscapedColons::No,
+                RequireEscaped::empty(),
             )(&test_moniker_string)
             .unwrap();
             assert_eq!(
@@ -489,7 +511,7 @@ mod tests {
     fn missing_path_component_selector_test() {
         let component_selector_string = "c";
         let (_, component_selector) = component_selector::<nom::error::VerboseError<&str>>(
-            RequireEscapedColons::Yes,
+            RequireEscaped::COLONS,
         )(component_selector_string)
         .unwrap();
         let mut path_vec = component_selector.segments;
@@ -516,10 +538,8 @@ mod tests {
             "a$c/d",
         ];
         for test_string in test_vector {
-            let component_selector_result = consuming_component_selector::<VerboseError>(
-                test_string,
-                RequireEscapedColons::Yes,
-            );
+            let component_selector_result =
+                consuming_component_selector::<VerboseError>(test_string, RequireEscaped::COLONS);
             assert!(component_selector_result.is_err(), "expected '{}' to fail", test_string);
         }
     }
@@ -588,6 +608,48 @@ mod tests {
                 Some(vec!["a", "a/*:a"].into()),
             ),
             (
+                r#""a 1/b:d""#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b".into())],
+                Some(Segment::ExactMatch("d".into())),
+                None,
+            ),
+            (
+                r#""a 1/b 2:d""#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b 2".into())],
+                Some(Segment::ExactMatch("d".into())),
+                None,
+            ),
+            (
+                r#""a 1/b 2:d 3""#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b 2".into())],
+                Some(Segment::ExactMatch("d 3".into())),
+                None,
+            ),
+            (
+                r#"a\ 1/b:d"#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b".into())],
+                Some(Segment::ExactMatch("d".into())),
+                None,
+            ),
+            (
+                r#"a\ 1/b\ 2:d"#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b 2".into())],
+                Some(Segment::ExactMatch("d".into())),
+                None,
+            ),
+            (
+                r#"a\ 1/b\ 2:d\ 3"#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b 2".into())],
+                Some(Segment::ExactMatch("d 3".into())),
+                None,
+            ),
+            (
+                r#""a\ 1/b\ 2:d\ 3""#,
+                vec![Segment::ExactMatch("a 1".into()), Segment::ExactMatch("b 2".into())],
+                Some(Segment::ExactMatch("d 3".into())),
+                None,
+            ),
+            (
                 "a/b:c",
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
                 Some(Segment::ExactMatch("c".into())),
@@ -620,7 +682,7 @@ mod tests {
         ];
 
         for (string, expected_path, expected_property, expected_tree_name) in test_vector {
-            let (_, tree_selector) = tree_selector::<nom::error::VerboseError<&str>>(string)
+            let tree_selector = standalone_tree_selector::<VerboseError>(string)
                 .unwrap_or_else(|e| panic!("input: |{string}| error: {e}"));
             assert_eq!(
                 tree_selector,
@@ -691,19 +753,18 @@ mod tests {
         ];
         for (string, node, property) in with_spaces {
             assert_eq!(
-                all_consuming::<_, _, nom::error::VerboseError<&str>, _>(tree_selector)(string)
-                    .unwrap_or_else(|e| panic!("all_consuming |{string}| failed: {e}"))
-                    .1,
+                all_consuming::<_, _, nom::error::VerboseError<&str>, _>(tree_selector(
+                    RequireEscaped::WHITESPACE
+                ))(string)
+                .unwrap_or_else(|e| panic!("all_consuming |{string}| failed: {e}"))
+                .1,
                 TreeSelector { node, property, tree_names: None },
                 "input: |{string}|",
             );
         }
 
         // Un-escaped quotes aren't accepted when parsing with spaces.
-        assert!(all_consuming::<_, _, nom::error::VerboseError<&str>, _>(tree_selector)(
-            r#"a/b:"xc"/d"#
-        )
-        .is_err());
+        assert!(standalone_tree_selector::<VerboseError>(r#"a/b:"xc"/d"#).is_err());
     }
 
     #[fuchsia::test]
@@ -834,24 +895,27 @@ mod tests {
 
     #[fuchsia::test]
     fn parse_full_selector_with_spaces() {
+        let expected_regardless_of_escape_or_quote = Selector {
+            component: ComponentSelector {
+                segments: vec![
+                    Segment::ExactMatch("core".into()),
+                    Segment::ExactMatch("foo".into()),
+                ],
+            },
+            tree: TreeSelector {
+                node: vec![Segment::ExactMatch("some node".into()), Segment::Pattern("*".into())],
+                property: Some(Segment::ExactMatch("prop".into())),
+                tree_names: None,
+            },
+        };
         assert_eq!(
             selector::<VerboseError>(r#"core/foo:some\ node/*:prop"#).unwrap(),
-            Selector {
-                component: ComponentSelector {
-                    segments: vec![
-                        Segment::ExactMatch("core".into()),
-                        Segment::ExactMatch("foo".into()),
-                    ],
-                },
-                tree: TreeSelector {
-                    node: vec![
-                        Segment::ExactMatch("some node".into()),
-                        Segment::Pattern("*".into()),
-                    ],
-                    property: Some(Segment::ExactMatch("prop".into())),
-                    tree_names: None,
-                },
-            }
+            expected_regardless_of_escape_or_quote,
+        );
+
+        assert_eq!(
+            selector::<VerboseError>(r#""core/foo:some node/*:prop""#).unwrap(),
+            expected_regardless_of_escape_or_quote,
         );
     }
 
