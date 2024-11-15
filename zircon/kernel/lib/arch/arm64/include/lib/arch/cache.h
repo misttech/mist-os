@@ -67,6 +67,10 @@ inline void InvalidateLocalTlbs() { asm volatile("tlbi vmalle1" ::: "memory"); }
 //
 // These are typically only useful during system setup or shutdown when
 // the MMU is not enabled. Other use-cases should use range-based cache operation.
+//
+// Interrupts must be disabled.  Because these routines may make use of CPU
+// registers that are not saved/restored on exception, it's crucial these
+// routines are not interrupted.
 extern "C" void CleanLocalCaches();
 extern "C" void InvalidateLocalCaches();
 extern "C" void CleanAndInvalidateLocalCaches();
