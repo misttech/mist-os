@@ -158,6 +158,12 @@ pub fn map_elf_segments(
     // We intentionally use wrapping subtraction here, in case the ELF file happens to use vaddr's
     // that are higher than the VMAR base chosen by the kernel. Wrapping addition will be used when
     // adding this bias to vaddr values.
+    //
+    // For arch32 entries, the caller must assure that the relative bias will
+    // not underflow. Beyond that, no virtual offset supplied by an ELF32 header
+    // is able to overflow 64-bit addition and if the mapping lands outside of
+    // addressable User memory, the Mapper/MemoryManager will disallow the
+    // mapping.
     let mapper_relative_bias = vaddr_bias.wrapping_sub(mapper_base);
     let vmo_name = vmo.get_name().map_err(|s| ElfLoadError::GetVmoName(s))?;
     for hdr in headers.program_headers_with_type(elf::SegmentType::Load) {
