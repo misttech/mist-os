@@ -1282,10 +1282,10 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
 
   const TransferMode transfer_mode = TransferMode::Get().ReadFrom(driver_test().driver()->mmio_);
   EXPECT_TRUE(transfer_mode.dma_enable());
-  EXPECT_FALSE(transfer_mode.block_count_enable());
   EXPECT_EQ(transfer_mode.auto_cmd_enable(), TransferMode::kAutoCmdDisable);
   EXPECT_TRUE(transfer_mode.read());
   EXPECT_FALSE(transfer_mode.multi_block());
+  // The controller ignores block count enable if multi block is cleared.
 
   EXPECT_EQ(BlockSize::Get().ReadFrom(driver_test().driver()->mmio_).reg_value(), 128u);
   EXPECT_EQ(BlockCount::Get().ReadFrom(driver_test().driver()->mmio_).reg_value(), 1u);

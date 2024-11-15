@@ -109,17 +109,8 @@ void Sdhci::PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Comm
   if (req.cmd_flags & SDMMC_RESP_DATA_PRESENT) {
     command->set_data_present(1);
   }
-  if (req.cmd_flags & SDMMC_CMD_DMA_EN) {
-    transfer_mode->set_dma_enable(1);
-  }
-  if (req.cmd_flags & SDMMC_CMD_BLKCNT_EN) {
-    transfer_mode->set_block_count_enable(1);
-  }
   if (req.cmd_flags & SDMMC_CMD_READ) {
     transfer_mode->set_read(1);
-  }
-  if (req.cmd_flags & SDMMC_CMD_MULTI_BLK) {
-    transfer_mode->set_multi_block(1);
   }
 }
 
@@ -519,7 +510,7 @@ zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
-    transfer_mode.set_multi_block(blockcount > 1 ? 1 : 0);
+    transfer_mode.set_multi_block(blockcount > 1 ? 1 : 0).set_block_count_enable(1);
 
     BlockSize::Get().FromValue(blocksize).WriteTo(&*regs_mmio_buffer_);
     BlockCount::Get()

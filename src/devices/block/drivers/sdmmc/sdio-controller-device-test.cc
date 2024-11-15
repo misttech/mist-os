@@ -486,19 +486,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   });
   driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
-
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-
+  EXPECT_EQ(sdmmc_.requests().size(), size_t{5});
   sdmmc_.requests().clear();
 
   // The write sequence should be: four writes of blocks of eight, one write of four bytes. This is
@@ -532,18 +520,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   });
   driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
-
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
-            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests().size(), size_t{5});
 
   EXPECT_OK(vmo.read(buffer, 0, sizeof(buffer)));
   EXPECT_EQ(0, memcmp(buffer + 16, kTestData, 36));
