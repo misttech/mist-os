@@ -69,14 +69,6 @@ type WlanAuthResult = flexible enum : uint8 {
     FAILURE_TIMEOUT = 5;
 };
 
-type WlanFullmacDeauthIndication = struct {
-    peer_sta_address ieee80211.MacAddr;
-    reason_code ieee80211.ReasonCode;
-    /// locally_initiated is true if deauth is initiated from the device,
-    /// and is false if it's initiated remotely (e.g. due to deauth frame)
-    locally_initiated bool;
-};
-
 type WlanAssocResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED_REASON_UNSPECIFIED = 1;
@@ -443,8 +435,15 @@ closed protocol WlanFullmacImplIfc {
     strict DeauthConf(table {
         1: peer_sta_address ieee80211.MacAddr;
     }) -> ();
-    strict DeauthInd(struct {
-        ind WlanFullmacDeauthIndication;
+    /// Report that the driver deauthenticated.
+    strict DeauthInd(table {
+        /// MAC address of the peer. Required.
+        1: peer_sta_address ieee80211.MacAddr;
+        /// Reason code for deauthentication. Required.
+        2: reason_code ieee80211.ReasonCode;
+        /// locally_initiated is true if deauth is initiated from the device,
+        /// and is false if it's initiated remotely (e.g. due to deauth frame)
+        3: locally_initiated bool;
     }) -> ();
     strict AssocInd(table {
         1: peer_sta_address ieee80211.MacAddr;

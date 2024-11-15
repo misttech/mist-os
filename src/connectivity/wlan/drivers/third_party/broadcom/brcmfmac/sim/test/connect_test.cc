@@ -143,7 +143,7 @@ class ConnectTest : public SimTest {
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
-  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
+  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
 
  protected:
@@ -263,7 +263,7 @@ void ConnectInterface::DeauthConf(DeauthConfRequestView request,
 }
 void ConnectInterface::DeauthInd(DeauthIndRequestView request,
                                  DeauthIndCompleter::Sync& completer) {
-  test_->OnDeauthInd(&request->ind);
+  test_->OnDeauthInd(request);
   completer.Reply();
 }
 void ConnectInterface::DisassocInd(DisassocIndRequestView request,
@@ -390,12 +390,13 @@ void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauth
   context_.deauth_conf_count++;
 }
 
-void ConnectTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind) {
+void ConnectTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind) {
   context_.deauth_ind_count++;
-  if (ind->locally_initiated) {
+  if (ind->has_locally_initiated() && ind->locally_initiated()) {
     context_.ind_locally_initiated_count++;
   }
-  client_ifc_.stats_.deauth_indications.push_back(*ind);
+  auto deauth_ind = fidl::ToNatural(*ind);
+  client_ifc_.stats_.deauth_indications.push_back(deauth_ind);
 }
 
 void ConnectTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {

@@ -84,9 +84,9 @@ TEST_F(SimTest, DeauthFromApResultsInDeauthInd) {
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
   // Verify reason code is propagated
-  EXPECT_EQ(deauth_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(kDeauthReason));
+  EXPECT_EQ(deauth_ind.reason_code(), static_cast<wlan_ieee80211::ReasonCode>(kDeauthReason));
   // Deauthenticated by AP so not locally initiated
-  EXPECT_EQ(deauth_ind.locally_initiated, false);
+  EXPECT_EQ(deauth_ind.locally_initiated(), false);
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
   EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
@@ -406,9 +406,9 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDeauth) {
   // second disconnect because of the reason code.
   ASSERT_EQ(client_ifc.stats_.deauth_indications.size(), 1U);
   const auto& deauth_ind = client_ifc.stats_.deauth_indications.front();
-  EXPECT_TRUE(deauth_ind.locally_initiated);
-  ASSERT_EQ(deauth_ind.peer_sta_address.size(), ETH_ALEN);
-  ASSERT_BYTES_EQ(deauth_ind.peer_sta_address.data(), kApBssid.byte, ETH_ALEN);
+  EXPECT_TRUE(deauth_ind.locally_initiated());
+  ASSERT_EQ(deauth_ind.peer_sta_address()->size(), ETH_ALEN);
+  ASSERT_BYTES_EQ(deauth_ind.peer_sta_address()->data(), kApBssid.byte, ETH_ALEN);
 
   // And we should see no other disconnects.
   EXPECT_EQ(client_ifc.stats_.disassoc_indications.size(), 0U);

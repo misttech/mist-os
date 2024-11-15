@@ -1337,23 +1337,26 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication ind = {};
-
   BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending deauth ind to SME. reason: %d",
               fidl::ToUnderlying(reason_code));
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), mac_addr, ETH_ALEN);
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
-
-  memcpy(ind.peer_sta_address.data(), mac_addr, ETH_ALEN);
-  ind.reason_code = static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
-  ind.locally_initiated = locally_initiated;
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
-  auto result = ndev->if_proto.buffer(*arena)->DeauthInd(ind);
+  auto deauth_ind_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest::Builder(*arena)
+          .peer_sta_address(peer_sta_address)
+          .reason_code(static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code))
+          .locally_initiated(locally_initiated)
+          .Build();
+
+  auto result = ndev->if_proto.buffer(*arena)->DeauthInd(deauth_ind_builder);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send deauth ind msg status: %s", result.status_string());
     return;

@@ -946,10 +946,11 @@ async fn test_remote_deauth() {
 
     fullmac_driver
         .ifc_proxy
-        .deauth_ind(&fidl_fullmac::WlanFullmacDeauthIndication {
-            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
-            locally_initiated: false,
+        .deauth_ind(&fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest {
+            peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+            reason_code: Some(fidl_ieee80211::ReasonCode::UnspecifiedReason),
+            locally_initiated: Some(false),
+            ..Default::default()
         })
         .await
         .expect("Could not send deauth ind");

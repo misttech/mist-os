@@ -73,10 +73,10 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_deauthenticate_confirm(payload),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::DeauthInd { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::DeauthInd { payload, responder } => {
             responder.send().context("Failed to respond to DeauthInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::DeauthInd {
-                ind: fullmac_to_mlme::convert_deauthenticate_indication(ind),
+                ind: fullmac_to_mlme::convert_deauthenticate_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::AssocInd { payload, responder } => {

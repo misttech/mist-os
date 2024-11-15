@@ -346,13 +346,13 @@ pub fn convert_deauthenticate_confirm(
 }
 
 pub fn convert_deauthenticate_indication(
-    ind: fidl_fullmac::WlanFullmacDeauthIndication,
-) -> fidl_mlme::DeauthenticateIndication {
-    fidl_mlme::DeauthenticateIndication {
-        peer_sta_address: ind.peer_sta_address,
-        reason_code: ind.reason_code,
-        locally_initiated: ind.locally_initiated,
-    }
+    ind: fidl_fullmac::WlanFullmacImplIfcDeauthIndRequest,
+) -> Result<fidl_mlme::DeauthenticateIndication> {
+    Ok(fidl_mlme::DeauthenticateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
+        reason_code: ind.reason_code.context("missing reason code")?,
+        locally_initiated: ind.locally_initiated.context("missing locally initiated")?,
+    })
 }
 pub fn convert_associate_indication(
     ind: fidl_fullmac::WlanFullmacImplIfcAssocIndRequest,

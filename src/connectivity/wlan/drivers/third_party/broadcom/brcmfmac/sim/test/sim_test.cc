@@ -216,8 +216,9 @@ void SimInterface::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter
 }
 
 void SimInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
-  stats_.deauth_indications.push_back(request->ind);
-  const auto& peer_sta_address = request->ind.peer_sta_address.data();
+  auto deauth_ind = fidl::ToNatural(*request);
+  stats_.deauth_indications.push_back(deauth_ind);
+  const auto& peer_sta_address = request->peer_sta_address().data();
   if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
     assoc_ctx_.state = AssocContext::kNone;
   }
