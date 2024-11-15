@@ -100,7 +100,6 @@
 //src/devices/block/drivers/virtio:virtio_block-driver
 //src/devices/block/drivers/virtio:virtio_scsi-driver
 //src/devices/block/drivers/zxcrypt:zxcrypt-driver
-//src/devices/board/drivers/acpi-arm64:acpi-arm64-driver
 //src/devices/board/drivers/astro/post-init:post-init-driver
 //src/devices/board/drivers/astro:astro-driver
 //src/devices/board/drivers/crosvm:driver

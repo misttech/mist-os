@@ -30,7 +30,6 @@ namespace driver_symbols {
 // To remove items from the allowlist, please send a change to one of the OWNERS of
 // this file to remove an element from the list below.
 const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
-    "#meta/acpi-arm64.cm",
     "#meta/aml-g12-pdm.cm",
     "#meta/aml-g12-tdm-dai.cm",
     "#meta/aml-g12-tdm.cm",

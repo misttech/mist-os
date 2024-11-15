@@ -76,11 +76,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/ahci.cm" ]
     },
     {
-      package_target = "//src/devices/board/drivers/acpi-arm64:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/acpi-arm64.cm" ]
-    },
-    {
       package_target = "//src/devices/board/drivers/qemu-arm64:package"
       package_set = "bootfs"
       driver_components = [ "meta/qemu-arm64.cm" ]

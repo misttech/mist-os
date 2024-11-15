@@ -144,7 +144,6 @@ source_set("ddktl") {
     "//src/devices/block/drivers/ramdisk:*",
     "//src/devices/block/drivers/virtio:*",
     "//src/devices/block/drivers/zxcrypt:*",
-    "//src/devices/board/drivers/acpi-arm64:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/nelson:*",

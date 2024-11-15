@@ -89,7 +89,6 @@ shared_library("driver") {
     "//src/devices/block/drivers/usb-mass-storage:*",
     "//src/devices/block/drivers/virtio:*",
     "//src/devices/block/drivers/zxcrypt:*",
-    "//src/devices/board/drivers/acpi-arm64:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/machina:*",
