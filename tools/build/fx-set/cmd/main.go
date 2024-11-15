@@ -363,7 +363,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	rbeMode := args.rbeMode
 	if rbeMode == "auto" {
 		if rbeSupported && canUseRbe {
-			rbeMode = "legacy_default" // subject to change
+			rbeMode = "cloudtop"
 		} else {
 			rbeMode = "off"
 		}
