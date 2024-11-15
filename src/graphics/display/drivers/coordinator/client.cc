@@ -599,19 +599,28 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
 void Client::SetLayerImage(SetLayerImageRequestView request,
                            SetLayerImageCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  SetLayerImageImpl(ToLayerId(request->layer_id), ToImageId(request->image_id),
+                    ToEventId(request->wait_event_id), ToEventId(request->signal_event_id));
+}
 
+void Client::SetLayerImage2(SetLayerImage2RequestView request,
+                            SetLayerImage2Completer::Sync& /*_completer*/) {
+  SetLayerImageImpl(ToLayerId(request->layer_id), ToImageId(request->image_id),
+                    ToEventId(request->wait_event_id), kInvalidEventId);
+}
+
+void Client::SetLayerImageImpl(LayerId layer_id, ImageId image_id, EventId wait_event_id,
+                               EventId signal_event_id) {
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, request->layer_id.value);
+    FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, layer_id.value());
     TearDown();
     return;
   }
 
-  const ImageId image_id = ToImageId(request->image_id);
   auto image_it = images_.find(image_id);
   if (!image_it.IsValid()) {
     FDF_LOG(ERROR, "SetLayerImage with invalid image ID: %" PRIu64, image_id.value());
@@ -649,8 +658,15 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
 
-  const EventId wait_event_id = ToEventId(request->wait_event_id);
-  const EventId signal_event_id = ToEventId(request->signal_event_id);
+  // It is now illegal to provide a valid `signal_event_id`.
+  // TODO(https://fxbug.dev/370839049) This is temporary, until a subsequent CL modifies the FIDL
+  // API to make it impossible to provide a signal event.
+  if (signal_event_id.value() != kInvalidEventId.value()) {
+    FDF_LOG(ERROR, "SetLayerImage only accepts invalid `signal_event_id`");
+    TearDown();
+    return;
+  }
+
   // TODO(https://fxbug.dev/42080337): Check if the IDs are valid (i.e. imported but not
   // yet released) before calling SetImage().
   layer->SetImage(image_it.CopyPointer(), wait_event_id, signal_event_id);

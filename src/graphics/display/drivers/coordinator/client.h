@@ -48,6 +48,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace display {
@@ -181,6 +182,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                            SetLayerColorConfigCompleter::Sync& _completer) override;
   void SetLayerImage(SetLayerImageRequestView request,
                      SetLayerImageCompleter::Sync& _completer) override;
+  void SetLayerImage2(SetLayerImage2RequestView request,
+                      SetLayerImage2Completer::Sync& _completer) override;
   void CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) override;
   void ApplyConfig(ApplyConfigCompleter::Sync& _completer) override;
   void ApplyConfig3(ApplyConfig3RequestView request,
@@ -250,6 +253,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // Discards all the pending config on all Displays and Layers.
   void DiscardConfig();
+
+  void SetLayerImageImpl(LayerId layer_id, ImageId image_id, EventId wait_event_id,
+                         EventId signal_event_id);
 
   Controller* const controller_;
   ClientProxy* const proxy_;

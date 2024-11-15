@@ -358,8 +358,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
     const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
-    auto result = dc->SetLayerImage(fidl_layer_id, fidl_image_id, fidl_wait_event_id,
-                                    fhd::wire::EventId{.value = 0});
+    auto result = dc->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_wait_event_id);
 
     ZX_ASSERT(result.ok());
   }
