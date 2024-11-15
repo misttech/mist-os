@@ -946,9 +946,7 @@ mod tests {
 
             // Cloning meta_as_file yields meta_as_file
             let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-            let () = proxy
-                .clone(fio::OpenFlags::RIGHT_READABLE, server_end.into_channel().into())
-                .unwrap();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
                 root_dir.hash.to_string().as_bytes()
@@ -983,8 +981,7 @@ mod tests {
 
             // Cloning meta_as_dir yields meta_as_dir
             let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let () =
-                proxy.clone(fio::OpenFlags::empty(), server_end.into_channel().into()).unwrap();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
                 vec![
@@ -1140,9 +1137,7 @@ mod tests {
 
             // Cloning meta_as_file yields meta_as_file
             let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-            let () = proxy
-                .clone(fio::OpenFlags::RIGHT_READABLE, server_end.into_channel().into())
-                .unwrap();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
                 root_dir.hash.to_string().as_bytes()
@@ -1174,8 +1169,7 @@ mod tests {
 
             // Cloning meta_as_dir yields meta_as_dir
             let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let () =
-                proxy.clone(fio::OpenFlags::empty(), server_end.into_channel().into()).unwrap();
+            let () = proxy.clone2(server_end.into_channel().into()).unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
                 vec![
