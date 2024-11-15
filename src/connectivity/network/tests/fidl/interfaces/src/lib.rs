@@ -4,6 +4,8 @@
 
 #![cfg(test)]
 
+mod error;
+
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use fuchsia_async::{self as fasync, TimeoutExt as _};

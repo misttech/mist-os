@@ -9,5 +9,12 @@
                 "*",
             ],
         },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                //TODO(https://fxbug.dev/379298848): Remove error logs for this test.
+                "resolve_default_route_while_dhcp_is_running_ns3",
+            ],
+        },
     ],
 }

@@ -5,50 +5,49 @@
 import("//build/components.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
-group("tests") {
-  testonly = true
-  deps = [
-    ":netstack-error-fidl-tests",
-    ":netstack-fidl-tests",
-    ":netstack-filter-fidl-tests",
-  ]
-}
-
 tests = [
-  "debug",
-  "interfaces",
-  "interfaces-admin",
-  "neighbor",
-  "routes",
-  "routes-admin",
+  {
+    label = "debug"
+  },
+  {
+    label = "interfaces"
+    err_logs = true
+  },
+  {
+    label = "interfaces-admin"
+    err_logs = true
+  },
+  {
+    label = "neighbor"
+  },
+  {
+    label = "routes"
+    err_logs = true
+  },
+  {
+    label = "routes-admin"
+    err_logs = true
+  },
 ]
 
-foreach(test, tests) {
-  name = "netstack-${test}-fidl-test"
-  fuchsia_test_component_with_expectations(name) {
-    manifest = "meta/${name}.cml"
-    expectations = "expectations/${test}.json5"
-    deps = [ test ]
-  }
-}
-
-filter_deprecated_tests = []
 if (target_cpu != "riscv64") {
-  filter_deprecated_tests += [
-    "nat",
-    "tcp",
-    "udp",
-  ]
-}
-
-foreach(test, filter_deprecated_tests) {
-  name = "netstack-${test}-filter-deprecated-fidl-test"
-  fuchsia_test_component_with_expectations(name) {
-    manifest = "meta/netstack-${test}-filter-deprecated-fidl-test.cml"
-    expectations = "expectations/${test}.json5"
-    deps = [ "filter-deprecated/${test}" ]
+  foreach(filter_deprecated_test,
+          [
+            "nat",
+            "tcp",
+            "udp",
+          ]) {
+    tests += [
+      {
+        label = "${filter_deprecated_test}-filter-deprecated"
+        expect = "${filter_deprecated_test}"
+        dep = "filter-deprecated/${filter_deprecated_test}"
+      },
+    ]
   }
 }
 
@@ -66,42 +65,75 @@ if (target_cpu != "riscv64") {
       [ "//src/connectivity/network/netstack:component-debug" ]
 }
 
-fuchsia_test_package("netstack-fidl-tests") {
-  test_components = []
-  foreach(test, tests) {
-    test_components += [ ":netstack-${test}-fidl-test" ]
+all_test_packages = []
+_package_deps = _common_test_package_deps +
+                [ "//src/lib/testing/expectation:expectation_comparer" ]
+
+foreach(test, tests) {
+  _err_logs = false
+  if (defined(test.err_logs)) {
+    _err_logs = test.err_logs
   }
-  foreach(test, filter_deprecated_tests) {
-    test_components += [ ":netstack-${test}-filter-deprecated-fidl-test" ]
+  _label = test.label
+  _name = "netstack-${_label}-fidl-test"
+  _component_label = "${_name}"
+  _expect = "expectations/${_label}.json5"
+  if (defined(test.expect)) {
+    _expect = "expectations/${test.expect}.json5"
+  }
+  _component_dep = _label
+  if (defined(test.dep)) {
+    _component_dep = test.dep
   }
 
-  deps = _common_test_package_deps +
-         [ "//src/lib/testing/expectation:expectation_comparer" ]
+  if (!_err_logs) {
+    _package_label = "${_name}_pkg"
 
-  # TODO(https://fxbug.dev/42144060): Figure out how to allow high-severity logs
-  # in expected-to-fail tests.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
+    fuchsia_test_component_with_expectations(_component_label) {
+      component_name = _name
+      expectations = _expect
+      manifest = "meta/${_name}.cml"
+      deps = [ _component_dep ]
     }
-  }
-}
 
-fuchsia_test_component("netstack-interfaces-error-fidl-test") {
-  manifest = "meta/netstack-interfaces-error-fidl-test.cml"
-  deps = [ "interfaces:error" ]
-}
-
-# TODO(https://fxbug.dev/42144060): Merge this with the above package once it is
-# supported to configure acceptable error log lines.
-fuchsia_test_package("netstack-error-fidl-tests") {
-  test_components = [ ":netstack-interfaces-error-fidl-test" ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
+    fuchsia_test_package(_package_label) {
+      package_name = _name
+      test_components = [ ":${_component_label}" ]
+      deps = _package_deps
     }
+
+    all_test_packages += [ ":${_package_label}" ]
+  } else {
+    fuchsia_test_component(_component_label) {
+      component_name = _name
+      manifest = "meta/${_name}.cml"
+      deps = [ _component_dep ]
+    }
+
+    _no_err_logs_package_name = "${_name}-no-err-logs"
+    fuchsia_test_with_expectations_package(_no_err_logs_package_name) {
+      test_components = [ ":${_component_label}" ]
+      expectations = _expect
+      treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+      deps = _package_deps
+    }
+    _with_err_logs_package_name = "${_name}-with-err-logs"
+    fuchsia_test_with_expectations_package(_with_err_logs_package_name) {
+      test_components = [ ":${_component_label}" ]
+      expectations = _expect
+      treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+      deps = _package_deps
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    }
+    all_test_packages += [
+      ":${_no_err_logs_package_name}",
+      ":${_with_err_logs_package_name}",
+    ]
   }
-  deps = _common_test_package_deps
 }
 
 fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
@@ -124,4 +156,9 @@ fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
       shard_part_regex = "([^::]+(?:::[^::]+)?).*"
     },
   ]
+}
+
+group("tests") {
+  testonly = true
+  deps = all_test_packages + [ ":netstack-filter-fidl-tests" ]
 }

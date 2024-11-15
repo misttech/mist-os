@@ -9,5 +9,11 @@
                 "*",
             ],
         },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                "error::*",
+            ],
+        },
     ],
 }
