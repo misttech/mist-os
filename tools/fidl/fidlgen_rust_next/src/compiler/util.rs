@@ -5,20 +5,40 @@
 use std::io::{Error, Write};
 
 use super::Compiler;
-use crate::ir::{CompIdent, Id, Ident, IntType, PrimSubtype};
+use crate::ir::{
+    CompId, Constant, ConstantKind, DeclType, Id, IntType, LiteralKind, PrimSubtype, Type, TypeKind,
+};
 
 pub fn emit_prefixed_comp_ident<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
     prefix: &str,
 ) -> Result<(), Error> {
     let (lib, ty) = ident.split();
-    // TODO: This needs to check the type of the declaration
-    let type_name = ty.camel();
+    let type_name = match compiler.schema.get_decl_type(ident).unwrap() {
+        DeclType::Alias
+        | DeclType::Bits
+        | DeclType::Enum
+        | DeclType::Struct
+        | DeclType::Table
+        | DeclType::Union => ty.camel(),
+        DeclType::Const => ty.screaming_snake(),
+        DeclType::NewType
+        | DeclType::Overlay
+        | DeclType::Protocol
+        | DeclType::Resource
+        | DeclType::Service => todo!(),
+    };
 
     if lib == compiler.schema.name {
         write!(out, "crate::{prefix}{type_name}")?;
+    } else if lib == "zx" {
+        let name = match ty.non_canonical() {
+            "ObjType" => "ObjectType",
+            _ => &type_name,
+        };
+        write!(out, "fidl_next::zx::{prefix}{name}")?;
     } else {
         let escaped = lib.replace(".", "_");
         write!(out, "fidl_{escaped}::{prefix}{type_name}")?;
@@ -30,7 +50,7 @@ pub fn emit_prefixed_comp_ident<W: Write>(
 pub fn emit_natural_comp_ident<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     emit_prefixed_comp_ident(compiler, out, ident, "")
 }
@@ -38,9 +58,61 @@ pub fn emit_natural_comp_ident<W: Write>(
 pub fn emit_wire_comp_ident<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     emit_prefixed_comp_ident(compiler, out, ident, "Wire")
+}
+
+pub fn emit_natural_constant<W: Write>(
+    compiler: &mut Compiler<'_>,
+    out: &mut W,
+    constant: &Constant,
+    ty: &Type,
+) -> Result<(), Error> {
+    match &constant.kind {
+        ConstantKind::Identifier { identifier } => {
+            let (comp_id, member) = identifier.split();
+            emit_natural_comp_ident(compiler, out, comp_id)?;
+
+            if let Some(member) = member {
+                match compiler.schema.get_decl_type(comp_id).unwrap() {
+                    DeclType::Bits => write!(out, "::{}", member.screaming_snake())?,
+                    DeclType::Enum => {
+                        // Some zx types don't conform to the regular naming scheme
+                        if comp_id.library() == "zx"
+                            && comp_id.decl_name().non_canonical() == "ObjType"
+                        {
+                            write!(out, "::{}", member.screaming_snake())?;
+                        } else {
+                            write!(out, "::{}", member.camel())?;
+                        }
+                    }
+                    _ => panic!("expected member to be of bits or enum"),
+                }
+            }
+        }
+        ConstantKind::Literal { literal } => match literal.kind {
+            LiteralKind::String => write!(out, "\"{}\"", literal.value.escape_default())?,
+            LiteralKind::Bool => write!(out, "{}", literal.value)?,
+            LiteralKind::Numeric => match &ty.kind {
+                TypeKind::Identifier { identifier, .. } => {
+                    emit_natural_comp_ident(compiler, out, identifier)?;
+                    write!(out, "::from_bits_retain({})", constant.value)?;
+                }
+                TypeKind::Primitive { .. } => write!(out, "{}", literal.value)?,
+                _ => panic!("invalid constant type"),
+            },
+        },
+        ConstantKind::BinaryOperator { .. } => {
+            let TypeKind::Identifier { identifier, .. } = &ty.kind else {
+                panic!("invalid constant type");
+            };
+            emit_natural_comp_ident(compiler, out, identifier)?;
+            write!(out, "::from_bits_retain({})", constant.value)?;
+        }
+    }
+
+    Ok(())
 }
 
 pub fn emit_doc_string<W: Write>(out: &mut W, doc: Option<&str>) -> Result<(), Error> {
@@ -54,7 +126,7 @@ pub fn emit_doc_string<W: Write>(out: &mut W, doc: Option<&str>) -> Result<(), E
     Ok(())
 }
 
-pub trait IdentExt {
+pub trait IdExt {
     fn split(&self) -> Split<'_>;
 
     fn camel(&self) -> String {
@@ -90,13 +162,7 @@ pub trait IdentExt {
     }
 }
 
-impl IdentExt for Ident {
-    fn split(&self) -> Split<'_> {
-        Split { str: self.non_canonical() }
-    }
-}
-
-impl IdentExt for Id<'_> {
+impl IdExt for Id {
     fn split(&self) -> Split<'_> {
         Split { str: self.non_canonical() }
     }
@@ -168,6 +234,22 @@ pub fn int_type_natural_name(int: IntType) -> &'static str {
     }
 }
 
+pub fn prim_subtype_natural_name(prim: PrimSubtype) -> &'static str {
+    match prim {
+        PrimSubtype::Bool => "bool",
+        PrimSubtype::Float32 => "f32",
+        PrimSubtype::Float64 => "f64",
+        PrimSubtype::Int8 => "i8",
+        PrimSubtype::Int16 => "i16",
+        PrimSubtype::Int32 => "i32",
+        PrimSubtype::Int64 => "i64",
+        PrimSubtype::Uint8 => "u8",
+        PrimSubtype::Uint16 => "u16",
+        PrimSubtype::Uint32 => "u32",
+        PrimSubtype::Uint64 => "u64",
+    }
+}
+
 pub fn prim_subtype_wire_name(prim: PrimSubtype) -> &'static str {
     match prim {
         PrimSubtype::Bool => "bool",
@@ -186,7 +268,7 @@ pub fn prim_subtype_wire_name(prim: PrimSubtype) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::IdentExt as _;
+    use super::IdExt as _;
     use crate::ir::Id;
 
     const TEST_CASES: &[&str] = &[
@@ -221,7 +303,7 @@ mod tests {
 
         for (case, expected) in TEST_CASES.iter().zip(EXPECTEDS.iter()) {
             assert_eq!(
-                &Id::new(case).split().collect::<Vec<_>>(),
+                &Id::from_str(case).split().collect::<Vec<_>>(),
                 expected,
                 "{case} did not split correctly",
             );
@@ -246,7 +328,7 @@ mod tests {
 
         for (case, expected) in TEST_CASES.iter().zip(EXPECTEDS.iter()) {
             assert_eq!(
-                &Id::new(case).snake(),
+                &Id::from_str(case).snake(),
                 expected,
                 "{case} was not transformed to snake case correctly",
             );
@@ -271,7 +353,7 @@ mod tests {
 
         for (case, expected) in TEST_CASES.iter().zip(EXPECTEDS.iter()) {
             assert_eq!(
-                &Id::new(case).camel(),
+                &Id::from_str(case).camel(),
                 expected,
                 "{case} was not transformed to camel case correctly",
             );
@@ -296,7 +378,7 @@ mod tests {
 
         for (case, expected) in TEST_CASES.iter().zip(EXPECTEDS.iter()) {
             assert_eq!(
-                &Id::new(case).screaming_snake(),
+                &Id::from_str(case).screaming_snake(),
                 expected,
                 "{case} was not transformed to screaming snake case correctly",
             );

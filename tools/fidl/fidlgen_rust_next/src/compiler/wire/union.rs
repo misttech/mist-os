@@ -4,21 +4,21 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::{emit_doc_string, IdentExt as _};
+use crate::compiler::util::{emit_doc_string, IdExt as _};
 use crate::compiler::wire::emit_type;
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 // TODO: wire unions need a drop impl
 
 pub fn emit_union<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let u = &compiler.schema.union_declarations[ident];
 
-    let name = u.name.type_name().camel();
+    let name = u.name.decl_name().camel();
     let is_static = u.shape.max_out_of_line == 0;
     let mut has_only_static_members = true;
     for member in &u.members {

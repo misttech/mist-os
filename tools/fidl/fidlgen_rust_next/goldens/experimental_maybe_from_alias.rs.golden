@@ -11,7 +11,7 @@ pub type WireAliasOfArrayContainingAliasOfArray = [::fidl_next::u64_le; 2];
 pub type AliasOfBytes = Vec<u8>;
 pub type WireAliasOfBytes<'buf> = ::fidl_next::WireVector<'buf, u8>;
 pub type AliasOfRequest =
-    ::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>;
+    ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>;
 pub type WireAliasOfRequest =
     ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>;
 pub type AliasOfString = String;
@@ -36,13 +36,15 @@ pub struct Testing {
     pub a1: [u64; 1],
     pub a2: Vec<[u64; 1]>,
     pub a3: [[u64; 1]; 4],
-    pub r1: ::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>,
+    pub r1:
+        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
     pub r2: Vec<
-        ::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>,
+        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
     >,
-    pub r3:
-        [::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>;
-            4],
+    pub r3: [::fidl_next::EndpointResource<
+        Option<::fidl_next::zx::Handle>,
+        ::fidl_next::ServerEndpoint,
+    >; 4],
     pub b1: Vec<u8>,
     pub b2: Vec<Vec<u8>>,
     pub b3: [Vec<u8>; 4],
@@ -76,12 +78,13 @@ where
     [u64; 1]: ::fidl_next::Encode<___E>,
     Vec<[u64; 1]>: ::fidl_next::Encode<___E>,
     [[u64; 1]; 4]: ::fidl_next::Encode<___E>,
-    ::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>:
+    ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>:
         ::fidl_next::Encode<___E>,
-    Vec<::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>>:
-        ::fidl_next::Encode<___E>,
-    [::fidl_next::EndpointResource<Option<::fidl_next::Handle>, ::fidl_next::ServerEndpoint>; 4]:
-        ::fidl_next::Encode<___E>,
+    Vec<
+        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
+    >: ::fidl_next::Encode<___E>,
+    [::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>;
+        4]: ::fidl_next::Encode<___E>,
     Vec<u8>: ::fidl_next::Encode<___E>,
     Vec<Vec<u8>>: ::fidl_next::Encode<___E>,
     [Vec<u8>; 4]: ::fidl_next::Encode<___E>,

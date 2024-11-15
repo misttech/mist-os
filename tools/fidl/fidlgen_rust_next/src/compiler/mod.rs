@@ -66,9 +66,12 @@ impl<'a> Compiler<'a> {
                     natural::emit_alias(self, out, ident)?;
                     wire::emit_alias(self, out, ident)?;
                 }
-                DeclType::Bits => todo!(),
+                DeclType::Bits => {
+                    natural::emit_bits(self, out, ident)?;
+                    wire::emit_bits(self, out, ident)?;
+                }
                 DeclType::Const => {
-                    natural::emit_constant(self, out, ident)?;
+                    natural::emit_const(self, out, ident)?;
                 }
                 // Custom resources are currently treated as the underlying type
                 DeclType::Resource => (),

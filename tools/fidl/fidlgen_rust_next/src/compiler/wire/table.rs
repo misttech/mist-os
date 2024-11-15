@@ -4,21 +4,21 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::{emit_doc_string, IdentExt as _};
+use crate::compiler::util::{emit_doc_string, IdExt as _};
 use crate::compiler::wire::{emit_type, emit_type_check};
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 // TODO: wire tables need a drop impl
 
 pub fn emit_table<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let t = &compiler.schema.table_declarations[ident];
 
-    let name = t.name.type_name().camel();
+    let name = t.name.decl_name().camel();
 
     // Write wire type
 

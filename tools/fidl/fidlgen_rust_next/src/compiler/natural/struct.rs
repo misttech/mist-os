@@ -5,20 +5,20 @@
 use std::io::{Error, Write};
 
 use crate::compiler::natural::emit_type;
-use crate::compiler::util::{emit_doc_string, IdentExt as _};
+use crate::compiler::util::{emit_doc_string, IdExt as _};
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 pub fn emit_struct<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let s = &compiler.schema.struct_declarations[ident];
 
     let is_wire_static = s.shape.max_out_of_line == 0;
 
-    let name = s.name.type_name().camel();
+    let name = s.name.decl_name().camel();
     let wire_params = if is_wire_static { "" } else { "<'buf>" };
 
     // Write wire type

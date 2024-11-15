@@ -5,19 +5,19 @@
 use std::io::{Error, Write};
 
 use crate::compiler::util::{
-    emit_doc_string, int_type_natural_name, int_type_wire_name, IdentExt as _,
+    emit_doc_string, int_type_natural_name, int_type_wire_name, IdExt as _,
 };
 use crate::compiler::Compiler;
-use crate::ir::CompIdent;
+use crate::ir::CompId;
 
 pub fn emit_enum<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let e = &compiler.schema.enum_declarations[ident];
 
-    let name = e.name.type_name().camel();
+    let name = e.name.decl_name().camel();
     let natural_ty = int_type_natural_name(e.ty);
     let wire_ty = int_type_wire_name(e.ty);
 
@@ -76,11 +76,11 @@ pub fn emit_enum<W: Write>(
         let member_name = &member.name.camel();
         let value = &member.value.value;
 
-        writeln!(out, "{name}::{member_name} => {value},")?;
+        writeln!(out, "Self::{member_name} => {value},")?;
     }
 
     if !e.is_strict {
-        writeln!(out, "{name}::Unknown(value) => value,")?;
+        writeln!(out, "Self::Unknown(value) => value,")?;
     }
 
     writeln!(
@@ -106,16 +106,16 @@ pub fn emit_enum<W: Write>(
     )?;
 
     for member in &e.members {
-        let value = &member.value.value;
         let member_name = &member.name.camel();
+        let value = &member.value.value;
 
-        write!(out, "{value} => {name}::{member_name},")?;
+        write!(out, "{value} => Self::{member_name},")?;
     }
 
     if e.is_strict {
         writeln!(out, "_ => unsafe {{ ::core::hint::unreachable_unchecked() }},")?;
     } else {
-        writeln!(out, "value => {name}::Unknown(value),")?;
+        writeln!(out, "value => Self::Unknown(value),")?;
     }
 
     writeln!(
@@ -134,7 +134,7 @@ pub fn emit_enum<W: Write>(
         r#"
         impl ::fidl_next::TakeFrom<Wire{name}> for {name} {{
             fn take_from(from: &mut Wire{name}) -> Self {{
-                {name}::from(*from)
+                Self::from(*from)
             }}
         }}
         "#,

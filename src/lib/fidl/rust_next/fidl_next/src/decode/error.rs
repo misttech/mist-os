@@ -33,11 +33,20 @@ pub enum DecodeError {
 
     /// An enum had an invalid ordinal
     #[error("invalid enum ordinal; expected a valid ordinal, found {0}")]
-    InvalidEnumOrdinal(usize),
+    InvalidEnumOrdinal(i128),
 
     /// A union had an invalid ordinal
     #[error("invalid union ordinal; expected a valid ordinal, found {0}")]
     InvalidUnionOrdinal(usize),
+
+    /// A bit set had an invalid set of bits
+    #[error("invalid bits; expected a subset of {expected:b}, found {actual:b}")]
+    InvalidBits {
+        /// The expected set of bits
+        expected: usize,
+        /// The actual set of bits
+        actual: usize,
+    },
 
     /// An envelope was out-of-line, but the out-of-line data was too small
     #[error(

@@ -4,9 +4,9 @@
 
 use core::mem::replace;
 
+use crate::zx::sys::zx_handle_t;
+use crate::zx::{Channel, Handle};
 use munge::munge;
-use zx::sys::zx_handle_t;
-use zx::{Channel, Handle};
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{

@@ -5,19 +5,19 @@
 use std::io::{Error, Write};
 
 use crate::compiler::util::{
-    emit_doc_string, int_type_natural_name, int_type_wire_name, IdentExt as _,
+    emit_doc_string, int_type_natural_name, int_type_wire_name, IdExt as _,
 };
 use crate::compiler::Compiler;
-use crate::ir::{CompIdent, IntType};
+use crate::ir::{CompId, IntType};
 
 pub fn emit_enum<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,
-    ident: &CompIdent,
+    ident: &CompId,
 ) -> Result<(), Error> {
     let e = &compiler.schema.enum_declarations[ident];
 
-    let name = e.name.type_name().camel();
+    let name = e.name.decl_name().camel();
     let natural_ty = int_type_natural_name(e.ty);
     let wire_ty = int_type_wire_name(e.ty);
 
@@ -99,7 +99,7 @@ pub fn emit_enum<W: Write>(
             r#"
                 => (),
                 unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(
-                    unknown as usize,
+                    unknown as i128,
                 )),
             }}
             "#,

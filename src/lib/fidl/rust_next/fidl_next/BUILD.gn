@@ -53,6 +53,7 @@ rustc_library("fidl_next") {
     "//third_party/rust_crates:futures",
 
     # Meaningful dependencies
+    "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:munge",
     "//third_party/rust_crates:rend",
     "//third_party/rust_crates:thiserror",

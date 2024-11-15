@@ -2,18 +2,19 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-pub const BASIC: &str = "\'\"\\\n\r\t";
-pub const DOLLAR: &str = "$";
-pub const DOLLAR_BRACE: &str = "${";
-/// "pleaseescapethisdocommentproperly"
 #[derive(Clone, Debug)]
-pub struct DocCommentWithQuotes {}
-
-impl ::fidl_next::Encodable for DocCommentWithQuotes {
-    type Encoded<'buf> = WireDocCommentWithQuotes;
+pub struct Baz {
+    pub g: fidl_test_middle::Bar,
 }
 
-impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes {
+impl ::fidl_next::Encodable for Baz {
+    type Encoded<'buf> = WireBaz;
+}
+
+impl<___E> ::fidl_next::Encode<___E> for Baz
+where
+    fidl_test_middle::Bar: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21,21 +22,22 @@ impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes {
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
+                g,
             } = slot;
         }
-
+        ::fidl_next::Encode::encode(&mut self.g, encoder, g)?;
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<DocCommentWithQuotes> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireDocCommentWithQuotes>;
+impl ::fidl_next::EncodableOption for Box<Baz> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireBaz>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Baz>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
-    DocCommentWithQuotes: ::fidl_next::Encode<___E>,
+    Baz: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
         this: Option<&mut Self>,
@@ -53,20 +55,23 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
-    fn take_from(from: &mut WireDocCommentWithQuotes) -> Self {
-        Self {}
+impl ::fidl_next::TakeFrom<WireBaz> for Baz {
+    fn take_from(from: &mut WireBaz) -> Self {
+        Self { g: ::fidl_next::TakeFrom::take_from(&mut from.g) }
     }
 }
 
-/// "pleaseescapethisdocommentproperly"
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct WireDocCommentWithQuotes {}
+pub struct WireBaz {
+    pub g: fidl_test_middle::WireBar,
+}
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireDocCommentWithQuotes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireBaz
 where
     ___D: ?Sized,
+
+    fidl_test_middle::WireBar: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -74,16 +79,10 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
+                mut g,
             } = slot;
         }
-
+        ::fidl_next::Decode::decode(g.as_mut(), decoder)?;
         Ok(())
     }
 }
-
-pub const MAX: &str = "\u{10ffff}";
-pub const NULL: &str = "\u{0}";
-pub const SMILE_LEADING_ZERO: &str = "\u{1f600}";
-pub const SMILE_LITERAL: &str = "\u{1f600}";
-pub const SMILE_LOWER: &str = "\u{1f600}";
-pub const SMILE_UPPER: &str = "\u{1f600}";

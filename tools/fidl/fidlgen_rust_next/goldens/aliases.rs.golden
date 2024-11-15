@@ -33,8 +33,8 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireObjType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            ObjType::None => 0,
-            ObjType::Channel => 4,
+            Self::None => 0,
+            Self::Channel => 4,
         });
 
         Ok(())
@@ -44,8 +44,8 @@ where
 impl ::core::convert::From<WireObjType> for ObjType {
     fn from(wire: WireObjType) -> Self {
         match u32::from(wire.value) {
-            0 => ObjType::None,
-            4 => ObjType::Channel,
+            0 => Self::None,
+            4 => Self::Channel,
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -53,7 +53,7 @@ impl ::core::convert::From<WireObjType> for ObjType {
 
 impl ::fidl_next::TakeFrom<WireObjType> for ObjType {
     fn take_from(from: &mut WireObjType) -> Self {
-        ObjType::from(*from)
+        Self::from(*from)
     }
 }
 
@@ -80,7 +80,7 @@ where
 
         match u32::from(*value) {
             0 | 4 => (),
-            unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(unknown as usize)),
+            unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(unknown as i128)),
         }
 
         Ok(())
@@ -96,9 +96,9 @@ impl ::core::convert::From<ObjType> for WireObjType {
     }
 }
 
-pub type Channel = ::fidl_next::Handle;
+pub type Channel = ::fidl_next::zx::Handle;
 pub type WireChannel = ::fidl_next::WireHandle;
-pub type AliasOfChannel = ::fidl_next::Handle;
+pub type AliasOfChannel = ::fidl_next::zx::Handle;
 pub type WireAliasOfChannel = ::fidl_next::WireHandle;
 #[derive(Debug)]
 pub struct ExampleOfUseOfAliases {
@@ -107,9 +107,9 @@ pub struct ExampleOfUseOfAliases {
     pub field_of_vec_of_strings_at_most_nine: Vec<String>,
     pub field_of_vec_of_strings_at_most_5: Vec<String>,
     pub field_of_vec_of_ref_me_at_most_5: Vec<fidl_test_someotherlibrary::ReferenceMe>,
-    pub field_of_channel: ::fidl_next::Handle,
-    pub field_of_client_end: ::fidl_next::Handle,
-    pub field_of_nullable_client_end: Option<::fidl_next::Handle>,
+    pub field_of_channel: ::fidl_next::zx::Handle,
+    pub field_of_client_end: ::fidl_next::zx::Handle,
+    pub field_of_nullable_client_end: Option<::fidl_next::zx::Handle>,
 }
 
 impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
@@ -123,9 +123,9 @@ where
     Vec<String>: ::fidl_next::Encode<___E>,
     Vec<String>: ::fidl_next::Encode<___E>,
     Vec<fidl_test_someotherlibrary::ReferenceMe>: ::fidl_next::Encode<___E>,
-    ::fidl_next::Handle: ::fidl_next::Encode<___E>,
-    ::fidl_next::Handle: ::fidl_next::Encode<___E>,
-    Option<::fidl_next::Handle>: ::fidl_next::Encode<___E>,
+    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
+    Option<::fidl_next::zx::Handle>: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,

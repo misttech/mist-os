@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod alias;
+mod bits;
 mod r#enum;
 mod r#struct;
 mod table;
@@ -17,6 +18,7 @@ use crate::compiler::Compiler;
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub use self::alias::emit_alias;
+pub use self::bits::emit_bits;
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
 pub use self::r#union::emit_union;
@@ -74,7 +76,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
         }
         TypeKind::Identifier { identifier, nullable, .. } => {
             match compiler.schema.get_decl_type(identifier).unwrap() {
-                DeclType::Enum => {
+                DeclType::Bits | DeclType::Enum => {
                     emit_wire_comp_ident(compiler, out, identifier)?;
                 }
                 DeclType::Table => {
@@ -109,7 +111,6 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 }
                 DeclType::Protocol => todo!(),
                 DeclType::Alias => todo!(),
-                DeclType::Bits => todo!(),
                 DeclType::Const => todo!(),
                 DeclType::Resource => {
                     // All resources are currently treated like handles

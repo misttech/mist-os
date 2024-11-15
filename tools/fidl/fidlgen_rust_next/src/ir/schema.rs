@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use super::{
-    CompIdent, Const, DeclType, Enum, Library, Struct, Table, TypeAlias, TypeShape, Union,
+    Bits, CompId, CompIdent, Const, DeclType, Enum, Library, Struct, Table, TypeAlias, TypeShape,
+    Union,
 };
 
 /// A FIDL JSON IR schema.
@@ -17,8 +18,9 @@ pub struct Schema {
     #[serde(deserialize_with = "crate::de::index")]
     pub alias_declarations: HashMap<CompIdent, TypeAlias>,
     #[serde(deserialize_with = "crate::de::index")]
+    pub bits_declarations: HashMap<CompIdent, Bits>,
+    #[serde(deserialize_with = "crate::de::index")]
     pub const_declarations: HashMap<CompIdent, Const>,
-    // pub bits_declarations: Vec<Bits>,
     #[serde(deserialize_with = "crate::de::index")]
     pub enum_declarations: HashMap<CompIdent, Enum>,
     // pub interface_declarations: Vec<Protocol>,
@@ -38,7 +40,7 @@ pub struct Schema {
 }
 
 impl Schema {
-    pub fn get_decl_type(&self, ident: &CompIdent) -> Option<&DeclType> {
+    pub fn get_decl_type(&self, ident: &CompId) -> Option<&DeclType> {
         let library = ident.library();
         if library == self.name {
             self.declarations.get(ident)
@@ -47,7 +49,7 @@ impl Schema {
         }
     }
 
-    pub fn get_type_shape(&self, ident: &CompIdent) -> Option<&TypeShape> {
+    pub fn get_type_shape(&self, ident: &CompId) -> Option<&TypeShape> {
         let library = ident.library();
         if library == self.name {
             match self.declarations.get(ident)? {

@@ -23,7 +23,7 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyEmptyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            MyEmptyFlexibleEnum::Unknown(value) => value,
+            Self::Unknown(value) => value,
         });
 
         Ok(())
@@ -33,14 +33,14 @@ where
 impl ::core::convert::From<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     fn from(wire: WireMyEmptyFlexibleEnum) -> Self {
         match u32::from(wire.value) {
-            value => MyEmptyFlexibleEnum::Unknown(value),
+            value => Self::Unknown(value),
         }
     }
 }
 
 impl ::fidl_next::TakeFrom<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
     fn take_from(from: &mut WireMyEmptyFlexibleEnum) -> Self {
-        MyEmptyFlexibleEnum::from(*from)
+        Self::from(*from)
     }
 }
 
@@ -97,9 +97,9 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            MyFlexibleEnum::Foo => 1,
-            MyFlexibleEnum::Bar => 2,
-            MyFlexibleEnum::Unknown(value) => value,
+            Self::Foo => 1,
+            Self::Bar => 2,
+            Self::Unknown(value) => value,
         });
 
         Ok(())
@@ -109,16 +109,16 @@ where
 impl ::core::convert::From<WireMyFlexibleEnum> for MyFlexibleEnum {
     fn from(wire: WireMyFlexibleEnum) -> Self {
         match u32::from(wire.value) {
-            1 => MyFlexibleEnum::Foo,
-            2 => MyFlexibleEnum::Bar,
-            value => MyFlexibleEnum::Unknown(value),
+            1 => Self::Foo,
+            2 => Self::Bar,
+            value => Self::Unknown(value),
         }
     }
 }
 
 impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
     fn take_from(from: &mut WireMyFlexibleEnum) -> Self {
-        MyFlexibleEnum::from(*from)
+        Self::from(*from)
     }
 }
 
@@ -183,10 +183,10 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyFlexibleEnumWithCustomUnknown { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            MyFlexibleEnumWithCustomUnknown::Foo => 1,
-            MyFlexibleEnumWithCustomUnknown::Bar => 2,
-            MyFlexibleEnumWithCustomUnknown::CustomUnknown => 3,
-            MyFlexibleEnumWithCustomUnknown::Unknown(value) => value,
+            Self::Foo => 1,
+            Self::Bar => 2,
+            Self::CustomUnknown => 3,
+            Self::Unknown(value) => value,
         });
 
         Ok(())
@@ -198,10 +198,10 @@ impl ::core::convert::From<WireMyFlexibleEnumWithCustomUnknown>
 {
     fn from(wire: WireMyFlexibleEnumWithCustomUnknown) -> Self {
         match u32::from(wire.value) {
-            1 => MyFlexibleEnumWithCustomUnknown::Foo,
-            2 => MyFlexibleEnumWithCustomUnknown::Bar,
-            3 => MyFlexibleEnumWithCustomUnknown::CustomUnknown,
-            value => MyFlexibleEnumWithCustomUnknown::Unknown(value),
+            1 => Self::Foo,
+            2 => Self::Bar,
+            3 => Self::CustomUnknown,
+            value => Self::Unknown(value),
         }
     }
 }
@@ -210,7 +210,7 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnumWithCustomUnknown>
     for MyFlexibleEnumWithCustomUnknown
 {
     fn take_from(from: &mut WireMyFlexibleEnumWithCustomUnknown) -> Self {
-        MyFlexibleEnumWithCustomUnknown::from(*from)
+        Self::from(*from)
     }
 }
 
@@ -280,8 +280,8 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyStrictEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
-            MyStrictEnum::Foo => 1,
-            MyStrictEnum::Bar => 2,
+            Self::Foo => 1,
+            Self::Bar => 2,
         });
 
         Ok(())
@@ -291,8 +291,8 @@ where
 impl ::core::convert::From<WireMyStrictEnum> for MyStrictEnum {
     fn from(wire: WireMyStrictEnum) -> Self {
         match u32::from(wire.value) {
-            1 => MyStrictEnum::Foo,
-            2 => MyStrictEnum::Bar,
+            1 => Self::Foo,
+            2 => Self::Bar,
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -300,7 +300,7 @@ impl ::core::convert::From<WireMyStrictEnum> for MyStrictEnum {
 
 impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
     fn take_from(from: &mut WireMyStrictEnum) -> Self {
-        MyStrictEnum::from(*from)
+        Self::from(*from)
     }
 }
 
@@ -329,7 +329,7 @@ where
 
         match u32::from(*value) {
             1 | 2 => (),
-            unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(unknown as usize)),
+            unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(unknown as i128)),
         }
 
         Ok(())
