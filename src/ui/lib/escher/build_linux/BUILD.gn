@@ -9,9 +9,9 @@
 group("examples") {
   testonly = true
   deps = [
-    "//src/ui/examples/escher/rainfall($host_toolchain)",
-    "//src/ui/examples/escher/waterfall($host_toolchain)",
-    "//src/ui/tools/paper_shader_compiler($host_toolchain)",
+    "//src/ui/examples/escher/rainfall($linux_x64_toolchain)",
+    "//src/ui/examples/escher/waterfall($linux_x64_toolchain)",
+    "//src/ui/tools/paper_shader_compiler($linux_x64_toolchain)",
   ]
 }
 
@@ -24,8 +24,8 @@ group("examples") {
 group("tests") {
   testonly = true
   deps = [
-    "//src/ui/examples/escher/test:escher_examples_test($host_toolchain)",
-    "//src/ui/lib/escher/test:escher_renderer_tests($host_toolchain)",
-    "//src/ui/lib/escher/test:escher_unittests($host_toolchain)",
+    "//src/ui/examples/escher/test:escher_examples_test($linux_x64_toolchain)",
+    "//src/ui/lib/escher/test:escher_renderer_tests($linux_x64_toolchain)",
+    "//src/ui/lib/escher/test:escher_unittests($linux_x64_toolchain)",
   ]
 }

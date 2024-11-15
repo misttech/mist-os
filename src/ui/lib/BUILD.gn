@@ -7,8 +7,8 @@ group("tests") {
 
   deps = [
     "escher:tests",
-    "escher/test:escher_renderer_tests($host_toolchain)",
-    "escher/test:escher_unittests($host_toolchain)",
+    "escher/test:escher_renderer_tests($linux_x64_toolchain)",
+    "escher/test:escher_unittests($linux_x64_toolchain)",
     "focus_chain_provider:tests",
     "input-device-constants:tests",
     "input_pipeline:tests",

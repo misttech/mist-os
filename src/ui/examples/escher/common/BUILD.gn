@@ -46,12 +46,12 @@ source_set("common_base") {
   }
 }
 
-if (is_host) {
+if (is_linux) {
   group("host_test_data") {
     testonly = true
     deps = [
-      "assets:host_assets($host_toolchain)",
-      "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)",
+      "assets:host_assets($linux_x64_toolchain)",
+      "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
     ]
   }
 }

@@ -5,7 +5,7 @@
 import("//build/dist/resource.gni")
 import("//build/testing/host_test_data.gni")
 
-if (is_host) {
+if (is_linux) {
   # Copies shaders needed for escher linux tests to a specific test data
   # directory near the test binary.
   host_test_data("host_assets") {

@@ -4,7 +4,7 @@
 
 import("//src/lib/vulkan/build/vulkan_targets.gni")
 
-if (is_host && !has_prebuilt_vulkan_runtime) {
+if (is_linux && !has_prebuilt_vulkan_runtime) {
   # Escher cannot run without prebuilt Vulkan runtime on host for now.
   # Since we may include Escher host tests in the default build,
   # we substitute in a dummy executable in the case of a mac build.
@@ -24,10 +24,11 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//src/ui/lib/escher",
     ]
 
-    if (is_host) {
+    if (is_linux) {
       testonly = true
-      deps +=
-          [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
+      deps += [
+        "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
+      ]
     }
   }
 
@@ -43,10 +44,11 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//src/ui/lib/escher",
     ]
 
-    if (is_host) {
+    if (is_linux) {
       testonly = true
-      deps +=
-          [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
+      deps += [
+        "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
+      ]
     }
   }
 

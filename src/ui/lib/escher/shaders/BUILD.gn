@@ -63,7 +63,7 @@ test_spirv_files = [
   # shader_program_unittest.cc
 ]
 
-if (is_host) {
+if (is_linux) {
   # Copies shaders needed for escher linux tests to a specific test data
   # directory near the test binary.
   shader_host_test_data_targets = []
