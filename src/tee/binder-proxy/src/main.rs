@@ -21,7 +21,9 @@ fn main() -> Result<(), Error> {
         anyhow::bail!("Could not register /dev/urandom compatibility device: {register_status}");
     }
 
-    let binder_proxy = binder_proxy::BinderProxy::new(GUEST_PORT as u32)?;
+    let config = binder_proxy_config::Config::take_from_startup_handle();
+
+    let binder_proxy = binder_proxy::BinderProxy::new(GUEST_PORT as u32, config)?;
     binder_proxy.run()?;
     Ok(())
 }

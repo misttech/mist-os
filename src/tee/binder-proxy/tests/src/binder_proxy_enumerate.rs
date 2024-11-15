@@ -7,22 +7,36 @@ use android_system_microfuchsia_vm_service::aidl::android::system::microfuchsia:
 };
 use anyhow::{self, Error};
 use rpcbinder::RpcSession;
-use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
+use std::{os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd}, sync::Once};
 use vsock_sys::{create_virtio_stream_socket, sockaddr_vm};
-use binder::IBinder;
+use tracing;
+use binder_proxy_tests_config;
 
 extern "C" {
     fn register_dev_urandom_compat() -> zx::sys::zx_status_t;
 }
 
+static INIT_DEV_URANDOM_COMPAT: Once = Once::new();
+
+fn init_dev_urandom_compat_once() {
+    INIT_DEV_URANDOM_COMPAT.call_once(|| {
+        let register_status = zx::Status::from_raw(unsafe { register_dev_urandom_compat() });
+        if register_status != zx::Status::OK {
+            panic!("Could not register /dev/urandom compatibility device {register_status}");
+        }
+    });
+}
+
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let register_status = zx::Status::from_raw(unsafe { register_dev_urandom_compat() });
-    if register_status != zx::Status::OK {
-        anyhow::bail!("Could not register /dev/urandom compatibility device {register_status}");
-    }
+    tracing::info!("binder proxy enumerate main");
+    init_dev_urandom_compat_once();
+
     let session = RpcSession::new();
     let service: binder::Strong<dyn IMicrofuchsia> = session.setup_preconnected_client(|| {
+        // TODO: Why doesn't the polling loop in the binder library work?
+        // We are probably returning the wrong error on connection failure.
+        std::thread::sleep(std::time::Duration::from_secs(2));
         // Make a virtio stream socket.
         let mut socket_fd = 0;
         let status = zx::Status::from_raw(unsafe { create_virtio_stream_socket(&mut socket_fd) });
@@ -55,7 +69,11 @@ async fn main() -> Result<(), Error> {
 
         Some(socket_fd.into_raw_fd())
     })?;
-    service.as_binder().ping_binder().unwrap();
+    let tee_uuid = service.trustedAppUuids()?;
+
+    let config = binder_proxy_tests_config::Config::take_from_startup_handle();
+
+    assert_eq!(tee_uuid, config.expected_uuids);
 
     Ok(())
 }

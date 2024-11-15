@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/rust/default.shard.cml",
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/binder_proxy_tests",
+        binary: "bin/binder_proxy_enumerate_tests",
     },
     children: [
         {
@@ -18,10 +18,9 @@
     ],
     capabilities: [
         {
-            directory: "ta",
-            from: "self",
-            rights: [ "rx*" ],
-            path: "/svc/ta",
+            config: "fuchsia.binder.BindToLoopback",
+            type: "bool",
+            value: true,
         },
     ],
     use: [
@@ -29,8 +28,23 @@
             protocol: "fuchsia.vsock.Connector",
             from: "parent",
         },
+        {
+            config: "fuchsia.binder-proxy-tests.enumeration.ExpectedUuids",
+            key: "expected_uuids",
+            type: "vector",
+            max_count: 100,
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+        },
     ],
     offer: [
+        {
+            config: "fuchsia.binder.BindToLoopback",
+            from: "self",
+            to: "#binder-proxy",
+        },
         {
             protocol: "fuchsia.vsock.Connector",
             from: "parent",
@@ -38,8 +52,9 @@
         },
         {
             directory: "ta",
-            from: "self",
+            from: "parent",
             to: "#binder-proxy",
+            rights: [ "rx*" ],
         },
     ],
 }

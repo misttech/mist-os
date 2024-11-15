@@ -14,5 +14,8 @@ interface IMicrofuchsia {
 
   void setHostProxy(IHostProxy proxy);
 
-  // TODO: Add API to instantiate sessions with specific TAs.
+  // Enumerate the Trusted Apps within the VM.
+  @utf8InCpp String[] trustedAppUuids();
+
+  // TODO: Add API to connect to a particular TA.
 }

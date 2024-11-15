@@ -23,10 +23,12 @@ rustc_binary("bin") {
 
   deps = [
     ":android_system_microfuchsia_vm_service",
+    ":binder_proxy_config",
     "//sdk/rust/zx",
     "//src/lib/android/binder/rust:binder",
     "//src/lib/android/binder/rust/rpcbinder",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-sync",
     "//src/paravirtualization/lib/vsock/vsock_sys",
     "//src/tee/lib/dev_urandom_compat",
     "//third_party/rust_crates:anyhow",
@@ -50,10 +52,18 @@ aidl_cpp("android_system_microfuchsia_vm_service_cpp") {
   interfaces = android_system_microfuchsia_vm_service_aidl_interfaces
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "binder-proxy"
   manifest = "meta/binder_proxy.cml"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_rust_lib("binder_proxy_config") {
+  cm_label = ":manifest"
 }
 
 fuchsia_package("binder-proxy") {

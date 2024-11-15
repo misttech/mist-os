@@ -4,20 +4,37 @@
 
 use android_system_microfuchsia_vm_service::{aidl::android::system::microfuchsia::vm_service::{IHostProxy::IHostProxy, IMicrofuchsia::{self, BnMicrofuchsia}}, binder::{BinderFeatures, SpIBinder}};
 use binder;
+use std::fs;
+use fuchsia_sync::Mutex;
 
-pub struct Microfuchsia {}
+pub struct Microfuchsia {
+    host_proxy: Mutex<Option<binder::Strong<dyn IHostProxy>>>,
+}
 
 impl binder::Interface for Microfuchsia {}
 
 impl IMicrofuchsia::IMicrofuchsia for Microfuchsia {
-    fn setHostProxy(&self, _arg_proxy: &binder::Strong<dyn IHostProxy>) -> binder::Result<()> {
-        todo!()
+    fn setHostProxy(&self, host_proxy: &binder::Strong<dyn IHostProxy>) -> binder::Result<()> {
+        *self.host_proxy.lock() = Some(host_proxy.clone());
+        binder::Result::Ok(())
+    }
+
+    fn trustedAppUuids(&self) -> binder::Result<Vec<String>> {
+        // TODO: Sort out which errors should be returned to the caller and translate them
+        // to the proper binder errors. If we're completely misconfigured then we probably do not
+        // want to continue.
+        let uuids = fs::read_dir("/ta")
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .map(|s| s.into_string().unwrap())
+            .collect::<Vec<_>>();
+        binder::Result::Ok(uuids)
     }
 }
 
 impl Microfuchsia {
     pub fn new() -> Self {
-        Self {}
+        Self { host_proxy: Mutex::new(None) }
     }
 }
 

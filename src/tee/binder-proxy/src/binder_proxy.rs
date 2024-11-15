@@ -7,6 +7,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use anyhow::Error;
 
 use crate::microfuchsia_control;
+use binder_proxy_config::Config;
 use vsock_sys::{create_virtio_stream_socket, sockaddr_vm};
 
 use rpcbinder;
@@ -16,7 +17,7 @@ pub struct BinderProxy {
 }
 
 impl BinderProxy {
-    pub fn new(port: u32) -> Result<Self, Error> {
+    pub fn new(port: u32, config: Config) -> Result<Self, Error> {
         // Make a virtio stream socket.
         let mut socket_fd = 0;
         let status = zx::Status::from_raw(unsafe { create_virtio_stream_socket(&mut socket_fd) });
@@ -24,11 +25,16 @@ impl BinderProxy {
             anyhow::bail!("Could not create virtio stream socket: {status:?}");
         }
         let socket_fd = unsafe { OwnedFd::from_raw_fd(socket_fd) };
+        let cid = if config.bind_to_loopback {
+            1 // VM_ADDR_CID_LOCAL
+        } else {
+            2 // VM_ADDR_CID_HOST
+        };
         // Bind the socket to listen for connections from the host on the specified port.
         let addr = sockaddr_vm {
             svm_family: libc::AF_VSOCK as u16,
             svm_port: port,
-            svm_cid: 2, // VMADDR_CID_HOST
+            svm_cid: cid,
             ..Default::default()
         };
         let r = unsafe {

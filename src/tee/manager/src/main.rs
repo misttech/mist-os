@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fidl_fuchsia_tee::ApplicationRequestStream;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 use fuchsia_component::server::ServiceFs;
@@ -157,7 +157,8 @@ async fn main() -> Result<(), Error> {
     }
 
     let system_props =
-        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))?;
+        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))
+            .context("Failed to read system properties")?;
     let mut data_dir = fs.dir("data");
     let mut properties_dir = data_dir.dir("properties");
     let vmo = read_only(system_props).get_backing_memory(fio::VmoFlags::READ).await?;

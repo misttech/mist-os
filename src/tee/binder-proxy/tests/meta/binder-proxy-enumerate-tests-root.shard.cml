@@ -10,13 +10,34 @@
     children: [
         {
             name: "binder-proxy-tests",
-            url: "#meta/binder-proxy-tests.cm",
+            url: "#meta/binder-proxy-enumerate-tests.cm",
+        },
+        {
+            name: "ta-manager",
+            url: "ta-manager#meta/ta-manager.cm",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.vsock.Connector",
             from: "#vsock",
+            to: "#binder-proxy-tests",
+        },
+        {
+            directory: "config",
+            from: "#ta-manager-config",
+            to: "#ta-manager",
+            rights: [ "rx*" ],
+        },
+        {
+            directory: "ta",
+            from: "#ta-manager",
+            to: "#binder-proxy-tests",
+            rights: [ "rx*" ],
+        },
+        {
+            config: "fuchsia.binder-proxy-tests.enumeration.ExpectedUuids",
+            from: "self",
             to: "#binder-proxy-tests",
         },
     ],
