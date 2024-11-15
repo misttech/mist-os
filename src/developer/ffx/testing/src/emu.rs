@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use async_io::Async;
 use make_fuchsia_vol::make_empty_disk_with_uefi;
 use once_cell::sync::Lazy;
 use std::ffi::OsString;
 use std::io::ErrorKind;
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use tempfile::TempDir;
+use tokio::net::UnixStream;
 
 pub struct Emu {
     dir: TempDir,
@@ -139,10 +138,8 @@ impl Emu {
         }
     }
 
-    pub async fn serial(&self) -> Async<UnixStream> {
-        Async::<UnixStream>::connect(self.serial_path())
-            .await
-            .expect("failed to connect to emulator socket")
+    pub async fn serial(&self) -> UnixStream {
+        UnixStream::connect(self.serial_path()).await.expect("failed to connect to emulator socket")
     }
 }
 

@@ -8,6 +8,7 @@ use fixture::fixture;
 use fuchsia_async as _;
 use futures::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, Stream, StreamExt};
+use netext::TokioAsyncReadExt;
 use std::time::Duration;
 
 /// Test `ffx target flash` by bringing up an emulator in fastboot.
@@ -25,7 +26,8 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
 
     {
         let serial = emu.serial().await;
-        let (mut serial_lines, mut serial_writer) = serial_lines(serial).await;
+        let (mut serial_lines, mut serial_writer) =
+            serial_lines(serial.into_futures_stream()).await;
 
         // On initial boot, press `f` to enter fastboot.
         enter_fastboot(&mut serial_lines, &mut serial_writer).await;
@@ -77,7 +79,8 @@ async fn test_target_flash_from_product(ctx: TestContext) {
 
     {
         let serial = emu.serial().await;
-        let (mut serial_lines, mut serial_writer) = serial_lines(serial).await;
+        let (mut serial_lines, mut serial_writer) =
+            serial_lines(serial.into_futures_stream()).await;
 
         // On initial boot, press `f` to enter fastboot.
         enter_fastboot(&mut serial_lines, &mut serial_writer).await;
@@ -143,7 +146,8 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
 
     {
         let serial = emu.serial().await;
-        let (mut serial_lines, mut serial_writer) = serial_lines(serial).await;
+        let (mut serial_lines, mut serial_writer) =
+            serial_lines(serial.into_futures_stream()).await;
 
         // On initial boot, press `f` to enter fastboot.
         enter_fastboot(&mut serial_lines, &mut serial_writer).await;
@@ -185,7 +189,8 @@ async fn test_target_bootloader_info(ctx: TestContext) {
 
     {
         let serial = emu.serial().await;
-        let (mut serial_lines, mut serial_writer) = serial_lines(serial).await;
+        let (mut serial_lines, mut serial_writer) =
+            serial_lines(serial.into_futures_stream()).await;
 
         // On initial boot, press `f` to enter fastboot.
         enter_fastboot(&mut serial_lines, &mut serial_writer).await;
@@ -218,7 +223,8 @@ async fn test_target_bootloader_info_from_product(ctx: TestContext) {
 
     {
         let serial = emu.serial().await;
-        let (mut serial_lines, mut serial_writer) = serial_lines(serial).await;
+        let (mut serial_lines, mut serial_writer) =
+            serial_lines(serial.into_futures_stream()).await;
 
         // On initial boot, press `f` to enter fastboot.
         enter_fastboot(&mut serial_lines, &mut serial_writer).await;
