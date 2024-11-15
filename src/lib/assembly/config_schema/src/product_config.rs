@@ -27,15 +27,8 @@ pub struct ProductConfig {
     /// Product-specific session information.
     ///
     /// Default to None which creates a "paused" config that launches nothing to start.
-    /// Only one of `session.url` or `session_url` below should be defined.
     #[serde(default)]
     pub session: Option<ProductSessionConfig>,
-
-    /// Start URL to pass to `session_manager`.
-    ///
-    /// Default to the empty string which creates a "paused" config that launches nothing to start.
-    #[serde(default)]
-    pub session_url: String,
 
     /// Generic product information.
     #[serde(default)]
@@ -239,6 +232,7 @@ pub struct TrustedApp {
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductSessionConfig {
+    /// Start URL to pass to `session_manager`.
     pub url: String,
 
     /// Specifies initial element properties for the window manager.
