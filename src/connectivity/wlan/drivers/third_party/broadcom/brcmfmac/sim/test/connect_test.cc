@@ -140,7 +140,7 @@ class ConnectTest : public SimTest {
 
   // Event handlers
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
-  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
+  void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
@@ -268,7 +268,8 @@ void ConnectInterface::DeauthInd(DeauthIndRequestView request,
 }
 void ConnectInterface::DisassocInd(DisassocIndRequestView request,
                                    DisassocIndCompleter::Sync& completer) {
-  test_->OnDisassocInd(&request->ind);
+  auto disassoc_ind = fidl::ToNatural(*request);
+  test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void ConnectInterface::SignalReport(SignalReportRequestView request,
@@ -399,9 +400,10 @@ void ConnectTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthI
   client_ifc_.stats_.deauth_indications.push_back(deauth_ind);
 }
 
-void ConnectTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {
+void ConnectTest::OnDisassocInd(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {
   context_.disassoc_ind_count++;
-  if (ind->locally_initiated) {
+  if (ind->locally_initiated().has_value() && ind->locally_initiated().value()) {
     context_.ind_locally_initiated_count++;
   }
   client_ifc_.stats_.disassoc_indications.push_back(*ind);
@@ -1222,10 +1224,10 @@ TEST_F(ConnectTest, DisassocFromAPTest) {
   EXPECT_EQ(context_.disassoc_ind_count, 1U);
   EXPECT_EQ(context_.ind_locally_initiated_count, 0U);
 
-  EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
-      client_ifc_.stats_.disassoc_indications.front();
-  EXPECT_EQ(disassoc_ind.locally_initiated, false);
+  ASSERT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
+  const auto& disassoc_ind = client_ifc_.stats_.disassoc_indications.front();
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_FALSE(disassoc_ind.locally_initiated().value());
 }
 
 // After assoc & disassoc, send disassoc again to test event handling

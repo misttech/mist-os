@@ -219,12 +219,13 @@ TEST_F(WnmTest, RoamOnBtmReqButTargetApIgnoresReassoc) {
 
   // Also verify that we got only the right disconnect.
   ASSERT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
-      client_ifc_.stats_.disassoc_indications.front();
-  EXPECT_EQ(disassoc_ind.reason_code, wlan_ieee80211::ReasonCode::kStaLeaving);
+  const auto& disassoc_ind = client_ifc_.stats_.disassoc_indications.front();
+  ASSERT_TRUE(disassoc_ind.reason_code().has_value());
+  EXPECT_EQ(disassoc_ind.reason_code().value(), wlan_ieee80211::ReasonCode::kStaLeaving);
   // Firmware-initiated disconnect with no SME-requested disconnect means
   // locally initiated.
-  EXPECT_EQ(disassoc_ind.locally_initiated, true);
+  ASSERT_TRUE(disassoc_ind.locally_initiated().has_value());
+  EXPECT_TRUE(disassoc_ind.locally_initiated().value());
   EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
   EXPECT_EQ(client_ifc_.stats_.deauth_results.size(), 0U);
@@ -319,8 +320,7 @@ TEST_F(WnmTest, RoamOnBtmReqButSmeDisassocInterruptsRoam) {
   const simulation::SimBtmReqFrame btm_req(kAp0Bssid, client_mac, req_mode, candidates);
   ScheduleBtmReq(btm_req, zx::sec(1));
 
-  constexpr wlan_ieee80211::ReasonCode disassoc_reason =
-      wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc;
+  constexpr auto disassoc_reason = wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc;
   // Schedule a disassoc from SME, just after the roam starts.
   env_->ScheduleNotification([&] { client_ifc_.DisassociateFrom(kAp0Bssid, disassoc_reason); },
                              zx::sec(1) + zx::msec(100));

@@ -1448,10 +1448,11 @@ mod handle_driver_event_tests {
             Some(mac_role);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_ind = fidl_fullmac::WlanFullmacDisassocIndication {
-            peer_sta_address: [1u8; 6],
-            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
-            locally_initiated: true,
+        let disassoc_ind = fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            reason_code: Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth),
+            locally_initiated: Some(true),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_ind(&disassoc_ind)),

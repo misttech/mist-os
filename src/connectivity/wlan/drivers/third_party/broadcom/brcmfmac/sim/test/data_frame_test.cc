@@ -145,7 +145,7 @@ class DataFrameTest : public SimTest {
   // Fullmac event handlers
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
-  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
+  void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
   void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
@@ -247,7 +247,8 @@ void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
 }
 void DataFrameInterface::DisassocInd(DisassocIndRequestView request,
                                      DisassocIndCompleter::Sync& completer) {
-  test_->OnDisassocInd(&request->ind);
+  auto disassoc_ind = fidl::ToNatural(*request);
+  test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void DataFrameInterface::EapolConf(EapolConfRequestView request,
@@ -351,7 +352,8 @@ void DataFrameTest::OnSignalReport(
   }
 }
 
-void DataFrameTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {}
+void DataFrameTest::OnDisassocInd(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {}
 
 void DataFrameTest::StartConnect() {
   // Send connect request

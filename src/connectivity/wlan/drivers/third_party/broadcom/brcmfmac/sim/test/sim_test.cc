@@ -242,7 +242,7 @@ void SimInterface::DisassocConf(DisassocConfRequestView request,
 
 void SimInterface::DisassocInd(DisassocIndRequestView request,
                                DisassocIndCompleter::Sync& completer) {
-  stats_.disassoc_indications.push_back(request->ind);
+  stats_.disassoc_indications.push_back(fidl::ToNatural(*request));
   assoc_ctx_.state = AssocContext::kNone;
   completer.Reply();
 }

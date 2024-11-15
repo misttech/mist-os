@@ -391,14 +391,15 @@ pub fn convert_disassociate_confirm(
 }
 
 pub fn convert_disassociate_indication(
-    ind: fidl_fullmac::WlanFullmacDisassocIndication,
-) -> fidl_mlme::DisassociateIndication {
-    fidl_mlme::DisassociateIndication {
-        peer_sta_address: ind.peer_sta_address,
-        reason_code: ind.reason_code,
-        locally_initiated: ind.locally_initiated,
-    }
+    ind: fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest,
+) -> Result<fidl_mlme::DisassociateIndication> {
+    Ok(fidl_mlme::DisassociateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer_sta_address")?,
+        reason_code: ind.reason_code.context("missing reason_code")?,
+        locally_initiated: ind.locally_initiated.context("missing locally_initiated")?,
+    })
 }
+
 pub fn convert_start_confirm(
     conf: fidl_fullmac::WlanFullmacStartConfirm,
 ) -> fidl_mlme::StartConfirm {

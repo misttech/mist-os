@@ -92,7 +92,7 @@ class CreateSoftAPTest : public SimTest {
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest* ind);
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
-  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
+  void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
   void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
   void OnChannelSwitch(const wlan_fullmac_wire::WlanFullmacChannelSwitchInfo* info);
@@ -151,7 +151,8 @@ void SoftApInterface::DisassocConf(DisassocConfRequestView request,
 }
 void SoftApInterface::DisassocInd(DisassocIndRequestView request,
                                   DisassocIndCompleter::Sync& completer) {
-  test_->OnDisassocInd(&request->ind);
+  auto disassoc_ind = fidl::ToNatural(*request);
+  test_->OnDisassocInd(&disassoc_ind);
   completer.Reply();
 }
 void SoftApInterface::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
@@ -353,8 +354,11 @@ void CreateSoftAPTest::OnDisassocConf(
   ASSERT_TRUE(resp->status().has_value());
   disassoc_conf_recv_ = true;
 }
-void CreateSoftAPTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
+
+void CreateSoftAPTest::OnDisassocInd(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind) {
+  ASSERT_TRUE(ind->peer_sta_address().has_value());
+  EXPECT_BYTES_EQ(ind->peer_sta_address()->data(), ind_expect_mac_.byte, ETH_ALEN);
   disassoc_ind_recv_ = true;
 }
 

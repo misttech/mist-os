@@ -984,13 +984,14 @@ async fn test_remote_disassoc_then_reconnect() {
 
     fullmac_driver
         .ifc_proxy
-        .disassoc_ind(&fidl_fullmac::WlanFullmacDisassocIndication {
-            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-            reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
-            locally_initiated: false,
+        .disassoc_ind(&fidl_fullmac::WlanFullmacImplIfcDisassocIndRequest {
+            peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+            reason_code: Some(fidl_ieee80211::ReasonCode::ReasonInactivity),
+            locally_initiated: Some(false),
+            ..Default::default()
         })
         .await
-        .expect("Could not send DissasocInd");
+        .expect("Could not send DisassocInd");
 
     assert_variant!(
         fullmac_driver.request_stream.next().await,

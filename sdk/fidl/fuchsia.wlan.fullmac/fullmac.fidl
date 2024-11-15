@@ -81,13 +81,6 @@ type WlanAssocResult = flexible enum : uint8 {
     REFUSED_TEMPORARILY = 8;
 };
 
-type WlanFullmacDisassocIndication = struct {
-    peer_sta_address ieee80211.MacAddr;
-    reason_code ieee80211.ReasonCode;
-    /// locally_initiated is true if diassoc is initiated from the device,
-    /// and is false if it's initiated remotely (e.g. due to disassoc frame)
-    locally_initiated bool;
-};
 
 type WlanStartResult = flexible enum : uint8 {
     SUCCESS = 0;
@@ -464,8 +457,17 @@ closed protocol WlanFullmacImplIfc {
         ///     driver was busy
         1: status zx.Status;
     }) -> ();
-    strict DisassocInd(struct {
-        ind WlanFullmacDisassocIndication;
+    /// Report that disassociation with the specified peer occurred (IEEE 802.11-2020 6.3.9.3).
+    strict DisassocInd(table {
+        /// Address of the peer that was disassociated. Required.
+        1: peer_sta_address ieee80211.MacAddr;
+        /// Reason for the disassociation. Required.
+        2: reason_code ieee80211.ReasonCode;
+        /// Whether the disassociation was initiated from the device. Required.
+        /// locally_initiated is true if disassociation was initiated from the device (e.g. firmware
+        /// or vendor driver started the disassociation); false if the disassociation was initiated
+        /// externally (e.g. due to receipt of a disassociate frame from an AP).
+        3: locally_initiated bool;
     }) -> ();
     strict StartConf(struct {
         resp WlanFullmacStartConfirm;
