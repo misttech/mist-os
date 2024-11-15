@@ -4,7 +4,7 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::snake_to_camel;
+use crate::compiler::util::IdentExt;
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
 
@@ -17,8 +17,8 @@ pub fn emit_alias<W: Write>(
 ) -> Result<(), Error> {
     let a = &compiler.schema.alias_declarations[ident];
 
-    let name = snake_to_camel(a.name.type_name());
-    write!(out, "pub type Wire{}", name)?;
+    let name = a.name.type_name().camel();
+    write!(out, "pub type Wire{name}")?;
 
     // TODO: this doesn't always emit the correct lifetime parameters
     if a.ty.shape.max_out_of_line != 0 {

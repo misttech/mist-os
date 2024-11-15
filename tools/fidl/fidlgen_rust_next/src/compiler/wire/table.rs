@@ -4,7 +4,7 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::emit_doc_string;
+use crate::compiler::util::{emit_doc_string, IdentExt as _};
 use crate::compiler::wire::{emit_type, emit_type_check};
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
@@ -18,7 +18,7 @@ pub fn emit_table<W: Write>(
 ) -> Result<(), Error> {
     let t = &compiler.schema.table_declarations[ident];
 
-    let name = t.name.type_name();
+    let name = t.name.type_name().camel();
 
     // Write wire type
 
@@ -68,7 +68,7 @@ pub fn emit_table<W: Write>(
     )?;
 
     for member in &t.members {
-        let name = &member.name;
+        let member_name = member.name.snake();
         let ord = member.ordinal;
         write!(
             out,
@@ -85,14 +85,14 @@ pub fn emit_table<W: Write>(
                 write!(
                     out,
                     r#"
-                    let {name} = unsafe {{
+                    let {member_name} = unsafe {{
                         slot.deref_unchecked().deref_unchecked::<
                     "#
                 )?;
                 emit_type(compiler, out, &member.ty)?;
                 writeln!(out, ">() }};")
             },
-            &member.name,
+            &member_name,
             &member.ty,
         )?;
         writeln!(
@@ -124,9 +124,9 @@ pub fn emit_table<W: Write>(
 
     for member in &t.members {
         let ord = member.ordinal;
-        let name = &member.name;
+        let member_name = member.name.snake();
 
-        write!(out, "pub fn {name}(&self) -> Option<&")?;
+        write!(out, "pub fn {member_name}(&self) -> Option<&")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(
             out,
@@ -139,7 +139,7 @@ pub fn emit_table<W: Write>(
             "#,
         )?;
 
-        write!(out, "pub fn {name}_mut(&mut self) -> Option<&mut ")?;
+        write!(out, "pub fn {member_name}_mut(&mut self) -> Option<&mut ")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(
             out,
@@ -152,7 +152,7 @@ pub fn emit_table<W: Write>(
             "#,
         )?;
 
-        write!(out, "pub fn take_{name}(&mut self) -> Option<")?;
+        write!(out, "pub fn take_{member_name}(&mut self) -> Option<")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(
             out,
@@ -184,8 +184,8 @@ pub fn emit_table<W: Write>(
         )?;
 
         for member in &t.members {
-            let name = &member.name;
-            writeln!(out, ".field(\"{name}\", &self.{name}())")?;
+            let member_name = member.name.snake();
+            writeln!(out, ".field(\"{member_name}\", &self.{member_name}())")?;
         }
 
         writeln!(

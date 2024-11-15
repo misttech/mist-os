@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use super::r#type::Type;
 use super::type_shape::TypeShape;
-use super::{Attributes, CompIdent};
+use super::{Attributes, CompIdent, Ident};
 use crate::de::Index;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -38,7 +38,7 @@ pub struct UnionMember {
     #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
-    pub name: String,
+    pub name: Ident,
     pub ordinal: NonZeroI64,
     #[serde(rename = "type")]
     pub ty: Type,

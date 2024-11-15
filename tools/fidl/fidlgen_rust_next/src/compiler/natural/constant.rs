@@ -4,7 +4,7 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::emit_natural_comp_ident;
+use crate::compiler::util::{emit_natural_comp_ident, IdentExt as _};
 use crate::compiler::Compiler;
 use crate::ir::{CompIdent, Type, TypeKind};
 
@@ -36,7 +36,8 @@ pub fn emit_constant<W: Write>(
 ) -> Result<(), Error> {
     let c = &compiler.schema.const_declarations[ident];
 
-    write!(out, "pub const {}: ", c.name.type_name(),)?;
+    let name = c.name.type_name().screaming_snake();
+    write!(out, "pub const {name}: ")?;
     emit_const_type(compiler, out, &c.ty)?;
     write!(out, " = {};", &c.value.expression)?;
 

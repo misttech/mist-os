@@ -40,7 +40,6 @@ impl<'a> Compiler<'a> {
                 unused_mut,
                 unused_imports,
                 unreachable_code,
-                nonstandard_style,
             )]
             "#,
         )?;

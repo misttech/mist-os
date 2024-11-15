@@ -4,7 +4,7 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::util::snake_to_camel;
+use crate::compiler::util::IdentExt as _;
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
 
@@ -17,8 +17,8 @@ pub fn emit_alias<W: Write>(
 ) -> Result<(), Error> {
     let a = &compiler.schema.alias_declarations[ident];
 
-    let name = snake_to_camel(a.name.type_name());
-    write!(out, "pub type {} = ", name)?;
+    let name = a.name.type_name().camel();
+    write!(out, "pub type {name} = ")?;
     emit_type(compiler, out, &a.ty)?;
     writeln!(out, ";")?;
 

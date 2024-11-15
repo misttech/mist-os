@@ -5,7 +5,7 @@
 use std::io::{Error, Write};
 
 use crate::compiler::util::{
-    emit_doc_string, int_type_natural_name, int_type_wire_name, snake_to_camel,
+    emit_doc_string, int_type_natural_name, int_type_wire_name, IdentExt as _,
 };
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
@@ -17,7 +17,7 @@ pub fn emit_enum<W: Write>(
 ) -> Result<(), Error> {
     let e = &compiler.schema.enum_declarations[ident];
 
-    let name = &e.name.type_name();
+    let name = e.name.type_name().camel();
     let natural_ty = int_type_natural_name(e.ty);
     let wire_ty = int_type_wire_name(e.ty);
 
@@ -37,7 +37,7 @@ pub fn emit_enum<W: Write>(
     )?;
 
     for member in &e.members {
-        let member_name = snake_to_camel(&member.name);
+        let member_name = &member.name.camel();
         let value = &member.value.value;
 
         writeln!(out, "{member_name} = {value},")?;
@@ -73,7 +73,7 @@ pub fn emit_enum<W: Write>(
     )?;
 
     for member in &e.members {
-        let member_name = snake_to_camel(&member.name);
+        let member_name = &member.name.camel();
         let value = &member.value.value;
 
         writeln!(out, "{name}::{member_name} => {value},")?;
@@ -107,15 +107,15 @@ pub fn emit_enum<W: Write>(
 
     for member in &e.members {
         let value = &member.value.value;
-        let member_name = snake_to_camel(&member.name);
+        let member_name = &member.name.camel();
 
         write!(out, "{value} => {name}::{member_name},")?;
     }
 
     if e.is_strict {
-        writeln!(out, "_ => unsafe {{ ::core::hint::unreachable_unchecked() }},",)?;
+        writeln!(out, "_ => unsafe {{ ::core::hint::unreachable_unchecked() }},")?;
     } else {
-        writeln!(out, "value => {name}::Unknown(value),",)?;
+        writeln!(out, "value => {name}::Unknown(value),")?;
     }
 
     writeln!(

@@ -5,7 +5,7 @@
 use std::io::{Error, Write};
 
 use crate::compiler::natural::emit_type;
-use crate::compiler::util::emit_doc_string;
+use crate::compiler::util::{emit_doc_string, IdentExt as _};
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
 
@@ -16,7 +16,7 @@ pub fn emit_table<W: Write>(
 ) -> Result<(), Error> {
     let t = &compiler.schema.table_declarations[ident];
 
-    let name = t.name.type_name();
+    let name = t.name.type_name().camel();
 
     // Write natural type
 
@@ -30,9 +30,9 @@ pub fn emit_table<W: Write>(
     writeln!(out, "pub struct {name} {{")?;
 
     for member in &t.members {
-        let name = &member.name;
+        let member_name = member.name.snake();
 
-        write!(out, "pub {name}: Option<")?;
+        write!(out, "pub {member_name}: Option<")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(out, ">,")?;
     }
@@ -50,10 +50,10 @@ pub fn emit_table<W: Write>(
     )?;
 
     for member in t.members.iter().rev() {
-        let name = &member.name;
+        let member_name = member.name.snake();
         let ord = member.ordinal;
 
-        writeln!(out, "if self.{name}.is_some() {{ return {ord}; }}")?;
+        writeln!(out, "if self.{member_name}.is_some() {{ return {ord}; }}")?;
     }
 
     writeln!(
@@ -112,15 +112,15 @@ pub fn emit_table<W: Write>(
     )?;
 
     for member in t.members.iter().rev() {
-        let name = &member.name;
+        let member_name = member.name.snake();
         let ord = member.ordinal;
 
         writeln!(
             out,
             r#"
-            {ord} => if let Some({name}) = &mut self.{name} {{
+            {ord} => if let Some({member_name}) = &mut self.{member_name} {{
                 ::fidl_next::WireEnvelope::encode_value(
-                    {name},
+                    {member_name},
                     preallocated.encoder,
                     slot.as_mut(),
                 )?;
@@ -159,9 +159,12 @@ pub fn emit_table<W: Write>(
     )?;
 
     for member in t.members.iter().rev() {
-        let name = &member.name;
+        let member_name = member.name.snake();
 
-        writeln!(out, "{name}: from.{name}_mut().map(::fidl_next::TakeFrom::take_from),",)?;
+        writeln!(
+            out,
+            "{member_name}: from.{member_name}_mut().map(::fidl_next::TakeFrom::take_from),"
+        )?;
     }
 
     writeln!(

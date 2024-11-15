@@ -34,6 +34,7 @@ if (is_host) {
       "src/ir/decl_type.rs",
       "src/ir/enum.rs",
       "src/ir/handle.rs",
+      "src/ir/ident.rs",
       "src/ir/library.rs",
       "src/ir/literal.rs",
       "src/ir/mod.rs",

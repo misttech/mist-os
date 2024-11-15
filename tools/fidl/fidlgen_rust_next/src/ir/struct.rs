@@ -5,7 +5,7 @@
 use serde::Deserialize;
 
 use super::r#type::Type;
-use super::{Attributes, CompIdent, TypeShape};
+use super::{Attributes, CompIdent, Ident, TypeShape};
 use crate::de::Index;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -33,7 +33,7 @@ pub struct StructMember {
     #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
-    pub name: String,
+    pub name: Ident,
     #[serde(rename = "type")]
     pub ty: Type,
 }

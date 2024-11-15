@@ -4,6 +4,8 @@
 
 use serde::Deserialize;
 
+use super::Id;
+
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
 pub struct CompIdent {
@@ -12,8 +14,9 @@ pub struct CompIdent {
 
 impl CompIdent {
     /// Splits this identifier into a library name and decl name.
-    pub fn split(&self) -> (&str, &str) {
-        self.inner.split_once('/').unwrap()
+    pub fn split(&self) -> (&str, Id<'_>) {
+        let (library, type_name) = self.inner.split_once('/').unwrap();
+        (library, Id::new(type_name))
     }
 
     /// Returns the library of the identifier.
@@ -24,7 +27,7 @@ impl CompIdent {
     }
 
     /// Get the name excluding the library and member name.
-    pub fn type_name(&self) -> &str {
+    pub fn type_name(&self) -> Id<'_> {
         self.split().1
     }
 }
