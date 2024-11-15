@@ -32,28 +32,57 @@ TEST(MmioVisitorTest, ReadRegSuccessfully) {
   ASSERT_TRUE(mmio_tester->has_visited());
   ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
 
-  // Check MMIO of sample-device.
-  auto mmio = mmio_tester->env()
-                  .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 0)
-                  .mmio();
+  // Check MMIO of reg-device.
+  auto reg_device_mmio = mmio_tester->GetPbusNodes("reg-device")[0].mmio();
 
-  // Test MMIO properties.
-  ASSERT_TRUE(mmio);
-  ASSERT_EQ(3lu, mmio->size());
-  ASSERT_EQ(REG_A_BASE, *(*mmio)[0].base());
-  ASSERT_EQ(static_cast<uint64_t>(REG_A_LENGTH), *(*mmio)[0].length());
-  ASSERT_TRUE((*mmio)[0].name().has_value());
-  ASSERT_EQ(*(*mmio)[0].name(), "reg-a");
+  ASSERT_TRUE(reg_device_mmio);
+  ASSERT_EQ(3lu, reg_device_mmio->size());
+  ASSERT_EQ(REG_A_BASE, *(*reg_device_mmio)[0].base());
+  ASSERT_EQ(static_cast<uint64_t>(REG_A_LENGTH), *(*reg_device_mmio)[0].length());
+  ASSERT_TRUE((*reg_device_mmio)[0].name().has_value());
+  ASSERT_EQ(*(*reg_device_mmio)[0].name(), "reg-a");
 
-  ASSERT_EQ((uint64_t)REG_B_BASE_WORD0 << 32 | REG_B_BASE_WORD1, *(*mmio)[1].base());
-  ASSERT_EQ((uint64_t)REG_B_LENGTH_WORD0 << 32 | REG_B_LENGTH_WORD1, *(*mmio)[1].length());
-  ASSERT_TRUE((*mmio)[1].name().has_value());
-  ASSERT_EQ(*(*mmio)[1].name(), "reg-b");
+  ASSERT_EQ((uint64_t)REG_B_BASE_WORD0 << 32 | REG_B_BASE_WORD1, *(*reg_device_mmio)[1].base());
+  ASSERT_EQ((uint64_t)REG_B_LENGTH_WORD0 << 32 | REG_B_LENGTH_WORD1,
+            *(*reg_device_mmio)[1].length());
+  ASSERT_TRUE((*reg_device_mmio)[1].name().has_value());
+  ASSERT_EQ(*(*reg_device_mmio)[1].name(), "reg-b");
 
-  ASSERT_EQ((uint64_t)REG_C_BASE_WORD0 << 32 | REG_C_BASE_WORD1, *(*mmio)[2].base());
-  ASSERT_EQ((uint64_t)REG_C_LENGTH_WORD0 << 32 | REG_C_LENGTH_WORD1, *(*mmio)[2].length());
-  ASSERT_TRUE((*mmio)[2].name().has_value());
-  ASSERT_EQ(*(*mmio)[2].name(), "reg-c");
+  ASSERT_EQ((uint64_t)REG_C_BASE_WORD0 << 32 | REG_C_BASE_WORD1, *(*reg_device_mmio)[2].base());
+  ASSERT_EQ((uint64_t)REG_C_LENGTH_WORD0 << 32 | REG_C_LENGTH_WORD1,
+            *(*reg_device_mmio)[2].length());
+  ASSERT_TRUE((*reg_device_mmio)[2].name().has_value());
+  ASSERT_EQ(*(*reg_device_mmio)[2].name(), "reg-c");
+
+  // Check MMIO of memory-region-device.
+  auto memory_region_device_mmio = mmio_tester->GetPbusNodes("memory-region-device")[0].mmio();
+
+  ASSERT_TRUE(memory_region_device_mmio);
+  ASSERT_EQ(1lu, memory_region_device_mmio->size());
+  ASSERT_EQ(static_cast<uint64_t>(TEST_BASE_1), *(*memory_region_device_mmio)[0].base());
+  ASSERT_EQ(static_cast<uint64_t>(TEST_LENGTH_1), *(*memory_region_device_mmio)[0].length());
+  ASSERT_TRUE((*memory_region_device_mmio)[0].name().has_value());
+  ASSERT_EQ(*(*memory_region_device_mmio)[0].name(), "test-region-1");
+
+  // Check MMIO of combination-device.
+  auto combination_device_mmio = mmio_tester->GetPbusNodes("combination-device")[0].mmio();
+
+  ASSERT_TRUE(combination_device_mmio);
+  ASSERT_EQ(2lu, combination_device_mmio->size());
+  uint32_t mmio_tested = 0;
+  for (auto& mmio : *combination_device_mmio) {
+    ASSERT_TRUE(mmio.name().has_value());
+    if (*mmio.name() == "reg-1") {
+      ASSERT_EQ(static_cast<uint64_t>(REG_1_BASE), *mmio.base());
+      ASSERT_EQ(static_cast<uint64_t>(REG_1_LENGTH), *mmio.length());
+      mmio_tested++;
+    } else if (*mmio.name() == "test-region-2") {
+      ASSERT_EQ(static_cast<uint64_t>(TEST_BASE_2), *mmio.base());
+      ASSERT_EQ(static_cast<uint64_t>(TEST_LENGTH_2), *mmio.length());
+      mmio_tested++;
+    }
+  }
+  ASSERT_EQ(2u, mmio_tested);
 }
 
 TEST(MmioVisitorTest, TranslateRegSuccessfully) {
