@@ -95,9 +95,9 @@ pub(crate) async fn serve_routes_v4(
                 let stream = route_set.into_stream()?;
                 let ctx = ctx.clone();
                 spawner.spawn(async {
-                    serve_route_set::<Ipv4, _, _, _>(
+                    serve_route_set::<Ipv4, _, _>(
                         stream,
-                        GlobalRouteSet::new(ctx),
+                        &mut GlobalRouteSet::new(ctx),
                         std::future::pending(), /* never cancelled */
                     )
                     .await;
@@ -120,9 +120,9 @@ pub(crate) async fn serve_routes_v6(
                 let stream = route_set.into_stream()?;
                 let ctx = ctx.clone();
                 spawner.spawn(async {
-                    serve_route_set::<Ipv6, _, _, _>(
+                    serve_route_set::<Ipv6, _, _>(
                         stream,
-                        GlobalRouteSet::new(ctx),
+                        &mut GlobalRouteSet::new(ctx),
                         std::future::pending(), /* never cancelled */
                     )
                     .await;

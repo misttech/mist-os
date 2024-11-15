@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::borrow::BorrowMut;
 use std::collections::HashSet;
 use std::pin::pin;
 use std::sync::Arc;
@@ -38,11 +37,10 @@ pub(crate) use crate::bindings::routes::rules_admin::serve_rule_table;
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     R: RouteSet<I>,
-    B: BorrowMut<R>,
     C: Future<Output = ()>,
 >(
     stream: I::RouteSetRequestStream,
-    mut route_set: B,
+    route_set: &mut R,
     cancel_token: C,
 ) {
     let debug_name = match I::VERSION {
@@ -62,7 +60,7 @@ pub(crate) async fn serve_route_set<
             },
             request = stream.try_next() => match request {
                 Ok(Some(request)) => {
-                    route_set.borrow_mut().handle_request(request).await.unwrap_or_else(|e| {
+                    route_set.handle_request(request).await.unwrap_or_else(|e| {
                         if !e.is_closed() {
                             error!("error handling {debug_name} request: {e:?}");
                         }
@@ -274,7 +272,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
     ) {
         let mut user_route_set = UserRouteSet::from_main_table(self.ctx.clone());
         spawner.spawn(async move {
-            serve_route_set::<I, UserRouteSet<I>, _, _>(
+            serve_route_set::<I, UserRouteSet<I>, _>(
                 stream,
                 &mut user_route_set,
                 std::future::pending(), /* never cancelled */
@@ -366,7 +364,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
         // serving the user route sets.
         let cancel_token = self.cancel_event.wait();
         spawner.spawn(async move {
-            serve_route_set::<I, UserRouteSet<I>, _, _>(stream, &mut user_route_set, cancel_token)
+            serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut user_route_set, cancel_token)
                 .await;
             user_route_set.close().await;
         })
