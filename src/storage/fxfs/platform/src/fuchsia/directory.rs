@@ -2118,7 +2118,7 @@ mod tests {
             let dir = open_dir_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-                &format!("fee_{}", i),
+                &format!("plaintext_{}", i),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2154,7 +2154,7 @@ mod tests {
                 continue;
             } else {
                 assert!(entry.name.len() >= FSCRYPT_PADDING);
-                assert!(!entry.name.contains("fee"));
+                assert!(!entry.name.starts_with("plaintext_"), "{entry:?} isn't encrypted!");
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
@@ -2164,7 +2164,7 @@ mod tests {
             if entry.name == ".".to_owned() {
                 continue;
             } else {
-                assert!(entry.name.contains("fee"));
+                assert!(entry.name.starts_with("plaintext_"), "{entry:?} is still encrypted!");
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
