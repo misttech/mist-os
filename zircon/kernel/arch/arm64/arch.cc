@@ -313,6 +313,19 @@ static void arm64_cpu_early_init() {
   // Save all of the features of the cpu.
   arm64_feature_init();
 
+  // Check for TCR2 and SCTLR2 and zero since none of their features are used.
+  auto mmfr3 = arch::ArmIdAa64Mmfr3El1::Read();
+  if (mmfr3.tcrx() != 0) {
+    auto tcr2 = arch::ArmTcr2El1::Get().FromValue(0);
+    arch::ArmTcr2El1::Write(tcr2);
+    __isb(ARM_MB_SY);
+  }
+  if (mmfr3.sctlrx() != 0) {
+    auto sctlr2 = arch::ArmSctlr2El1::Get().FromValue(0);
+    arch::ArmSctlr2El1::Write(sctlr2);
+    __isb(ARM_MB_SY);
+  }
+
   // Enable cycle counter, if FEAT_PMUv3 is enabled.
   if (feat_pmuv3_enabled) {
     __arm_wsr64("pmcr_el0", PMCR_EL0_ENABLE_BIT | PMCR_EL0_LONG_COUNTER_BIT);

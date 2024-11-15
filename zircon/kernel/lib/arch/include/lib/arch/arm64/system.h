@@ -161,6 +161,25 @@ ARCH_ARM64_SYSREG(ArmSctlrEl2, "sctlr_el2");
 struct ArmSctlrEl3 : public arch::SysRegDerived<ArmSctlrEl3, ArmSystemControlRegister> {};
 ARCH_ARM64_SYSREG(ArmSctlrEl3, "sctlr_el3");
 
+struct ArmSystemControlRegister2 : public SysRegDerivedBase<ArmSystemControlRegister2, uint64_t> {
+  DEF_BIT(6, enidcp128);  // EL1, EL2
+  DEF_BIT(5, ease);       // EL1, EL2
+  DEF_BIT(4, enanerr);    // EL1, EL2, EL3
+  DEF_BIT(3, enaderr);    // EL1, EL2, EL3
+  DEF_BIT(2, nmea);       // EL1, EL2
+  DEF_BIT(1, emec);       // EL2, EL3
+};
+
+// Use alternate register description to work around GCC not allowing the use of the name.
+struct ArmSctlr2El1 : public arch::SysRegDerived<ArmSctlr2El1, ArmSystemControlRegister2> {};
+ARCH_ARM64_SYSREG(ArmSctlr2El1, "S3_0_c1_c0_3");  // SCTLR_EL1
+
+struct ArmSctlr2El2 : public arch::SysRegDerived<ArmSctlr2El2, ArmSystemControlRegister2> {};
+ARCH_ARM64_SYSREG(ArmSctlr2El2, "S3_4_c1_c0_3");  // SCTLR_EL2
+
+struct ArmSctlr2El3 : public arch::SysRegDerived<ArmSctlr2El3, ArmSystemControlRegister2> {};
+ARCH_ARM64_SYSREG(ArmSctlr2El3, "S3_6_c1_c0_3");  // SCTLR_EL3
+
 // [arm/sysreg]/scr_el3: Secure Configuration Register
 struct ArmScrEl3 : public SysRegBase<ArmScrEl3, uint64_t> {
   DEF_RSVDZ_FIELD(63, 39);
@@ -373,6 +392,29 @@ struct ArmVtcrEl2 : public SysRegDerived<ArmVtcrEl2, ArmTranslationControlRegist
   DEF_FIELD(7, 6, sl0);
 };
 ARCH_ARM64_SYSREG(ArmVtcrEl2, "vtcr_el2");
+
+// Extended Translation Control Register (TCR2_EL1)
+//
+// [arm/v9]: D23.2.172 TCR2_EL1, Translation Control Register (EL1)
+class ArmTcr2El1 : public SysRegBase<ArmTcr2El1> {
+ public:
+  // Bits [63:16] reserved.
+  DEF_BIT(15, disch1);  // Disable contiguous bit for start table for TTBR1. (FEAT_D128)
+  DEF_BIT(14, disch0);  // Disable contiguous bit for start table for TTBR0. (FEAT_D128)
+  // Bits [13:12] reserved.
+  DEF_BIT(11, haft);   // Hardware managed access flag for table descriptors. (FEAT_HAFT)
+  DEF_BIT(10, pttwi);  // Permit translation table walk incoherence. (FEAT_THE)
+  // Bits [9:4] reserved.
+  DEF_BIT(5, d128);   // Enable 128 bit translation tables. (FEAT_D128)
+  DEF_BIT(4, aie);    // Enable attribute indexing extension. (FEAT_AIE)
+  DEF_BIT(3, poe);    // Enable permission overlays for privileged accesses. (FEAT_S1POE)
+  DEF_BIT(2, e0poe);  // Enable permission overlays for unprivileged accesses. (FEAT_S1POE)
+  DEF_BIT(1, pie);    // Enable indirect permission scheme. (FEAT_S1PIE)
+  DEF_BIT(0, pnch);   // Enable protected attribute enable. (FEAT_THE)
+};
+
+// Use alternate register description to work around GCC not allowing the use of the name.
+ARCH_ARM64_SYSREG(ArmTcr2El1, "S3_0_c2_c0_3");  // TCR2_EL1
 
 // Page table root pointer.
 //
