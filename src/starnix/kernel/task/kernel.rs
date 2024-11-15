@@ -74,6 +74,10 @@ pub struct KernelFeatures {
     ///
     /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
     pub io_uring: bool,
+
+    /// Whether the kernel should return an error to userspace, rather than panicking, if `reboot()`
+    /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
+    pub error_on_failed_reboot: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
