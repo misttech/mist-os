@@ -12,7 +12,6 @@
 #include <type_traits>
 
 #include "internal.h"
-#include "mmio.h"
 
 // This file provides some helpers for accessing bitfields in registers.
 //
