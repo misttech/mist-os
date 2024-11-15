@@ -12,23 +12,9 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-
-  python_host_test("wlan_policy_using_sl4f_test") {
-    enable_mypy = true
-    main_source = "wlan_policy_using_sl4f_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-    ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":wlan_policy_using_fc_test($host_toolchain)",
-    ":wlan_policy_using_sl4f_test($host_toolchain)",
-  ]
+  public_deps = [ ":wlan_policy_using_fc_test($host_toolchain)" ]
 }

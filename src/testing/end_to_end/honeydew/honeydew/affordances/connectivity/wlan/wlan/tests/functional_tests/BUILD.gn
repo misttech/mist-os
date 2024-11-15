@@ -6,25 +6,6 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("wlan_test_sl4f") {
-    main_source = "test_wlan.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:wlan_base_test",
-      "//third_party/antlion",
-    ]
-    honeydew_config = {
-      affordances = {
-        wlan = {
-          implementation = "sl4f"
-        }
-      }
-    }
-    environments = [ wlan_vim3_ap_env ]
-    test_data_deps =
-        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
-  }
-
   python_mobly_test("wlan_test_fc") {
     main_source = "test_wlan.py"
     libraries = [
@@ -45,19 +26,8 @@ if (is_host) {
   }
 }
 
-group("test_wlan_sl4f") {
-  testonly = true
-  public_deps = [
-    ":wlan_test_sl4f($host_toolchain)",
-    "//src/testing/end_to_end/honeydew:sl4f_packages",
-  ]
-}
-
 # Group containing all of the WLAN affordance functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [
-    ":test_wlan_sl4f",
-    ":wlan_test_fc($host_toolchain)",
-  ]
+  public_deps = [ ":wlan_test_fc($host_toolchain)" ]
 }
