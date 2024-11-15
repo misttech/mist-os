@@ -19,6 +19,7 @@ source_set("driver-utils") {
 }
 
 test("driver-utils-test") {
+  output_name = "display-driver-utils-test"
   sources = [
     "poll-until-test.cc",
     "post-task-test.cc",
@@ -34,7 +35,7 @@ test("driver-utils-test") {
 }
 
 fuchsia_unittest_package("driver-utils-test-package") {
-  package_name = "driver-utils-test"
+  package_name = "display-driver-utils-test"
   deps = [ ":driver-utils-test" ]
 
   test_specs = {
