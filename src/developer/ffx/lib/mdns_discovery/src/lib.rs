@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context as _, Result};
-use async_io::Async;
 use async_lock::Mutex;
-use async_net::UdpSocket;
 use async_trait::async_trait;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
@@ -24,6 +22,7 @@ use std::os::unix::prelude::AsRawFd;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use timeout::timeout;
+use tokio::net::UdpSocket;
 use zerocopy::SplitByteSlice;
 
 /// Default mDNS port
@@ -920,7 +919,8 @@ fn make_listen_socket(listen_addr: SocketAddr) -> Result<UdpSocket> {
         }
     }
     .into();
-    Ok(Async::new(socket)?.into())
+    socket.set_nonblocking(true)?;
+    Ok(UdpSocket::from_std(socket)?)
 }
 
 fn make_sender_socket(interface_id: u32, addr: SocketAddr, ttl: u32) -> Result<UdpSocket> {
@@ -954,7 +954,8 @@ fn make_sender_socket(interface_id: u32, addr: SocketAddr, ttl: u32) -> Result<U
         }
     }
     .into();
-    Ok(Async::new(socket)?.into())
+    socket.set_nonblocking(true)?;
+    Ok(UdpSocket::from_std(socket)?)
 }
 
 #[cfg(test)]
