@@ -382,8 +382,8 @@ function diff_file_relpath() {
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
 
-    # fidldoc.zip bears timestamps of its contents (nondeterministic)
-    fidldoc.zip) expect=diff; diff_zip "$left" "$right" ;;
+    # TODO(b/379173865): fidldoc.zip bears timestamps (nondeterministic)
+    fidldoc.zip) expect=ignore ;;
 
     *.pyz | *.zip) expect=match; diff_zip "$left" "$right" ;;
     # Most archives carry timestamp information of their contents.
