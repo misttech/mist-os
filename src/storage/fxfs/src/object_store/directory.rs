@@ -3442,4 +3442,63 @@ mod tests {
         };
         fs.close().await.expect("Close failed");
     }
+
+    #[fuchsia::test]
+    // TODO(b/377400611): Remove 'should_panic' once fixed.
+    #[should_panic(expected = "casefold lookup failed")]
+    async fn test_create_casefold_encrypted_directory() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+
+        // Create a (very weak) key for our encrypted directory.
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+
+        let object_id = {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        fs.root_store().store_object_id(),
+                        store.store_object_id()
+                    ),],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let dir = Directory::create(&mut transaction, &store, Some(wrapping_key_id))
+                .await
+                .expect("create failed");
+
+            transaction.commit().await.expect("commit");
+            dir.object_id()
+        };
+        let dir = Directory::open(&store, object_id).await.expect("open failed");
+
+        dir.set_casefold(true).await.expect("set casefold");
+        assert!(dir.casefold());
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), dir.object_id()),],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let _file =
+            dir.create_child_file(&mut transaction, "bAr").await.expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        // Check that we can look up the original name.
+        assert!(dir.lookup("bAr").await.expect("original lookup failed").is_some());
+
+        // Check that we can lookup via a case insensitive name.
+        assert!(dir.lookup("BAR").await.expect("casefold lookup failed").is_some());
+
+        fs.close().await.expect("Close failed");
+    }
 }
