@@ -517,6 +517,8 @@ then
   echo "end of UNEXPECTED DIFFS"
   echo
   exit_status=1
+else
+  echo "No UNEXPECTED DIFFS found (good)"
 fi
 
 # Good news: these files matched
@@ -529,7 +531,25 @@ then
   echo "end of UNEXPECTED MATCHES"
   echo
   exit_status=1
+else
+  echo "No UNEXPECTED MATCHES found (good)"
 fi
+
+# Make sure all cases are covered.
+if test "${#unspecified_files[@]}" != 0
+then
+  echo "UNSPECIFIED FILES: (action: classify into {match,diff,unknown,ignore,skip})"
+  for path in "${unspecified_files[@]}"
+  do echo "  $path"
+  done
+  echo "end of UNSPECIFIED FILES"
+  echo
+  exit_status=1
+fi
+
+[[ "$exit_status" == 0 ]] ||
+  echo "ACTION: investigate the above, perhaps file a go/fuchsia-build-bug."
+echo "The rest of this report is FYI only, no action is required."
 
 # This group mismatched, but we didn't know what to expect.
 if test "${#unclassified_diffs[@]}" != 0
@@ -567,18 +587,6 @@ then
 fi
 
 # Don't bother reporting "${ignored_files[@]}", the list is long and not useful.
-
-# Make sure all cases are covered.
-if test "${#unspecified_files[@]}" != 0
-then
-  echo "UNSPECIFIED FILES: (action: classify into one of the above categories)"
-  for path in "${unspecified_files[@]}"
-  do echo "  $path"
-  done
-  echo "end of UNSPECIFIED FILES"
-  echo
-  exit_status=1
-fi
 
 echo "Exiting with status $exit_status"
 exit "$exit_status"
