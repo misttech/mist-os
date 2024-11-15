@@ -32,6 +32,9 @@ pub enum ConversionError {
     #[error("conversion to type is not supported")]
     NotSupported,
 
+    #[error("conversion failed because a capability could not be cloned")]
+    NotCloneable,
+
     #[error("value at `{key}` could not be converted: {err}")]
     Nested {
         key: String,
@@ -104,23 +107,25 @@ impl Capability {
     }
 
     pub fn try_clone(&self) -> Result<Self, ()> {
-        let out = match self {
-            Self::Connector(s) => Self::Connector(s.clone()),
-            Self::DirConnector(s) => Self::DirConnector(s.clone()),
-            Self::ConnectorRouter(s) => Self::ConnectorRouter(s.clone()),
-            Self::DictionaryRouter(s) => Self::DictionaryRouter(s.clone()),
-            Self::DirEntryRouter(s) => Self::DirEntryRouter(s.clone()),
-            Self::DirConnectorRouter(s) => Self::DirConnectorRouter(s.clone()),
-            Self::DataRouter(s) => Self::DataRouter(s.clone()),
-            Self::Dictionary(s) => Self::Dictionary(s.clone()),
-            Self::Data(s) => Self::Data(s.clone()),
-            Self::Unit(s) => Self::Unit(s.clone()),
-            Self::Directory(s) => Self::Directory(s.clone()),
-            Self::Handle(s) => Self::Handle(s.try_clone()?),
-            Self::Instance(s) => Self::Instance(s.clone()),
-            Self::DirEntry(s) => Self::DirEntry(s.clone()),
-        };
-        Ok(out)
+        match self {
+            Self::Connector(s) => Ok(Self::Connector(s.clone())),
+            Self::DirConnector(s) => Ok(Self::DirConnector(s.clone())),
+            Self::ConnectorRouter(s) => Ok(Self::ConnectorRouter(s.clone())),
+            Self::DictionaryRouter(s) => Ok(Self::DictionaryRouter(s.clone())),
+            Self::DirEntryRouter(s) => Ok(Self::DirEntryRouter(s.clone())),
+            Self::DirConnectorRouter(s) => Ok(Self::DirConnectorRouter(s.clone())),
+            Self::DataRouter(s) => Ok(Self::DataRouter(s.clone())),
+            Self::Dictionary(s) => Ok(Self::Dictionary(s.clone())),
+            Self::Data(s) => Ok(Self::Data(s.clone())),
+            Self::Unit(s) => Ok(Self::Unit(s.clone())),
+            Self::Directory(_) => {
+                // Not supported.
+                Err(())
+            }
+            Self::Handle(s) => Ok(Self::Handle(s.try_clone()?)),
+            Self::Instance(s) => Ok(Self::Instance(s.clone())),
+            Self::DirEntry(s) => Ok(Self::DirEntry(s.clone())),
+        }
     }
 
     pub fn debug_typename(&self) -> &'static str {

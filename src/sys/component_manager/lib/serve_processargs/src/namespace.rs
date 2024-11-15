@@ -502,13 +502,13 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());
-        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
         let dir_proxy = dir_proxy.into_proxy().unwrap();
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open(fio::OpenFlags::DIRECTORY | rights, fio::ModeType::empty(), "a/foo", server_end)
+            .open(fio::OpenFlags::DIRECTORY | rights, fio::ModeType::empty(), "foo", server_end)
             .unwrap();
 
         // The MockDir should receive the Open request.
@@ -565,7 +565,7 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());
-        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
         let dir_proxy = dir_proxy.into_proxy().unwrap();
@@ -578,7 +578,7 @@ mod tests {
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_EXECUTABLE,
                 fio::ModeType::empty(),
-                "a/foo",
+                "foo",
                 server_end,
             )
             .unwrap();
@@ -595,7 +595,7 @@ mod tests {
             .open(
                 fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 fio::ModeType::empty(),
-                "a/foo",
+                "foo",
                 server_end,
             )
             .unwrap();

@@ -28,6 +28,7 @@ impl crate::RemotableCapability for DirConnector {
         self,
         _scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        // We may wish to implement this in the future, but for now nothing needs it.
         Err(ConversionError::NotSupported)
     }
 }

@@ -71,13 +71,6 @@ impl RemotableCapability for Dict {
                 return UpdateNotifierRetention::Drop_;
             };
             match update {
-                EntryUpdate::Add(key, Capability::Directory(d)) => {
-                    let name = Name::try_from(key.to_string())
-                        .expect("cm_types::Name is always a valid vfs Name");
-                    directory
-                        .add_entry_impl(name, d.clone().into_remote(), false)
-                        .expect("dictionary values must be unique");
-                }
                 EntryUpdate::Add(key, value) => {
                     let value = match value.try_clone() {
                         Ok(value) => value,
@@ -157,25 +150,21 @@ impl RemotableCapability for Dict {
 mod tests {
     use super::*;
     use crate::dict::Key;
-    use crate::{serve_capability_store, Data, Dict, DirEntry, Directory, Handle, Unit};
+    use crate::{serve_capability_store, Data, Dict, DirEntry, Handle, Unit};
     use assert_matches::assert_matches;
-    use fidl::endpoints::{
-        create_endpoints, create_proxy, create_proxy_and_stream, ClientEnd, Proxy, ServerEnd,
-    };
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, Proxy, ServerEnd};
     use fidl::handle::{Channel, HandleBased, Status};
     use fuchsia_fs::directory;
     use futures::StreamExt;
     use lazy_static::lazy_static;
     use test_util::Counter;
     use vfs::directory::entry::{
-        serve_directory, DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest, SubNode,
+        serve_directory, DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest,
     };
-    use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::pseudo_directory;
     use vfs::remote::RemoteLike;
-    use vfs::service::endpoint;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     lazy_static! {
@@ -1132,72 +1121,6 @@ mod tests {
         assert_eq!(mock_dir.0.get(), 1)
     }
 
-    fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
-        let scope = ExecutionScope::new();
-        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
-        root.open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        client
-    }
-
-    #[fuchsia::test]
-    async fn try_into_open_with_directory() {
-        let dir_entry = DirEntry::new(endpoint(|_scope, _channel| {}));
-        let scope = ExecutionScope::new();
-        let fs = pseudo_directory! {
-            "a" => dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap(),
-            "b" => dir_entry.clone().try_into_directory_entry(scope.clone()).unwrap(),
-            "c" => dir_entry.try_into_directory_entry(scope.clone()).unwrap(),
-        };
-        let directory = Directory::from(serve_vfs_dir(fs));
-        let dict = Dict::new();
-        dict.insert(CAP_KEY.clone(), Capability::Directory(directory))
-            .expect("dict entry already exists");
-
-        let remote = dict.try_into_directory_entry(scope.clone()).unwrap();
-
-        // List the inner directory and verify its contents.
-        {
-            let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
-                .unwrap()
-                .into_proxy()
-                .unwrap();
-            assert_eq!(
-                fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
-                vec![directory::DirEntry {
-                    name: CAP_KEY.to_string(),
-                    kind: fio::DirentType::Directory
-                },]
-            );
-        }
-        {
-            let dir_proxy = serve_directory(
-                Arc::new(SubNode::new(
-                    remote,
-                    CAP_KEY.to_string().try_into().unwrap(),
-                    fio::DirentType::Directory,
-                )),
-                &scope,
-                fio::OpenFlags::DIRECTORY,
-            )
-            .unwrap()
-            .into_proxy()
-            .unwrap();
-            assert_eq!(
-                fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
-                vec![
-                    directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },
-                    directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Service },
-                    directory::DirEntry { name: "c".to_string(), kind: fio::DirentType::Service },
-                ]
-            );
-        }
-    }
-
     #[fuchsia::test]
     async fn live_update_add_nodes() {
         let dict = Dict::new();
@@ -1231,8 +1154,8 @@ mod tests {
         // Add an item to the dictionary, and assert that the projected directory contains the
         // added item.
         let fs = pseudo_directory! {};
-        let directory = Directory::from(serve_vfs_dir(fs));
-        dict.insert("a".parse().unwrap(), Capability::Directory(directory.clone()))
+        let dir_entry = DirEntry::new(fs);
+        dict.insert("a".parse().unwrap(), Capability::DirEntry(dir_entry.clone()))
             .expect("dict entry already exists");
 
         assert_eq!(
@@ -1249,7 +1172,7 @@ mod tests {
 
         // Add an item to the dictionary, and assert that the projected directory contains the
         // added item.
-        dict.insert("b".parse().unwrap(), Capability::Directory(directory))
+        dict.insert("b".parse().unwrap(), Capability::DirEntry(dir_entry))
             .expect("dict entry already exists");
         let mut readdir_results = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         readdir_results.sort_by(|entry_1, entry_2| entry_1.name.cmp(&entry_2.name));
@@ -1273,12 +1196,12 @@ mod tests {
     async fn live_update_remove_nodes() {
         let dict = Dict::new();
         let fs = pseudo_directory! {};
-        let directory = Directory::from(serve_vfs_dir(fs));
-        dict.insert("a".parse().unwrap(), Capability::Directory(directory.clone()))
+        let dir_entry = DirEntry::new(fs);
+        dict.insert("a".parse().unwrap(), Capability::DirEntry(dir_entry.clone()))
             .expect("dict entry already exists");
-        dict.insert("b".parse().unwrap(), Capability::Directory(directory.clone()))
+        dict.insert("b".parse().unwrap(), Capability::DirEntry(dir_entry.clone()))
             .expect("dict entry already exists");
-        dict.insert("c".parse().unwrap(), Capability::Directory(directory.clone()))
+        dict.insert("c".parse().unwrap(), Capability::DirEntry(dir_entry.clone()))
             .expect("dict entry already exists");
 
         let scope = ExecutionScope::new();
