@@ -7,7 +7,8 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntryHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntryHandle, FileHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
+    ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{SecurityPermission, SecurityServer};
@@ -335,7 +336,7 @@ pub fn check_fs_node_read_link_access(
 /// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     profile_duration!("security.hooks.file_alloc_security");
-    FileObjectState { _state: selinux_hooks::file_alloc_security(current_task) }
+    FileObjectState { state: selinux_hooks::file_alloc_security(current_task) }
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
@@ -446,8 +447,12 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
     profile_duration!("security.hooks.update_state_on_exec");
     if_selinux_else(
         current_task,
-        |_| {
-            selinux_hooks::task::update_state_on_exec(current_task, elf_security_state);
+        |security_server| {
+            selinux_hooks::task::update_state_on_exec(
+                security_server,
+                current_task,
+                elf_security_state,
+            );
         },
         || (),
     );
@@ -840,6 +845,14 @@ pub fn set_procattr(
     )
 }
 
+/// Stashes a reference to the selinuxfs null file for later use by hooks that remap
+/// inaccessible file descriptors to null.
+pub fn selinuxfs_init_null(current_task: &CurrentTask, null_fs_node: &FileHandle) {
+    // Note: No `if_selinux_...` guard because hook is invoked inside selinuxfs initialization code;
+    // i.e., hook is only invoked when selinux is enabled.
+    selinux_hooks::selinuxfs_init_null(current_task, null_fs_node)
+}
+
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
 /// initialization to be completed. This includes resolving labeling schemes and state for
 /// file-systems mounted prior to policy load (e.g. the "selinuxfs" itself), and initializing
@@ -880,6 +893,8 @@ pub fn selinuxfs_check_access(
 }
 
 pub mod testing {
+    use std::sync::OnceLock;
+
     use super::{selinux_hooks, Arc, KernelState, SecurityServer};
     use starnix_sync::Mutex;
 
@@ -890,6 +905,7 @@ pub mod testing {
             state: security_server.map(|server| selinux_hooks::KernelState {
                 server,
                 pending_file_systems: Mutex::default(),
+                selinuxfs_null: OnceLock::default(),
             }),
         }
     }

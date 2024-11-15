@@ -10,6 +10,7 @@ use fuchsia_inspect_contrib::profile_duration;
 
 use seq_lock::SeqLock;
 
+use starnix_core::device::mem::DevNull;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::security;
 use starnix_core::task::CurrentTask;
@@ -17,11 +18,12 @@ use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
-    BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
+    BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, NamespaceNode, SeekTarget,
+    SimpleFileNode, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
+use starnix_uapi::auth::FsCred;
 
 use selinux::policy::SUPPORTED_POLICY_VERSION;
 use selinux::{
@@ -215,9 +217,26 @@ impl SeLinuxFs {
         );
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
-        dir.entry_dev(current_task, "null", DeviceFileNode, mode!(IFCHR, 0o666), DeviceType::NULL);
+        let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
+        let null_fs_node = fs.create_node(current_task, null_ops, |id| {
+            let mut info = FsNodeInfo::new(id, mode!(IFCHR, 0o666), FsCred::root());
+            info.rdev = DeviceType::NULL;
+            info
+        });
+        dir.node("null", null_fs_node.clone());
 
         dir.build_root();
+
+        // Initialize selinux kernel state to store a copy of "/sys/fs/selinux/null" for use in
+        // hooks that redirect file descriptors to null.
+        let null_ops: Box<dyn FileOps> = Box::new(DevNull);
+        let null_flags = OpenFlags::empty();
+        let null_name =
+            NamespaceNode::new_anonymous(DirEntry::new(null_fs_node, None, "null".into()));
+        let null_file_object = FileObject::new(current_task, null_ops, null_name, null_flags)
+            .expect("create file object for just-created selinuxfs/null");
+
+        security::selinuxfs_init_null(current_task, &null_file_object);
 
         Ok(fs)
     }
@@ -503,8 +522,9 @@ impl SeLinuxApiOps for AccessApi {
     }
 }
 
-struct DeviceFileNode;
-impl FsNodeOps for DeviceFileNode {
+struct NullFileNode;
+
+impl FsNodeOps for NullFileNode {
     fs_node_impl_not_dir!();
 
     fn create_file_ops(
@@ -514,7 +534,7 @@ impl FsNodeOps for DeviceFileNode {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        unreachable!("Special nodes cannot be opened.");
+        Ok(Box::new(DevNull))
     }
 }
 

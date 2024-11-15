@@ -9,7 +9,8 @@ use crate::security::selinux_hooks::{
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::todo_check_permission;
-use selinux::{FilePermission, NullessByteStr, ObjectClass};
+use selinux::{FdPermission, FilePermission, NullessByteStr, ObjectClass};
+use starnix_logging::track_stub;
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -17,7 +18,13 @@ use starnix_uapi::{errno, error};
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
-pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
+pub fn update_state_on_exec(
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    elf_security_state: &ResolvedElfState,
+) {
+    close_inaccessible_file_descriptors(security_server, current_task, elf_security_state);
+
     let task_attrs = &mut current_task.security_state.lock();
     let previous_sid = task_attrs.current_sid;
 
@@ -31,6 +38,39 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
         keycreate_sid: None,
         sockcreate_sid: None,
     };
+}
+
+/// "Closes" file descriptors that `current_task` does not have permission to access by remapping
+/// those file descriptors to the null file in selinuxfs.
+fn close_inaccessible_file_descriptors(
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    elf_security_state: &ResolvedElfState,
+) {
+    let kernel_state = current_task
+        .kernel()
+        .security_state
+        .state
+        .as_ref()
+        .expect("kernel has security state because SELinux is enabled");
+
+    let null_file_handle =
+        kernel_state.selinuxfs_null.get().expect("selinuxfs_init_null() has been called").clone();
+
+    let source_sid =
+        elf_security_state.sid.expect("resolved elf state sid when selinux is enabled");
+    let permission_check = security_server.as_permission_check();
+    // Remap-to-null any fds that failed a check for allowing
+    // `[child-process] [fd-from-child-fd-table]:fd { use }`.
+    current_task.files.remap_fds(|file| {
+        let target_sid = file.security_state.state.sid;
+        let fd_use_result =
+            check_permission(&permission_check, source_sid, target_sid, FdPermission::Use);
+        match fd_use_result {
+            Ok(_) => None,
+            _ => Some(null_file_handle.clone()),
+        }
+    });
 }
 
 /// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.

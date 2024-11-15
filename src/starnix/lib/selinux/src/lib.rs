@@ -79,6 +79,8 @@ enumerable_enum! {
         Character,
         /// The SELinux "dir" object class.
         Dir,
+        /// The SELinux "fd" object class.
+        Fd,
         /// The SELinux "fifo_file" object class.
         Fifo,
         /// The SELinux "file" object class.
@@ -105,6 +107,7 @@ impl ObjectClass {
             Self::Block => "blk_file",
             Self::Character => "chr_file",
             Self::Dir => "dir",
+            Self::Fd => "fd",
             Self::Fifo => "fifo_file",
             Self::File => "file",
             Self::FileSystem => "filesystem",
@@ -246,6 +249,8 @@ permission_enum! {
         Character(CharacterFilePermission),
         /// Permissions for the well-known SELinux "dir" file-like object class.
         Dir(DirPermission),
+        /// Permissions for the well-known SELinux "fd" object class.
+        Fd(FdPermission),
         /// Permissions for the well-known SELinux "fifo_file" file-like object class.
         Fifo(FifoFilePermission),
         /// Permissions for the well-known SELinux "file" object class.
@@ -393,6 +398,20 @@ class_permission_enum! {
         Reparent("reparent"),
         /// Search access to the directory.
         Search("search"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "fd" class permission in SELinux policy that has a particular meaning in policy
+    /// enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FdPermission {
+        // keep-sorted start
+        /// Permission to use file descriptors copied/retained/inherited from another security
+        /// context. This permission is generally used to control whether an `exec*()` call from a
+        /// cloned process that retained a copy of the file descriptor table should succeed.
+        Use("use"),
         // keep-sorted end
     }
 }

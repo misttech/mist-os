@@ -399,6 +399,22 @@ impl FdTable {
             })
             .collect()
     }
+
+    /// Executes `predicate(file) => maybe_replacement` on every non-empty table entry. Replaces
+    /// `file` with `replacement_file` in the table when
+    /// `maybe_replacement == Some(replacement_file)`.
+    pub fn remap_fds<F: Fn(&FileHandle) -> Option<FileHandle>>(&self, predicate: F) {
+        let inner = self.inner.lock();
+        let mut store = inner.store.lock();
+
+        for maybe_entry in store.entries.iter_mut() {
+            if let Some(entry) = maybe_entry {
+                if let Some(replacement_file) = predicate(&entry.file) {
+                    entry.file = replacement_file;
+                }
+            }
+        }
+    }
 }
 
 impl ReleasableByRef for FdTable {

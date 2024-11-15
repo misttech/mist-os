@@ -10,8 +10,8 @@ use super::FsNodeSecurityXattr;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, PathBuilder,
-    UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
+    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -31,7 +31,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -853,7 +853,11 @@ fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'st
 
 /// Returns the security state structure for the kernel.
 pub(super) fn kernel_init_security() -> KernelState {
-    KernelState { server: SecurityServer::new(), pending_file_systems: Mutex::default() }
+    KernelState {
+        server: SecurityServer::new(),
+        pending_file_systems: Mutex::default(),
+        selinuxfs_null: OnceLock::default(),
+    }
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
@@ -941,7 +945,21 @@ where
 
 /// Returns the security state for a new file object created by `current_task`.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    FileObjectState { _sid: current_task.security_state.lock().current_sid }
+    FileObjectState { sid: current_task.security_state.lock().current_sid }
+}
+
+pub(super) fn selinuxfs_init_null(current_task: &CurrentTask, null_file_handle: &FileHandle) {
+    let kernel_state = current_task
+        .kernel()
+        .security_state
+        .state
+        .as_ref()
+        .expect("selinux kernel state exists when selinux is enabled");
+
+    kernel_state
+        .selinuxfs_null
+        .set(null_file_handle.clone())
+        .expect("selinuxfs null file initialized at most once");
 }
 
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
@@ -988,6 +1006,10 @@ pub(super) struct KernelState {
     /// Set of [`create::vfs::FileSystem`]s that have been constructed, and must be labeled as soon
     /// as a policy is loaded into the `server`.
     pub(super) pending_file_systems: Mutex<HashSet<WeakKey<FileSystem>>>,
+
+    /// Stashed reference to "/sys/fs/selinux/null" used for replacing inaccessible file descriptors
+    /// with a null file.
+    pub(super) selinuxfs_null: OnceLock<FileHandle>,
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -1040,7 +1062,7 @@ impl TaskAttrs {
 /// that the [`crate::task::Task`] that created the file object had.
 #[derive(Debug)]
 pub(super) struct FileObjectState {
-    _sid: SecurityId,
+    sid: SecurityId,
 }
 
 /// Security state for a [`crate::vfs::FileSystem`] instance. This holds the security fields
