@@ -78,7 +78,7 @@ class ArpTest : public SimTest {
   void Init();
   void CleanupApInterface();
 
-  void OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind);
+  void OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest* ind);
   void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
   void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
 
@@ -104,7 +104,8 @@ class ArpTest : public SimTest {
 };
 
 void GenericIfc::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
-  test_->OnAssocInd(&request->resp);
+  auto assoc_ind = fidl::ToNatural(*request);
+  test_->OnAssocInd(&assoc_ind);
   completer.Reply();
 }
 
@@ -118,8 +119,8 @@ void GenericIfc::StopConf(StopConfRequestView request, StopConfCompleter::Sync& 
   completer.Reply();
 }
 
-void ArpTest::OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), kTheirMac.byte, ETH_ALEN), 0);
+void ArpTest::OnAssocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcAssocIndRequest* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address()->data(), kTheirMac.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
 }
 

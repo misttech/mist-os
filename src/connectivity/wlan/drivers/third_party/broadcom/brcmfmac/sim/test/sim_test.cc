@@ -227,7 +227,8 @@ void SimInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::S
 
 void SimInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
-  stats_.assoc_indications.push_back(request->resp);
+  auto assoc_ind = fidl::ToNatural(*request);
+  stats_.assoc_indications.push_back(assoc_ind);
   completer.Reply();
 }
 

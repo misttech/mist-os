@@ -1372,12 +1372,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let assoc_ind = fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: [1u8; 6],
-            listen_interval: 2,
-            ssid: fidl_ieee80211::CSsid { data: [3u8; 32], len: 4 },
-            rsne: vec![5u8; 6],
-            vendor_ie: vec![7u8; 8],
+        let assoc_ind = fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some([1u8; 6]),
+            listen_interval: Some(2),
+            ssid: vec![3u8; 4].into(),
+            rsne: Some(vec![5u8; 6]),
+            vendor_ie: Some(vec![7u8; 8]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),

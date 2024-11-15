@@ -6367,23 +6367,6 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacAssocInd assoc_ind_params = {};
-  memcpy(assoc_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
-
-  // Unfortunately, we have to ask the firmware to provide the associated station's
-  // listen interval.
-  struct brcmf_sta_info_le sta_info;
-  uint8_t mac[ETH_ALEN];
-  memcpy(mac, e->addr, ETH_ALEN);
-  brcmf_cfg80211_get_station(ndev, mac, &sta_info);
-  // convert from ms to beacon periods
-  assoc_ind_params.listen_interval =
-      sta_info.listen_interval_inms / ifp->vif->profile.beacon_period;
-
-  // Extract the SSID from the IEs
-  assoc_ind_params.ssid.len = ssid_ie->len;
-  memcpy(assoc_ind_params.ssid.data.data(), ssid_ie->data, ssid_ie->len);
-
   // Create arena before populating vectors
   zx::result<fdf::Arena> arena_result = fdf::Arena::Create(0, 0);
   if (arena_result.is_error()) {
@@ -6391,22 +6374,41 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
     return ZX_ERR_INTERNAL;
   }
   fdf::Arena& arena = arena_result.value();
+  fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  memcpy(peer_sta_address.data(), e->addr, ETH_ALEN);
+
+  // Unfortunately, we have to ask the firmware to provide the associated station's
+  // listen interval.
+  struct brcmf_sta_info_le sta_info;
+  std::vector<uint8_t> ssid{};
+  if (brcmf_cfg80211_get_station(ndev, peer_sta_address.data(), &sta_info) == ZX_OK) {
+    // Extract the SSID from the IEs
+    ssid.resize(ssid_ie->len);
+    memcpy(ssid.data(), ssid_ie->data, ssid_ie->len);
+  }
 
   // Extract the RSN information from the IEs
+  std::vector<uint8_t> rsne(fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen, 0);
   if (rsn_ie != nullptr) {
     size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
     const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
     cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
-    assoc_ind_params.rsne = fidl::VectorView<uint8_t>(arena, rsne_span.begin(), rsne_span.end());
+    rsne.assign(rsne_span.begin(), rsne_span.end());
   }
+  auto assoc_ind_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAssocIndRequest::Builder(arena)
+          .peer_sta_address(peer_sta_address)
+          .listen_interval(sta_info.listen_interval_inms / ifp->vif->profile.beacon_period)
+          .ssid(ssid)
+          .rsne(rsne)
+          .Build();
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending assoc indication to SME.");
 #if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "",
-              FMT_MAC_ARGS(assoc_ind_params.peer_sta_address));
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address.data()));
 #endif /* !defined(NDEBUG) */
 
-  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_params);
+  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_builder);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send assoc ind  result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;

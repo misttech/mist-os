@@ -355,22 +355,26 @@ pub fn convert_deauthenticate_indication(
     }
 }
 pub fn convert_associate_indication(
-    ind: fidl_fullmac::WlanFullmacAssocInd,
-) -> fidl_mlme::AssociateIndication {
-    fidl_mlme::AssociateIndication {
-        peer_sta_address: ind.peer_sta_address,
+    ind: fidl_fullmac::WlanFullmacImplIfcAssocIndRequest,
+) -> Result<fidl_mlme::AssociateIndication> {
+    Ok(fidl_mlme::AssociateIndication {
+        peer_sta_address: ind.peer_sta_address.context("missing peer sta address")?,
         // TODO(https://fxbug.dev/42068281): Fix the discrepancy between WlanFullmacAssocInd and
         // fidl_mlme::AssociateIndication
         capability_info: 0,
-        listen_interval: ind.listen_interval,
-        ssid: if ind.ssid.len > 0 {
-            Some(ind.ssid.data[..ind.ssid.len as usize].to_vec())
+        listen_interval: ind.listen_interval.context("missing listen interval")?,
+        ssid: if ind.ssid.clone().expect("missing ssid").len() > 0 {
+            Some(ind.ssid.expect("missing ssid"))
         } else {
             None
         },
         rates: vec![],
-        rsne: if ind.rsne.len() > 0 { Some(ind.rsne) } else { None },
-    }
+        rsne: if ind.rsne.clone().expect("missing rsne").len() > 0 {
+            Some(ind.rsne.expect("missing rsne"))
+        } else {
+            None
+        },
+    })
 }
 
 pub fn convert_disassociate_confirm(
@@ -802,15 +806,16 @@ mod tests {
 
     #[test]
     fn test_convert_associate_indication_empty_vec_and_ssid_are_none() {
-        let fullmac = fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: [3; 6],
-            listen_interval: 123,
-            ssid: fidl_ieee80211::CSsid { len: 0, data: [4; 32] },
-            rsne: vec![],
-            vendor_ie: vec![],
+        let fullmac = fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some([3; 6]),
+            listen_interval: Some(123),
+            ssid: vec![].into(),
+            rsne: vec![].into(),
+            vendor_ie: vec![].into(),
+            ..Default::default()
         };
 
-        let mlme = convert_associate_indication(fullmac);
+        let mlme = convert_associate_indication(fullmac).unwrap();
         assert!(mlme.ssid.is_none());
         assert!(mlme.rsne.is_none());
     }

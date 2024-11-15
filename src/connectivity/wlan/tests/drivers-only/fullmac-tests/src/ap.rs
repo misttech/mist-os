@@ -289,12 +289,13 @@ async fn test_remote_client_connected_open() {
 
     fullmac_driver
         .ifc_proxy
-        .assoc_ind(&fidl_fullmac::WlanFullmacAssocInd {
-            peer_sta_address: remote_sta_address.clone(),
-            listen_interval: 100,
-            ssid: vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid),
-            rsne: vec![],
-            vendor_ie: vec![],
+        .assoc_ind(&fidl_fullmac::WlanFullmacImplIfcAssocIndRequest {
+            peer_sta_address: Some(remote_sta_address.clone()),
+            listen_interval: Some(100),
+            ssid: Some(DEFAULT_OPEN_AP_CONFIG.ssid.clone()),
+            rsne: Some(vec![]),
+            vendor_ie: Some(vec![]),
+            ..Default::default()
         })
         .await
         .expect("Could not send AssocInd");

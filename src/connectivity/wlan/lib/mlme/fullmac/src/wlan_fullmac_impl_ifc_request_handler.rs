@@ -79,10 +79,10 @@ fn handle_one_request(
                 ind: fullmac_to_mlme::convert_deauthenticate_indication(ind),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::AssocInd { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::AssocInd { payload, responder } => {
             responder.send().context("Failed to respond to AssocInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::AssocInd {
-                ind: fullmac_to_mlme::convert_associate_indication(resp),
+                ind: fullmac_to_mlme::convert_associate_indication(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::DisassocConf { payload, responder } => {
