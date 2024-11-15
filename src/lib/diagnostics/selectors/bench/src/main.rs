@@ -99,6 +99,15 @@ fn bench_parse_selector() -> criterion::Benchmark {
         .chain(make_selector_cases("with_wildcard", "*ab*", None, vec![2, 64]).into_iter())
         .chain(make_selector_cases("with_escaped", "ab\\:", None, vec![2, 64]).into_iter())
         .chain(make_selector_cases("with_tree_name", "abcd", Some("foo"), vec![2, 64]).into_iter())
+        .chain(
+            make_selector_cases(
+                "with_tree_name_and_odd_chars",
+                "abcd",
+                Some(r#"foo:bar,baz\"qux\*_-"#),
+                vec![2, 64],
+            )
+            .into_iter(),
+        )
         .collect();
 
     let mut bench = criterion::Benchmark::new("parse_selector/empty", move |b| {
