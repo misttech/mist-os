@@ -23,6 +23,7 @@ fidl("fuchsia.power.broker") {
     "//sdk/lib/driver/power/cpp/*:*",
     "//src/connectivity/network/netstack3:*",
     "//src/connectivity/network/tests/integration/power:*",
+    "//src/connectivity/wlan/wlanix/*:*",
     "//src/developer/forensics/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
     "//src/devices/block/drivers/sdmmc/*:*",

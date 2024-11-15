@@ -393,7 +393,6 @@ struct SupplicantStaNetworkState {
     bssid: Option<Bssid>,
 }
 
-#[derive(Default)]
 struct SupplicantStaIfaceState {
     callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
@@ -819,6 +818,32 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 warn!("Failed to send disconnect response: {}", e);
             }
         }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave { payload, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave");
+            match payload.enable {
+                Some(enable) => match iface.set_power_save_mode(enable).await {
+                    Ok(()) => info!("Set power save mode to {}", enable),
+                    Err(e) => warn!("Failed to set power save mode: {:?}", e),
+                },
+                None => error!("Got SetPowerSave without a payload"),
+            }
+            if let Err(e) = responder.send() {
+                warn!("Failed to send disconnect response: {}", e);
+            }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetSuspendModeEnabled { payload, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetSuspendModeEnabled");
+            match payload.enable {
+                Some(enable) => match iface.set_suspend_mode(enable).await {
+                    Ok(()) => info!("Set suspend mode to {}", enable),
+                    Err(e) => warn!("Failed to set suspend mode: {:?}", e),
+                },
+                None => error!("Got SetSuspendModeEnabled without a payload"),
+            }
+            if let Err(e) = responder.send() {
+                warn!("Failed to send disconnect response: {}", e);
+            }
+        }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
         }
@@ -833,7 +858,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
     iface: Arc<C>,
     iface_id: u16,
 ) {
-    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState::default()));
+    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState { callbacks: vec![] }));
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
@@ -2455,6 +2480,45 @@ mod tests {
             ClientIfaceCall::OnSignalReport { ind } => ind
         );
         assert_eq!(signal_report_ind, mocked_signal_report);
+    }
+
+    #[test_case(true)]
+    #[test_case(false)]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_supplicant_set_power_save_mode(desired: bool) {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut set_fut: fidl::client::QueryResponseFut<()> = test_helper
+            .supplicant_sta_iface_proxy
+            .set_power_save(fidl_fuchsia_wlan_wlanix::SupplicantStaIfaceSetPowerSaveRequest {
+                enable: Some(desired),
+                ..Default::default()
+            });
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetPowerSaveMode(setting) => assert_eq!(*setting, desired));
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test_case(true)]
+    #[test_case(false)]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_supplicant_set_suspend_mode(desired: bool) {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut set_fut: fidl::client::QueryResponseFut<()> =
+            test_helper.supplicant_sta_iface_proxy.set_suspend_mode_enabled(
+                fidl_fuchsia_wlan_wlanix::SupplicantStaIfaceSetSuspendModeEnabledRequest {
+                    enable: Some(desired),
+                    ..Default::default()
+                },
+            );
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock().last().unwrap(), ClientIfaceCall::SetSuspendMode(setting)  => assert_eq!(*setting, desired));
+        assert_variant!(test_helper.exec.run_until_stalled(&mut set_fut), Poll::Ready(Ok(())));
     }
 
     struct SupplicantTestHelper {

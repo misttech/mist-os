@@ -15,14 +15,14 @@ use ieee80211::Bssid;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::scan::Compatibility;
 use {
-    fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_power_broker as fidl_power_broker, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme, power_broker_client as pbclient,
 };
 
 #[async_trait]
@@ -43,6 +43,7 @@ pub(crate) trait IfaceManager: Send + Sync {
 
 pub struct DeviceMonitorIfaceManager {
     monitor_svc: fidl_device_service::DeviceMonitorProxy,
+    pb_topology_svc: Option<fidl_power_broker::TopologyProxy>,
     ifaces: Mutex<HashMap<u16, Arc<SmeClientIface>>>,
 }
 
@@ -52,7 +53,11 @@ impl DeviceMonitorIfaceManager {
             fidl_device_service::DeviceMonitorMarker,
         >()
         .context("failed to connect to device monitor")?;
-        Ok(Self { monitor_svc, ifaces: Mutex::new(HashMap::new()) })
+        let pb_topology_svc =
+            fuchsia_component::client::connect_to_protocol::<fidl_power_broker::TopologyMarker>()
+                .inspect_err(|e| warn!("Failed to initialize PB topology: {:?}", e))
+                .ok();
+        Ok(Self { monitor_svc, pb_topology_svc, ifaces: Mutex::new(HashMap::new()) })
     }
 
     pub fn clone_device_monitor_svc(&self) -> fidl_device_service::DeviceMonitorProxy {
@@ -132,7 +137,14 @@ impl IfaceManager for DeviceMonitorIfaceManager {
 
         let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
         self.monitor_svc.get_client_sme(iface_id, server).await?.map_err(zx::Status::from_raw)?;
-        let mut iface = SmeClientIface::new(sme_proxy);
+        let mut iface = SmeClientIface::new(
+            phy_id,
+            iface_id,
+            sme_proxy,
+            self.monitor_svc.clone(),
+            self.pb_topology_svc.clone(),
+        )
+        .await;
         iface.wlanix_provisioned = wlanix_provisioned;
         let _ = self.ifaces.lock().insert(iface_id, Arc::new(iface));
         Ok(iface_id)
@@ -195,6 +207,29 @@ pub(crate) enum ScanEnd {
     Cancelled,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(u8)] // Intended to match fidl_power_broker::PowerLevel
+enum StaIfacePowerLevel {
+    Suspended = 0,
+    Normal = 1,
+    NoPowerSavings = 2,
+}
+
+pub(crate) struct PowerState {
+    power_element_context: Option<pbclient::PowerElementContext>,
+    suspend_mode_enabled: bool,
+    power_save_enabled: bool,
+}
+// Need to manually implement Debug for this, since pbclient::PowerElementContext is not Debug
+impl std::fmt::Debug for PowerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PowerState")
+            .field("suspend_mode_enabled", &self.suspend_mode_enabled)
+            .field("power_save_enabled", &self.power_save_enabled)
+            .finish()
+    }
+}
+
 #[async_trait]
 pub(crate) trait ClientIface: Sync + Send {
     async fn trigger_scan(&self) -> Result<ScanEnd, Error>;
@@ -211,10 +246,16 @@ pub(crate) trait ClientIface: Sync + Send {
 
     fn on_disconnect(&self, info: &fidl_sme::DisconnectSource);
     fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication);
+    async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error>;
+    async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error>;
 }
 
 #[derive(Debug)]
 pub(crate) struct SmeClientIface {
+    #[allow(unused)]
+    phy_id: u16,
+    #[allow(unused)]
+    monitor_svc: fidl_device_service::DeviceMonitorProxy,
     sme_proxy: fidl_sme::ClientSmeProxy,
     last_scan_results: Arc<Mutex<Vec<fidl_sme::ScanResult>>>,
     scan_abort_signal: Arc<Mutex<Option<oneshot::Sender<()>>>>,
@@ -222,17 +263,81 @@ pub(crate) struct SmeClientIface {
     // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
     wlanix_provisioned: bool,
     bss_scorer: BssScorer,
+    power_state: Arc<Mutex<PowerState>>,
 }
 
 impl SmeClientIface {
-    fn new(sme_proxy: fidl_sme::ClientSmeProxy) -> Self {
+    async fn new(
+        phy_id: u16,
+        iface_id: u16,
+        sme_proxy: fidl_sme::ClientSmeProxy,
+        monitor_svc: fidl_device_service::DeviceMonitorProxy,
+        pb_topology_svc: Option<fidl_power_broker::TopologyProxy>,
+    ) -> Self {
+        // If the power broker is available, initialize our power element
+        let power_element_context = if let Some(topology) = pb_topology_svc {
+            // TODO(http://fxbug.dev/377743780): determine how to keep this in sync with the max
+            // value in the StaIfacePowerLevel.
+            let valid_levels: Vec<u8> = (0..=StaIfacePowerLevel::NoPowerSavings as u8).collect();
+            let element_name = format!("wlanix-sta-iface-{}-supplicant-power", iface_id);
+
+            // We assume the driver starts out with no power savings. The higher level applications
+            // don't rely on this, it's only for reporting to the PB, so even if it's wrong it won't
+            // cause logic errors. So far, this is a safe assumption based on the drivers we have.
+            // TODO(https://fxbug.dev/378878423): Read this from the driver at initialization.
+            let initial_level = StaIfacePowerLevel::NoPowerSavings;
+            match pbclient::PowerElementContext::builder(
+                &topology,
+                element_name.as_str(),
+                &valid_levels,
+            )
+            .initial_current_level(initial_level as u8)
+            .register_dependency_tokens(false) // Prevent other elements from depending in this one.
+            .build()
+            .await
+            {
+                Ok(power_element_context) => Some(power_element_context),
+                Err(e) => {
+                    warn!("Failed to initialize power element context: {:?}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         SmeClientIface {
+            phy_id,
             sme_proxy,
+            monitor_svc,
             last_scan_results: Arc::new(Mutex::new(vec![])),
             scan_abort_signal: Arc::new(Mutex::new(None)),
             connected_network_rssi: Arc::new(Mutex::new(None)),
             wlanix_provisioned: true,
             bss_scorer: BssScorer::new(),
+            power_state: Arc::new(Mutex::new(PowerState {
+                power_element_context,
+                suspend_mode_enabled: false,
+                power_save_enabled: false,
+            })),
+        }
+    }
+
+    /// Sets the power level for the phy that this interface belongs to. Although this is a phy-
+    /// level operation, the wlanix FIDLs expose it on an interface. When no interfaces exist, there
+    /// is no way to alter power levels via the wlanix FIDLs. However, this is insignificant, as
+    /// empirical measurements show that the chips have virtually no power consumption when no
+    /// interfaces exist.
+    async fn update_power_level(&self, new_level: StaIfacePowerLevel) -> Result<(), Error> {
+        // If the Power Broker is initialized, report the new state
+        if let Some(pe) = &mut self.power_state.lock().power_element_context {
+            match pe.current_level.update(new_level as u8).await {
+                Err(e) => Err(format_err!("Error setting level: {:?}", e)),
+                Ok(Err(e)) => Err(format_err!("Error setting level: {:?}", e)),
+                Ok(Ok(())) => Ok(()),
+            }
+        } else {
+            Err(format_err!("Successfully set hardware state, but can't report it to PB since it is not initialized"))
         }
     }
 }
@@ -377,6 +482,47 @@ impl ClientIface for SmeClientIface {
     fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication) {
         let _prev = self.connected_network_rssi.lock().replace(ind.rssi_dbm);
     }
+
+    async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error> {
+        // Update our cache
+        let mut power_state = self.power_state.lock();
+        power_state.power_save_enabled = enabled;
+        // Figure out the new state
+        let new_level = if power_state.suspend_mode_enabled {
+            info!("Got SetPowerSave {} while SetSuspendModeEnabled is true", enabled);
+            // TODO(https://fxbug.dev/340921554): log a metric in this case, ambiguous demand
+            StaIfacePowerLevel::Suspended
+        } else {
+            match enabled {
+                true => StaIfacePowerLevel::Normal,
+                false => StaIfacePowerLevel::NoPowerSavings,
+            }
+        };
+        drop(power_state);
+        self.update_power_level(new_level).await
+    }
+
+    async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error> {
+        let mut power_state = self.power_state.lock();
+        power_state.suspend_mode_enabled = enabled;
+        // Figure out the new state
+        let new_level = if enabled {
+            // Assume that this overrides any SetPowerSave
+            StaIfacePowerLevel::Suspended
+        } else {
+            if power_state.power_save_enabled {
+                info!("SetSuspendModeEnabled=false while SetPowerSave={:?}, reverting to power save mode", power_state.power_save_enabled );
+                // TODO(https://fxbug.dev/340921554): log a metric in this case, unclear if we
+                // should revert to power_save_enabled=true or not.
+                StaIfacePowerLevel::Normal
+            } else {
+                warn!("SetSuspendModeEnabled=false while SetPowerSave={:?}, moving to high performance", power_state.power_save_enabled );
+                StaIfacePowerLevel::NoPowerSavings
+            }
+        };
+        drop(power_state);
+        self.update_power_level(new_level).await
+    }
 }
 
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
@@ -466,6 +612,8 @@ pub mod test_utils {
         GetConnectedNetworkRssi,
         OnDisconnect { info: fidl_sme::DisconnectSource },
         OnSignalReport { ind: fidl_internal::SignalReportIndication },
+        SetPowerSaveMode(bool),
+        SetSuspendMode(bool),
     }
 
     pub struct TestClientIface {
@@ -557,6 +705,16 @@ pub mod test_utils {
 
         fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication) {
             self.calls.lock().push(ClientIfaceCall::OnSignalReport { ind });
+        }
+
+        async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error> {
+            self.calls.lock().push(ClientIfaceCall::SetPowerSaveMode(enabled));
+            Ok(())
+        }
+
+        async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error> {
+            self.calls.lock().push(ClientIfaceCall::SetSuspendMode(enabled));
+            Ok(())
         }
     }
 
@@ -681,6 +839,8 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use std::pin::pin;
+
     use super::test_utils::FAKE_IFACE_RESPONSE;
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
@@ -690,33 +850,78 @@ mod tests {
     use test_case::test_case;
     use wlan_common::channel::{Cbw, Channel};
     use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
+    use wlan_common::test_utils::ExpectWithin;
     use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_common_security as fidl_security,
-        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, rand,
     };
 
-    fn setup_test() -> (
+    fn setup_test_manager() -> (
         fasync::TestExecutor,
         fidl_device_service::DeviceMonitorRequestStream,
         DeviceMonitorIfaceManager,
     ) {
-        let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
-
+        let exec = fasync::TestExecutor::new();
         let (monitor_svc, monitor_stream) =
             create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
                 .expect("Failed to create device monitor service");
         (
             exec,
             monitor_stream,
-            DeviceMonitorIfaceManager { monitor_svc, ifaces: Mutex::new(HashMap::new()) },
+            DeviceMonitorIfaceManager {
+                monitor_svc,
+                ifaces: Mutex::new(HashMap::new()),
+                pb_topology_svc: None,
+            },
         )
+    }
+
+    const TEST_IFACE_ID: u16 = 123;
+    fn setup_test_manager_with_iface() -> (
+        fasync::TestExecutor,
+        fidl_device_service::DeviceMonitorRequestStream,
+        fidl_sme::ClientSmeRequestStream,
+        DeviceMonitorIfaceManager,
+        Arc<SmeClientIface>,
+    ) {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc, monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc: monitor_svc.clone(),
+            ifaces: Mutex::new(HashMap::new()),
+            pb_topology_svc: None,
+        };
+        let (sme_proxy, sme_stream) =
+            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+        let phy_id = rand::random();
+        let iface = exec.run_singlethreaded(SmeClientIface::new(
+            phy_id,
+            TEST_IFACE_ID,
+            sme_proxy,
+            monitor_svc,
+            None,
+        ));
+        manager.ifaces.lock().insert(TEST_IFACE_ID, Arc::new(iface));
+        let mut client_fut = manager.get_client_iface(TEST_IFACE_ID);
+        let iface = exec.run_singlethreaded(&mut client_fut).expect("Failed to get client iface");
+        drop(client_fut);
+        (exec, monitor_stream, sme_stream, manager, iface)
     }
 
     #[test]
     fn test_query_interface() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc, mut monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc,
+            pb_topology_svc: None,
+            ifaces: Mutex::new(HashMap::new()),
+        };
         let mut fut = manager.query_iface(FAKE_IFACE_RESPONSE.id);
 
         // We should query device monitor for info on the iface.
@@ -734,7 +939,7 @@ mod tests {
 
     #[test]
     fn test_get_country() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        let (mut exec, mut monitor_stream, manager) = setup_test_manager();
         let mut fut = manager.get_country(123);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -753,7 +958,21 @@ mod tests {
 
     #[test]
     fn test_create_and_serve_client_iface() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        // Create the manager here instead of using setup_test_manager(), since we need the
+        // pb_topology_proxy to be present.
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc, mut monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let (pb_topology_proxy, mut pb_stream) =
+            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>()
+                .expect("Failed to create proxy");
+
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc,
+            pb_topology_svc: Some(pb_topology_proxy),
+            ifaces: Mutex::new(HashMap::new()),
+        };
         let mut fut = manager.create_client_iface(0);
 
         // No interfaces to begin.
@@ -787,24 +1006,34 @@ mod tests {
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { responder, .. })) => responder);
         responder.send(Ok(())).expect("Failed to send GetClientSme response");
 
+        // Expect power broker initialization
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut pb_stream.next()),
+            Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload: _payload, responder }))) => {
+                assert_variant!(responder.send(Ok(())), Ok(()));
+        });
+
         // Creation complete!
-        let request_id =
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(id)) => id);
+        let request_id = exec.run_singlethreaded(&mut fut).expect("Creation completes ok");
         assert_eq!(request_id, FAKE_IFACE_RESPONSE.id);
 
         // The new iface shows up in ListInterfaces.
         assert_eq!(manager.list_ifaces(), vec![FAKE_IFACE_RESPONSE.id]);
 
         // The new iface is ready for use.
-        assert_variant!(
+        let iface = assert_variant!(
             exec.run_until_stalled(&mut manager.get_client_iface(FAKE_IFACE_RESPONSE.id)),
-            Poll::Ready(Ok(_))
+            Poll::Ready(Ok(i)) => i
         );
+
+        // The iface has the power broker topology passed in from the manager
+        assert!(iface.power_state.lock().power_element_context.is_some());
     }
 
     #[test]
     fn test_create_iface_fails() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        let (mut exec, mut monitor_stream, manager) = setup_test_manager();
         let mut fut = manager.create_client_iface(0);
 
         // Indicate that there are no existing ifaces.
@@ -830,7 +1059,7 @@ mod tests {
     // TODO(b/298030838): Delete test when wlanix is the sole config path.
     #[test]
     fn test_create_iface_with_unmanaged() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        let (mut exec, mut monitor_stream, manager) = setup_test_manager();
         let mut fut = manager.create_client_iface(0);
 
         // No interfaces to begin.
@@ -858,21 +1087,20 @@ mod tests {
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { responder, .. })) => responder);
         responder.send(Ok(())).expect("Failed to send GetClientSme response");
 
-        // We finish up and have a new iface.
-        let id = assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(id)) => id);
+        // We finish up and have a new iface. This may take longer than one try, since resolving
+        // the power broker FIDL can take a few loops.
+        let mut fut_with_timeout =
+            pin!(fut.expect_within(zx::MonotonicDuration::from_seconds(5), "Awaiting iface"));
+        let id = assert_variant!(exec.run_singlethreaded(&mut fut_with_timeout), Ok(id) => id);
         assert_eq!(id, FAKE_IFACE_RESPONSE.id);
         assert_eq!(&manager.list_ifaces()[..], [id]);
     }
 
     #[test]
     fn test_destroy_iface() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
-
-        let (proxy, _server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(proxy)));
-
-        let mut fut = manager.destroy_iface(1);
+        let (mut exec, mut monitor_stream, _sme_stream, manager, _iface) =
+            setup_test_manager_with_iface();
+        let mut fut = manager.destroy_iface(TEST_IFACE_ID);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         let responder = assert_variant!(
@@ -887,15 +1115,38 @@ mod tests {
     // TODO(b/298030838): Delete test when wlanix is the sole config path.
     #[test]
     fn test_destroy_iface_not_wlanix() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
+        // Create the manager here instead of using setup_test_manager(), since we need the
+        // sme_proxy and monitor_svc to create the interface.
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc, mut monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let (sme_proxy, _sme_stream) =
+            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc: monitor_svc.clone(),
+            pb_topology_svc: None,
+            ifaces: Mutex::new(HashMap::new()),
+        };
+        let iface = SmeClientIface {
+            phy_id: 42,
+            sme_proxy,
+            monitor_svc,
+            last_scan_results: Arc::new(Mutex::new(vec![])),
+            scan_abort_signal: Arc::new(Mutex::new(None)),
+            connected_network_rssi: Arc::new(Mutex::new(None)),
+            wlanix_provisioned: false, // set to false for this test
+            bss_scorer: BssScorer::new(),
+            power_state: Arc::new(Mutex::new(PowerState {
+                power_element_context: None,
+                suspend_mode_enabled: false,
+                power_save_enabled: false,
+            })),
+        };
+        let iface_id = 17;
+        manager.ifaces.lock().insert(iface_id, Arc::new(iface));
 
-        let (proxy, _server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
-        let mut iface = SmeClientIface::new(proxy);
-        iface.wlanix_provisioned = false;
-        manager.ifaces.lock().insert(1, Arc::new(iface));
-
-        let mut fut = manager.destroy_iface(1);
+        let mut fut = manager.destroy_iface(iface_id);
 
         // No destroy request is sent.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -909,8 +1160,9 @@ mod tests {
 
     #[test]
     fn test_get_client_iface_fails_no_such_iface() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let mut fut = manager.get_client_iface(1);
+        let (mut exec, _monitor_stream, _sme_stream, manager, _iface) =
+            setup_test_manager_with_iface();
+        let mut fut = manager.get_client_iface(TEST_IFACE_ID + 1);
 
         // No ifaces exist, so this should always error.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_e)));
@@ -918,8 +1170,9 @@ mod tests {
 
     #[test]
     fn test_destroy_iface_no_such_iface() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let mut fut = manager.destroy_iface(1);
+        let (mut exec, _monitor_stream, _sme_stream, manager, _iface) =
+            setup_test_manager_with_iface();
+        let mut fut = manager.destroy_iface(TEST_IFACE_ID + 1);
 
         // No ifaces exist, so this should always return immediately.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -927,12 +1180,8 @@ mod tests {
 
     #[test]
     fn test_trigger_scan() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
         assert!(iface.get_last_scan_results().is_empty());
         let mut scan_fut = iface.trigger_scan();
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -948,12 +1197,8 @@ mod tests {
 
     #[test]
     fn test_abort_scan() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
         assert!(iface.get_last_scan_results().is_empty());
         let mut scan_fut = iface.trigger_scan();
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -1009,12 +1254,8 @@ mod tests {
         bssid_specified: bool,
         expected_authentication: fidl_security::Authentication,
     ) {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         let bss_description = fake_fidl_bss_description!(protection => fake_protection_cfg,
             ssid: Ssid::try_from("foo").unwrap(),
@@ -1090,12 +1331,8 @@ mod tests {
         passphrase: Option<Vec<u8>>,
         bssid: Option<Bssid>,
     ) {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, _sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         if has_network {
             let bss_description = fake_fidl_bss_description!(protection => fake_protection_cfg,
@@ -1117,12 +1354,8 @@ mod tests {
 
     #[test]
     fn test_connect_fails_at_sme() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         let bss_description = fake_fidl_bss_description!(Open,
             ssid: Ssid::try_from("foo").unwrap(),
@@ -1167,10 +1400,36 @@ mod tests {
 
     #[test]
     fn test_connect_fails_with_timeout() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        // Create the manager here instead of using setup_test_manager(), since we need fake time
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+        let (monitor_svc, _monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let (sme_proxy, mut sme_stream) =
+            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc: monitor_svc.clone(),
+            pb_topology_svc: None,
+            ifaces: Mutex::new(HashMap::new()),
+        };
+        let iface = SmeClientIface {
+            phy_id: 42,
+            sme_proxy,
+            monitor_svc,
+            last_scan_results: Arc::new(Mutex::new(vec![])),
+            scan_abort_signal: Arc::new(Mutex::new(None)),
+            connected_network_rssi: Arc::new(Mutex::new(None)),
+            wlanix_provisioned: true,
+            bss_scorer: BssScorer::new(),
+            power_state: Arc::new(Mutex::new(PowerState {
+                power_element_context: None,
+                suspend_mode_enabled: false,
+                power_save_enabled: false,
+            })),
+        };
+
+        manager.ifaces.lock().insert(1, Arc::new(iface));
         let mut client_fut = manager.get_client_iface(1);
         let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
 
@@ -1267,12 +1526,8 @@ mod tests {
         recent_connect_failure: Option<(fidl_common::BssDescription, fidl_sme::ConnectResult)>,
         expected_bssid: Bssid,
     ) {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         if let Some((bss_description, connect_failure)) = recent_connect_failure {
             // Set up a connect failure so that later in the test, there'd be a score penalty
@@ -1316,12 +1571,8 @@ mod tests {
 
     #[test]
     fn test_disconnect() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         let mut disconnect_fut = iface.disconnect();
         assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
@@ -1336,12 +1587,8 @@ mod tests {
 
     #[test]
     fn test_on_disconnect() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (_exec, _monitor_stream, _sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
         assert_variant!(iface.get_connected_network_rssi(), Some(-40));
@@ -1353,15 +1600,107 @@ mod tests {
 
     #[test]
     fn test_on_signal_report() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
-            .expect("Failed to create device monitor service");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (_exec, _monitor_stream, _sme_stream, _manager, iface) =
+            setup_test_manager_with_iface();
 
         assert_variant!(iface.get_connected_network_rssi(), None);
         iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
         assert_variant!(iface.get_connected_network_rssi(), Some(-40));
+    }
+
+    enum PowerCall {
+        SetPowerSaveMode(bool),
+        SetSuspendMode(bool),
+    }
+    #[test_case(vec![
+        // Turning on power save mode should take us to PsModeBalanced
+        (PowerCall::SetPowerSaveMode(true), fidl_common::PowerSaveType::PsModeBalanced),
+        // Regardless of power save mode, suspend mode should take us to PsModeUltraLowPower
+        (PowerCall::SetSuspendMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+    ]; "Suspend mode overrides power save on")]
+    #[test_case(vec![
+        // Turning off power save mode should take us to PsModePerformance
+        (PowerCall::SetPowerSaveMode(false), fidl_common::PowerSaveType::PsModePerformance),
+        // Regardless of power save mode, suspend mode should take us to PsModeUltraLowPower
+        (PowerCall::SetSuspendMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+    ]; "Suspend mode overrides power save off")]
+    #[test_case(vec![
+        (PowerCall::SetSuspendMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+        // Once we're in suspend mode, changing power save mode should have no effect
+        (PowerCall::SetPowerSaveMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+        (PowerCall::SetPowerSaveMode(false), fidl_common::PowerSaveType::PsModeUltraLowPower),
+    ]; "Power save has no effect during suspend mode")]
+    #[test_case(vec![
+        (PowerCall::SetPowerSaveMode(true), fidl_common::PowerSaveType::PsModeBalanced),
+        (PowerCall::SetSuspendMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+        // When turning off suspend mode, we should revert to the previous setting of power save mode
+        // If power save was on before suspend, it should be on after as well
+        (PowerCall::SetSuspendMode(false), fidl_common::PowerSaveType::PsModeBalanced)
+    ]; "Turning off suspend mode reverts to power save on")]
+    #[test_case(vec![
+        (PowerCall::SetPowerSaveMode(false), fidl_common::PowerSaveType::PsModePerformance),
+        (PowerCall::SetSuspendMode(true), fidl_common::PowerSaveType::PsModeUltraLowPower),
+        // When turning off suspend mode, we should revert to the previous setting of power save mode
+        // If power save was off before suspend, it should be off after as well
+        (PowerCall::SetSuspendMode(false), fidl_common::PowerSaveType::PsModePerformance)
+    ]; "Turning off suspend mode reverts to power save off")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_set_power_mode(sequence: Vec<(PowerCall, fidl_common::PowerSaveType)>) {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc, _monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let (sme_proxy, _sme_stream) =
+            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+        let (pb_topology_proxy, mut pb_stream) =
+            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>()
+                .expect("Failed to create proxy");
+        let phy_id = rand::random();
+
+        // Create the interface with a power broker channel
+        let mut iface_create_fut = pin!(SmeClientIface::new(
+            phy_id,
+            TEST_IFACE_ID,
+            sme_proxy,
+            monitor_svc,
+            Some(pb_topology_proxy),
+        ));
+        assert_variant!(exec.run_until_stalled(&mut iface_create_fut), Poll::Pending);
+        // Expect power broker initialization
+        let mut pb_update_channel = assert_variant!(
+            exec.run_until_stalled(&mut pb_stream.next()),
+            Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload, responder }))) => {
+                assert_eq!(payload.initial_current_level, Some(StaIfacePowerLevel::NoPowerSavings as u8));
+                assert_variant!(responder.send(Ok(())), Ok(()));
+                payload.level_control_channels.unwrap().current.into_stream().unwrap()
+        });
+        let iface = exec.run_singlethreaded(iface_create_fut);
+
+        // Run each call in the test sequence
+        for (call, expected_driver_val) in sequence {
+            // Set the power save mode
+            let mut power_call_fut = match call {
+                PowerCall::SetPowerSaveMode(val) => iface.set_power_save_mode(val),
+                PowerCall::SetSuspendMode(val) => iface.set_suspend_mode(val),
+            };
+            assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+
+            // Validate the expected setting is sent to the power broker
+            let expected_pb_val = match expected_driver_val {
+                fidl_common::PowerSaveType::PsModeUltraLowPower => StaIfacePowerLevel::Suspended,
+                fidl_common::PowerSaveType::PsModeLowPower => panic!("Unexpected value"),
+                fidl_common::PowerSaveType::PsModeBalanced => StaIfacePowerLevel::Normal,
+                fidl_common::PowerSaveType::PsModePerformance => StaIfacePowerLevel::NoPowerSavings,
+            };
+            assert_variant!(exec.run_until_stalled(&mut power_call_fut), Poll::Pending);
+            assert_variant!(
+                exec.run_until_stalled(&mut pb_update_channel.next()),
+                Poll::Ready(Some(Ok(fidl_power_broker::CurrentLevelRequest::Update { current_level, responder }))) => {
+                    assert_eq!(current_level, expected_pb_val as u8);
+                    assert_variant!(responder.send(Ok(())), Ok(()));
+            });
+            // Future completes
+            exec.run_singlethreaded(&mut power_call_fut).expect("future finished");
+        }
     }
 }

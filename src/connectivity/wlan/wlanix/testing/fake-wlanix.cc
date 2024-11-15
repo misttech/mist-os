@@ -250,6 +250,24 @@ void FakeWlanix::Disconnect(DisconnectCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceDisconnect});
 }
 
+void FakeWlanix::SetPowerSave(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetPowerSaveRequest* request,
+    SetPowerSaveCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceSetPowerSave});
+  if (!request->has_enable()) {
+    ZX_ASSERT_MSG(false, "expect `enable` to be present");
+  }
+}
+
+void FakeWlanix::SetSuspendModeEnabled(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetSuspendModeEnabledRequest* request,
+    SetSuspendModeEnabledCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceSetSuspendModeEnabled});
+  if (!request->has_enable()) {
+    ZX_ASSERT_MSG(false, "expect `enable` to be present");
+  }
+}
+
 void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

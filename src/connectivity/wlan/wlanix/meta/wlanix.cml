@@ -26,6 +26,17 @@
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],
         },
+
+        // System power level controls.
+        {
+            protocol: [
+                "fuchsia.power.broker.ElementInfoProviderService",
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            availability: "optional",
+        },
     ],
     expose: [
         {

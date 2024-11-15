@@ -139,6 +139,12 @@ open protocol SupplicantStaIface {
         1: network server_end:SupplicantStaNetwork;
     });
     flexible Disconnect() -> ();
+    flexible SetPowerSave(resource table {
+        1: enable bool;
+    }) -> ();
+    flexible SetSuspendModeEnabled(resource table {
+        1: enable bool;
+    }) -> ();
 };
 
 open protocol SupplicantStaIfaceCallback {
