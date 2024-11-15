@@ -151,7 +151,7 @@ def _fuchsia_product_configuration_impl(ctx):
     return [
         DefaultInfo(files = depset(direct = output_files + ctx.files.product_config_labels + ctx.files.deps)),
         FuchsiaProductConfigInfo(
-            product_config = product_config_file,
+            config = product_config_file.path,
             build_type = build_type,
             build_id_dirs = build_id_dirs,
         ),
@@ -161,7 +161,7 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
     return [
         DefaultInfo(files = depset(direct = ctx.files.files)),
         FuchsiaProductConfigInfo(
-            product_config = ctx.file.product_config,
+            config = ctx.file.product_config.path,
             build_type = ctx.attr.build_type,
             build_id_dirs = [],
         ),

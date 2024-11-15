@@ -76,7 +76,7 @@ def _fuchsia_product_assembly_impl(ctx):
     board_config_file_path = board_config.config
 
     # Invoke Product Assembly
-    product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
+    product_config_file_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config
     build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
     build_id_dirs = ctx.attr.product_config[FuchsiaProductConfigInfo].build_id_dirs
 
@@ -92,7 +92,7 @@ def _fuchsia_product_assembly_impl(ctx):
         "assembly",
         "product",
         "--product",
-        product_config_file.path,
+        product_config_file_path,
         "--board-info",
         board_config_file_path,
         "--input-bundles-dir",

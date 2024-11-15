@@ -7,7 +7,10 @@ load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaProductConf
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_product_configuration_test_impl(ctx):
-    product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
+    product_config_files = ctx.attr.product_config[DefaultInfo].files.to_list()
+    product_config_file = (
+        ([file for file in product_config_files if file.path.endswith("_product_config.json")] + [None])[0]
+    )
     golden_file = ctx.file.golden_file
     return [create_validation_script_provider(ctx, product_config_file, golden_file)]
 
