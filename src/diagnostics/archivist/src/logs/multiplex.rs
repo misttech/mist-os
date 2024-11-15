@@ -3,20 +3,20 @@
 // found in the LICENSE file.
 
 use crate::identity::ComponentIdentity;
+use derivative::Derivative;
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
 use selectors::SelectorExt;
 use std::cmp::Ordering;
-use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::trace;
 
-pub type PinStream<I> = Pin<Box<dyn DebugStream<Item = I> + Send + 'static>>;
+pub type PinStream<I> = Pin<Box<dyn Stream<Item = I> + Send + 'static>>;
 
 static MULTIPLEXER_ID: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
 
@@ -190,11 +190,13 @@ enum IncomingStream<S> {
 
 /// A `SubStream` wraps an inner stream and keeps its latest value cached inline for comparison
 /// with the cached values of other `SubStream`s, allowing for semi-ordered merging of streams.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct SubStream<I> {
     identity: Arc<ComponentIdentity>,
     cached: Option<I>,
     inner_is_live: bool,
+    #[derivative(Debug = "ignore")]
     inner: PinStream<I>,
 }
 
@@ -235,21 +237,6 @@ fn compare_sub_streams<I: Ord>(a: &SubStream<I>, b: &SubStream<I>) -> Ordering {
         (None, Some(_)) => Ordering::Greater,
         (Some(_), None) => Ordering::Less,
         (None, None) => Ordering::Equal,
-    }
-}
-
-pub trait DebugStream: Debug {
-    type Item;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>>;
-}
-
-impl<I, T> DebugStream for T
-where
-    T: Debug + Stream<Item = I>,
-{
-    type Item = I;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Stream::poll_next(self, cx)
     }
 }
 

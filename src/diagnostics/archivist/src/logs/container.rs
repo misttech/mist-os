@@ -5,7 +5,7 @@
 use crate::diagnostics::TRACE_CATEGORY;
 use crate::identity::ComponentIdentity;
 use crate::logs::multiplex::PinStream;
-use crate::logs::shared_buffer::{ContainerBuffer, LazyItem};
+use crate::logs::shared_buffer::{self, ContainerBuffer, LazyItem};
 use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
@@ -23,6 +23,7 @@ use fuchsia_async::Task;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::prelude::*;
+use futures::stream::StreamExt;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -89,6 +90,13 @@ struct ContainerState {
     is_initializing: bool,
 }
 
+#[derive(Debug)]
+pub struct CursorItem {
+    pub rolled_out: u64,
+    pub message: Arc<StoredMessage>,
+    pub identity: Arc<ComponentIdentity>,
+}
+
 impl LogsArtifactsContainer {
     pub fn new<'a>(
         identity: Arc<ComponentIdentity>,
@@ -128,6 +136,35 @@ impl LogsArtifactsContainer {
         self.next_hanging_get_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
+    fn create_raw_cursor(
+        &self,
+        buffer_cursor: shared_buffer::Cursor,
+    ) -> impl Stream<Item = CursorItem> {
+        let identity = Arc::clone(&self.identity);
+        buffer_cursor
+            .enumerate()
+            .scan((zx::BootInstant::ZERO, 0u64), move |(last_timestamp, rolled_out), (i, item)| {
+                futures::future::ready(match item {
+                    LazyItem::Next(message) => {
+                        *last_timestamp = message.timestamp();
+                        Some(Some(CursorItem {
+                            message,
+                            identity: Arc::clone(&identity),
+                            rolled_out: *rolled_out,
+                        }))
+                    }
+                    LazyItem::ItemsRolledOut(rolled_out_count, timestamp) => {
+                        if i > 0 {
+                            *rolled_out += rolled_out_count;
+                        }
+                        *last_timestamp = timestamp;
+                        Some(None)
+                    }
+                })
+            })
+            .filter_map(future::ready)
+    }
+
     /// Returns a stream of this component's log messages.
     ///
     /// # Rolled out logs
@@ -143,64 +180,41 @@ impl LogsArtifactsContainer {
         let Some(buffer_cursor) = self.buffer.cursor(mode) else {
             return Box::pin(futures::stream::empty());
         };
-
-        let identity = Arc::clone(&self.identity);
-        Box::pin(
-            buffer_cursor
-                .enumerate()
-                .scan(
-                    (zx::BootInstant::ZERO, 0u64),
-                    move |(last_timestamp, rolled_out_messages), (i, item)| {
-                        futures::future::ready(match item {
-                            LazyItem::Next(m) => {
-                                let trace_id = ftrace::Id::random();
-                                let _trace_guard = ftrace::async_enter!(
-                                    trace_id,
-                                    TRACE_CATEGORY,
-                                    c"LogContainer::cursor.parse_message",
-                                    // An async duration cannot have multiple concurrent child async durations
-                                    // so we include the nonce as metadata to manually determine relationship.
-                                    "parent_trace_id" => u64::from(parent_trace_id),
-                                    "trace_id" => u64::from(trace_id)
-                                );
-                                *last_timestamp = m.timestamp();
-                                match m.parse(&identity) {
-                                    Ok(m) => Some(Some(Arc::new(maybe_add_rolled_out_error(
-                                        rolled_out_messages,
-                                        m,
-                                    )))),
-                                    Err(err) => {
-                                        let data = maybe_add_rolled_out_error(
-                                            rolled_out_messages,
-                                            LogsDataBuilder::new(BuilderArgs {
-                                                moniker: identity.moniker.clone(),
-                                                timestamp: *last_timestamp,
-                                                component_url: Some(identity.url.clone()),
-                                                severity: diagnostics_data::Severity::Warn,
-                                            })
-                                            .add_error(
-                                                diagnostics_data::LogError::FailedToParseRecord(
-                                                    format!("{err:?}"),
-                                                ),
-                                            )
-                                            .build(),
-                                        );
-                                        Some(Some(Arc::new(data)))
-                                    }
-                                }
-                            }
-                            LazyItem::ItemsRolledOut(rolled_out_count, timestamp) => {
-                                if i > 0 {
-                                    *rolled_out_messages += rolled_out_count;
-                                }
-                                *last_timestamp = timestamp;
-                                Some(None)
-                            }
-                        })
-                    },
-                )
-                .filter_map(future::ready),
-        )
+        let mut rolled_out_count = 0;
+        Box::pin(self.create_raw_cursor(buffer_cursor).map(
+            move |CursorItem { message, identity, rolled_out }| {
+                rolled_out_count += rolled_out;
+                let trace_id = ftrace::Id::random();
+                let _trace_guard = ftrace::async_enter!(
+                    trace_id,
+                    TRACE_CATEGORY,
+                    c"LogContainer::cursor.parse_message",
+                    // An async duration cannot have multiple concurrent child async durations
+                    // so we include the nonce as metadata to manually determine relationship.
+                    "parent_trace_id" => u64::from(parent_trace_id),
+                    "trace_id" => u64::from(trace_id)
+                );
+                match message.parse(&identity) {
+                    Ok(m) => Arc::new(maybe_add_rolled_out_error(&mut rolled_out_count, m)),
+                    Err(err) => {
+                        let data = maybe_add_rolled_out_error(
+                            &mut rolled_out_count,
+                            LogsDataBuilder::new(BuilderArgs {
+                                moniker: identity.moniker.clone(),
+                                timestamp: message.timestamp(),
+                                component_url: Some(identity.url.clone()),
+                                severity: diagnostics_data::Severity::Warn,
+                            })
+                            .add_error(diagnostics_data::LogError::FailedToParseRecord(format!(
+                                "{err:?}"
+                            )))
+                            .build(),
+                        );
+                        Arc::new(data)
+                    }
+                }
+            },
+        ))
     }
 
     /// Handle `LogSink` protocol on `stream`. Each socket received from the `LogSink` client is
