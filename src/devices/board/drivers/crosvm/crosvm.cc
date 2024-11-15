@@ -163,8 +163,10 @@ zx::result<> Crosvm::StartBanjoServer() {
     return result.take_error();
   }
 
-  zx::result child =
-      AddChild(kPcirootNodeName, {{banjo_server_->property()}}, compat_server_.CreateOffers2());
+  std::vector offers{compat_server_.CreateOffers2()};
+  offers.push_back(metadata_server_.MakeOffer());
+
+  zx::result child = AddChild(kPcirootNodeName, {{banjo_server_->property()}}, offers);
   if (child.is_error()) {
     return child.take_error();
   }
