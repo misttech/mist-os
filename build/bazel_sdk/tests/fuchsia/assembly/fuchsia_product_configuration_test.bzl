@@ -11,8 +11,15 @@ def _fuchsia_product_configuration_test_impl(ctx):
     product_config_file = (
         ([file for file in product_config_files if file.path.endswith("_product_config.json")] + [None])[0]
     )
+
+    # if it's a directory
+    relative_path = None
+    if product_config_file == None:
+        product_config_file = product_config_files[0]
+        relative_path = ctx.attr.product_config[FuchsiaProductConfigInfo].config.removeprefix(product_config_file.path)
+
     golden_file = ctx.file.golden_file
-    return [create_validation_script_provider(ctx, product_config_file, golden_file)]
+    return [create_validation_script_provider(ctx, product_config_file, golden_file, relative_path = relative_path)]
 
 fuchsia_product_configuration_test = rule(
     doc = """Validate the generated product configuration file.""",

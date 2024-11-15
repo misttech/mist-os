@@ -37,6 +37,7 @@ test_suite(
         "//fuchsia/assembly:board_configuration_golden_test",
         "//fuchsia/assembly:board_input_bundle_golden_test",
         "//fuchsia/assembly:fuchsia_gen_android_starnix_container_test",
+        "//fuchsia/assembly:hybrid_product_config_golden_test",
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:prebuilt_product_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",

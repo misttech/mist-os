@@ -15,7 +15,12 @@ load(
     "FuchsiaOmahaOtaConfigInfo",
     "FuchsiaProductConfigInfo",
 )
-load(":utils.bzl", "extract_labels", "replace_labels_with_files")
+load(
+    ":utils.bzl",
+    "combine_directories",
+    "extract_labels",
+    "replace_labels_with_files",
+)
 
 # Define build types
 BUILD_TYPES = struct(
@@ -316,3 +321,54 @@ def fuchsia_product_configuration(
         relative_paths = relative_paths,
         **kwargs
     )
+
+def fuchsia_hybrid_product_configuration_impl(ctx):
+    product_dir_name = ctx.label.name
+    product_dir = ctx.actions.declare_directory(product_dir_name)
+    product_configuration = ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[-1]
+
+    product_config_outputs = []
+    src_config_dirname = "/".join(ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[:-1])
+
+    subdirectories_to_overwrite = {}
+    for label, package_dir_name in ctx.attr.replace_packages.items():
+        src_dir = "/".join(label[FuchsiaPackageInfo].package_manifest.path.split("/")[:-1])
+        subdirectories_to_overwrite[src_dir] = package_dir_name
+
+    inputs = []
+    for label in ctx.attr.replace_packages.keys():
+        inputs += label[FuchsiaPackageInfo].files
+
+    combine_directories(
+        ctx,
+        src_config_dirname,
+        product_dir.path,
+        depset(inputs, transitive = [ctx.attr.product_configuration[DefaultInfo].files]),
+        [product_dir],
+        subdirectories_to_overwrite = subdirectories_to_overwrite,
+    )
+
+    return [
+        DefaultInfo(files = depset([product_dir])),
+        FuchsiaProductConfigInfo(
+            config = product_dir.path + "/" + product_configuration,
+            build_type = ctx.attr.product_configuration[FuchsiaProductConfigInfo].build_type,
+            build_id_dirs = [],
+        ),
+    ]
+
+fuchsia_hybrid_product_configuration = rule(
+    doc = "Combine in-tree packages with a prebuilt product config from out of tree for hybrid assembly",
+    implementation = fuchsia_hybrid_product_configuration_impl,
+    provides = [FuchsiaProductConfigInfo],
+    attrs = {
+        "product_configuration": attr.label(
+            doc = "Prebuilt product config",
+            providers = [FuchsiaProductConfigInfo],
+            mandatory = True,
+        ),
+        "replace_packages": attr.label_keyed_string_dict(
+            doc = "List of directories and packages to replace them with",
+        ),
+    } | COMPATIBILITY.HOST_ATTRS,
+)
