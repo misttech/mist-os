@@ -57,6 +57,9 @@ _common_test_package_deps = [
 
   # netstack3 is under test.
   "//src/connectivity/network/netstack3:component-debug",
+
+  # some tests run the DHCP client along with the hermetic netstack.
+  "//src/connectivity/network/dhcpv4/client/bindings:component",
 ]
 
 # RISC-V on Fuchsia does not support Golang.

@@ -20,10 +20,11 @@ use fuchsia_async::TimeoutExt;
 use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use netemul::{InStack, InterfaceConfig};
+use netemul::InterfaceConfig;
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
-    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
+    KnownServiceProvider, Netstack, Netstack3, NetstackAndDhcpClient, NetstackVersion,
+    TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
@@ -195,16 +196,18 @@ async fn resolve_route<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-#[variant(N, Netstack)]
-async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
+#[variant(N, NetstackAndDhcpClient)]
+async fn resolve_default_route_while_dhcp_is_running<N: NetstackAndDhcpClient>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     // Configure a host.
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
+    let realm = sandbox
+        .create_netstack_realm_with::<N::Netstack, _, _>(name, [KnownServiceProvider::DhcpClient])
+        .expect("failed to create client realm");
 
     let ep = realm.join_network(&net, "host").await.expect("host failed to join network");
-    ep.start_dhcp::<InStack>().await.expect("failed to start DHCP");
+    ep.start_dhcp::<N::DhcpClient>().await.expect("failed to start DHCP");
 
     let routes = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes::StateMarker>()
