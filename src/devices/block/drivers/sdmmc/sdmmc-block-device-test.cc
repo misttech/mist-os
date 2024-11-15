@@ -2079,12 +2079,14 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
+    out_data[MMC_EXT_CSD_CACHE_FLUSH_POLICY] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
     out_data[MMC_EXT_CSD_CACHE_SIZE_251] = 0x34;
     out_data[MMC_EXT_CSD_CACHE_SIZE_MSB] = 0x12;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A] = 3;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 7;
+    out_data[MMC_EXT_CSD_BARRIER_SUPPORT] = 1;
     out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 63;
     out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 62;
   });
@@ -2129,6 +2131,16 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
       root->node().get_property<inspect::BoolPropertyValue>("cache_enabled");
   ASSERT_NOT_NULL(cache_enabled);
   EXPECT_TRUE(cache_enabled->value());
+
+  const auto* cache_flush_fifo =
+      root->node().get_property<inspect::BoolPropertyValue>("cache_flush_fifo");
+  ASSERT_NOT_NULL(cache_flush_fifo);
+  EXPECT_TRUE(cache_flush_fifo->value());
+
+  const auto* barrier_supported =
+      root->node().get_property<inspect::BoolPropertyValue>("barrier_supported");
+  ASSERT_NOT_NULL(barrier_supported);
+  EXPECT_TRUE(barrier_supported->value());
 
   const auto* max_packed_reads =
       root->node().get_property<inspect::UintPropertyValue>("max_packed_reads");
