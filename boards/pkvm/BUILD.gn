@@ -69,7 +69,7 @@ board_input_bundle("main_bundle") {
       {
         package_target = "//src/devices/board/drivers/crosvm:package"
         package_set = "bootfs"
-        driver_components = [ "meta/crosvm.cml" ]
+        driver_components = [ "meta/crosvm.cm" ]
       },
     ]
   } else {
