@@ -16,13 +16,15 @@ import("//build/go/go_library.gni")
 #     The GN label for the go_library containing the main function. Alternative
 #     to gopackage.
 #
-#   embed (optional)
-#     Only used by Bazel-converted go_binaries.
-#     Alternative to library, should contain exactly one element.
-#     Type: list of labels
-#
 #   source_dir, sources
 #     Same meaning as defined in go_library.gni.
+#
+#   Only used by Bazel-converted targets:
+#
+#     embed (optional)
+#       Alternative to library, should contain exactly one element.
+#       Type: list of labels
+#
 #
 template("go_binary") {
   if (defined(invoker.sources)) {
