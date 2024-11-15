@@ -49,6 +49,8 @@ rustc_binary("wlanix_bin") {
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:strum",
+    "//third_party/rust_crates:strum_macros",
     "//third_party/rust_crates:tracing",
   ]
 

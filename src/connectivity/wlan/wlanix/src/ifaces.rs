@@ -15,6 +15,8 @@ use ieee80211::Bssid;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use tracing::{info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::scan::Compatibility;
@@ -207,7 +209,7 @@ pub(crate) enum ScanEnd {
     Cancelled,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, EnumIter)]
 #[repr(u8)] // Intended to match fidl_power_broker::PowerLevel
 enum StaIfacePowerLevel {
     Suspended = 0,
@@ -276,9 +278,7 @@ impl SmeClientIface {
     ) -> Self {
         // If the power broker is available, initialize our power element
         let power_element_context = if let Some(topology) = pb_topology_svc {
-            // TODO(http://fxbug.dev/377743780): determine how to keep this in sync with the max
-            // value in the StaIfacePowerLevel.
-            let valid_levels: Vec<u8> = (0..=StaIfacePowerLevel::NoPowerSavings as u8).collect();
+            let valid_levels: Vec<u8> = StaIfacePowerLevel::iter().map(|it| it as u8).collect();
             let element_name = format!("wlanix-sta-iface-{}-supplicant-power", iface_id);
 
             // We assume the driver starts out with no power savings. The higher level applications
