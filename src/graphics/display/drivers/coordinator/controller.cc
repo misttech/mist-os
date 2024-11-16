@@ -72,6 +72,8 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   layer_t test_layers[] = {
       // The width and height will be replaced by the code below.
       layer_t{
+          .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
+          .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
           .image_handle = INVALID_DISPLAY_ID,
           .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
           .fallback_color =
@@ -82,8 +84,6 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
           .alpha_mode = ALPHA_DISABLE,
           .alpha_layer_val = 0.0,
           .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
-          .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
-          .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
       },
   };
   display_config_t test_configs[] = {

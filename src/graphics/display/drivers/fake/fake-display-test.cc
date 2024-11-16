@@ -292,18 +292,6 @@ fuchsia_sysmem2::wire::BufferCollectionConstraints CreateImageConstraints(
 // on the top-left corner of the screen without any scaling.
 layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& image_metadata) {
   return layer_t{
-      .image_handle = image_handle,
-      .image_metadata = image_metadata,
-      .alpha_mode = ALPHA_DISABLE,
-      .alpha_layer_val = 1.0,
-      .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
-      .image_source =
-          {
-              .x = 0,
-              .y = 0,
-              .width = image_metadata.width,
-              .height = image_metadata.height,
-          },
       .display_destination =
           {
               .x = 0,
@@ -311,6 +299,18 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
               .width = image_metadata.width,
               .height = image_metadata.height,
           },
+      .image_source =
+          {
+              .x = 0,
+              .y = 0,
+              .width = image_metadata.width,
+              .height = image_metadata.height,
+          },
+      .image_handle = image_handle,
+      .image_metadata = image_metadata,
+      .alpha_mode = ALPHA_DISABLE,
+      .alpha_layer_val = 1.0,
+      .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
   };
 }
 

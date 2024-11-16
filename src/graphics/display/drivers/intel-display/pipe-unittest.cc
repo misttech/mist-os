@@ -71,6 +71,8 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
   static constexpr uint32_t kHeight = 768;
 
   return layer_t{
+      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
+      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_handle = handle,
       .image_metadata =
           {
@@ -80,8 +82,6 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
           },
       .alpha_mode = ALPHA_DISABLE,
       .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
-      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
-      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
   };
 }
 

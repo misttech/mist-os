@@ -236,14 +236,14 @@ type Color = struct {
 
 /// Equivalent to the ['fuchsia.hardware.display.types/Layer'] FIDL type.
 type Layer = struct {
+    display_destination RectU;
+    image_source RectU;
     image_handle uint64;
     image_metadata ImageMetadata;
     fallback_color Color;
     alpha_mode Alpha;
     alpha_layer_val float32;
     image_source_transformation CoordinateTransformation;
-    image_source RectU;
-    display_destination RectU;
 };
 
 /// constants for display_config's mode_flags field

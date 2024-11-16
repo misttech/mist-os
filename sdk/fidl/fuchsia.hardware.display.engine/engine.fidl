@@ -45,6 +45,35 @@ type DisplayMode = struct {
 };
 
 type Layer = struct {
+    /// The display image (composited output) region occupied by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// display's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty display destination
+    /// rectangle that is entirely contained within the display. A rectangle is
+    /// empty iff its size is 0x0 (width and height are both zero).
+    display_destination fuchsia.math.RectU;
+
+    /// The associated image region whose pixels are drawn by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// image's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid image source rectangle that is
+    /// entirely contained within the image. If the rectangle is empty, the
+    /// hardware is configured to skip fetching image pixels, and instead fill
+    /// `display_destination` using a constant color, which is `fallback_color`
+    /// defined below.
+    ///
+    /// Hardware image scaling is requested implicitly, when the region's
+    /// dimensions differ from the dimensions of `display_destination`. Some
+    /// display hardware may not support scaling. All display hardware has
+    /// limitations in scaling support.
+    image_source fuchsia.math.RectU;
+
     /// The image whose pixels are drawn by this layer.
     ///
     /// If valid, the image ID must be the result of a successful call to
@@ -55,11 +84,15 @@ type Layer = struct {
     ///
     /// To allow for future evolution, Layer consumers must ignore the image ID
     /// if `image_source` specifies an empty rectangle.
+    ///
+    /// Hardware image cropping is requested implicitly, when the source
+    /// region's dimensions differ from the image's dimensions. Some display
+    /// hardware may not support cropping.
     image_id ImageId;
 
-    /// The arguments used to import `image_handle`.
+    /// The arguments used to import `image_id`.
     ///
-    /// If `image_handle` is valid, the metadata must equal the argument passed
+    /// If `image_id` is valid, the metadata must equal the argument passed
     /// to [`fuchsia.hardware.display.engine/Engine.ImportImage`].
     ///
     /// A valid layer definition requires that the metadata is valid if
@@ -112,39 +145,6 @@ type Layer = struct {
     /// To allow for future evolution, Layer consumers must ignore the
     /// transformation if `image_source` specifies an empty rectangle.
     image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
-
-    /// The associated image region whose pixels are drawn by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// image's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards. The rectangle is empty if its size is 0x0 (width and
-    /// height are both zero).
-    ///
-    /// A valid layer definition requires a valid image source rectangle that is
-    /// entirely contained within the image. If the rectangle is empty, the
-    /// image ID, metadata, and source transformation are ignored, and the
-    /// hardware is configured to fill the layer's pixels using
-    /// `fallback_color`.
-    ///
-    /// Hardware image cropping is requested implicitly, when the source
-    /// region's dimensions differ from the image's dimensions. Some display
-    /// hardware may not support cropping.
-    image_source fuchsia.math.RectU;
-
-    /// The display image (composited output) region occupied by the layer.
-    ///
-    /// The rectangle uses the Vulkan coordinate space. The origin is at the
-    /// display's top-left corner. The X axis points to the right, and the Y axis
-    /// points downwards.
-    ///
-    /// A valid layer definition requires a valid non-empty display destination
-    /// rectangle that is entirely contained within the display.
-    ///
-    /// Hardware image scaling is requested implicitly, when the output region's
-    /// dimensions differ from the dimensions of `image_source`. Some display
-    /// hardware may not support scaling. All display hardware has limitations
-    /// in scaling support.
-    display_destination fuchsia.math.RectU;
 };
 
 type DisplayConfig = struct {
