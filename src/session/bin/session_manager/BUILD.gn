@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/golden_files.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 metrics_registry("session_framework_metrics_registry") {
@@ -78,6 +79,7 @@ rustc_library("lib") {
 fuchsia_component_manifest("manifest") {
   component_name = "session_manager"
   manifest = "meta/session_manager.cml"
+  deps = [ ":session_manager_cml_golden" ]
 }
 
 fuchsia_structured_config_rust_lib("session_manager_config") {
@@ -125,4 +127,13 @@ fuchsia_unittest_package("session_manager_tests") {
 group("tests") {
   testonly = true
   deps = [ ":session_manager_tests" ]
+}
+
+golden_files("session_manager_cml_golden") {
+  comparisons = [
+    {
+      golden = "meta/session_manager.cml.golden"
+      candidate = "meta/session_manager.cml"
+    },
+  ]
 }

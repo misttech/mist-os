@@ -1,3 +1,1 @@
-carolineliu@google.com
-neelsa@google.com
-include /src/sys/component_manager/OWNERS
+include /src/ui/bin/scene_manager/OWNERS
