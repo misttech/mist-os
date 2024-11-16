@@ -66,8 +66,7 @@ zx_status_t ServiceDirectory::CloneChannel(
   if (!directory_.is_bound()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return directory_->Clone(fuchsia::io::OpenFlags::CLONE_SAME_RIGHTS,
-                           fidl::InterfaceRequest<fuchsia::io::Node>(dir.TakeChannel()));
+  return directory_->Clone2(fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(dir.TakeChannel()));
 }
 
 }  // namespace sys
