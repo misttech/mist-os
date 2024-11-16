@@ -24,16 +24,16 @@ go_binary("bin") {
   output_dir = target_out_dir
 }
 
-fuchsia_component("go-impl") {
+fuchsia_component("impl") {
   testonly = true
-  manifest = "meta/go-impl.cml"
+  manifest = "meta/impl.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("go") {
   testonly = true
   package_name = "fidl-compatibility-test-go"
-  deps = [ ":go-impl" ]
+  deps = [ ":impl" ]
 }
 
 export_fuchsia_package_to_bazel("go.bazel_input") {

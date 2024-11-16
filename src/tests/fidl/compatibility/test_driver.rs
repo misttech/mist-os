@@ -17,7 +17,7 @@ async fn config_server(stream: ConfigRequestStream) {
                     // LINT.IfChange
                     let impls = IMPLS
                         .iter()
-                        .map(|s| format!("fidl-compatibility-test-{s}#meta/{s}-impl.cm"))
+                        .map(|s| format!("fidl-compatibility-test-{s}#meta/impl.cm"))
                         .collect::<Vec<_>>();
                     // LINT.ThenChange(BUILD.gn)
                     responder.send(&impls).expect("sent response");
