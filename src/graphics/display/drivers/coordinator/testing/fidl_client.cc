@@ -182,9 +182,8 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   for (const auto& info : present_layers) {
     const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
     const EventId wait_event_id = info.image_ready_wait_event_id.value_or(kInvalidEventId);
-    if (auto reply = dc_->SetLayerImage(fidl_layer_id, ToFidlImageId(info.image_id),
-                                        /*wait_event_id=*/ToFidlEventId(wait_event_id),
-                                        /*signal_event_id=*/ToFidlEventId(kInvalidEventId));
+    if (auto reply = dc_->SetLayerImage2(fidl_layer_id, ToFidlImageId(info.image_id),
+                                         /*wait_event_id=*/ToFidlEventId(wait_event_id));
         !reply.ok()) {
       return reply.status();
     }

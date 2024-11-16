@@ -30,10 +30,6 @@ pub enum LayerConfig {
         /// When present, the display driver will not apply the configuration until the client
         /// signals this event.
         unblock_event: Option<EventId>,
-
-        /// Event signaled by the display driver when a display configuration has been retired
-        /// (i.e. it is no longer active) following the application of a new configuration.
-        retirement_event: Option<EventId>,
     },
 }
 

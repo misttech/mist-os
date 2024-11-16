@@ -243,18 +243,12 @@ impl Coordinator {
                         let fidl_color = fidl_fuchsia_hardware_display_types::Color::from(color);
                         proxy.set_layer_color_config(&layer.id.into(), &fidl_color)?;
                     }
-                    LayerConfig::Primary {
-                        image_id,
-                        image_metadata,
-                        unblock_event,
-                        retirement_event,
-                    } => {
+                    LayerConfig::Primary { image_id, image_metadata, unblock_event } => {
                         proxy.set_layer_primary_config(&layer.id.into(), &image_metadata)?;
-                        proxy.set_layer_image(
+                        proxy.set_layer_image2(
                             &layer.id.into(),
                             &(*image_id).into(),
                             &unblock_event.unwrap_or(INVALID_EVENT_ID).into(),
-                            &retirement_event.unwrap_or(INVALID_EVENT_ID).into(),
                         )?;
                     }
                 }

@@ -694,14 +694,13 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId&
   const fuchsia_hardware_display::ImageId image_id =
       scenic_impl::ToDisplayFidlImageId(image.identifier);
   const fit::result<fidl::OneWayStatus> set_layer_image_result =
-      display_coordinator_->SetLayerImage({{
+      display_coordinator_->SetLayerImage2({{
           .layer_id = layer_id,
           .image_id = image_id,
           .wait_event_id = wait_id,
-          .signal_event_id = kInvalidEventId,
       }});
   FX_DCHECK(set_layer_image_result.is_ok())
-      << "Failed to call FIDL SetLayerImage method: " << set_layer_image_result.error_value();
+      << "Failed to call FIDL SetLayerImage2 method: " << set_layer_image_result.error_value();
 }
 
 bool DisplayCompositor::CheckConfig() {

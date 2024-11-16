@@ -47,7 +47,7 @@ class MockDisplayCoordinator
   MOCK_METHOD(void, SetLayerColorConfig,
               (SetLayerColorConfigRequest&, SetLayerColorConfigCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, SetLayerImage, (SetLayerImageRequest&, SetLayerImageCompleter::Sync&),
+  MOCK_METHOD(void, SetLayerImage2, (SetLayerImage2Request&, SetLayerImage2Completer::Sync&),
               (override));
 
   MOCK_METHOD(void, ApplyConfig, (ApplyConfigCompleter::Sync&), (override));

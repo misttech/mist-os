@@ -354,14 +354,13 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       {.value = fuchsia_hardware_display_types::kInvalidDispId}};
   const fit::result<fidl::OneWayStatus> set_layer_image_result =
       (*display_coordinator)
-          ->SetLayerImage({{
+          ->SetLayerImage2({{
               .layer_id = layer_id,
               .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[0]),
               .wait_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
-              .signal_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
           }});
   EXPECT_TRUE(set_layer_image_result.is_ok())
-      << "Failed to call FIDL SetLayerImage: " << set_layer_image_result.error_value();
+      << "Failed to call FIDL SetLayerImage2: " << set_layer_image_result.error_value();
 
   // Apply the config.
   const fidl::Result check_config_result = (*display_coordinator)
@@ -387,18 +386,17 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   EXPECT_TRUE(vsync_result.is_ok())
       << "first WaitForVsync() failed with status: " << vsync_result.status_string();
 
-  // Set the layer image again, to the second image, so that our first call to SetLayerImage()
+  // Set the layer image again, to the second image, so that our first call to SetLayerImage2()
   // above will signal.
   const fit::result<fidl::OneWayStatus> set_layer_image_result2 =
       (*display_coordinator)
-          ->SetLayerImage({{
+          ->SetLayerImage2({{
               .layer_id = layer_id,
               .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[1]),
               .wait_event_id = display_wait_event_id,
-              .signal_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
           }});
   EXPECT_TRUE(set_layer_image_result2.is_ok())
-      << "Failed to call FIDL SetLayerImage: " << set_layer_image_result2.error_value();
+      << "Failed to call FIDL SetLayerImage2: " << set_layer_image_result2.error_value();
 
   // Apply the config to display the second image.
   const fidl::Result check_config_result2 =

@@ -9,8 +9,8 @@
 use {
     anyhow::Result,
     display_utils::{
-        Coordinator, DisplayConfig, DisplayId, Event, Image, ImageId, ImageParameters, Layer,
-        LayerConfig, LayerId, PixelFormat,
+        Coordinator, DisplayConfig, DisplayId, Image, ImageId, ImageParameters, Layer, LayerConfig,
+        LayerId, PixelFormat,
     },
     fuchsia_trace::duration,
     std::{borrow::Borrow, io::Write},
@@ -40,12 +40,11 @@ pub trait Scene {
 
 struct Presentation {
     image: MappedImage,
-    retirement_event: Event,
 }
 
 impl Presentation {
-    pub fn new(image: MappedImage, retirement_event: Event) -> Self {
-        Presentation { image, retirement_event }
+    pub fn new(image: MappedImage) -> Self {
+        Presentation { image }
     }
 }
 
@@ -86,9 +85,8 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
             let mut image = MappedImage::create(
                 Image::create(coordinator.clone(), next_image_id, &params).await?,
             )?;
-            let retire_event = coordinator.create_event()?;
             scene.init_image(&mut image)?;
-            image_presentations.push(Presentation::new(image, retire_event));
+            image_presentations.push(Presentation::new(image));
         }
 
         let layer_id = coordinator.create_layer().await?;
@@ -114,7 +112,6 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
                     image_id: presentation.image.id(),
                     image_metadata: self.params.borrow().into(),
                     unblock_event: None,
-                    retirement_event: Some(presentation.retirement_event.id()),
                 },
             }],
         }]
@@ -164,8 +161,12 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
             }
 
             // Wait for the previous frame image to retire before drawing on it.
-            let previous_presentation = &self.presentations[current_config ^ 1];
-            previous_presentation.retirement_event.wait().await?;
+            // TODO(https://fxbug.dev/42097581): this was inadvertently broken when we removed
+            // support for signal events in `Coordinator.SetLayerImage`.  This needs to be updated
+            // to wait for a vsync stamp that indicates the image is ready to use.  The following is
+            // the old, broken code:
+            // let previous_presentation = &self.presentations[current_config ^ 1];
+            // previous_presentation.retirement_event.wait().await?;
         }
     }
 }
