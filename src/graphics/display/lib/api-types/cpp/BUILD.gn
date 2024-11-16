@@ -17,6 +17,7 @@ source_set("cpp") {
     "config-stamp.h",
     "coordinate-transformation.cc",
     "coordinate-transformation.h",
+    "dimensions.h",
     "display-timing.cc",
     "display-timing.h",
     "driver-buffer-collection-id.h",
@@ -31,7 +32,6 @@ source_set("cpp") {
     "image-tiling-type.cc",
     "image-tiling-type.h",
     "layer-id.h",
-    "rectangle.cc",
     "rectangle.h",
     "vsync-ack-cookie.h",
   ]
@@ -53,6 +53,7 @@ test_sources = [
   "color-test.cc",
   "config-stamp-test.cc",
   "coordinate-transformation-test.cc",
+  "dimensions-test.cc",
   "display-id-test.cc",
   "display-timing-test.cc",
   "driver-buffer-collection-id-test.cc",

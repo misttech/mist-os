@@ -98,6 +98,7 @@ TEST(RectangleTest, FromDesignatedInitializer) {
   });
   EXPECT_EQ(100, rectangle.x());
   EXPECT_EQ(200, rectangle.y());
+  EXPECT_EQ(Dimensions({.width = 400, .height = 500}), rectangle.dimensions());
   EXPECT_EQ(400, rectangle.width());
   EXPECT_EQ(500, rectangle.height());
 }
@@ -113,6 +114,7 @@ TEST(RectangleTest, FromFidlRectU) {
   static constexpr Rectangle rectangle = Rectangle::From(fidl_rectangle);
   EXPECT_EQ(100, rectangle.x());
   EXPECT_EQ(200, rectangle.y());
+  EXPECT_EQ(Dimensions({.width = 400, .height = 500}), rectangle.dimensions());
   EXPECT_EQ(400, rectangle.width());
   EXPECT_EQ(500, rectangle.height());
 }
@@ -128,6 +130,7 @@ TEST(RectangleTest, FromBanjoRectangle) {
   static constexpr Rectangle rectangle = Rectangle::From(banjo_rectangle);
   EXPECT_EQ(100, rectangle.x());
   EXPECT_EQ(200, rectangle.y());
+  EXPECT_EQ(Dimensions({.width = 400, .height = 500}), rectangle.dimensions());
   EXPECT_EQ(400, rectangle.width());
   EXPECT_EQ(500, rectangle.height());
 }

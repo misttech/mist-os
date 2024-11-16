@@ -11,6 +11,7 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types/cpp/dimensions.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 
 namespace display {
@@ -18,19 +19,13 @@ namespace display {
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/ImageMetadata`].
 //
 // Instances are guaranteed to represent images whose dimensions are supported
-// by the display stack.
+// by the display stack. See `Dimensions` for details on validity guarantees.
 class ImageMetadata {
  private:
   // Enables creating instances using the designated initializer syntax.
   struct ConstructorArgs;
 
  public:
-  // The maximum image width supported by the display stack.
-  static constexpr int kMaxWidth = 65535;
-
-  // The maximum image height supported by the display stack.
-  static constexpr int kMaxHeight = 65535;
-
   // True iff `image_metadata` is convertible to a valid ImageMetadata.
   [[nodiscard]] static constexpr bool IsValid(
       const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata);
@@ -58,13 +53,11 @@ class ImageMetadata {
   constexpr fuchsia_hardware_display_types::wire::ImageMetadata ToFidl() const;
   constexpr image_metadata_t ToBanjo() const;
 
-  // Guaranteed to be in [0, `kMaxWidth`].
-  constexpr int32_t width() const { return width_; }
-
-  // Guaranteed to be in [0, `kMaxHeight`].
-  constexpr int32_t height() const { return height_; }
-
+  constexpr const Dimensions& dimensions() const { return dimensions_; }
   constexpr ImageTilingType tiling_type() const { return tiling_type_; }
+
+  constexpr int32_t width() const { return dimensions_.width(); }
+  constexpr int32_t height() const { return dimensions_.height(); }
 
  private:
   struct ConstructorArgs {
@@ -73,79 +66,39 @@ class ImageMetadata {
     ImageTilingType tiling_type;
   };
 
-  // In debug mode, asserts that IsValid() would return true.
-  //
-  // IsValid() variant with developer-friendly debug assertions.
-  static constexpr void DebugAssertIsValid(const ImageMetadata::ConstructorArgs& args);
-  static constexpr void DebugAssertIsValid(
-      const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata);
-  static constexpr void DebugAssertIsValid(const image_metadata_t& banjo_image_metadata);
-
-  int32_t width_;
-  int32_t height_;
+  Dimensions dimensions_;
   ImageTilingType tiling_type_;
 };
 
 // static
 constexpr bool ImageMetadata::IsValid(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata) {
-  if (fidl_image_metadata.width < 0) {
-    return false;
-  }
-  if (fidl_image_metadata.width > kMaxWidth) {
-    return false;
-  }
-  if (fidl_image_metadata.height < 0) {
-    return false;
-  }
-  if (fidl_image_metadata.height > kMaxWidth) {
-    return false;
-  }
-
-  return true;
+  return Dimensions::IsValid(
+      {.unsigned_width = fidl_image_metadata.width, .unsigned_height = fidl_image_metadata.height});
 }
 
 // static
 constexpr bool ImageMetadata::IsValid(const image_metadata_t& banjo_image_metadata) {
-  if (banjo_image_metadata.width < 0) {
-    return false;
-  }
-  if (banjo_image_metadata.width > kMaxWidth) {
-    return false;
-  }
-  if (banjo_image_metadata.height < 0) {
-    return false;
-  }
-  if (banjo_image_metadata.height > kMaxWidth) {
-    return false;
-  }
-
-  return true;
+  return Dimensions::IsValid({.unsigned_width = banjo_image_metadata.width,
+                              .unsigned_height = banjo_image_metadata.height});
 }
 
 constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& args)
-    : width_(args.width), height_(args.height), tiling_type_(args.tiling_type) {
-  DebugAssertIsValid(args);
-}
+    : dimensions_({.width = args.width, .height = args.height}), tiling_type_(args.tiling_type) {}
 
 constexpr ImageMetadata::ImageMetadata(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata)
-    : width_(static_cast<int32_t>(fidl_image_metadata.width)),
-      height_(static_cast<int32_t>(fidl_image_metadata.height)),
-      tiling_type_(fidl_image_metadata.tiling_type) {
-  DebugAssertIsValid(fidl_image_metadata);
-}
+    : dimensions_({.unsigned_width = fidl_image_metadata.width,
+                   .unsigned_height = fidl_image_metadata.height}),
+      tiling_type_(fidl_image_metadata.tiling_type) {}
 
 constexpr ImageMetadata::ImageMetadata(const image_metadata_t& banjo_image_metadata)
-    : width_(static_cast<int32_t>(banjo_image_metadata.width)),
-      height_(static_cast<int32_t>(banjo_image_metadata.height)),
-      tiling_type_(banjo_image_metadata.tiling_type) {
-  DebugAssertIsValid(banjo_image_metadata);
-}
+    : dimensions_({.unsigned_width = banjo_image_metadata.width,
+                   .unsigned_height = banjo_image_metadata.height}),
+      tiling_type_(banjo_image_metadata.tiling_type) {}
 
 constexpr bool operator==(const ImageMetadata& lhs, const ImageMetadata& rhs) {
-  return lhs.width_ == rhs.width_ && lhs.height_ == rhs.height_ &&
-         lhs.tiling_type_ == rhs.tiling_type_;
+  return lhs.dimensions_ == rhs.dimensions_ && lhs.tiling_type_ == rhs.tiling_type_;
 }
 
 constexpr bool operator!=(const ImageMetadata& lhs, const ImageMetadata& rhs) {
@@ -156,8 +109,8 @@ constexpr fuchsia_hardware_display_types::wire::ImageMetadata ImageMetadata::ToF
   return fuchsia_hardware_display_types::wire::ImageMetadata{
       // The casts are guaranteed not to overflow (causing UB) because of the
       // allowed ranges on image widths and heights.
-      .width = static_cast<uint32_t>(width_),
-      .height = static_cast<uint32_t>(height_),
+      .width = static_cast<uint32_t>(dimensions_.width()),
+      .height = static_cast<uint32_t>(dimensions_.height()),
       .tiling_type = tiling_type_.ToFidl(),
   };
 }
@@ -166,35 +119,10 @@ constexpr image_metadata_t ImageMetadata::ToBanjo() const {
   return image_metadata_t{
       // The casts are guaranteed not to overflow (causing UB) because of the
       // allowed ranges on image widths and heights.
-      .width = static_cast<uint32_t>(width_),
-      .height = static_cast<uint32_t>(height_),
+      .width = static_cast<uint32_t>(dimensions_.width()),
+      .height = static_cast<uint32_t>(dimensions_.height()),
       .tiling_type = tiling_type_.ToBanjo(),
   };
-}
-
-// static
-constexpr void ImageMetadata::DebugAssertIsValid(const ImageMetadata::ConstructorArgs& args) {
-  ZX_DEBUG_ASSERT(args.width >= 0);
-  ZX_DEBUG_ASSERT(args.width <= ImageMetadata::kMaxWidth);
-  ZX_DEBUG_ASSERT(args.height >= 0);
-  ZX_DEBUG_ASSERT(args.height <= ImageMetadata::kMaxHeight);
-}
-
-// static
-constexpr void ImageMetadata::DebugAssertIsValid(
-    const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata) {
-  ZX_DEBUG_ASSERT(fidl_image_metadata.width >= 0);
-  ZX_DEBUG_ASSERT(fidl_image_metadata.width <= ImageMetadata::kMaxWidth);
-  ZX_DEBUG_ASSERT(fidl_image_metadata.height >= 0);
-  ZX_DEBUG_ASSERT(fidl_image_metadata.height <= ImageMetadata::kMaxHeight);
-}
-
-// static
-constexpr void ImageMetadata::DebugAssertIsValid(const image_metadata_t& banjo_image_metadata) {
-  ZX_DEBUG_ASSERT(banjo_image_metadata.width >= 0);
-  ZX_DEBUG_ASSERT(banjo_image_metadata.width <= ImageMetadata::kMaxWidth);
-  ZX_DEBUG_ASSERT(banjo_image_metadata.height >= 0);
-  ZX_DEBUG_ASSERT(banjo_image_metadata.height <= ImageMetadata::kMaxHeight);
 }
 
 }  // namespace display

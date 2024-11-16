@@ -7,14 +7,18 @@
 
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <zircon/assert.h>
 
 #include <cstdint>
+
+#include "src/graphics/display/lib/api-types/cpp/dimensions.h"
 
 namespace display {
 
 // FIDL type [`fuchsia.math/RectU`] representation useful for the display stack.
 //
 // Equivalent to the the banjo type [`fuchsia.hardware.display.controller/RectU`].
+// Also similar to the VkRect2D in the Vulkan API.
 //
 // See `::fuchsia_math::wire::RectU` for references.
 //
@@ -24,19 +28,14 @@ namespace display {
 // points downwards.
 //
 // Instances are guaranteed to represent regions of images whose dimensions are
-// supported by the display stack.
+// supported by the display stack. See `Dimensions` for details on validity
+// guarantees.
 class Rectangle {
  private:
   // Enables creating instances using the designated initializer syntax.
   struct ConstructorArgs;
 
  public:
-  // The maximum image width supported by the display stack.
-  static constexpr int kMaxImageWidth = 65535;
-
-  // The maximum image height supported by the display stack.
-  static constexpr int kMaxImageHeight = 65535;
-
   // True iff `fidl_rectangle` is convertible to a valid Rectangle.
   [[nodiscard]] static constexpr bool IsValid(const fuchsia_math::wire::RectU& fidl_rectangle);
   [[nodiscard]] static constexpr bool IsValid(const rect_u_t& banjo_rectangle);
@@ -72,17 +71,16 @@ class Rectangle {
   constexpr fuchsia_math::wire::RectU ToFidl() const;
   constexpr rect_u_t ToBanjo() const;
 
-  // Guaranteed to be in [0, `kMaxImageWidth`].
+  // Guaranteed to be in [0, `Dimensions::kMaxWidth`].
   constexpr int32_t x() const { return x_; }
 
-  // Guaranteed to be in [0, `kMaxImageHeight`].
+  // Guaranteed to be in [0, `Dimensions::kMaxHeight`].
   constexpr int32_t y() const { return y_; }
 
-  // Guaranteed to be in [0, `kMaxImageWidth`].
-  constexpr int32_t width() const { return width_; }
+  constexpr const Dimensions& dimensions() const { return dimensions_; }
 
-  // Guaranteed to be in [0, `kMaxImageHeight`].
-  constexpr int32_t height() const { return height_; }
+  constexpr int32_t width() const { return dimensions_.width(); }
+  constexpr int32_t height() const { return dimensions_.height(); }
 
  private:
   struct ConstructorArgs {
@@ -101,8 +99,7 @@ class Rectangle {
 
   int32_t x_;
   int32_t y_;
-  int32_t width_;
-  int32_t height_;
+  Dimensions dimensions_;
 };
 
 // static
@@ -110,25 +107,25 @@ constexpr bool Rectangle::IsValid(const fuchsia_math::wire::RectU& fidl_rectangl
   if (fidl_rectangle.x < 0) {
     return false;
   }
-  if (fidl_rectangle.x > kMaxImageWidth) {
+  if (fidl_rectangle.x > Dimensions::kMaxWidth) {
     return false;
   }
   if (fidl_rectangle.y < 0) {
     return false;
   }
-  if (fidl_rectangle.y > kMaxImageHeight) {
+  if (fidl_rectangle.y > Dimensions::kMaxHeight) {
     return false;
   }
   if (fidl_rectangle.width < 0) {
     return false;
   }
-  if (fidl_rectangle.width > kMaxImageWidth - fidl_rectangle.x) {
+  if (fidl_rectangle.width > Dimensions::kMaxWidth - fidl_rectangle.x) {
     return false;
   }
   if (fidl_rectangle.height < 0) {
     return false;
   }
-  if (fidl_rectangle.height > kMaxImageHeight - fidl_rectangle.y) {
+  if (fidl_rectangle.height > Dimensions::kMaxHeight - fidl_rectangle.y) {
     return false;
   }
 
@@ -140,25 +137,25 @@ constexpr bool Rectangle::IsValid(const rect_u_t& banjo_rectangle) {
   if (banjo_rectangle.x < 0) {
     return false;
   }
-  if (banjo_rectangle.x > kMaxImageWidth) {
+  if (banjo_rectangle.x > Dimensions::kMaxWidth) {
     return false;
   }
   if (banjo_rectangle.y < 0) {
     return false;
   }
-  if (banjo_rectangle.y > kMaxImageHeight) {
+  if (banjo_rectangle.y > Dimensions::kMaxHeight) {
     return false;
   }
   if (banjo_rectangle.width < 0) {
     return false;
   }
-  if (banjo_rectangle.width > kMaxImageWidth - banjo_rectangle.x) {
+  if (banjo_rectangle.width > Dimensions::kMaxWidth - banjo_rectangle.x) {
     return false;
   }
   if (banjo_rectangle.height < 0) {
     return false;
   }
-  if (banjo_rectangle.height > kMaxImageHeight - banjo_rectangle.y) {
+  if (banjo_rectangle.height > Dimensions::kMaxHeight - banjo_rectangle.y) {
     return false;
   }
 
@@ -166,7 +163,7 @@ constexpr bool Rectangle::IsValid(const rect_u_t& banjo_rectangle) {
 }
 
 constexpr Rectangle::Rectangle(const Rectangle::ConstructorArgs& args)
-    : x_(args.x), y_(args.y), width_(args.width), height_(args.height) {
+    : x_(args.x), y_(args.y), dimensions_({.width = args.width, .height = args.height}) {
   DebugAssertIsValid(args);
 }
 
@@ -193,8 +190,7 @@ constexpr Rectangle Rectangle::From(const rect_u_t& banjo_rectangle) {
 }
 
 constexpr bool operator==(const Rectangle& lhs, const Rectangle& rhs) {
-  return lhs.x_ == rhs.x_ && lhs.y_ == rhs.y_ && lhs.width_ == rhs.width_ &&
-         lhs.height_ == rhs.height_;
+  return lhs.x_ == rhs.x_ && lhs.y_ == rhs.y_ && lhs.dimensions_ == rhs.dimensions_;
 }
 
 constexpr bool operator!=(const Rectangle& lhs, const Rectangle& rhs) { return !(lhs == rhs); }
@@ -205,8 +201,8 @@ constexpr fuchsia_math::wire::RectU Rectangle::ToFidl() const {
       // allowed ranges on image widths and heights.
       .x = static_cast<uint32_t>(x_),
       .y = static_cast<uint32_t>(y_),
-      .width = static_cast<uint32_t>(width_),
-      .height = static_cast<uint32_t>(height_),
+      .width = static_cast<uint32_t>(dimensions_.width()),
+      .height = static_cast<uint32_t>(dimensions_.height()),
   };
 }
 
@@ -216,45 +212,48 @@ constexpr rect_u_t Rectangle::ToBanjo() const {
       // allowed ranges on image widths and heights.
       .x = static_cast<uint32_t>(x_),
       .y = static_cast<uint32_t>(y_),
-      .width = static_cast<uint32_t>(width_),
-      .height = static_cast<uint32_t>(height_),
+      .width = static_cast<uint32_t>(dimensions_.width()),
+      .height = static_cast<uint32_t>(dimensions_.height()),
   };
 }
 
 // static
 constexpr void Rectangle::DebugAssertIsValid(const Rectangle::ConstructorArgs& args) {
   ZX_DEBUG_ASSERT(args.x >= 0);
-  ZX_DEBUG_ASSERT(args.x <= Rectangle::kMaxImageWidth);
+  ZX_DEBUG_ASSERT(args.x <= Dimensions::kMaxWidth);
   ZX_DEBUG_ASSERT(args.y >= 0);
-  ZX_DEBUG_ASSERT(args.y <= Rectangle::kMaxImageHeight);
+  ZX_DEBUG_ASSERT(args.y <= Dimensions::kMaxHeight);
   ZX_DEBUG_ASSERT(args.width >= 0);
-  ZX_DEBUG_ASSERT(args.width <= Rectangle::kMaxImageWidth - args.x);
+  ZX_DEBUG_ASSERT(args.width <= Dimensions::kMaxWidth - args.x);
   ZX_DEBUG_ASSERT(args.height >= 0);
-  ZX_DEBUG_ASSERT(args.height <= Rectangle::kMaxImageHeight - args.y);
+  ZX_DEBUG_ASSERT(args.height <= Dimensions::kMaxHeight - args.y);
+  ZX_DEBUG_ASSERT((args.width == 0) == (args.height == 0));
 }
 
 // static
 constexpr void Rectangle::DebugAssertIsValid(const fuchsia_math::wire::RectU& fidl_rectangle) {
   ZX_DEBUG_ASSERT(fidl_rectangle.x >= 0);
-  ZX_DEBUG_ASSERT(fidl_rectangle.x <= Rectangle::kMaxImageWidth);
+  ZX_DEBUG_ASSERT(fidl_rectangle.x <= Dimensions::kMaxWidth);
   ZX_DEBUG_ASSERT(fidl_rectangle.y >= 0);
-  ZX_DEBUG_ASSERT(fidl_rectangle.y <= Rectangle::kMaxImageHeight);
+  ZX_DEBUG_ASSERT(fidl_rectangle.y <= Dimensions::kMaxHeight);
   ZX_DEBUG_ASSERT(fidl_rectangle.width >= 0);
-  ZX_DEBUG_ASSERT(fidl_rectangle.width <= Rectangle::kMaxImageWidth - fidl_rectangle.x);
+  ZX_DEBUG_ASSERT(fidl_rectangle.width <= Dimensions::kMaxWidth - fidl_rectangle.x);
   ZX_DEBUG_ASSERT(fidl_rectangle.height >= 0);
-  ZX_DEBUG_ASSERT(fidl_rectangle.height <= Rectangle::kMaxImageHeight - fidl_rectangle.y);
+  ZX_DEBUG_ASSERT(fidl_rectangle.height <= Dimensions::kMaxHeight - fidl_rectangle.y);
+  ZX_DEBUG_ASSERT((fidl_rectangle.width == 0) == (fidl_rectangle.height == 0));
 }
 
 // static
 constexpr void Rectangle::DebugAssertIsValid(const rect_u_t& banjo_rectangle) {
   ZX_DEBUG_ASSERT(banjo_rectangle.x >= 0);
-  ZX_DEBUG_ASSERT(banjo_rectangle.x <= Rectangle::kMaxImageWidth);
+  ZX_DEBUG_ASSERT(banjo_rectangle.x <= Dimensions::kMaxWidth);
   ZX_DEBUG_ASSERT(banjo_rectangle.y >= 0);
-  ZX_DEBUG_ASSERT(banjo_rectangle.y <= Rectangle::kMaxImageHeight);
+  ZX_DEBUG_ASSERT(banjo_rectangle.y <= Dimensions::kMaxHeight);
   ZX_DEBUG_ASSERT(banjo_rectangle.width >= 0);
-  ZX_DEBUG_ASSERT(banjo_rectangle.width <= Rectangle::kMaxImageWidth - banjo_rectangle.x);
+  ZX_DEBUG_ASSERT(banjo_rectangle.width <= Dimensions::kMaxWidth - banjo_rectangle.x);
   ZX_DEBUG_ASSERT(banjo_rectangle.height >= 0);
-  ZX_DEBUG_ASSERT(banjo_rectangle.height <= Rectangle::kMaxImageHeight - banjo_rectangle.y);
+  ZX_DEBUG_ASSERT(banjo_rectangle.height <= Dimensions::kMaxHeight - banjo_rectangle.y);
+  ZX_DEBUG_ASSERT((banjo_rectangle.width == 0) == (banjo_rectangle.height == 0));
 }
 
 }  // namespace display

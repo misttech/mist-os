@@ -75,6 +75,7 @@ TEST(ImageMetadataTest, FromDesignatedInitializer) {
       .height = 480,
       .tiling_type = ImageTilingType::kCapture,
   });
+  EXPECT_EQ(Dimensions({.width = 640, .height = 480}), image_metadata.dimensions());
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
   EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
@@ -88,6 +89,7 @@ TEST(ImageMetadataTest, FromFidlImageMetadata) {
   };
 
   static constexpr ImageMetadata image_metadata(fidl_image_metadata);
+  EXPECT_EQ(Dimensions({.width = 640, .height = 480}), image_metadata.dimensions());
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
   EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
@@ -101,6 +103,7 @@ TEST(ImageMetadataTest, FromBanjoImageMetadata) {
   };
 
   static constexpr ImageMetadata image_metadata(banjo_image_metadata);
+  EXPECT_EQ(Dimensions({.width = 640, .height = 480}), image_metadata.dimensions());
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
   EXPECT_EQ(ImageTilingType::kCapture, image_metadata.tiling_type());
