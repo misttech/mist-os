@@ -6,13 +6,7 @@
 
 use tracing_mutex as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "wake_locks")] {
-        use async_utils as _;
-        use fidl_fuchsia_power_suspend as _;
-    }
-}
-
+use {async_utils as _, fidl_fuchsia_power_suspend as _};
 pub mod arch;
 pub mod bpf;
 pub mod device;

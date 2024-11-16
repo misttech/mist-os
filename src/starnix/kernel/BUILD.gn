@@ -171,7 +171,6 @@ rustc_library("starnix_core") {
     "mm/vmex_resource.rs",
     "mm/vmsplice.rs",
     "mutable_state.rs",
-    "power/listener.rs",
     "power/manager.rs",
     "power/mod.rs",
     "power/state.rs",
@@ -310,11 +309,11 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
+    "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
@@ -378,7 +377,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:fragile",
@@ -438,10 +436,6 @@ rustc_library("starnix_core") {
   }
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
-  }
-  if (starnix_enable_wake_locks) {
-    features += [ "wake_locks" ]
-    deps += [ "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust" ]
   }
   inputs = [
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",

@@ -5,8 +5,6 @@
 use crate::{generate_kernel_name, StarnixKernel};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-#[cfg(feature = "wake_locks")]
-use fidl_fuchsia_power_system as fpower;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
@@ -14,7 +12,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner, zx};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_power_system as fpower, zx,
+};
 
 /// The component URL of the Starnix kernel.
 const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
@@ -95,7 +96,6 @@ impl Kernels {
     }
 
     /// Drops any active wake lease for the container running in the given `container_job`.
-    #[cfg(feature = "wake_locks")]
     pub fn drop_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
         fuchsia_trace::instant!(
             c"power",
@@ -110,13 +110,7 @@ impl Kernels {
         Ok(())
     }
 
-    #[cfg(not(feature = "wake_locks"))]
-    pub fn drop_wake_lease(&self, _container_job: &zx::Job) -> Result<(), Error> {
-        Ok(())
-    }
-
     /// Acquires a wake lease for the container running in the given `container_job`.
-    #[cfg(feature = "wake_locks")]
     pub async fn acquire_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
         fuchsia_trace::duration!(c"power", c"starnix-runner:acquire-application-activity-lease");
         let job_koid = container_job.get_koid()?;
@@ -138,11 +132,6 @@ impl Kernels {
             *kernel.wake_lease.lock() = Some(wake_lease);
             tracing::info!("Acquired wake lease for {:?}", container_job);
         }
-        Ok(())
-    }
-
-    #[cfg(not(feature = "wake_locks"))]
-    pub async fn acquire_wake_lease(&self, _container_job: &zx::Job) -> Result<(), Error> {
         Ok(())
     }
 }
