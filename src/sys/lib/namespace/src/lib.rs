@@ -98,10 +98,11 @@ impl Clone for Namespace {
             unsafe {
                 let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
                 let borrowed = fio::DirectorySynchronousProxy::new(borrowed);
-                let (client_end, server_end) = fidl::endpoints::create_endpoints();
-                let _ = borrowed.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end);
+                let (client_end, server_end) =
+                    fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+                let _ = borrowed.clone2(server_end.into_channel().into());
                 std::mem::forget(borrowed.into_channel());
-                client_end.into_channel().into()
+                client_end
             }
         });
         Self { tree }

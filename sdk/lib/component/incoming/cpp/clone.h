@@ -34,17 +34,11 @@ zx::result<fidl::ClientEnd<Protocol>> Clone(fidl::UnownedClientEnd<Protocol> cli
   static_assert(internal::is_complete_v<Protocol>,
                 "|Protocol| must be defined to use |component::Clone|");
   zx::result<zx::channel> result;
-  // TODO(https://fxbug.dev/324111518): Call `fuchsia.unknown/Cloneable.Clone2` unconditionally on
-  // all protocols when all out-of-tree fuchsia.io servers have support for it.
-  if constexpr (internal::has_fidl_method_fuchsia_io_clone_v<Protocol>) {
-    result = internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_io::Node>(client.channel()));
-  } else if constexpr (internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>) {
+  if constexpr (internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>) {
     result =
         internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>(client.channel()));
   } else {
-    // This assertion will always fail.
     static_assert(false, "|Protocol| must compose |fuchsia.unknown/Cloneable|.");
-    __builtin_unreachable();
   }
   if (!result.is_ok()) {
     return result.take_error();

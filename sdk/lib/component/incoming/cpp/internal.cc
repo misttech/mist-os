@@ -60,16 +60,6 @@ zx::result<> ConnectAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
   return zx::ok();
 }
 
-zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_io::Node>&& node, zx::channel server_end) {
-  const fidl::Status result =
-      fidl::WireCall(node)->Clone(fuchsia_io::wire::OpenFlags::kCloneSameRights,
-                                  fidl::ServerEnd<fuchsia_io::Node>(std::move(server_end)));
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok();
-}
-
 zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>&& cloneable,
                       zx::channel server_end) {
   const fidl::Status result = fidl::WireCall(cloneable)->Clone2(
