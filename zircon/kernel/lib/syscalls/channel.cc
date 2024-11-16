@@ -38,91 +38,6 @@ KCOUNTER(channel_msg_16k_bytes, "channel.bytes.16k")
 KCOUNTER(channel_msg_64k_bytes, "channel.bytes.64k")
 KCOUNTER(channel_msg_received, "channel.messages")
 
-// Randomly generated multilinear hash coefficients. These should be sufficient for non-user builds
-// where tracing syscalls are enabled. In the future, if we elect to enable tracing facilities in
-// user builds, this can be strengthened by generating the coefficients during boot.
-constexpr uint64_t kHashCoefficients[] = {
-    0xa573c3ccbd7e2010ULL, 0x165cbcf3a0de8544ULL, 0x8b975f576f025514ULL,
-    0xabc406ce862c9a1dULL, 0xf292bea1a3fe6bedULL, 0x1c7c06b8b02b4585ULL,
-};
-
-// 64bit to 32bit hash using the multilinear hash family ax + by + c.
-inline uint32_t HashValue(uint64_t a, uint64_t b, uint64_t c, uint64_t value) {
-  const uint32_t x = static_cast<uint32_t>(value);
-  const uint32_t y = static_cast<uint32_t>(value >> 32);
-  return static_cast<uint32_t>((a * x + b * y + c) >> 32);
-}
-
-// Two hash functions using different randomly generated coefficients.
-inline uint32_t HashA(uint64_t value) {
-  return HashValue(kHashCoefficients[0], kHashCoefficients[1], kHashCoefficients[2], value);
-}
-inline uint32_t HashB(uint64_t value) {
-  return HashValue(kHashCoefficients[3], kHashCoefficients[4], kHashCoefficients[5], value);
-}
-
-// Generates a flow id using a universal hash function of the minimum endpoint koid and the message
-// packet address. In general, koids are guaranteed to be unique over the lifetime of a particular
-// system boot. Using the min endpoint koid ensures both endpoints use the same hash input. The
-// message packet address is shared between the sender and receiver and is guaranteed to be unique
-// until after the flow end event releases the flow id, allowing it to be reused. Given that the
-// (koid, msg) pair is guaranteed to be unique over the span of the flow, the likelihood of id
-// confusion is equivalent to the likelihood of hash collisions by temporally overlapping flows.
-uint64_t ChannelMessageFlowId(const MessagePacketPtr& msg, const ChannelDispatcher& channel) {
-  const zx_koid_t min_koid = ktl::min(channel.get_koid(), channel.get_related_koid());
-  const uint64_t high = HashA(min_koid);
-  const uint64_t low = HashB(reinterpret_cast<uint64_t>(msg.get()));
-  return high << 32 | low;
-}
-
-enum class MessageOp : uint8_t {
-  Read,
-  Write,
-};
-
-inline void TraceMessage(const MessagePacketPtr& msg, const ChannelDispatcher& channel,
-                         MessageOp message_op) {
-  // We emit these trace events non-standardly to work around some compatibility issues:
-  //
-  // 1) We partially inline the trace macro so that we can purposely emit 0-length durations.
-  //
-  //    chrome://tracing requires flow events to be contained in a duration. Perfetto requires flows
-  //    events to be attached to a "slice". However, the Perfetto viewer treats instant events as
-  //    0-length slices. This means that we can assign flows to them, and they get a special easy to
-  //    click on arrow instead of a tiny duration bar. Using a 0-length duration gets us nice
-  //    instant events in the Perfetto viewer, while still supporting flows in chrome://tracing.
-  //
-  // 2) Even though we know exactly when the duration ends, we emit a Begin/End pair instead of
-  //    using a duration-complete event.
-  //
-  //    Because we do so little work between creating the duration-complete scope and then emitting
-  //    the flow event, if we emit a duration-complete event, the two events may be created with the
-  //    same timestamp. Since the duration-complete event is only written when the scope ends, it is
-  //    written _after_ the flow event in the trace, causing the flow to not be associated with the
-  //    previous event, not it. By using a Begin/End pair, we ensure that though the events have the
-  //    same timestamp, they will be read in the correct order and the flow events will be
-  //    associated correctly.
-
-  uint64_t ts;
-  const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
-
-  KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
-                                  ("ordinal", msg ? msg->fidl_header().ordinal : 0u));
-
-  switch (message_op) {
-    case MessageOp::Write:
-      KTRACE_FLOW_BEGIN_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
-                                  ChannelMessageFlowId(msg, channel));
-      break;
-    case MessageOp::Read:
-      KTRACE_FLOW_END_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
-                                ChannelMessageFlowId(msg, channel));
-      break;
-  }
-
-  KTRACE_DURATION_END_TIMESTAMP("kernel:ipc", "ChannelMessage", ts);
-}
-
 void record_recv_msg_sz(uint32_t size) {
   kcounter_add(channel_msg_received, 1);
 
@@ -272,8 +187,6 @@ static zx_status_t channel_read(zx_handle_t handle_value, uint32_t options,
   }
   if (result == ZX_ERR_BUFFER_TOO_SMALL)
     return result;
-
-  TraceMessage(msg, *channel, MessageOp::Read);
 
   if (num_bytes > 0u) {
     if (msg->CopyDataTo(bytes.reinterpret<char>()) != ZX_OK)
@@ -445,8 +358,6 @@ static zx_status_t channel_write(zx_handle_t handle_value, uint32_t options,
 
   cleanup.cancel();
 
-  TraceMessage(msg, *channel, MessageOp::Write);
-
   status = channel->Write(up->handle_table().get_koid(), ktl::move(msg));
   if (status != ZX_OK)
     return status;
@@ -514,15 +425,11 @@ zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options,
       return status;
   }
 
-  TraceMessage(msg, *channel, MessageOp::Write);
-
   // Write message and wait for reply, deadline, or cancellation
   MessagePacketPtr reply;
   status = channel->Call(up->handle_table().get_koid(), ktl::move(msg), deadline, &reply);
   if (status != ZX_OK)
     return status;
-
-  TraceMessage(reply, *channel, MessageOp::Read);
 
   return channel_call_epilogue(up, ktl::move(reply), &args, actual_bytes, actual_handles);
 }
