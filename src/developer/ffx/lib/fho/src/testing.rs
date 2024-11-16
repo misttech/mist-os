@@ -197,6 +197,28 @@ pub fn fake_proxy<T: fidl::endpoints::Proxy>(
     proxy
 }
 
+/// Sets up a fake FDomain proxy of type `T` handing requests to the given
+/// callback and returning their responses.
+///
+/// This is basically the same thing as `ffx_plugin` used to generate for
+/// each proxy argument, but uses a generic instead of text replacement.
+pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
+    client: Arc<fdomain_client::Client>,
+    mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
+) -> T {
+    use futures::TryStreamExt;
+    let (proxy, mut stream) = client.create_proxy_and_stream::<T::Protocol>().await.unwrap();
+    fuchsia_async::Task::local(async move {
+        // Capture the client so it doesn't go out of scope
+        let _client = client;
+        while let Ok(Some(req)) = stream.try_next().await {
+            handle_request(req);
+        }
+    })
+    .detach();
+    proxy
+}
+
 #[cfg(test)]
 mod internal {
     use super::*;
