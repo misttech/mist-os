@@ -597,12 +597,6 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   // no Reply defined
 }
 
-void Client::SetLayerImage(SetLayerImageRequestView request,
-                           SetLayerImageCompleter::Sync& /*_completer*/) {
-  SetLayerImageImpl(ToLayerId(request->layer_id), ToImageId(request->image_id),
-                    ToEventId(request->wait_event_id), ToEventId(request->signal_event_id));
-}
-
 void Client::SetLayerImage2(SetLayerImage2RequestView request,
                             SetLayerImage2Completer::Sync& /*_completer*/) {
   SetLayerImageImpl(ToLayerId(request->layer_id), ToImageId(request->image_id),

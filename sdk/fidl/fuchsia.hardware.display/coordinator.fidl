@@ -340,44 +340,6 @@ closed protocol Coordinator {
     /// with an image layer that has no image (note that is is not illegal to
     /// validate such a configuration). It is illegal to reuse a wait event which
     /// another layer that has not been presented is waiting on.
-    strict SetLayerImage(struct {
-        layer_id LayerId;
-        image_id ImageId;
-        wait_event_id EventId;
-        // Must be INVALID_DISP_ID.
-        signal_event_id EventId;
-    });
-
-    /// Sets the image for the layer.
-    ///
-    /// If wait_event_id corresponds to an imported event, the driver will
-    /// wait for ZX_EVENT_SIGNALED on the object before presenting the image.
-    ///
-    /// A layer's active image is the most recently applied image which either has
-    /// no wait event or whose wait event has been signaled. Whenever a new image
-    /// becomes active, any older images which never became active are dropped, and
-    /// their signal events will be fired as soon as their wait events are
-    /// signaled. The driver also does not have any concept like 'target vsync',
-    /// meaning that if multiple images become active within one vsync period, then
-    /// only the last image will actually be displayed.
-    ///
-    /// By default, the driver retains an active image until a new image becomes
-    /// active. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
-    /// resets the layer's active and pending images, even if the new ImageConfig
-    /// matches the old ImageConfig.
-    ///
-    /// An image cannot be used for multiple layers simultaneously, nor can an
-    /// image be given back to the display coordinator while it is still in use.
-    /// An image is considered in use when it is part of a pending configuration
-    /// or from when its configuration is applied until it is replaced by a
-    /// subsequent configuration that is *displayed* (not merely applied).
-    ///
-    /// It is illegal to call this with an invalid layer or image id, to
-    /// call it on a color layer, or to call it with an image and layer whose
-    /// ImageConfigs do not match. It is illegal to apply a configuration
-    /// with an image layer that has no image (note that is is not illegal to
-    /// validate such a configuration). It is illegal to reuse a wait event which
-    /// another layer that has not been presented is waiting on.
     strict SetLayerImage2(struct {
         layer_id LayerId;
         image_id ImageId;
@@ -392,7 +354,7 @@ closed protocol Coordinator {
     ///
     /// Most SetX operations require revalidating the configuration. The
     /// following operations do not require revalidation.
-    /// * SetLayerImage()
+    /// * SetLayerImage2()
     ///
     /// If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {
