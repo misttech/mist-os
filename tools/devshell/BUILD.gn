@@ -59,8 +59,8 @@ if (!is_host) {
       # For `fx power-digest`
       "//src/power/tools:install($host_toolchain)",
 
-      # For `fx gnerate`
-      "//build/tools/gnerator:host($host_toolchain)",
+      # For `fx bazel2gn`
+      "//build/tools/bazel2gn:host($host_toolchain)",
     ]
   }
 }

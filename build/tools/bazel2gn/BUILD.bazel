@@ -4,14 +4,14 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
-load("//build/tools/gnerator/bazel_rules:defs.bzl", "install_host_tools")
+load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "install_host_tools")
 
 go_library(
-    name = "gnerator_lib",
+    name = "bazel2gn_lib",
     srcs = [
-        "gnerator.go",
+        "bazel2gn.go",
     ],
-    importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator",
+    importpath = "go.fuchsia.dev/fuchsia/build/tools/bazel2gn",
     target_compatible_with = HOST_CONSTRAINTS,
     deps = [
         "//third_party/golibs:go.starlark.net/syntax",
@@ -19,25 +19,25 @@ go_library(
 )
 
 go_binary(
-    name = "gnerator",
+    name = "bazel2gn",
     srcs = [
         "cmd/main.go",
     ],
     target_compatible_with = HOST_CONSTRAINTS,
     deps = [
-        ":gnerator_lib",
+        ":bazel2gn_lib",
         "//third_party/golibs:go.starlark.net/starlark",
         "//third_party/golibs:go.starlark.net/syntax",
     ],
 )
 
 go_test(
-    name = "gnerator_tests",
+    name = "bazel2gn_tests",
     srcs = [
-        "gnerator_test.go",
+        "bazel2gn_test.go",
     ],
     embed = [
-        ":gnerator_lib",
+        ":bazel2gn_lib",
     ],
     target_compatible_with = HOST_CONSTRAINTS,
     deps = [
@@ -49,7 +49,7 @@ go_test(
 
 install_host_tools(
     name = "host",
-    outputs = ["gnerator"],
+    outputs = ["bazel2gn"],
     target_compatible_with = HOST_CONSTRAINTS,
-    deps = [":gnerator"],
+    deps = [":bazel2gn"],
 )

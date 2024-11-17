@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package gnerator_test
+package bazel2gn_test
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"go.fuchsia.dev/fuchsia/build/tools/gnerator"
+	"go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -40,7 +40,7 @@ func toSyntaxFile(t *testing.T, s string) *syntax.File {
 func bazelToGN(f *syntax.File) (string, error) {
 	var gotLines []string
 	for _, stmt := range f.Stmts {
-		lines, err := gnerator.StmtToGN(stmt)
+		lines, err := bazel2gn.StmtToGN(stmt)
 		if err != nil {
 			return "", fmt.Errorf("converting Bazel statement to GN: %v", err)
 		}
@@ -60,11 +60,11 @@ func TestStmtToGN(t *testing.T) {
 			bazel: `load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
-  name = "gnerator",
+  name = "bazel2gn",
   srcs = [
-    "gnerator.go",
+    "bazel2gn.go",
   ],
-  importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator",
+  importpath = "go.fuchsia.dev/fuchsia/build/tools/bazel2gn",
   deps = [
     "//third_party/golibs:go.starlark.net/syntax",
   ],
@@ -76,17 +76,17 @@ go_binary(
     "cmd/main.go",
   ],
   deps = [
-    ":gnerator",
+    ":bazel2gn",
     "//third_party/golibs:go.starlark.net/starlark",
     "//third_party/golibs:go.starlark.net/syntax",
   ],
 )
 
 go_test(
-  name = "gnerator_tests",
-  embed = [ ":gnerator" ],
+  name = "bazel2gn_tests",
+  embed = [ ":bazel2gn" ],
   srcs = [
-    "gnerator_test.go",
+    "bazel2gn_test.go",
   ],
   deps = [
     "//third_party/golibs:github.com/google/go-cmp/cmp",
@@ -94,11 +94,11 @@ go_test(
     "//third_party/golibs:go.starlark.net/syntax",
   ],
 )`,
-			wantGN: `go_library("gnerator") {
+			wantGN: `go_library("bazel2gn") {
   sources = [
-    "gnerator.go",
+    "bazel2gn.go",
   ]
-  importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator"
+  importpath = "go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
   deps = [
     "//third_party/golibs:go.starlark.net/syntax",
   ]
@@ -108,17 +108,17 @@ go_binary("cmd") {
     "cmd/main.go",
   ]
   deps = [
-    ":gnerator",
+    ":bazel2gn",
     "//third_party/golibs:go.starlark.net/starlark",
     "//third_party/golibs:go.starlark.net/syntax",
   ]
 }
-go_test("gnerator_tests") {
+go_test("bazel2gn_tests") {
   embed = [
-    ":gnerator",
+    ":bazel2gn",
   ]
   sources = [
-    "gnerator_test.go",
+    "bazel2gn_test.go",
   ]
   deps = [
     "//third_party/golibs:github.com/google/go-cmp/cmp",

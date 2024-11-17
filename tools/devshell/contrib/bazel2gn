@@ -6,7 +6,7 @@
 #### CATEGORY=Source tree
 ### Syncs BUILD.gn and BUILD.bazel for targets that are dual-building in both.
 
-## usage: fx gnerate
+## usage: fx bazel2gn
 ## Updates BUILD.gn listed in this script based on the BUILD.bazel files in
 ## their directories.
 
@@ -15,14 +15,14 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
 fx-config-read
 
-declare -r GNERATOR_TARGET="host-tools/gnerator"
-declare -r GNERATOR_BIN="${FUCHSIA_BUILD_DIR}/host-tools/gnerator"
+declare -r BAZEL2GN_TARGET="host-tools/bazel2gn"
+declare -r BAZEL2GN_BIN="${FUCHSIA_BUILD_DIR}/host-tools/bazel2gn"
 
-fx-run-ninja false "${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" "${GNERATOR_TARGET}"
+fx-run-ninja false "${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" "${BAZEL2GN_TARGET}"
 
 # TODO(jayzhuang): Detect this list instead of hardcoding.
 declare -r DIRS_TO_SYNC=(
-  'build/tools/gnerator'
+  'build/tools/bazel2gn'
   'tools/fidl/fidlgen_cpp'
   'tools/fidl/fidlgen_cpp/codegen'
   'tools/fidl/lib/fidlgen'
@@ -38,7 +38,7 @@ declare -r DIRS_TO_SYNC=(
 for dir in "${DIRS_TO_SYNC[@]}"
 do
   build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
-  "${GNERATOR_BIN}" \
+  "${BAZEL2GN_BIN}" \
     --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \
     --gn_output_path "${build_gn}"
   "${PREBUILT_GN}" format "${build_gn}"

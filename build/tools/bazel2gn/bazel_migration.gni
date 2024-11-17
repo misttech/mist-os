@@ -2,14 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# All GN templates and global variables supported by gnerator are imported here,
-# so converted GN files can import this file, to keep gnerator simple.
+# All GN templates and global variables supported by bazel2gn are imported here,
+# so converted GN files can import this file, to keep bazel2gn simple.
 #
 # NOTE: This will cause most BUILD.gn files converted from BUILD.bazel file to
 # import more gni files than they need. This should be OK because all these
 # templates are commonly used in Fuchsia's GN build anyways. If this causes
 # noticeable regressions in `gn gen` time or ninja build time, we can improve
-# gnerator to be able to generate the correct import statements instead.
+# bazel2gn to be able to generate the correct import statements instead.
 
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
