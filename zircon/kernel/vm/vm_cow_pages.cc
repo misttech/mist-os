@@ -1712,12 +1712,19 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
     return ZX_ERR_NEXT;
   });
 
+  const char* node_type = "";
+  if (is_hidden_locked()) {
+    node_type = "(hidden) ";
+  } else if (is_slice_locked()) {
+    node_type = "(slice) ";
+  }
+
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
-  printf("cow_pages %p size %#" PRIx64 " offset %#" PRIx64 " start limit %#" PRIx64
+  printf("cow_pages %p %ssize %#" PRIx64 " offset %#" PRIx64 " start limit %#" PRIx64
          " limit %#" PRIx64 " content pages %zu compressed pages %zu ref %d parent %p\n",
-         this, size_, parent_offset_, parent_start_limit_, parent_limit_, page_count,
+         this, node_type, size_, parent_offset_, parent_start_limit_, parent_limit_, page_count,
          compressed_count, ref_count_debug(), parent_.get());
 
   if (page_source_) {
