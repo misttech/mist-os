@@ -41,7 +41,9 @@
 #   metadata (optional)
 #     Scope giving the metadata of this library.
 #
-#   Only used by Bazel-converted targets:
+#
+#   The following fields are only used by Bazel-converted targets.
+#   See //build/tools/bazel2gn/README.md for details.
 #
 #      embedsrcs (optional)
 #        For sources used by go:embed, has the same semantics as sources in GN.

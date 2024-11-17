@@ -19,7 +19,9 @@ import("//build/go/go_library.gni")
 #   source_dir, sources
 #     Same meaning as defined in go_library.gni.
 #
-#   Only used by Bazel-converted targets:
+#
+#   The following fields are only used by Bazel-converted targets.
+#   See //build/tools/bazel2gn/README.md for details.
 #
 #     embed (optional)
 #       Alternative to library, should contain exactly one element.
