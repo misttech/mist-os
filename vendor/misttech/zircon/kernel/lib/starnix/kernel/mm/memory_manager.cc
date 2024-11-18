@@ -743,11 +743,7 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
   size_t bytes_read = 0;
-  auto vec = get_contiguous_mappings_at(addr, bytes.size());
-  if (vec.is_error()) {
-    LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
-    return vec.take_error();
-  }
+  auto vec = get_contiguous_mappings_at(addr, bytes.size()) _EP(vec);
 
   for (auto& [mapping, len] : vec.value()) {
     auto next_offset = bytes_read + len;
@@ -1024,11 +1020,7 @@ fit::result<Errno, UserAddress> MemoryManager::map_memory(
     auto _state = state.Write();
     result = _state->map_memory(
         fbl::RefPtr<MemoryManager>(this), addr, ktl::move(memory), memory_offset, length, flags,
-        options.contains(MappingOptions::POPULATE), ktl::move(name), released_mappings);
-    if (result.is_error()) {
-      LTRACEF("failed to map memory %d\n", result.error_value().error_code());
-      return result.take_error();
-    }
+        options.contains(MappingOptions::POPULATE), ktl::move(name), released_mappings) _EP(result);
   }
 
   // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
