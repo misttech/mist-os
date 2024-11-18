@@ -1506,7 +1506,10 @@ impl FsNodeOps for FuseNode {
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        self.fetch_and_refresh_info_impl(locked, current_task, info)
+        // NOTE: Do not be tempted to always refresh information here; sadly, there are CTS tests
+        // that rely on this only updating attributes if they have expired, and this matches what
+        // Linux appears to do.
+        self.refresh_expired_node_attributes(locked, current_task, info)
     }
 
     fn get_xattr(
