@@ -152,7 +152,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // argv
   constexpr fbl::static_vector<uint8_t, 8> kZero(8, 0u);
   auto next_arg_addr = argv_start;
-  for (auto arg : argv) {
+  for (const auto& arg : argv) {
     ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_arg_addr), sizeof(next_arg_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_arg_addr += arg.length() + 1;
@@ -160,7 +160,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   ktl::copy(kZero.begin(), kZero.end(), util::back_inserter(main_data));
   // environ
   auto next_env_addr = environ_start;
-  for (auto env : envp) {
+  for (const auto& env : envp) {
     ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_env_addr), sizeof(next_env_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_env_addr += env.length() + 1;
