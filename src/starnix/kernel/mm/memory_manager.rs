@@ -960,9 +960,9 @@ impl MemoryManagerState {
     }
 
     // Map the memory without updating `self.mappings`.
-    fn map_internal(
+    fn map_in_user_vmar(
         &self,
-        addr: DesiredAddress,
+        addr: SelectedAddress,
         memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
@@ -972,7 +972,7 @@ impl MemoryManagerState {
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            self.select_address(addr, length, flags)?,
+            addr,
             memory,
             memory_offset,
             length,
@@ -1006,8 +1006,14 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
-        let mapped_addr =
-            self.map_internal(addr, &memory, memory_offset, length, flags, populate)?;
+        let mapped_addr = self.map_in_user_vmar(
+            self.select_address(addr, length, flags)?,
+            &memory,
+            memory_offset,
+            length,
+            flags,
+            populate,
+        )?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -1051,9 +1057,7 @@ impl MemoryManagerState {
         let selected_addr = self.select_address(addr, length, flags)?;
         let backing_memory_offset = selected_addr.addr().ptr();
 
-        let mapped_addr = map_in_vmar(
-            &self.user_vmar,
-            &self.user_vmar_info,
+        let mapped_addr = self.map_in_user_vmar(
             selected_addr,
             &self.private_anonymous.backing,
             backing_memory_offset as u64,
@@ -1273,8 +1277,8 @@ impl MemoryManagerState {
                 let growth_start = original_range.end;
                 let growth_length = new_length - old_length;
                 // Map new pages to back the growth.
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(growth_start),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(growth_start),
                     &self.private_anonymous.backing,
                     growth_start.ptr() as u64,
                     growth_length,
@@ -1398,8 +1402,8 @@ impl MemoryManagerState {
                     self.private_anonymous.move_pages(&range_to_move, dst_addr)?;
                 }
 
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(dst_addr),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(dst_addr),
                     &self.private_anonymous.backing,
                     dst_addr.ptr() as u64,
                     dst_length,
@@ -1623,8 +1627,8 @@ impl MemoryManagerState {
                 backing.base = range.start;
                 backing.memory_offset = 0;
 
-                self.map_internal(
-                    DesiredAddress::FixedOverwrite(range.start),
+                self.map_in_user_vmar(
+                    SelectedAddress::FixedOverwrite(range.start),
                     &backing.memory,
                     0,
                     child_length,
@@ -3430,9 +3434,7 @@ impl MemoryManager {
                     }
 
                     let target_memory_offset = range.start.ptr() as u64;
-                    map_in_vmar(
-                        &target_state.user_vmar,
-                        &target_state.user_vmar_info,
+                    target_state.map_in_user_vmar(
                         SelectedAddress::FixedOverwrite(range.start),
                         &target_state.private_anonymous.backing,
                         target_memory_offset,
