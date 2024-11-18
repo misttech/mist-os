@@ -4,6 +4,7 @@
 
 #include "src/devices/bin/driver_manager/bind/bind_manager.h"
 
+#include "src/devices/bin/driver_manager/node_property_conversion.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
@@ -126,8 +127,14 @@ void BindManager::BindInternal(BindRequest request,
   // should not be used.
   if (node->type() == NodeType::kNormal) {
     auto node_properties = node->GetNodeProperties();
+
     if (node_properties.has_value()) {
-      builder.properties(node_properties.value());
+      std::vector<fuchsia_driver_framework::wire::NodeProperty> deprecated_properties;
+      deprecated_properties.reserve(node_properties->size());
+      for (auto& property : node_properties.value()) {
+        deprecated_properties.emplace_back(ToDeprecatedProperty(arena, property));
+      }
+      builder.properties(deprecated_properties);
     }
   }
   if (!driver_url_suffix.empty()) {

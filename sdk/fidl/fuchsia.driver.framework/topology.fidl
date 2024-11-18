@@ -38,6 +38,9 @@ alias NodeOffersVector = vector<Offer>:MAX_OFFER_COUNT;
 alias NodePropertyVector = vector<NodeProperty>:MAX_PROPERTY_COUNT;
 alias NodeName = string:MAX_NODE_NAME_LENGTH;
 
+@available(added=NEXT)
+alias NodeProperties = vector<NodeProperty2>:MAX_PROPERTY_COUNT;
+
 /// Definition of a symbol provided by a driver for a node. A symbol is local to
 /// a driver host.
 type NodeSymbol = table {
@@ -77,6 +80,15 @@ type NodeProperty = struct {
 type Offer = flexible union {
     1: zircon_transport fuchsia.component.decl.Offer;
     2: driver_transport fuchsia.component.decl.Offer;
+};
+
+@available(added=NEXT)
+type NodeProperty2 = struct {
+    /// Property key.
+    key NodePropertyKeyString;
+
+    /// Property value.
+    value NodePropertyValue;
 };
 
 // Arguments for adding a node to the devfs filesystem.

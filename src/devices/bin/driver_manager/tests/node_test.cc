@@ -52,7 +52,7 @@ class FakeDriverHost : public driver_manager::DriverHost {
  public:
   using StartCallback = fit::callback<void(zx::result<>)>;
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
-             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+             fuchsia_driver_framework::wire::NodePropertyDictionary2 node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
@@ -368,18 +368,17 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
 
 TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   const char* kParent1Name = "parent-1";
-  const std::vector<fuchsia_driver_framework::NodeProperty> kParent1NodeProperties{
-      fdf::MakeProperty("test-key-1", 2u)};
+  const std::vector<fuchsia_driver_framework::NodeProperty2> kParent1NodeProperties{
+      fdf::MakeProperty2("test-key-1", 2u)};
   const char* kParent2Name = "parent-2";
-  const std::vector<fuchsia_driver_framework::NodeProperty> kParent2NodeProperties{
-      fdf::MakeProperty("test-key-2", "test=value")};
-
+  const std::vector<fuchsia_driver_framework::NodeProperty2> kParent2NodeProperties{
+      fdf::MakeProperty2("test-key-2", "test=value")};
   auto parent_1 = CreateNode(kParent1Name);
   parent_1->SetNonCompositeProperties(kParent1NodeProperties);
   auto parent_2 = CreateNode(kParent2Name);
   parent_2->SetNonCompositeProperties(kParent2NodeProperties);
 
-  std::vector<fuchsia_driver_framework::NodePropertyEntry> parent_properties;
+  std::vector<fuchsia_driver_framework::NodePropertyEntry2> parent_properties;
   parent_properties.emplace_back(kParent1Name, kParent1NodeProperties);
   parent_properties.emplace_back(kParent2Name, kParent2NodeProperties);
   auto composite = CreateCompositeNode("composite", {parent_1, parent_2}, parent_properties,
@@ -391,10 +390,7 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   ASSERT_EQ(1ul, primary_parent_node_properties->size());
 
   const auto& primary_parent_node_property_1 = primary_parent_node_properties.value()[0];
-  ASSERT_TRUE(primary_parent_node_property_1.key.is_string_value());
-  ASSERT_EQ(kParent1NodeProperties[0].key().string_value().value(),
-            primary_parent_node_property_1.key.string_value().get());
-  ASSERT_TRUE(primary_parent_node_property_1.value.is_int_value());
+  ASSERT_EQ(kParent1NodeProperties[0].key(), std::string(primary_parent_node_property_1.key.get()));
   ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
             primary_parent_node_property_1.value.int_value());
 
@@ -404,9 +400,7 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   ASSERT_EQ(1ul, parent_1_node_properties->size());
 
   const auto& parent_1_node_property_1 = parent_1_node_properties.value()[0];
-  ASSERT_TRUE(parent_1_node_property_1.key.is_string_value());
-  ASSERT_EQ(kParent1NodeProperties[0].key().string_value().value(),
-            parent_1_node_property_1.key.string_value().get());
+  ASSERT_EQ(kParent1NodeProperties[0].key(), std::string(parent_1_node_property_1.key.get()));
   ASSERT_TRUE(parent_1_node_property_1.value.is_int_value());
   ASSERT_EQ(kParent1NodeProperties[0].value().int_value().value(),
             parent_1_node_property_1.value.int_value());
@@ -417,9 +411,7 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   ASSERT_EQ(1ul, parent_2_node_properties->size());
 
   const auto& parent_2_node_property_1 = parent_2_node_properties.value()[0];
-  ASSERT_TRUE(parent_2_node_property_1.key.is_string_value());
-  ASSERT_EQ(kParent2NodeProperties[0].key().string_value().value(),
-            parent_2_node_property_1.key.string_value().get());
+  ASSERT_EQ(kParent2NodeProperties[0].key(), parent_2_node_property_1.key.get());
   ASSERT_TRUE(parent_2_node_property_1.value.is_string_value());
   ASSERT_EQ(kParent2NodeProperties[0].value().string_value().value(),
             parent_2_node_property_1.value.string_value().get());

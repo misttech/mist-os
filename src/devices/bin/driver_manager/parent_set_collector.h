@@ -31,7 +31,7 @@ class ParentSetCollector {
   // Caller should check that |ContainsNode| is false for the index before calling this.
   // Only a weak_ptr of the node is stored by this class (until collection in GetIfComplete).
   zx::result<> AddNode(uint32_t index,
-                       const std::vector<fuchsia_driver_framework::NodeProperty>& node_properties,
+                       const std::vector<fuchsia_driver_framework::NodeProperty2>& node_properties,
                        std::weak_ptr<Node> node);
 
   // Check if all parents are found. If so, then create and return the composite node. If the
@@ -58,7 +58,7 @@ class ParentSetCollector {
 
   std::vector<std::string> parent_names_;
 
-  std::vector<fuchsia_driver_framework::NodePropertyEntry> parent_properties_;
+  std::vector<fuchsia_driver_framework::NodePropertyEntry2> parent_properties_;
 
   uint32_t primary_index_;
 

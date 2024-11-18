@@ -504,6 +504,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node_properties_2",
+        "ordinal": "12",
+        "type": "vector<fuchsia.driver.framework/NodePropertyEntry2>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/DriverStartArgs.node_token",
         "ordinal": "11",
         "type": "zx/Handle:EVENT"
@@ -812,6 +818,22 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty2.key",
+        "ordinal": "1",
+        "type": "string:256"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty2.value",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/NodePropertyValue"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodeProperty2"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.driver.framework/NodePropertyEntry.name",
         "ordinal": "1",
         "type": "string:128"
@@ -825,6 +847,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.framework/NodePropertyEntry"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2.name",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2.properties",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeProperty2>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodePropertyEntry2"
     },
     {
         "kind": "union/member",

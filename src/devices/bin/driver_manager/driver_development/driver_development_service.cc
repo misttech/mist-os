@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "src/devices/bin/driver_manager/driver_development/info_iterator.h"
+#include "src/devices/bin/driver_manager/node_property_conversion.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
@@ -39,10 +40,7 @@ void SetNodeInfoBuilderNodeProperties(
 
   fidl::VectorView<fdf::wire::NodeProperty> node_properties(allocator, properties->size());
   for (size_t i = 0; i < properties->size(); ++i) {
-    node_properties[i] = fdf::wire::NodeProperty{
-        .key = fidl::ToWire(allocator, fidl::ToNatural(properties.value()[i].key)),
-        .value = fidl::ToWire(allocator, fidl::ToNatural(properties.value()[i].value)),
-    };
+    node_properties[i] = ToDeprecatedProperty(allocator, properties.value()[i]);
   }
   node_info_builder.node_property_list(node_properties);
 }
