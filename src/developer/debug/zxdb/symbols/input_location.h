@@ -40,6 +40,9 @@ struct InputLocation {
   // Converts the input location type to a string. This is intended to be used in error messages.
   static const char* TypeToString(Type type);
 
+  // Returns a string representation of this input location for debug logging.
+  std::string ToString() const;
+
   bool operator==(const InputLocation& other) const;
   bool operator!=(const InputLocation& other) const { return !operator==(other); }
 

@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
@@ -31,6 +32,8 @@ std::vector<Location> LoadedModuleSymbols::ResolveInputLocation(
     return module_symbols()->ResolveInputLocation(symbol_context(), input_location, options);
   }
 
+  DEBUG_LOG(ModuleSymbols) << "Don't have a matching module for resolving "
+                           << input_location.ToString();
   return std::vector<Location>();
 }
 

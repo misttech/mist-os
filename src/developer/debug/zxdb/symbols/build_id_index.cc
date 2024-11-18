@@ -380,13 +380,22 @@ void BuildIDIndex::IndexSourcePath(const std::string& path) {
 bool BuildIDIndex::IndexSourceFile(const std::string& file_path, const std::string& build_dir,
                                    bool preserve) {
   DEBUG_LOG(BuildIDIndex) << "Indexing source file " << file_path << ".";
-  auto elf = elflib::ElfLib::Create(file_path);
-  if (!elf)
+  auto file = fopen(file_path.c_str(), "r");
+  if (!file) {
+    DEBUG_LOG(BuildIDIndex) << "Couldn't open " << file_path << ": " << strerror(errno);
     return false;
+  }
+  auto elf = elflib::ElfLib::Create(file, elflib::ElfLib::Ownership::kTakeOwnership);
+  if (!elf) {
+    DEBUG_LOG(BuildIDIndex) << "Couldn't parse ELF file from " << file_path;
+    return false;
+  }
 
   std::string build_id = elf->GetGNUBuildID();
-  if (build_id.empty())
+  if (build_id.empty()) {
+    DEBUG_LOG(BuildIDIndex) << "ELF file " << file_path << " did not have a build ID.";
     return false;
+  }
 
   DEBUG_LOG(BuildIDIndex) << "Source file " << file_path << " has build id " << build_id << ".";
 
@@ -415,7 +424,6 @@ bool BuildIDIndex::IndexSourceFile(const std::string& file_path, const std::stri
 }
 
 void BuildIDIndex::EnsureCacheClean() {
-  DEBUG_LOG(BuildIDIndex) << "Cleaning symbol cache.";
   if (!cache_dirty_)
     return;
 
