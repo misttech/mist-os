@@ -132,7 +132,7 @@ if (is_host) {
   }
 
   install_python_tool("install") {
-    name = "test2"
+    name = "test"
     binary = ":fxtest-rewrite"
   }
 }
