@@ -6,21 +6,23 @@
 
 #include <fidl/fuchsia.boot/cpp/markers.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.boot/cpp/wire_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/dlfcn.h>
 #include <zircon/fidl.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/types.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <vector>
 
 #include <zxtest/zxtest.h>
@@ -211,10 +213,26 @@ void GetDebugDataMessage(zx::unowned_channel svc, Message& msg) {
   ASSERT_NE(msg.handles[1], ZX_HANDLE_INVALID);
 }
 
-int main() {
-  int res = standalone::TestMain();
-  if (res == 0) {
-    printf(BOOT_TEST_SUCCESS_STRING "\n");
-  }
-  return res;
+void GetBootfsEntries(std::vector<BootfsFileVmo>& entries) {
+  auto userboot = zx::channel(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
+  ASSERT_TRUE(userboot);
+
+  // Wait until userboot closes their channel endpoint, signalling that messages have been written.
+  zx_signals_t signals;
+  // Close the loader service channel, such that userboot publishes any remaining message.
+  zx_handle_close(dl_set_loader_service(ZX_HANDLE_INVALID));
+  // Wait until userboot closes the userboot channel end.
+  ASSERT_OK(userboot.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), &signals));
+  ASSERT_TRUE((signals & ZX_CHANNEL_PEER_CLOSED) != 0);
+
+  // Drain messages, until you find the Post message for SvcStash.
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  UserbootServer server;
+
+  fidl::ServerEnd<fuchsia_boot::Userboot> userboot_endpoint(std::move(userboot));
+  fidl::BindServer(loop.dispatcher(), std::move(userboot_endpoint), &server);
+  // Drain all messages.
+  loop.RunUntilIdle();
+  entries = server.take_bootfs_entries();
+  ASSERT_GT(entries.size(), 0);
 }

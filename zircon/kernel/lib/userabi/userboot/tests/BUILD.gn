@@ -10,6 +10,7 @@ import("//zircon/kernel/params.gni")
 group("boot_tests") {
   testonly = true
   deps = [
+    ":early-boot-bootfs-entries-test",
     ":early-boot-multiple-process-test",
     ":early-boot-single-process-test",
   ]
@@ -63,9 +64,31 @@ if (is_fuchsia) {
     userboot_entry_type = "boot"
     userboot_next_is_test = true
   }
+
+  zbi_test_executable("early-boot-bootfs-entries-test-bin") {
+    sources = [ "bootfs-entries-test.cc" ]
+    deps = [
+      ":helper",
+      "data-publisher:published-data",
+      "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+      "//src/zircon/testing/standalone-test",
+      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zxtest",
+    ]
+
+    # This test needs to run as a 'boot' program, such that it is handed the SvcStash handle.
+    userboot_entry_type = "boot"
+    userboot_next_is_test = true
+  }
 }
 
 if (current_toolchain == default_toolchain) {
+  kernel_zbi_test("early-boot-bootfs-entries-test") {
+    generate_cuckoo = false
+    deps = [ ":early-boot-bootfs-entries-test-bin" ]
+    environments = kernel_test_environments
+  }
+
   kernel_zbi_test("early-boot-single-process-test") {
     generate_cuckoo = false
     deps = [ ":early-boot-single-process-test-bin" ]

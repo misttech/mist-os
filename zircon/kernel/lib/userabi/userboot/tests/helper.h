@@ -52,8 +52,13 @@ inline void GetStashedSvc(zx::channel svc_stash, zx::channel& svc) {
   GetStashedSvc(std::move(svc_stash), dropped, svc);
 }
 
-// Will sec `svc_stash` to the equivalent startup SvcStash handle.
+// Will set `svc_stash` to the equivalent startup SvcStash handle.
+// Note: Mutually exclusive with `GetBootfsEnties`.
 void GetSvcStash(zx::channel& svc_stash);
+
+//  Will set `entries` to the collection of VMOs posted.
+// Note: Mutually exclusive with `GetSvcStash`.
+void GetBootfsEntries(std::vector<BootfsFileVmo>& entries);
 
 // `T` is a callable that is given a readable channel and a token to determine whether the loop
 // should continue or not. It is important to leave the signature as non returning, such that
