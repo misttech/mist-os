@@ -287,7 +287,7 @@ mod tests {
                 ALPHA_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
@@ -307,7 +307,7 @@ mod tests {
                 CAST_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
@@ -324,7 +324,7 @@ mod tests {
                 MISC_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
@@ -343,7 +343,7 @@ mod tests {
                 PLAYREADY_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
@@ -360,7 +360,7 @@ mod tests {
                 WEAVE_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
@@ -377,7 +377,7 @@ mod tests {
                 WIDEVINE_BIN_FILE_CONTENTS,
             )
             .unwrap();
-            proxy.clone(fio::OpenFlags::RIGHT_READABLE, dir.into_channel().into()).unwrap();
+            proxy.clone2(dir.into_channel().into()).unwrap();
         }
     }
 
