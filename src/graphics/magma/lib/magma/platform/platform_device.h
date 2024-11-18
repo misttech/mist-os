@@ -37,9 +37,6 @@ class PlatformDevice {
 
   virtual std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const = 0;
 
-  virtual Status LoadFirmware(const char* filename, std::unique_ptr<PlatformBuffer>* firmware_out,
-                              uint64_t* size_out) const = 0;
-
   // Map an MMIO listed at |index| in the MDI for this device.
   virtual std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index,
                                                    PlatformMmio::CachePolicy cache_policy) {

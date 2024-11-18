@@ -19,9 +19,6 @@ class ZirconPlatformDeviceWithoutProtocol : public PlatformDevice {
 
   void* GetDeviceHandle() override { return zx_device(); }
 
-  Status LoadFirmware(const char* filename, std::unique_ptr<PlatformBuffer>* firmware_out,
-                      uint64_t* size_out) const override;
-
   std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const override {
     return DRETP(nullptr, "No protocol");
   }

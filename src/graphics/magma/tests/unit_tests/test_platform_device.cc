@@ -85,18 +85,6 @@ TEST(PlatformDevice, SetThreadRole) {
 }
 #endif
 
-TEST(PlatformDevice, FirmwareLoader) {
-  magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
-  ASSERT_TRUE(platform_device);
-
-  std::unique_ptr<magma::PlatformBuffer> buffer;
-  uint64_t size;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            platform_device->LoadFirmware("test_firmware.txt", &buffer, &size).get());
-  EXPECT_NE(nullptr, buffer.get());
-  EXPECT_EQ(59u, size);
-}
-
 TEST(PlatformDevice, RegisterInterrupt) {
   magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
   ASSERT_NE(platform_device, nullptr);
