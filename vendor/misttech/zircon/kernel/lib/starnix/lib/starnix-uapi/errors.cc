@@ -4,10 +4,31 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/bstring.h>
 
 #include <linux/errno.h>
 
 namespace starnix_uapi {
+
+BString to_string(const std::source_location& location) {
+  return mtl::format("%s:%d:%d", location.file_name(), location.line(), location.column());
+}
+
+BString ErrnoCode::to_string() const {
+  return mtl::format("%s(%d)", name_ ? name_ : "<null>", code_);
+}
+
+BString Errno::to_string() const {
+  auto location = starnix_uapi::to_string(location_);
+  auto code = code_.to_string();
+  if (context_.has_value()) {
+    return mtl::format("errno %.*s from %.*s, context: %.*s", static_cast<int>(code.size()),
+                       code.data(), static_cast<int>(location.size()), location.data(),
+                       static_cast<int>(context_->size()), context_->data());
+  }
+  return mtl::format("errno %.*s from %.*s", static_cast<int>(code.size()), code.data(),
+                     static_cast<int>(location.size()), location.data());
+}
 
 uint32_t from_status_like_fdio(zx_status_t status) {
   switch (status) {
@@ -80,7 +101,7 @@ uint32_t from_status_like_fdio(zx_status_t status) {
 }
 
 /// Maps `Err(EINTR)` to the specified errno.
-fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err) {
+fit::result<Errno> map_eintr(fit::result<Errno> result, const Errno& err) {
   if (result.is_error()) {
     if (result.error_value().error_code() == EINTR) {
       return fit::error(err);

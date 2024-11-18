@@ -5,6 +5,8 @@
 source_set("tests") {
   sources = [
     "device_types-tests.cc",
+    "errors-tests.cc",
+
     #"file_mode-tests.cc",
     "open_flags-test.cc",
     "user_address-test.cc",
