@@ -32,22 +32,24 @@ struct ErrorImpl : public StdError {
 };
 
 template <typename C, typename E>
-struct ContextError {
+struct ContextError : public StdError {
   C context;
   E error;
 
-  BString to_string() const {
+  ContextError(C ctx, E err) : context(ktl::move(ctx)), error(ktl::move(err)) {}
+
+  BString to_string() const final {
     ktl::string_view sv = this->context;
     return format("%.*s", static_cast<int>(sv.size()), sv.data());
   }
 };
 
 template <typename M>
-class MessageError {
+class MessageError : public StdError {
  public:
   explicit MessageError(M message) : message_(ktl::move(message)) {}
 
-  BString to_string() const { return this->message_; }
+  BString to_string() const override { return this->message_; }
 
  private:
   M message_;
@@ -55,7 +57,8 @@ class MessageError {
 
 class Error {
  private:
-  StdError* inner_;
+  // Non-null ptr;
+  StdError* inner_ = nullptr;
 
  public:
   template <typename E>
@@ -90,9 +93,8 @@ class Error {
   }
 
   template <typename C>
-  Error context(C context) const {
-    ContextError e{.context = context, .error = *this};
-    return Error::construct(ktl::move(e));
+  Error context(C context) && {
+    return Error::construct(ContextError<C, Error>{ktl::move(context), ktl::move(*this)});
   }
 
   template <typename C>
@@ -102,8 +104,7 @@ class Error {
 
   template <typename C, typename E>
   static Error from_context(C context, E error) {
-    ContextError e{.context = context, .error = ktl::move(error)};
-    return Error::construct(ktl::move(e));
+    return Error::construct(ContextError<C, E>{ktl::move(context), ktl::move(error)});
   }
 
   BString to_string() const {
