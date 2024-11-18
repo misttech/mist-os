@@ -17,9 +17,41 @@ class StdError {
  public:
   virtual ~StdError() = default;
 
-  virtual ktl::optional<StdError*> source() const { return ktl::nullopt; }
+  virtual ktl::optional<const StdError*> source() const { return ktl::nullopt; }
 
   virtual BString to_string() const { return "StdError"; }
+};
+
+class Chain {
+ public:
+  explicit Chain(const StdError* head) : next_(head) {}
+
+  class Iterator {
+   public:
+    explicit Iterator(const StdError* error) : current_(error) {}
+
+    const StdError* operator*() const { return current_; }
+
+    Iterator& operator++() {
+      if (current_) {
+        auto next = current_->source();
+        current_ = next ? *next : nullptr;
+      }
+      return *this;
+    }
+
+    bool operator==(const Iterator& other) const { return current_ == other.current_; }
+    bool operator!=(const Iterator& other) const { return !(*this == other); }
+
+   private:
+    const StdError* current_;
+  };
+
+  Iterator begin() const { return Iterator(next_); }
+  Iterator end() const { return Iterator(nullptr); }
+
+ private:
+  const StdError* next_;
 };
 
 template <typename E = void>
@@ -29,7 +61,16 @@ struct ErrorImpl : public StdError {
   explicit ErrorImpl(E err) : object_(std::move(err)) {}
 
   BString to_string() const override { return object_.to_string(); }
+
+  ktl::optional<const StdError*> source() const override {
+    if constexpr (std::is_base_of_v<StdError, E>) {
+      return object_.source();
+    }
+    return ktl::nullopt;
+  }
 };
+
+class Error;
 
 template <typename C, typename E>
 struct ContextError : public StdError {
@@ -41,6 +82,16 @@ struct ContextError : public StdError {
   BString to_string() const final {
     ktl::string_view sv = this->context;
     return format("%.*s", static_cast<int>(sv.size()), sv.data());
+  }
+
+  ktl::optional<const StdError*> source() const override {
+    if constexpr (std::is_same_v<E, Error>) {
+      return error.source();
+    }
+    if constexpr (std::is_base_of_v<StdError, E>) {
+      return static_cast<const StdError*>(&error);
+    }
+    return ktl::nullopt;
   }
 };
 
@@ -55,7 +106,7 @@ class MessageError : public StdError {
   M message_;
 };
 
-class Error {
+class Error : public StdError {
  private:
   // Non-null ptr;
   StdError* inner_ = nullptr;
@@ -107,7 +158,7 @@ class Error {
     return Error::construct(ContextError<C, E>{ktl::move(context), ktl::move(error)});
   }
 
-  BString to_string() const {
+  BString to_string() const override {
     if (inner_) {
       return inner_->to_string();
     }
@@ -119,10 +170,31 @@ class Error {
     if (inner_) {
       auto str = inner_->to_string();
       printer("%.*s", static_cast<int>(str.size()), str.data());
+
+      auto chain = Chain(inner_);
+      auto it = chain.begin();
+      if (it != chain.end()) {
+        ++it;
+      }
+
+      for (; it != chain.end(); ++it) {
+        auto err_str = (*it)->to_string();
+        printer(":%.*s", static_cast<int>(err_str.size()), err_str.data());
+      }
     }
   }
 
+  ktl::optional<const StdError*> source() const override {
+    if (inner_) {
+      return inner_;
+    }
+    return ktl::nullopt;
+  }
+
  private:
+  template <typename C, typename E>
+  friend struct ContextError;
+
   template <typename E>
   static Error construct(E error) {
     return Error(ktl::move(error));
