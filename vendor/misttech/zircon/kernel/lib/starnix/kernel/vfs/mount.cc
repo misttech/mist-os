@@ -27,6 +27,14 @@ using namespace starnix_uapi;
 
 namespace starnix {
 
+WhatToMount WhatToMount::Fs(FileSystemHandle fs) { return WhatToMount(ktl::move(fs)); }
+
+WhatToMount WhatToMount::Bind(NamespaceNode node) { return WhatToMount(ktl::move(node)); }
+
+WhatToMount::WhatToMount(Variant what) : what_(ktl::move(what)) {}
+
+WhatToMount::~WhatToMount() = default;
+
 MountInfo::~MountInfo() = default;
 
 MountInfo MountInfo::detached() { return {ktl::nullopt}; }
@@ -55,21 +63,25 @@ NamespaceNode Mount::root() {
 
 ktl::optional<NamespaceNode> Mount::mountpoint() const {
   auto state = state_.Read();
-  auto &[mount, entry] = state->mountpoint.value();
+  auto& [mount, entry] = state->mountpoint.value();
   return NamespaceNode::New(mount.Lock(), entry);
 }
 
 MountFlags Mount::flags() const { return *flags_.Lock(); }
 
+fbl::RefPtr<DirEntry> Mount::GetKey() const { return root_; }
+
 MountHandle Mount::New(WhatToMount what, MountFlags flags) {
-  switch (what.type) {
-    case WhatToMountEnum::Fs: {
-      auto fs = ktl::get<FileSystemHandle>(what.what);
-      return new_with_root(fs->root(), flags);
-    }
-    case WhatToMountEnum::Bind:
-      return MountHandle();
-  }
+  return ktl::visit(
+      WhatToMount::overloaded{
+          [flags](const FileSystemHandle& fs) { return new_with_root(fs->root(), flags); },
+          [](const NamespaceNode& node) {
+            ZX_ASSERT_MSG(node.mount_.handle_.has_value(),
+                          "can't bind mount from an anonymous node");
+            // auto& mount = node.mount_.handle_.value();
+            return MountHandle();
+          }},
+      what.what_);
 }
 
 MountHandle Mount::new_with_root(DirEntryHandle root, MountFlags flags) {

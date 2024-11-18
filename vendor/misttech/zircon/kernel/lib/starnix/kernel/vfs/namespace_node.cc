@@ -314,6 +314,15 @@ PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> 
   return PathWithReachability::Reachable(path.build_absolute());
 }
 
+fit::result<Errno> NamespaceNode::mount(WhatToMount what, MountFlags flags) const {
+  return fit::error(errno(ENOTSUP));
+}
+
+/// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
+fit::result<Errno> NamespaceNode::unmount(UnmountFlags flags) const {
+  return fit::error(errno(ENOTSUP));
+}
+
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {
   return entry_->node_->readlink(current_task);
 }

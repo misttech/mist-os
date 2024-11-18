@@ -6,6 +6,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_MOUNT_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
@@ -14,7 +15,6 @@
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
-#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_counted_upgradeable.h>
@@ -26,6 +26,9 @@
 
 namespace starnix {
 
+using starnix_uapi::Errno;
+using starnix_uapi::MountFlags;
+
 class Mount;
 class FileSystem;
 class DirEntry;
@@ -33,7 +36,6 @@ class DirEntry;
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FileSystemHandle = fbl::RefPtr<FileSystem>;
 using MountHandle = fbl::RefPtr<Mount>;
-using starnix_uapi::MountFlags;
 
 struct MountState {
  private:
@@ -49,7 +51,7 @@ struct MountState {
   // root of the inner mount as a mountpoint. For example, if filesystem A is mounted at /foo,
   // mounting filesystem B on /foo will create the mount as a child of the A mount, attached to
   // A's root, instead of the root mount.
-  // submounts: HashMap<ArcKey<DirEntry>, MountHandle>,
+  fbl::WAVLTree<fbl::RefPtr<DirEntry>, MountHandle> submounts;
 
   /// The membership of this mount in its peer group. Do not access directly. Instead use
   /// peer_group(), take_from_peer_group(), and set_peer_group().
@@ -66,14 +68,32 @@ struct MountState {
   friend class Mount;
 };
 
-enum class WhatToMountEnum : uint8_t {
-  Fs,
-  Bind,
-};
+class WhatToMount {
+ public:
+  using Variant = ktl::variant<FileSystemHandle, NamespaceNode>;
 
-struct WhatToMount {
-  WhatToMountEnum type;
-  ktl::variant<FileSystemHandle, NamespaceNode> what;
+  static WhatToMount Fs(FileSystemHandle fs);
+
+  static WhatToMount Bind(NamespaceNode node);
+
+  // C++
+  ~WhatToMount();
+
+ private:
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  friend class Mount;
+  explicit WhatToMount(Variant what);
+
+  Variant what_;
 };
 
 /// An instance of a filesystem mounted in a namespace.
@@ -84,7 +104,8 @@ struct WhatToMount {
 ///
 /// The mounts in a namespace form a mount tree, with `mountpoint` pointing to the parent and
 /// `submounts` pointing to the children.
-class Mount : public fbl::RefCountedUpgradeable<Mount> {
+class Mount : public fbl::WAVLTreeContainable<fbl::RefPtr<Mount>>,
+              public fbl::RefCountedUpgradeable<Mount> {
  private:
   DirEntryHandle root_;
 
@@ -124,6 +145,8 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
   MountFlags flags() const;
 
   // C++
+  fbl::RefPtr<DirEntry> GetKey() const;
+
   ~Mount();
 
  private:

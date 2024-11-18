@@ -36,6 +36,7 @@ class Task;
 class FsNode;
 class LookupContext;
 class SymlinkTarget;
+class WhatToMount;
 
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FileHandle = fbl::RefPtr<FileObject>;
@@ -198,10 +199,10 @@ class NamespaceNode {
   /// A task may have a custom root set by `chroot`.
   PathWithReachability path_from_root(ktl::optional<NamespaceNode>) const;
 
-  // fit::result<Errno> mount(WhatToMount what, MountFlags flags);
+  fit::result<Errno> mount(WhatToMount what, MountFlags flags) const;
 
   /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
-  fit::result<Errno> unmount(UnmountFlags flags);
+  fit::result<Errno> unmount(UnmountFlags flags) const;
 
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
