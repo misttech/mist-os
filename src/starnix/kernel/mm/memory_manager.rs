@@ -268,9 +268,9 @@ impl MappingFlags {
         mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits())
     }
 
-    #[cfg(feature = "alternate_anon_allocs")]
+    #[cfg(any(feature = "alternate_anon_allocs", test))]
     fn options(&self) -> MappingOptions {
-        MappingOptions::from_bits_truncate(self.bits() << 3)
+        MappingOptions::from_bits_truncate(self.bits() >> 3)
     }
 
     fn from_access_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
@@ -4426,6 +4426,20 @@ mod tests {
     };
     use std::ffi::CString;
     use zerocopy::KnownLayout;
+
+    #[::fuchsia::test]
+    fn test_mapping_flags() {
+        let options = MappingOptions::ANONYMOUS;
+        let access_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
+        let mapping_flags = MappingFlags::from_access_flags_and_options(access_flags, options);
+        assert_eq!(mapping_flags.access_flags(), access_flags);
+        assert_eq!(mapping_flags.options(), options);
+
+        let new_access_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
+        let adusted_mapping_flags = mapping_flags.with_access_flags(new_access_flags);
+        assert_eq!(adusted_mapping_flags.access_flags(), new_access_flags);
+        assert_eq!(adusted_mapping_flags.options(), options);
+    }
 
     #[::fuchsia::test]
     async fn test_brk() {
