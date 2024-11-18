@@ -25,12 +25,13 @@ BT_FILE_DEPS=(
 
 BT_MOCKED_TOOLS=(
   "tools/devshell/build"
+  "tools/devshell/contrib/build-main-pb"
   "tools/devshell/wait"
   "tools/devshell/shell"
   "tools/devshell/lib/updates.sh"
 )
 
-declare fx build check_package_server trigger_update commit_update
+declare fx build build_main_pb check_package_server trigger_update commit_update
 
 BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
@@ -38,6 +39,7 @@ BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   fx-config-read
   build="${BT_TEMP_DIR}/tools/devshell/build"
+  build_main_pb="${BT_TEMP_DIR}/tools/devshell/contrib/build-main-pb"
   check_package_server="${BT_TEMP_DIR}/check_package_server"
   trigger_update="${BT_TEMP_DIR}/trigger_update"
   commit_update="${BT_TEMP_DIR}/commit_update"
@@ -45,6 +47,11 @@ BT_SET_UP() {
   btf::make_mock "$trigger_update"
   btf::make_mock "$commit_update"
   local updateslib="${BT_TEMP_DIR}/tools/devshell/lib/updates.sh"
+
+  # Set up mock build API modules.
+  cat > "${FUCHSIA_BUILD_DIR}/args.json" <<EOF
+{}
+EOF
 
   cat > "${updateslib}.mock_side_effects" <<EOF
     function check-for-package-server { $check_package_server ; }
@@ -64,7 +71,8 @@ EOF
 setup_ffx() {
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" <<EOF
-   if [[ "\$@" == "target update check-now --monitor" ]]; then
+   if [[ "\$@" == "target update check-now --monitor" ]] ||
+      [[ "\$@" == "target update check-now --monitor --product-bundle" ]]; then
      $trigger_update "\$@"
      return
    else
@@ -179,6 +187,22 @@ TEST_ota_nopackageserver() {
 
   # build was not called
   BT_ASSERT_FILE_DOES_NOT_EXIST "${build}.mock_state"
+}
+
+TEST_ota_mainpb() {
+  setup_ffx
+  cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
+{
+  "main_pb_label": "//core/product:mock_product"
+}
+EOF
+
+  local out="${BT_TEMP_DIR}/_fx_ota_output"
+  BT_EXPECT ${fx} ota > "$out" 2>&1
+  # build-main-pb was called
+  BT_ASSERT_FILE_EXISTS "${build_main_pb}.mock_state"
+  # update was triggered
+  BT_ASSERT_FILE_EXISTS "${trigger_update}.mock_state"
 }
 
 BT_RUN_TESTS "$@"
