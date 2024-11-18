@@ -7,13 +7,18 @@ use ftest_manager::{CaseStatus, SuiteStatus};
 use fuchsia_component::client;
 use futures::prelude::*;
 use pretty_assertions::assert_eq;
-use test_diagnostics::collect_string_from_socket;
+use test_case::test_case;
 use test_manager_test_lib::{
-    collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
-    TestRunEventPayload,
+    collect_string_from_socket_helper, collect_suite_events, default_run_option,
+    GroupRunEventByTestCase, RunEvent, TestBuilder, TestRunEventPayload,
 };
 
-async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usize) {
+async fn debug_data_stress_test(
+    case_name: &str,
+    vmo_count: usize,
+    vmo_size: usize,
+    compressed: bool,
+) {
     const TEST_URL: &str =
         "fuchsia-pkg://fuchsia.com/test_manager_stress_test#meta/debug_data_spam_test.cm";
 
@@ -25,8 +30,11 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     options.case_filters_to_run = Some(vec![case_name.into()]);
     let suite_instance =
         builder.add_suite(TEST_URL, options).await.expect("Cannot create suite instance");
-    let (run_events_result, suite_events_result) =
-        futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+    let (run_events_result, suite_events_result) = futures::future::join(
+        builder.run_with_option(compressed),
+        collect_suite_events(suite_instance),
+    )
+    .await;
 
     let suite_events = suite_events_result.unwrap().0;
     let expected_events = vec![
@@ -46,8 +54,10 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     let test_run_events = stream::iter(run_events_result.unwrap());
     let num_vmos = test_run_events
         .then(|run_event| async move {
-            let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-            let content = collect_string_from_socket(socket).await.expect("cannot read socket");
+            let TestRunEventPayload::DebugData { filename, socket } = run_event.payload;
+            let content = collect_string_from_socket_helper(socket, compressed)
+                .await
+                .unwrap_or_else(|e| panic!("cannot read socket for {}: {:?}", &filename, e));
             content.len() == vmo_size && content.chars().all(|c| c == 'a')
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
@@ -56,18 +66,22 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     assert_eq!(num_vmos, vmo_count);
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_stress_test_many_vmos() {
+async fn debug_data_stress_test_many_vmos(compressed: bool) {
     const NUM_EXPECTED_VMOS: usize = 3250;
     const VMO_SIZE: usize = 4096;
     const CASE_NAME: &'static str = "many_small_vmos";
-    debug_data_stress_test(CASE_NAME, NUM_EXPECTED_VMOS, VMO_SIZE).await;
+    debug_data_stress_test(CASE_NAME, NUM_EXPECTED_VMOS, VMO_SIZE, compressed).await;
 }
 
+#[test_case(true; "compressed debug_data")]
+#[test_case(false; "uncompressed debug_data")]
 #[fuchsia::test]
-async fn debug_data_stress_test_few_large_vmos() {
+async fn debug_data_stress_test_few_large_vmos(compressed: bool) {
     const NUM_EXPECTED_VMOS: usize = 2;
     const VMO_SIZE: usize = 1024 * 1024 * 400;
     const CASE_NAME: &'static str = "few_large_vmos";
-    debug_data_stress_test(CASE_NAME, NUM_EXPECTED_VMOS, VMO_SIZE).await;
+    debug_data_stress_test(CASE_NAME, NUM_EXPECTED_VMOS, VMO_SIZE, compressed).await;
 }
