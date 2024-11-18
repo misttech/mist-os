@@ -15,6 +15,9 @@
 #include <ktl/enforce.h>
 
 namespace util {
+
+using mtl::BString;
+
 namespace {
 
 template <typename OutputType>

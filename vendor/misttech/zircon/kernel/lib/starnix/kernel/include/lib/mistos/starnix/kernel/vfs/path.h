@@ -15,7 +15,7 @@
 
 namespace starnix {
 
-using FsString = BString;
+using FsString = mtl::BString;
 using FsStr = ktl::string_view;
 
 constexpr char SEPARATOR = '/';

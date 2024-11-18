@@ -6,6 +6,8 @@
 
 #include <ktl/enforce.h>
 
+namespace mtl {
+
 void BString::InitWithEmpty() {
   fbl::AllocChecker ac;
   data_.reserve(1, &ac);
@@ -59,3 +61,7 @@ int BString::compare(const BString& other) const {
 bool operator==(const BString& lhs, const BString& rhs) {
   return lhs.size() == rhs.size() && memcmp(lhs.data(), rhs.data(), lhs.size()) == 0;
 }
+
+BString to_string(const BString& str) { return str; }
+
+}  // namespace mtl
