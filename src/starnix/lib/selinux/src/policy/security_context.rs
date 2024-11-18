@@ -244,11 +244,11 @@ impl SecurityContext {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityLevel {
     sensitivity: SensitivityId,
-    categories: Vec<Category>,
+    categories: Vec<CategorySpan>,
 }
 
 impl SecurityLevel {
-    pub(super) fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
+    pub(super) fn new(sensitivity: SensitivityId, categories: Vec<CategorySpan>) -> Self {
         Self { sensitivity, categories }
     }
 
@@ -279,12 +279,13 @@ impl SecurityLevel {
         if let Some(categories_str) = categories_item {
             for entry in categories_str.split(",") {
                 let category = if let Some((low, high)) = entry.split_once(".") {
-                    Category::Range {
-                        low: Self::category_id_by_name(policy_index, low)?,
-                        high: Self::category_id_by_name(policy_index, high)?,
-                    }
+                    CategorySpan::new(
+                        Self::category_id_by_name(policy_index, low)?,
+                        Self::category_id_by_name(policy_index, high)?,
+                    )
                 } else {
-                    Category::Single(Self::category_id_by_name(policy_index, entry)?)
+                    let id = Self::category_id_by_name(policy_index, entry)?;
+                    CategorySpan::new(id, id)
                 };
                 categories.push(category);
             }
@@ -330,24 +331,27 @@ impl PartialOrd for SecurityLevel {
     }
 }
 
-/// Describes an entry in a category specification, which may be an
-/// individual category, or a range.
+/// Describes an entry in a category specification, which may be a single category
+/// (in which case `low` = `high`) or a span of consecutive categories. The bounds
+/// are included in the span.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Category {
-    Single(CategoryId),
-    Range { low: CategoryId, high: CategoryId },
+pub(super) struct CategorySpan {
+    low: CategoryId,
+    high: CategoryId,
 }
 
-impl Category {
+impl CategorySpan {
+    pub(super) fn new(low: CategoryId, high: CategoryId) -> Self {
+        Self { low, high }
+    }
+
     /// Returns a byte string describing the category, or category range.
     fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
-        match self {
-            Self::Single(category) => {
-                policy_index.parsed_policy().category(*category).name_bytes().into()
-            }
-            Self::Range { low, high } => [
-                policy_index.parsed_policy().category(*low).name_bytes(),
-                policy_index.parsed_policy().category(*high).name_bytes(),
+        match self.low == self.high {
+            true => policy_index.parsed_policy().category(self.low).name_bytes().into(),
+            false => [
+                policy_index.parsed_policy().category(self.low).name_bytes(),
+                policy_index.parsed_policy().category(self.high).name_bytes(),
             ]
             .join(b".".as_ref()),
         }
@@ -389,10 +393,11 @@ mod tests {
         parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap()
     }
 
+    // Represents a `CategorySpan`.
     #[derive(Debug, Eq, PartialEq)]
-    enum CategoryItem<'a> {
-        Single(&'a str),
-        Range { low: &'a str, high: &'a str },
+    struct CategoryItem<'a> {
+        low: &'a str,
+        high: &'a str,
     }
 
     fn user_name(policy: &TestPolicy, id: UserId) -> &str {
@@ -415,21 +420,18 @@ mod tests {
         std::str::from_utf8(policy.0.parsed_policy().category(id).name_bytes()).unwrap()
     }
 
-    fn category_item<'a>(policy: &'a TestPolicy, category: &Category) -> CategoryItem<'a> {
-        match category {
-            Category::Single(id) => CategoryItem::Single(category_name(policy, *id)),
-            Category::Range { low, high } => CategoryItem::Range {
-                low: category_name(policy, *low),
-                high: category_name(policy, *high),
-            },
+    fn category_span<'a>(policy: &'a TestPolicy, category: &CategorySpan) -> CategoryItem<'a> {
+        CategoryItem {
+            low: category_name(policy, category.low),
+            high: category_name(policy, category.high),
         }
     }
 
-    fn category_items<'a>(
+    fn category_spans<'a>(
         policy: &'a TestPolicy,
-        categories: &Vec<Category>,
+        categories: &Vec<CategorySpan>,
     ) -> Vec<CategoryItem<'a>> {
-        categories.iter().map(|x| category_item(policy, x)).collect()
+        categories.iter().map(|x| category_span(policy, x)).collect()
     }
 
     #[test]
@@ -473,8 +475,8 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
     }
@@ -493,8 +495,8 @@ mod tests {
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(sensitivity_name(&policy, high_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &high_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &high_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
     }
 
@@ -509,14 +511,15 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s0");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0")]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }]
         );
+
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(sensitivity_name(&policy, high_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &high_level.categories),
-            [CategoryItem::Range { low: "c0", high: "c4" }]
+            category_spans(&policy, &high_level.categories),
+            [CategoryItem { low: "c0", high: "c4" }]
         );
     }
 
@@ -531,8 +534,8 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0"), CategoryItem::Single("c4")]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }, CategoryItem { low: "c4", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
     }
@@ -548,8 +551,8 @@ mod tests {
         assert_eq!(type_name(&policy, security_context.type_), "type0");
         assert_eq!(sensitivity_name(&policy, security_context.low_level.sensitivity), "s1");
         assert_eq!(
-            category_items(&policy, &security_context.low_level.categories),
-            [CategoryItem::Single("c0"), CategoryItem::Range { low: "c3", high: "c4" }]
+            category_spans(&policy, &security_context.low_level.categories),
+            [CategoryItem { low: "c0", high: "c0" }, CategoryItem { low: "c3", high: "c4" }]
         );
         assert_eq!(security_context.high_level, None);
     }

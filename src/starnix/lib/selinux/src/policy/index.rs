@@ -6,7 +6,7 @@ use super::arrays::{Context, FsContext, FsUseType};
 use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{Category, SecurityContext, SecurityContextError, SecurityLevel};
+use super::security_context::{CategorySpan, SecurityContext, SecurityContextError, SecurityLevel};
 use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
     Permission,
@@ -403,17 +403,13 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         )
     }
 
-    /// Helper used by `security_level()` to create a `Category` instance from policy fields.
-    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> Category {
+    /// Helper used by `security_level()` to create a `CategorySpan` instance from policy fields.
+    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> CategorySpan {
         // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
-        if span.low == span.high {
-            Category::Single(CategoryId(NonZeroU32::new(span.low + 1).unwrap()))
-        } else {
-            Category::Range {
-                low: CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
-                high: CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
-            }
-        }
+        CategorySpan::new(
+            CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
+            CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
+        )
     }
 
     fn role_transition_new_role(
