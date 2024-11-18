@@ -78,14 +78,14 @@ inline BootstrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_
   using Dyn = elfldltl::Elf<>::Dyn;
   using size_type = elfldltl::Elf<>::size_type;
 
-  // We want this object to be in bss to reduce the amount of data pages which need COW. In general
-  // the only data/bss we want should be part of `_ld_abi`, but the vdso module will always be in
-  // the `_ld_abi` list so it is safe to keep this object in .bss. It will be protected to read only
-  // later. The explicit .bss section attribute ensures this object is zero initialized, we will get
-  // an assembler error otherwise. We also rely on this when only initializing some of the members
-  // of `vdso`.
-  [[gnu::section(".bss.vdso_module")]] __CONSTINIT static abi::Abi<>::Module vdso{
-      elfldltl::kLinkerZeroInitialized};
+  // We want this object to be in bss to reduce the amount of data pages which
+  // need COW.  In general the only data/bss we want should be part of
+  // `_ld_abi`, but the vdso module will always be in the `_ld_abi` list so it
+  // is safe to keep this object in .bss.  It will be protected to read-only
+  // later.  The explicit .bss section attribute ensures this object is zero
+  // initialized, we will get an assembler error otherwise.
+  [[gnu::section(".bss.vdso_module")]] constinit static abi::Abi<>::Module vdso =
+      abi::Abi<>::Module::LinkerZeroInitialized();
   vdso.InitLinkerZeroInitialized();
 
 #ifndef __Fuchsia__
@@ -146,10 +146,9 @@ inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>:
   // `_ld_abi`, but the self module will always be in the `_ld_abi` list so it
   // is safe to keep this object in .bss.  It will be protected to read only
   // later.  The explicit .bss section attribute ensures this object is zero
-  // initialized, we will get an assembler error otherwise.  We also rely on
-  // this when only initializing some of the members of `self`.
-  [[gnu::section(".bss.self_module")]] __CONSTINIT static abi::Abi<>::Module self{
-      elfldltl::kLinkerZeroInitialized};
+  // initialized, we will get an assembler error otherwise.
+  [[gnu::section(".bss.self_module")]] constinit static abi::Abi<>::Module self =
+      abi::Abi<>::Module::LinkerZeroInitialized();
   // Note, this call could be elided because it only sets `symbols` which will
   // be immediately replaced.  In case this function changes to do more we
   // should keep the call.  The compiler should be smart enough to figure out

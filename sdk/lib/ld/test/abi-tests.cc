@@ -49,7 +49,7 @@ TEST(LdTests, AbiTypes) {
 
   // Test that this object is zero initialized so it can be put in bss.
   alignas(Module) std::array<std::byte, sizeof(Module)> storage{};
-  new (&storage) Module(elfldltl::kLinkerZeroInitialized);
+  new (&storage) Module(Module::LinkerZeroInitialized());
   EXPECT_THAT(storage, testing::Each(testing::Eq(std::byte(0))));
 }
 

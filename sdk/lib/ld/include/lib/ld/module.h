@@ -46,10 +46,11 @@ namespace abi {
 
 template <class Elf, class AbiTraits>
 struct Abi<Elf, AbiTraits>::Module {
-  constexpr Module() = default;
-
-  constexpr explicit Module(elfldltl::LinkerZeroInitialized)
-      : symbols(elfldltl::kLinkerZeroInitialized) {}
+  // This can be used in an initializer to allow the variable to go into bss.
+  // InitLinkerZeroInitialized() must be called before the variable is used.
+  static constexpr Module LinkerZeroInitialized() {
+    return Module{.symbols{elfldltl::kLinkerZeroInitialized}};
+  }
 
   constexpr void InitLinkerZeroInitialized() { symbols.InitLinkerZeroInitialized(); }
 
