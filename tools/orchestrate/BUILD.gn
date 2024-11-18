@@ -72,7 +72,7 @@ go_binary("orchestrate") {
 sdk_host_tool("orchestrate_sdk") {
   category = "partner"
   output_name = "orchestrate"
-  deps = [ "//tools/orchestrate" ]
+  deps = [ ":orchestrate" ]
 }
 
 group("tests") {
