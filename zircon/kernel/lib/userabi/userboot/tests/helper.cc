@@ -33,10 +33,22 @@ class UserbootServer final : public fidl::WireServer<fuchsia_boot::Userboot> {
     stash_svc_ = request->stash_svc_endpoint.TakeChannel();
   }
 
+  void PostBootfsFiles(PostBootfsFilesRequestView request,
+                       PostBootfsFilesCompleter::Sync& completer) final {
+    for (auto& entry : request->files) {
+      entries_.emplace_back(BootfsFileVmo{
+          .offset = entry.offset,
+          .contents = std::move(entry.contents),
+      });
+    }
+  }
+
   zx::channel take_stash_svc() { return std::move(stash_svc_); }
+  std::vector<BootfsFileVmo> take_bootfs_entries() { return std::move(entries_); }
 
  private:
   zx::channel stash_svc_;
+  std::vector<BootfsFileVmo> entries_;
 };
 
 class StashSvcServer final : public fidl::WireServer<fuchsia_boot::SvcStash> {

@@ -918,6 +918,9 @@ impl BuiltinEnvironment {
                             svc_stash_provider =
                                 Some(SvcStashCapability::new(stash_svc_endpoint.into_channel()));
                         }
+                        UserbootRequest::PostBootfsFiles { .. } => {
+                            // Nothing Yet.
+                        }
                     }
                 }
             } else if let Err(err) = messages {

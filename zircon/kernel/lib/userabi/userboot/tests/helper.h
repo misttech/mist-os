@@ -33,6 +33,11 @@ struct DebugDataMessageView {
   const Message* message = nullptr;
 };
 
+struct BootfsFileVmo {
+  uint32_t offset;
+  zx::vmo contents;
+};
+
 // Out parameters are used so that the implementation can use |ASSERT_*| macros and
 // verified with |ASSERT_NON_FATAL_FAILURES|.
 
