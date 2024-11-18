@@ -27,7 +27,10 @@ pub enum Message {
     SetCpuPerformanceInfo(Vec<sys::zx_cpu_performance_info_t>),
 
     // Issues the zx_system_set_processor_power_domain syscall.
-    SetCpuProcessorPowerDomain(PowerLevelDomain, sys::zx_handle_t),
+    SetProcessorPowerDomain(PowerLevelDomain, sys::zx_handle_t),
+
+    // Issues the zx_system_set_processor_power_state syscall.
+    SetProcessorPowerState(sys::zx_handle_t, sys::zx_processor_power_state_t),
 
     /// Get the current operating point
     GetOperatingPoint,
@@ -60,7 +63,10 @@ pub enum MessageReturn {
     SetCpuPerformanceInfo,
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
-    SetCpuProcessorPowerDomain,
+    SetProcessorPowerDomain,
+
+    /// There is no arg in this MessageReturn type. It only serves as an ACK.
+    SetProcessorPowerState,
 
     /// Arg: the operating point returned from the node
     GetOperatingPoint(u32),
