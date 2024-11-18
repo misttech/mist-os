@@ -30,7 +30,6 @@ FIREWALL_TOOLS=(
   netls
   netruncmd
   onet
-  pm
   scrutiny
   sockscripter
   triage
