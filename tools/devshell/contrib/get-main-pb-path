@@ -6,7 +6,7 @@
 #### CATEGORY=Build
 ### get the output path to the provided product bundle
 
-## usage: fx get-product-path //products/minimal:product_bundle.x64
+## usage: fx get-main-pb-path //products/minimal:product_bundle.x64
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "$SCRIPT_DIR/../lib/vars.sh" || exit $?

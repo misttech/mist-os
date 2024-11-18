@@ -186,7 +186,7 @@ type setArgs struct {
 
 	buildEventService string
 
-	mainProductLabel string
+	mainPbLabel string
 
 	includeClippy bool
 
@@ -248,7 +248,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.StringVar(&cmd.buildEventService, "bes", "", "")
 
-	flagSet.StringVar(&cmd.mainProductLabel, "main-product", "", "")
+	flagSet.StringVar(&cmd.mainPbLabel, "main-pb", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
@@ -449,7 +449,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	return &fintpb.Static{
 		Board:               boardPath,
 		Product:             productPath,
-		MainProductLabel:    args.mainProductLabel,
+		MainPbLabel:         args.mainPbLabel,
 		Optimize:            optimize,
 		BasePackages:        args.basePackages,
 		CachePackages:       args.cachePackages,

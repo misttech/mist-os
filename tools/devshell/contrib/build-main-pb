@@ -15,6 +15,6 @@ fx-config-read
 
 set -e
 
-product=$(fx-command-run get-product)
+product=$(fx-command-run get-main-pb)
 echo "Building $product..."
 fx-command-run build "$product"

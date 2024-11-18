@@ -137,7 +137,7 @@
 ##                         multiple times with different ASSEMBLY_TARGET labels.
 ##                         if the 'ASSEMBLY_TARGET=' portion is omitted, the
 ##                         "main" assembly for the product will be assumed.
-##   --main-product        Build label for the main product bundle to work with.
+##   --main-pb             Build label for the main product bundle to work with.
 ##                         Useful for multi-product builds.
 ##
 ## Example:
