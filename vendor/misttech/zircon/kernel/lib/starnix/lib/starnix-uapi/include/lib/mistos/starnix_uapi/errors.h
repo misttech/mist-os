@@ -182,14 +182,14 @@ SourceContext<E, T...> make_source_context(fit::result<E, T...> result) {
 
 #define ERRNO_GET_MACRO(_1, _2, NAME, ...) NAME
 
-#define ERRNO_1(err)                                                     \
-  starnix_uapi::Errno::New(starnix_uapi::ErrnoCode(err, STRINGIFY(err)), \
-                           std::source_location::current())
+#define ERRNO_1(err, name) \
+  starnix_uapi::Errno::New(starnix_uapi::ErrnoCode(err, name), std::source_location::current())
 
-#define ERRNO_2(err, ctx)                                                              \
-  starnix_uapi::Errno::with_context(starnix_uapi::ErrnoCode(err, STRINGIFY(err)), ctx, \
-                                    std::source_location::current())
+#define ERRNO_2(err, name, ctx)                                         \
+  starnix_uapi::Errno::with_context(starnix_uapi::ErrnoCode(err, name), \
+                                    std::source_location::current(), ctx)
 
-#define errno(...) ERRNO_GET_MACRO(__VA_ARGS__, ERRNO_2, ERRNO_1)(__VA_ARGS__)
+#define errno(err, ...) \
+  ERRNO_GET_MACRO(err, ##__VA_ARGS__, ERRNO_2, ERRNO_1)(err, #err, ##__VA_ARGS__)
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_

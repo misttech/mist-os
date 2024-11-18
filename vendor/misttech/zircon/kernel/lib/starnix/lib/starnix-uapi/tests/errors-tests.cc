@@ -28,6 +28,35 @@ bool basic_errno_formatting() {
   END_TEST;
 }
 
+bool macro_errno_formatting() {
+  BEGIN_TEST;
+
+  auto err = errno(ENOENT);
+  ktl::string_view expected_prefix = "errno ENOENT(2) from"sv;
+
+  ASSERT_BYTES_EQ((const uint8_t*)(expected_prefix.data()),
+                  (const uint8_t*)(err.to_string().data()), expected_prefix.size());
+
+  END_TEST;
+}
+
+bool macro_errno_with_context_formatting() {
+  BEGIN_TEST;
+
+  auto err = errno(ENOENT, "TEST CONTEXT"sv);
+  ktl::string_view expected_prefix = "errno ENOENT(2) from"sv;
+  ktl::string_view expected_suffix = ", context: TEST CONTEXT"sv;
+
+  auto err_str = err.to_string();
+  ASSERT_BYTES_EQ((const uint8_t*)(expected_prefix.data()), (const uint8_t*)(err_str.data()),
+                  expected_prefix.size());
+  ASSERT_BYTES_EQ((const uint8_t*)(expected_suffix.data()),
+                  (const uint8_t*)(err_str.data() + err_str.size() - expected_suffix.size()),
+                  expected_suffix.size());
+
+  END_TEST;
+}
+
 bool context_errno_formatting() {
   BEGIN_TEST;
 
@@ -87,6 +116,8 @@ bool source_context() {
 
 UNITTEST_START_TESTCASE(starnix_uapi_errors)
 UNITTEST("basic errno formatting", unit_testing::basic_errno_formatting)
+UNITTEST("macro errno formatting", unit_testing::macro_errno_formatting)
+UNITTEST("macro errno with context formatting", unit_testing::macro_errno_with_context_formatting)
 UNITTEST("context errno formatting", unit_testing::context_errno_formatting)
 UNITTEST("with source context", unit_testing::with_source_context)
 UNITTEST("source context", unit_testing::source_context)
