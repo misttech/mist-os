@@ -53,7 +53,7 @@ pub struct TypeId(NonZeroU32);
 pub struct SensitivityId(NonZeroU32);
 
 /// Identifies a security category within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct CategoryId(NonZeroU32);
 
 /// Identifies a class within a policy.

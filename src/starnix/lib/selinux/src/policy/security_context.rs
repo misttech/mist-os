@@ -279,10 +279,12 @@ impl SecurityLevel {
         if let Some(categories_str) = categories_item {
             for entry in categories_str.split(",") {
                 let category = if let Some((low, high)) = entry.split_once(".") {
-                    CategorySpan::new(
-                        Self::category_id_by_name(policy_index, low)?,
-                        Self::category_id_by_name(policy_index, high)?,
-                    )
+                    let low = Self::category_id_by_name(policy_index, low)?;
+                    let high = Self::category_id_by_name(policy_index, high)?;
+                    if high <= low {
+                        return Err(SecurityContextError::InvalidSyntax);
+                    }
+                    CategorySpan::new(low, high)
                 } else {
                     let id = Self::category_id_by_name(policy_index, entry)?;
                     CategorySpan::new(id, id)
@@ -290,8 +292,34 @@ impl SecurityLevel {
                 categories.push(category);
             }
         }
+        if categories.is_empty() {
+            return Ok(Self { sensitivity, categories });
+        }
+        // Represent the set of category IDs in the following normalized form:
+        // - Consecutive IDs are coalesced into spans.
+        // - The list of spans is sorted by ID.
+        //
+        // 1. Sort by lower bound, then upper bound.
+        categories.sort_by(|x, y| (x.low, x.high).cmp(&(y.low, y.high)));
+        // 2. Merge overlapping and adjacent ranges.
+        let categories = categories.into_iter();
+        let normalized =
+            categories.fold(vec![], |mut normalized: Vec<CategorySpan>, current: CategorySpan| {
+                if let Some(last) = normalized.last_mut() {
+                    if current.low <= last.high
+                        || (u32::from(current.low.0) - u32::from(last.high.0) == 1)
+                    {
+                        *last = CategorySpan::new(last.low, current.high)
+                    } else {
+                        normalized.push(current);
+                    }
+                    return normalized;
+                }
+                normalized.push(current);
+                normalized
+            });
 
-        Ok(Self { sensitivity, categories })
+        Ok(Self { sensitivity, categories: normalized })
     }
 
     /// Returns a byte string describing the security level sensitivity and
@@ -482,6 +510,40 @@ mod tests {
     }
 
     #[test]
+    fn parse_security_context_and_normalize_categories() {
+        let policy = &test_policy();
+        let normalize = {
+            |security_context: &str| -> String {
+                String::from_utf8(
+                    policy.serialize_security_context(
+                        &policy
+                            .parse_security_context(security_context.into())
+                            .expect("creating security context should succeed"),
+                    ),
+                )
+                .unwrap()
+            }
+        };
+        // Overlapping category ranges are merged.
+        assert_eq!(normalize("user0:object_r:type0:s1:c0.c1,c1"), "user0:object_r:type0:s1:c0.c1");
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c0.c2,c1.c2"),
+            "user0:object_r:type0:s1:c0.c2"
+        );
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c0.c2,c1.c3"),
+            "user0:object_r:type0:s1:c0.c3"
+        );
+        // Adjacent category ranges are merged.
+        assert_eq!(normalize("user0:object_r:type0:s1:c0.c1,c2"), "user0:object_r:type0:s1:c0.c2");
+        // Category ranges are ordered by first element.
+        assert_eq!(
+            normalize("user0:object_r:type0:s1:c2.c3,c0"),
+            "user0:object_r:type0:s1:c0,c2.c3"
+        );
+    }
+
+    #[test]
     fn parse_security_context_with_sensitivity_range_and_category_interval() {
         let policy = test_policy();
         let security_context = policy
@@ -566,6 +628,8 @@ mod tests {
             "user0:object_r:type0",
             "user0:object_r:type0:s0-",
             "user0:object_r:type0:s0:s0:s0",
+            "user0:object_r:type0:s0:c0.c0", // Category upper bound is equal to lower bound.
+            "user0:object_r:type0:s0:c1.c0", // Category upper bound is less than lower bound.
         ] {
             assert_eq!(
                 policy.parse_security_context(invalid_label.as_bytes().into()),
