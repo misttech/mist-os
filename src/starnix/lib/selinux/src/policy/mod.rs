@@ -124,6 +124,12 @@ impl std::ops::BitOr for AccessVector {
     }
 }
 
+impl std::ops::BitAndAssign for AccessVector {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0
+    }
+}
+
 impl std::ops::BitOrAssign for AccessVector {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0

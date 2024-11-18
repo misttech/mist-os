@@ -104,10 +104,6 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
             // If the access decision indicates that the source domain is permissive then permit
             // all access.
             result.permit = true;
-
-            // TODO: https://fxbug.dev/379153786 - Don't audit permissive types, to reduce log
-            // overload in tests, until "dontaudit" is available.
-            result.audit = false;
         }
     }
 

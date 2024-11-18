@@ -1083,9 +1083,7 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            // TODO: https://fxbug.dev/379153786 - Don't audit permissive types, to reduce log
-            // overload in tests, until "dontaudit" is available.
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: true }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1106,9 +1104,7 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            // TODO: https://fxbug.dev/379153786 - Don't audit permissive types, to reduce log
-            // overload in tests, until "dontaudit" is available.
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: true }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1116,6 +1112,43 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+    }
+
+    #[test]
+    fn auditallow_and_dontaudit() {
+        let security_server = security_server_with_tests_policy();
+        security_server.set_enforcing(true);
+        assert!(security_server.is_enforcing());
+
+        let audit_sid = security_server
+            .security_context_to_sid("user0:object_r:test_audit_t:s0".into())
+            .unwrap();
+
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants the domain self-fork permission, and marks it audit-allow.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+
+        // Self-setsched permission is granted, and marked dont-audit, which takes no effect.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::SetSched),
+            PermissionCheckResult { permit: true, audit: false }
+        );
+
+        // Self-getsched permission is denied, but marked dont-audit.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: false, audit: false }
+        );
+
+        // Self-getpgid permission is denied, with neither audit-allow nor dont-audit.
+        assert_eq!(
+            permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetPgid),
             PermissionCheckResult { permit: false, audit: true }
         );
     }

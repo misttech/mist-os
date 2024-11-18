@@ -215,9 +215,15 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         }
     }
 
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists.
+    /// Computes the access granted to `source_type` on `target_type`, for the specified
+    /// `target_class`. The result is a set of access vectors with bits set for each
+    /// `target_class` permission, describing which permissions are allowed/denied, and
+    /// which should have access checks audit-logged when denied, or allowed.
+    ///
+    /// An [`AccessDecision`] is accumulated, starting from no permissions to be granted,
+    /// nor audit-logged if allowed, and all permissions to be audit-logged if denied.
+    /// Matching policy statements then add permissions to the granted & audit-allow sets,
+    /// or remove them from the audit-deny set.
     pub(super) fn compute_explicitly_allowed(
         &self,
         source_type: TypeId,
@@ -227,9 +233,17 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
+        let mut computed_audit_allow = AccessVector::NONE;
+        let mut computed_audit_deny = AccessVector::ALL;
+
         for access_vector in self.access_vectors.data.iter() {
-            // Concern ourselves only with explicit `allow [...];` policy statements.
-            if !access_vector.is_allow() {
+            // Ignore `access_vector` entries not relayed to "allow" or audit statements.
+            // TODO: https://fxbug.dev/379657220 - Can an `access_vector` entry express e.g. both
+            // "audit" and "auditallow" at the same time?
+            if !access_vector.is_allow()
+                && !access_vector.is_auditallow()
+                && !access_vector.is_dontaudit()
+            {
                 continue;
             }
 
@@ -263,7 +277,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // Multiple attributes may be associated with source/target types. Accumulate
             // explicitly allowed permissions into `computed_access_vector`.
             if let Some(permission_mask) = access_vector.permission_mask() {
-                computed_access_vector |= AccessVector::from_raw(permission_mask.get());
+                if access_vector.is_allow() {
+                    // `permission_mask` has bits set for each permission allowed by this rule.
+                    computed_access_vector |= AccessVector::from_raw(permission_mask.get());
+                } else if access_vector.is_auditallow() {
+                    // `permission_mask` has bits set for each permission to audit when allowed.
+                    computed_audit_allow |= AccessVector::from_raw(permission_mask.get());
+                } else if access_vector.is_dontaudit() {
+                    // `permission_mask` has bits cleared for each permission not to audit on denial.
+                    computed_audit_deny &= AccessVector::from_raw(permission_mask.get());
+                }
             }
         }
 
@@ -274,8 +297,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         }
         AccessDecision {
             allow: computed_access_vector,
-            auditallow: AccessVector::NONE,
-            auditdeny: AccessVector::ALL,
+            auditallow: computed_audit_allow,
+            auditdeny: computed_audit_deny,
             flags,
         }
     }
