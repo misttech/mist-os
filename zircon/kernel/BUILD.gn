@@ -925,6 +925,7 @@ if (!is_efi_toolchain) {
     testonly = true
     deps = [
       ":kernel-unittests-boot-test",
+      ":kernel-unittests-boot-test-bypass-debuglog",
       "phys:boot_tests",
       "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
     ]
@@ -935,20 +936,40 @@ if (!is_efi_toolchain) {
     }
   }
 
-  kernel_shell_script_test("kernel-unittests-boot-test") {
-    environments = kernel_test_environments
-    deps = [
-      ":kernel(:kernel_$current_cpu)",
-      "//zircon/system/utest/core:core-tests-standalone.args",
-    ]
-    script = [
-      "ut all",
-      "and ut -r 10 timer",
-      "and ut -r 10 pi",
-      "boot-test-success",
-      "graceful-shutdown",
-    ]
+  template("kernel_unittests_boot_test") {
+    kernel_shell_script_test(target_name) {
+      environments = kernel_test_environments
+      deps = [
+        ":kernel(:kernel_$current_cpu)",
+        "//zircon/system/utest/core:core-tests-standalone.args",
+      ]
+      script = [
+        "ut all",
+        "and ut -r 10 timer",
+        "and ut -r 10 pi",
+        "boot-test-success",
+        "graceful-shutdown",
+      ]
+      deps += invoker.deps
+    }
   }
+
+  kernel_unittests_boot_test("kernel-unittests-boot-test") {
+    deps = []
+  }
+
+  # In strange failure modes, the bypass-debuglog version may get more useful
+  # logging out than the normal one, though it may also greatly perturb the
+  # timing and hardware interactions of the test.  Running both versions in
+  # automation gives the best chance of logs from one of them being helpful.
+  kernel_unittests_boot_test("kernel-unittests-boot-test-bypass-debuglog") {
+    deps = [ ":bypass-debuglog" ]
+  }
+}
+
+kernel_cmdline("bypass-debuglog") {
+  testonly = true
+  args = [ "kernel.bypass-debuglog" ]
 }
 
 foreach(cpu, standard_fuchsia_cpus) {
