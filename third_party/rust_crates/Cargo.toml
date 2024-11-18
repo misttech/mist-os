@@ -280,6 +280,7 @@ vk-sys = "0.7.0"
 
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
+askama = { version = "0.12.1", default-features = false, features = ["config"] }
 async-executor = "1.5.0"
 async-fs = "1.6.0"
 async-io = "1.12.0"
@@ -377,6 +378,7 @@ windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-ta
 windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
+askama_derive = { path = "forks/askama_derive" }
 async-io = { path = "forks/async-io" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
@@ -478,6 +480,13 @@ rustflags = []
 #visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
 # FIXME: temporarily allow anyone to depend on 0.13.0 to enable a soft migration.
 visibility = [":*", "//*"]
+
+[gn.package.basic-toml."0.1.9"]
+env_vars = [
+  "CARGO_PKG_VERSION_MAJOR=0",
+  "CARGO_PKG_VERSION_MINOR=1",
+  "CARGO_PKG_VERSION_PATCH=9",
+]
 
 [gn.package.bitflags."1.3.2"]
 visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
@@ -626,6 +635,9 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 
 [gn.package.memoffset."0.9.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
+
+[gn.package.mime_guess."2.0.5"]
+env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
 [gn.package.mock-omaha-server."0.3.1"]
 rustflags = ["--cfg=fasync"]

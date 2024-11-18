@@ -1,0 +1,24 @@
+Name: askama_derive
+License File: LICENSE-APACHE, LICENSE-MIT
+Description: Askama implements a template rendering engine based on Jinja.
+
+# What is this crate used for?
+
+Type-safe text templating in Rust.
+
+# Are there any use restrictions? i.e. only for development hosts
+
+This is only used in host-side tooling.
+
+# What differs from upstream? Include a changelog if feasible.
+
+Two calls to `include_bytes!` have been changed. They now canonicalize their paths before emitting
+them.
+
+# Are there any restrictions to how it should be rolled?
+
+No.
+
+# Is there anything else which makes this dependency "special"?
+
+No.
