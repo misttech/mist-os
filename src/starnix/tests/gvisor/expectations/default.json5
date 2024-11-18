@@ -607,6 +607,7 @@
                 "ProcPidFile.SubprocessRunning",
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",
+                "ProcSelfMaps.AnonNameSharedAnon",
                 "ProcTask.TaskDirHasCorrectMetadata",
                 "ProcTask.VerifyTaskChildren",
                 "ProcTask.VerifyTaskDirNlinks",
