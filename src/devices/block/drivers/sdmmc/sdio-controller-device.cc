@@ -159,19 +159,10 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
     return st;
   }
 
-  const bool sdio_irq_supported =
-      sdmmc_->RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_) == ZX_OK;
-
   // 0 is the common function. Already initialized
   for (size_t i = 1; i < hw_info_.num_funcs; i++) {
     if ((st = InitFunc(static_cast<uint8_t>(i))) != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to initialize function %zu, retcode = %d", i, st);
-      return st;
-    }
-
-    if (sdio_irq_supported &&
-        (st = zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &sdio_irqs_[i])) != ZX_OK) {
-      FDF_LOGL(ERROR, logger(), "Failed to create virtual interrupt for function %zu: %d", i, st);
       return st;
     }
   }
@@ -197,6 +188,15 @@ zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
     return ZX_OK;
   }
 
+  for (uint32_t i = 1; i < hw_info_.num_funcs; i++) {
+    zx_status_t status = zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &sdio_irqs_[i]);
+    if (status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to create virtual interrupt for function %u: %s", i,
+               zx_status_get_string(status));
+      return status;
+    }
+  }
+
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sdio-irq-thread",
       [&](fdf_dispatcher_t*) { irq_shutdown_completion_.Signal(); });
@@ -206,6 +206,19 @@ zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
     return dispatcher.status_value();
   }
   irq_dispatcher_ = *std::move(dispatcher);
+
+  // Do this last, as we may be called at any time on any thread after registering the callback.
+  zx_status_t status = sdmmc_->RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_);
+  if (status != ZX_OK) {
+    in_band_interrupt_supported_ = false;
+
+    // Stop the dispatcher if in-band interrupts are not supported. We won't attempt to do any of
+    // this again, so there is no need to reset any state.
+    irq_dispatcher_.ShutdownAsync();
+    irq_shutdown_completion_.Wait();
+    return status;
+  }
+
   return ZX_OK;
 }
 
@@ -546,7 +559,7 @@ zx_status_t SdioControllerDevice::SdioGetInBandIntr(uint8_t fn_idx, zx::interrup
   if (!SdioFnIdxValid(fn_idx) || fn_idx == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (!sdio_irqs_[fn_idx].is_valid()) {
+  if (!in_band_interrupt_supported_) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

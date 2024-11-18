@@ -159,8 +159,11 @@ zx_status_t FakeSdmmcDevice::SdmmcRequestInternal(const sdmmc_req_t& req, uint32
 
 zx_status_t FakeSdmmcDevice::SdmmcRegisterInBandInterrupt(
     const in_band_interrupt_protocol_t* interrupt_cb) {
-  interrupt_cb_ = *interrupt_cb;
-  return ZX_OK;
+  if (in_band_interrupt_supported_) {
+    interrupt_cb_ = *interrupt_cb;
+    return ZX_OK;
+  }
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t FakeSdmmcDevice::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,

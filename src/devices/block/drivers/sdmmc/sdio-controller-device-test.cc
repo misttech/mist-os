@@ -419,6 +419,28 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
   EXPECT_OK(interrupt4.ack());
 }
 
+TEST_F(SdioControllerDeviceTest, InterruptNotSupported) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(7);
+  });
+
+  sdmmc_.set_in_band_interrupt_supported(false);
+
+  ASSERT_OK(StartDriver());
+
+  fidl::WireClient client1 = ConnectDeviceClient(1);
+  ASSERT_TRUE(client1.is_valid());
+
+  client1->GetInBandIntr().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+  });
+  driver_test().runtime().RunUntilIdle();
+
+  // The SDIO driver should have created an interrupt dispatcher, then stopped it after the fake
+  // SDMMC driver returned an error. Verify that the SDIO driver can still shut down cleanly.
+}
+
 TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   // Report five IO functions.
   sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
