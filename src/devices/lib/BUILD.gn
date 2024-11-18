@@ -25,5 +25,6 @@ group("tests") {
     "goldfish/pipe_io:tests",
     "mmio:tests",
     "synchronous-executor:tests",
+    "thermal:tests",
   ]
 }

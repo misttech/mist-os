@@ -10,6 +10,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/thermal/metadata.h>
 #include <lib/thermal/ntc.h>
 #include <limits.h>
 

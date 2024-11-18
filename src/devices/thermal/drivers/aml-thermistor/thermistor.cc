@@ -11,6 +11,7 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio.h>
+#include <lib/thermal/metadata.h>
 #include <lib/zx/interrupt.h>
 #include <string.h>
 #include <zircon/types.h>

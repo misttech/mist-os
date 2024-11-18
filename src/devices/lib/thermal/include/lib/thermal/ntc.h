@@ -11,11 +11,6 @@
 #include <algorithm>
 #include <vector>
 
-#include <lib/ddk/metadata.h>
-
-#define NTC_CHANNELS_METADATA_PRIVATE (0x4e544300 | DEVICE_METADATA_PRIVATE)  // NTCd
-#define NTC_PROFILE_METADATA_PRIVATE (0x4e545000 | DEVICE_METADATA_PRIVATE)   // NTPd
-
 namespace thermal {
 
 static constexpr uint32_t kMaxProfileLen = 50;
@@ -53,7 +48,9 @@ class Ntc {
   // Since the thermistor is in series with a pullup resistor, we must convert our sample
   //  value to a resistance then lookup in the profile table.
   zx_status_t GetTemperatureCelsius(float norm_sample, float* out) const {
-    if ((norm_sample < 0) || (norm_sample > 1.0)) {
+    // norm_sample should never be 1.0 because that would mean there is no pullup resistor. Also,
+    // this ensures that division below is valid.
+    if ((norm_sample < 0) || (norm_sample >= 1.0)) {
       return ZX_ERR_INVALID_ARGS;
     }
     float ratio = -(norm_sample) / (norm_sample - 1);
