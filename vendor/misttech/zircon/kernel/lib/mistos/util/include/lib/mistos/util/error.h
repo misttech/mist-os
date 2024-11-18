@@ -63,7 +63,25 @@ class Error {
     fbl::AllocChecker ac;
     auto ptr = new (&ac) ErrorImpl<std::decay_t<E>>(std::forward<E>(error));
     ZX_ASSERT(ac.check());
-    inner_ = ktl::move(ptr);
+    inner_ = ptr;
+  }
+
+  Error(Error&& other) : inner_(other.inner_) { other.inner_ = nullptr; }
+  Error& operator=(Error&& other) noexcept {
+    if (this != &other) {
+      delete inner_;
+      inner_ = other.inner_;
+      other.inner_ = nullptr;
+    }
+    return *this;
+  }
+
+  Error(const Error&) = delete;
+  Error& operator=(const Error&) = delete;
+
+  ~Error() {
+    delete inner_;
+    inner_ = nullptr;
   }
 
   template <typename M>
@@ -74,7 +92,7 @@ class Error {
   template <typename C>
   Error context(C context) const {
     ContextError e{.context = context, .error = *this};
-    return Error::construct(e);
+    return Error::construct(ktl::move(e));
   }
 
   template <typename C>
@@ -84,8 +102,8 @@ class Error {
 
   template <typename C, typename E>
   static Error from_context(C context, E error) {
-    ContextError e{.context = context, .error = error};
-    return Error::construct(e);
+    ContextError e{.context = context, .error = ktl::move(error)};
+    return Error::construct(ktl::move(e));
   }
 
   BString to_string() const {
@@ -103,15 +121,10 @@ class Error {
     }
   }
 
-  /*~Error() {
-    delete inner_;
-    inner_ = nullptr;
-  }*/
-
  private:
   template <typename E>
-  static Error construct(const E& error) {
-    return Error(error);
+  static Error construct(E error) {
+    return Error(ktl::move(error));
   }
 };
 
@@ -139,11 +152,11 @@ class Context : public fit::result<E, T...> {
   template <typename C>
   fit::result<Error, T...> context(C context) {
     if (this->is_error()) {
-      const auto& error = this->error_value();
+      auto error = ktl::move(this->error_value());
       if constexpr (std::is_base_of_v<ext::StdError, std::remove_cvref_t<decltype(error)>>) {
         return fit::error(error.ext_context(context));
       }
-      return fit::error(Error::from_context(context, error));
+      return fit::error(Error::from_context(context, ktl::move(error)));
     }
     if constexpr (sizeof...(T) > 0) {
       return fit::ok(ktl::move(this->value()));
@@ -158,11 +171,11 @@ class Context : public fit::result<E, T...> {
     requires std::is_convertible_v<std::invoke_result_t<F>, C>
   fit::result<Error, T...> with_context(F&& context_fn) {
     if (this->is_error()) {
-      const auto& error = this->error_value();
+      auto error = ktl::move(this->error_value());
       if constexpr (std::is_base_of_v<ext::StdError, std::remove_cvref_t<decltype(error)>>) {
         return fit::error(error.ext_context(context_fn()));
       }
-      return fit::error(Error::from_context(context_fn(), error));
+      return fit::error(Error::from_context(context_fn(), ktl::move(error)));
     }
     if constexpr (sizeof...(T) > 0) {
       return fit::ok(ktl::move(this->value()));
