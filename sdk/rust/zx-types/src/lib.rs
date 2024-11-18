@@ -1219,6 +1219,12 @@ impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
 }
 
 #[cfg(target_arch = "aarch64")]
+multiconst!(u64, [
+    ZX_REG_CPSR_ARCH_32_MASK = 0x10;
+    ZX_REG_CPSR_THUMB_MASK = 0x20;
+]);
+
+#[cfg(target_arch = "aarch64")]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_thread_state_general_regs_t {
@@ -1233,44 +1239,89 @@ pub struct zx_thread_state_general_regs_t {
 #[cfg(target_arch = "aarch64")]
 impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
     fn from(state: &zx_restricted_state_t) -> Self {
-        Self {
-            r: [
-                state.r[0],
-                state.r[1],
-                state.r[2],
-                state.r[3],
-                state.r[4],
-                state.r[5],
-                state.r[6],
-                state.r[7],
-                state.r[8],
-                state.r[9],
-                state.r[10],
-                state.r[11],
-                state.r[12],
-                state.r[13],
-                state.r[14],
-                state.r[15],
-                state.r[16],
-                state.r[17],
-                state.r[18],
-                state.r[19],
-                state.r[20],
-                state.r[21],
-                state.r[22],
-                state.r[23],
-                state.r[24],
-                state.r[25],
-                state.r[26],
-                state.r[27],
-                state.r[28],
-                state.r[29],
-            ],
-            lr: state.r[30],
-            sp: state.sp,
-            pc: state.pc,
-            cpsr: state.cpsr as u64,
-            tpidr: state.tpidr_el0,
+        if state.cpsr as u64 & ZX_REG_CPSR_ARCH_32_MASK == ZX_REG_CPSR_ARCH_32_MASK {
+            // aarch32
+            Self {
+                r: [
+                    state.r[0],
+                    state.r[1],
+                    state.r[2],
+                    state.r[3],
+                    state.r[4],
+                    state.r[5],
+                    state.r[6],
+                    state.r[7],
+                    state.r[8],
+                    state.r[9],
+                    state.r[10],
+                    state.r[11],
+                    state.r[12],
+                    state.r[13],
+                    state.r[14],
+                    state.pc, // ELR overwrites this.
+                    state.r[16],
+                    state.r[17],
+                    state.r[18],
+                    state.r[19],
+                    state.r[20],
+                    state.r[21],
+                    state.r[22],
+                    state.r[23],
+                    state.r[24],
+                    state.r[25],
+                    state.r[26],
+                    state.r[27],
+                    state.r[28],
+                    state.r[29],
+                ],
+                lr: state.r[14], // R[14] for aarch32
+                sp: state.r[13], // R[13] for aarch32
+                // TODO(https://fxbug.dev/379669623) Should it be checked for thumb and make
+                // sure it isn't over incrementing?
+                pc: state.pc, // Zircon populated this from elr.
+                cpsr: state.cpsr as u64,
+                tpidr: state.tpidr_el0,
+            }
+        } else {
+            Self {
+                r: [
+                    state.r[0],
+                    state.r[1],
+                    state.r[2],
+                    state.r[3],
+                    state.r[4],
+                    state.r[5],
+                    state.r[6],
+                    state.r[7],
+                    state.r[8],
+                    state.r[9],
+                    state.r[10],
+                    state.r[11],
+                    state.r[12],
+                    state.r[13],
+                    state.r[14],
+                    state.r[15],
+                    state.r[16],
+                    state.r[17],
+                    state.r[18],
+                    state.r[19],
+                    state.r[20],
+                    state.r[21],
+                    state.r[22],
+                    state.r[23],
+                    state.r[24],
+                    state.r[25],
+                    state.r[26],
+                    state.r[27],
+                    state.r[28],
+                    state.r[29],
+                ],
+                lr: state.r[30],
+                sp: state.sp,
+                pc: state.pc,
+                cpsr: state.cpsr as u64,
+                tpidr: state.tpidr_el0,
+            }
         }
     }
 }
@@ -1421,7 +1472,7 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
                 registers.r[27],
                 registers.r[28],
                 registers.r[29],
-                registers.lr,
+                registers.lr, // for compat this works nicely with zircon.
             ],
             pc: registers.pc,
             tpidr_el0: registers.tpidr,
