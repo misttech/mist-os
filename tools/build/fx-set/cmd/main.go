@@ -273,6 +273,18 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return nil, err
 	}
 
+	if len(cmd.basePackages) != 0 || len(cmd.cachePackages) != 0 {
+		fmt.Fprintln(os.Stderr, "WARNING:  The --with-base and --with-cache arguments have been deprecated.")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Please switch to one of the following:")
+		fmt.Fprintln(os.Stderr, "  - Use --with-test for tests.")
+		fmt.Fprintln(os.Stderr, "  - Use developer overrides for assembly (go/fuchsia-assembly-overrides) for")
+		fmt.Fprintln(os.Stderr, "    anything that needs to be added to the base/cache package set for a product.")
+		fmt.Fprintln(os.Stderr, "  - Use --with for adding other targets to the build (such as tools not in")
+		fmt.Fprintln(os.Stderr, "    //bundles/tools).")
+		fmt.Fprintln(os.Stderr)
+	}
+
 	if cmd.buildDir == "" {
 		cmd.buildDir = defaultBuildDir
 	} else if autoDir {
