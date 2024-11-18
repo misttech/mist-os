@@ -12,6 +12,7 @@ source_set("test-utils") {
   public_deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/paver",
@@ -24,6 +25,7 @@ source_set("test-utils") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/zbi-format",
+    "//src/storage/lib/block_client/cpp:fake_device",
     "//zircon/system/ulib/zx",
   ]
 }

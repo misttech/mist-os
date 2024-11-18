@@ -181,6 +181,17 @@ impl PartitionTableEntry {
         self.as_bytes().iter().all(|b| *b == 0)
     }
 
+    pub fn empty() -> Self {
+        Self {
+            type_guid: [0u8; 16],
+            instance_guid: [0u8; 16],
+            first_lba: 0,
+            last_lba: 0,
+            flags: 0,
+            name: [0u16; 36],
+        }
+    }
+
     pub fn ensure_integrity(&self) -> Result<(), Error> {
         ensure!(self.type_guid != [0u8; 16], "Empty type GUID");
         ensure!(self.instance_guid != [0u8; 16], "Empty instance GUID");

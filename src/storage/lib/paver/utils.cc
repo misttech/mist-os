@@ -173,24 +173,4 @@ zx::result<> IsBoard(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<> IsBootloader(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                          std::string_view vendor) {
-  zx::result status =
-      component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc_root, "fuchsia.sysinfo.SysInfo");
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(status.value())->GetBootloaderVendor();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  fidl::WireResponse response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
-    return zx::error(status);
-  }
-  if (response.vendor.get() == vendor) {
-    return zx::ok();
-  }
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
 }  // namespace paver

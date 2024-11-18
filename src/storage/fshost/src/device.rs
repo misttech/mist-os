@@ -645,6 +645,11 @@ impl RegisteredDevices {
         self.0.lock().get(&tag).map(|d| d.topological_path().to_string())
     }
 
+    /// Unregisters and returns the device with the specified tag, if registered.
+    pub fn take(&self, tag: DeviceTag) -> Option<Box<dyn Device>> {
+        self.0.lock().remove(&tag)
+    }
+
     /// Returns a block_connector for the device with the specified tag.  This will wait till the
     /// device is registered.
     pub async fn get_block_connector(
@@ -657,10 +662,13 @@ impl RegisteredDevices {
     }
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DeviceTag {
     /// The fshost ramdisk device.
     Ramdisk,
+
+    /// The block device containing the partition table in which the Fuchsia system resides.
+    SystemPartitionTable,
 
     /// The Fxblob device that isn't the ramdisk.
     FxblobOnRecovery,

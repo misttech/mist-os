@@ -50,9 +50,6 @@ zx::result<> WipeBlockPartition(const paver::BlockDevices& devices,
 zx::result<> IsBoard(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
                      std::string_view board_name);
 
-zx::result<> IsBootloader(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                          std::string_view vendor);
-
 }  // namespace paver
 
 #endif  // SRC_STORAGE_LIB_PAVER_UTILS_H_
