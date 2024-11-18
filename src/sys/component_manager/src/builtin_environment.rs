@@ -293,6 +293,37 @@ impl BuiltinEnvironmentBuilder {
             .runtime_config
             .ok_or_else(|| format_err!("Runtime config is required for BuiltinEnvironment."))?;
 
+        // Drain messages from `fuchsia.boot.Userboot`, and expose appropriate capabilities.
+        let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
+            .map(zx::Channel::from)
+            .map(fasync::Channel::from_channel)
+            .map(fboot::UserbootRequestStream::from_channel);
+
+        let mut svc_stash_provider = None;
+        let mut bootfs_entries = Vec::new();
+        if let Some(userboot) = userboot {
+            let messages = userboot.try_collect::<Vec<UserbootRequest>>().await;
+
+            if let Ok(mut messages) = messages {
+                while let Some(request) = messages.pop() {
+                    match request {
+                        UserbootRequest::PostStashSvc { stash_svc_endpoint, control_handle: _ } => {
+                            if svc_stash_provider.is_some() {
+                                warn!("Expected at most a single SvcStash, but more were found. Last entry will be preserved.");
+                            }
+                            svc_stash_provider =
+                                Some(SvcStashCapability::new(stash_svc_endpoint.into_channel()));
+                        }
+                        UserbootRequest::PostBootfsFiles { files, control_handle: _ } => {
+                            bootfs_entries.extend(files);
+                        }
+                    }
+                }
+            } else if let Err(err) = messages {
+                error!("Error extracting 'fuchsia.boot.Userboot' messages: {err}");
+            }
+        }
+
         let system_resource_handle =
             take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
         if let Some(bootfs_svc) = self.bootfs_svc {
@@ -301,14 +332,18 @@ impl BuiltinEnvironmentBuilder {
             // may require reading from '/boot' for configuration, etc.
             let bootfs_svc = match runtime_config.vmex_source {
                 VmexSource::SystemResource => bootfs_svc
-                    .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)?
+                    .ingest_bootfs_vmo_with_system_resource(
+                        &system_resource_handle,
+                        bootfs_entries,
+                    )?
                     .publish_kernel_vmo(get_stable_vdso_vmo()?)?
                     .publish_kernel_vmo(get_next_vdso_vmo()?)?
                     .publish_kernel_vmo(get_vdso_vmo(&zx::Name::new_lossy("vdso/test1"))?)?
                     .publish_kernel_vmo(get_vdso_vmo(&zx::Name::new_lossy("vdso/test2"))?)?
                     .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?,
                 VmexSource::Namespace => {
-                    let mut bootfs_svc = bootfs_svc.ingest_bootfs_vmo_with_namespace_vmex().await?;
+                    let mut bootfs_svc =
+                        bootfs_svc.ingest_bootfs_vmo_with_namespace_vmex(bootfs_entries).await?;
                     // This is a nested component_manager - tolerate missing vdso's.
                     for kernel_vmo in [
                         get_stable_vdso_vmo(),
@@ -418,6 +453,7 @@ impl BuiltinEnvironmentBuilder {
                 .unwrap_or_else(|| component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
             self.crash_records,
             capability_passthrough,
+            svc_stash_provider,
         )
         .await?)
     }
@@ -789,6 +825,7 @@ impl BuiltinEnvironment {
         inspector: Inspector,
         crash_records: CrashRecords,
         capability_passthrough: bool,
+        svc_stash_provider: Option<Arc<SvcStashCapability>>,
     ) -> Result<BuiltinEnvironment, Error> {
         let debug = runtime_config.debug;
 
@@ -838,6 +875,13 @@ impl BuiltinEnvironment {
                     // legacy routing
                 }
             }
+        }
+
+        // Extracted from userboot protocol in environment builder.
+        if let Some(svc_stash_provider) = svc_stash_provider {
+            root_input_builder.add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
+                move |stream| svc_stash_provider.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up ProcessLauncher if available.
@@ -898,42 +942,7 @@ impl BuiltinEnvironment {
             ),
             None => None,
         };
-        // Drain messages from `fuchsia.boot.Userboot`, and expose appropriate capabilities.
-        let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
-            .map(zx::Channel::from)
-            .map(fasync::Channel::from_channel)
-            .map(fboot::UserbootRequestStream::from_channel);
 
-        if let Some(userboot) = userboot {
-            let mut svc_stash_provider = None;
-            let messages = userboot.try_collect::<Vec<UserbootRequest>>().await;
-
-            if let Ok(mut messages) = messages {
-                while let Some(request) = messages.pop() {
-                    match request {
-                        UserbootRequest::PostStashSvc { stash_svc_endpoint, control_handle: _ } => {
-                            if svc_stash_provider.is_some() {
-                                warn!("Expected at most a single SvcStash, but more were found. Last entry will be preserved.");
-                            }
-                            svc_stash_provider =
-                                Some(SvcStashCapability::new(stash_svc_endpoint.into_channel()));
-                        }
-                        UserbootRequest::PostBootfsFiles { .. } => {
-                            // Nothing Yet.
-                        }
-                    }
-                }
-            } else if let Err(err) = messages {
-                error!("Error extracting 'fuchsia.boot.Userboot' messages:  {err}");
-            }
-
-            if let Some(svc_stash_provider) = svc_stash_provider {
-                root_input_builder
-                    .add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
-                        move |stream| svc_stash_provider.clone().serve(stream).boxed(),
-                    );
-            }
-        }
         // Set up BootArguments service.
         let boot_args = BootArguments::new(&mut zbi_parser).await?;
         root_input_builder.add_builtin_protocol_if_enabled::<fboot::ArgumentsMarker>(

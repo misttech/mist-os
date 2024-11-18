@@ -39,6 +39,9 @@ typedef struct {
 
 // Each directory entry holds a pathname and gives the offset and size
 // of the contents of the file by that name.
+//
+// Each range of pages can be used for multiple files, but all those files must
+// have the same offset and size, that is, no partial sharing of ranges.
 typedef struct {
   // Length of the name[] field at the end.  This length includes the
   // NUL terminator, which must be present, but does not include any
