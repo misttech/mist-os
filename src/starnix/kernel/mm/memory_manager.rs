@@ -1465,16 +1465,17 @@ impl MemoryManagerState {
     // An operation may be forbidden if the target mapping only partially covers
     // an existing mapping with the `MappingOptions::DONT_SPLIT` flag set.
     fn check_has_unauthorized_splits(&self, addr: UserAddress, length: usize) -> bool {
-        let target_mapping = addr..addr.saturating_add(length);
-        let mut intersection = self.mappings.intersection(target_mapping.clone());
+        let query_range = addr..addr.saturating_add(length);
+        let mut intersection = self.mappings.intersection(query_range.clone());
 
         // A mapping is not OK if it disallows splitting and the target range
         // does not fully cover the mapping range.
         let check_if_mapping_has_unauthorized_split =
             |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
-                mapping.is_some_and(|(range, mapping)| {
+                mapping.is_some_and(|(mapping_range, mapping)| {
                     mapping.flags.contains(MappingFlags::DONT_SPLIT)
-                        && (range.start < target_mapping.start || target_mapping.end < range.end)
+                        && (mapping_range.start < query_range.start
+                            || query_range.end < mapping_range.end)
                 })
             };
 
