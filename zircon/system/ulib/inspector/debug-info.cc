@@ -20,6 +20,7 @@
 
 #include "gwp-asan.h"
 #include "src/lib/debug/backtrace-request-utils.h"
+#include "zircon/system/ulib/inspector/backtrace.h"
 
 namespace {
 
@@ -302,9 +303,12 @@ void print_gwp_asan_info(FILE* out, const zx::process& process,
   }
 }
 
-// |skip_markup_context| avoids printing dso list repeatedly for multiple threads in a process.
+// - |skip_markup_context| avoids printing dso list repeatedly for multiple threads in a process.
+// - |only_modules_in_stack| will only print a module's info if a frame from the stack is in the
+// module. This can be useful for making sure long module lists don't blow out the logs.
 void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
-                                     zx_handle_t thread_handle, bool skip_markup_context) {
+                                     zx_handle_t thread_handle, bool skip_markup_context,
+                                     bool only_modules_in_stack) {
   zx_status_t status;
   // If the caller didn't supply |regs| use a local copy.
   zx_thread_state_general_regs_t regs;
@@ -392,8 +396,21 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
             thread_name, tid);
   }
 
+  const std::vector<unwinder::Frame> frames =
+      inspector::get_frames(out, process->get(), thread->get());
+
+  // Leave |pcs| empty to print context for all modules.
+  std::vector<uint64_t> pcs;
+  if (only_modules_in_stack) {
+    for (const unwinder::Frame& frame : frames) {
+      if (uint64_t pc; frame.regs.GetPC(pc).ok() && pc != 0) {
+        pcs.push_back(pc);
+      }
+    }
+  }
+
   if (!skip_markup_context)
-    inspector_print_markup_context(out, process->get());
+    inspector::print_markup_context(out, process->get(), std::move(pcs));
 
   inspector_print_backtrace_markup(out, process->get(), thread->get());
 
@@ -406,7 +423,8 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
 __EXPORT void inspector_print_debug_info(FILE* out, zx_handle_t process_handle,
                                          zx_handle_t thread_handle) {
   fprintf(out, "{{{reset:begin}}}\n");
-  inspector_print_debug_info_impl(out, process_handle, thread_handle, false);
+  inspector_print_debug_info_impl(out, process_handle, thread_handle, false,
+                                  /*only_modules_in_stack=*/true);
   fprintf(out, "{{{reset:end}}}\n");
 }
 
@@ -502,7 +520,8 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
 
     // We print the thread and then mark this koid as empty, so that it won't be printed on the
     // suspended pass. This means we can free the handle after this.
-    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context);
+    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context,
+                                    /*only_modules_in_stack=*/false);
     skip_markup_context = true;
     thread_handles[i].reset();
   }
@@ -541,7 +560,8 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
     }
 
     // We can now print the thread.
-    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context);
+    inspector_print_debug_info_impl(out, process->get(), child.get(), skip_markup_context,
+                                    /*only_modules_in_stack=*/false);
     skip_markup_context = true;
   }
 
