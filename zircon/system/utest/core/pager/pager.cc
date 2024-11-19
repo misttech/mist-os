@@ -3665,11 +3665,47 @@ TEST(Pager, PageRequestBatchingChecksAncestorPages) {
 // actually gets scheduled and makes progress out of the pager code. As such we cannot wait for
 // it to block again, since we do not know whether it is in the previous or next block event.
 // Therefore we just spin waiting to see the data.
-void WaitForData(const void* expected, const void* data, size_t size) {
-  while (memcmp(expected, data, size) != 0) {
+void WaitForData(const void* expected, const volatile void* data, size_t size) {
+  // data is volatile since we are intentionally not synchronizing the kernel, who could be
+  // performing modifications to it as we are reading it. To avoid undefined behavior we must
+  // therefore treat this entirely as volatile data, which means we cannot use existing methods like
+  // memcmp, as they only work on non-volatile pointers.
+  auto cmp = [expected, data, size]() {
+    for (size_t i = 0; i < size; i++) {
+      if (static_cast<const unsigned char*>(expected)[i] !=
+          static_cast<const volatile unsigned char*>(data)[i]) {
+        return false;
+      }
+    }
+    return true;
+  };
+  // Just keep spinning until we either see the data or the test times out. Due to the potential of
+  // being in a nested virtualization environment we have no other reliable way to know how long we
+  // might have to wait for the data to appear.
+  while (!cmp()) {
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
   }
-  EXPECT_BYTES_EQ(expected, data, size);
+  // Although the above check was racy, once it succeeds we know we were able to see all the
+  // expected data, however we still have not performed any synchronization. As such it would not
+  // be correct to now perform `ASSERT(cmp())` since the loads could get re-ordered and/or
+  // speculated prior to the cmp() in the `while` block completing. This could re-ordering /
+  // speculation could result in an `ASSERT` here failing, even after the loop exited.
+  //
+  // As we are not using any atomic objects there is no way to create defined behavior in the C++
+  // memory model that would allow us to put an `ASSERT(cmp())` here. We cannot even assume that the
+  // kernel will perform an atomic operation to release a lock since we could observe the data being
+  // present exactly as the kernel finishes its memcmp, but before it performs any other (atomic or
+  // otherwise) operations.
+  // Pragmatically we could perform a `std::atomic_thread_fence(std::memory_order_seq_cst)` and this
+  // would force the compiler to emit a sufficient barrier, however it would not be doing so because
+  // we are actually following its requirements, but rather because the compiler is unable to
+  // observe enough of the system to notice that we are actually performing undefined behavior.
+  //
+  // If we really wanted to insert this ASSERT here we could treat the kernel like a device and act
+  // like we are a driver and perform a read memory barrier (hw_rmb() in our ddk). This adds a
+  // dependency on the ddk and is, arguably, making things more confusing when we can simply leave
+  // it to the calling code to synchronize further with the kernel and perform a memcmp on a non
+  // volatile, but synchronized, reference to the data.
 }
 
 TEST(Pager, EarlyWakeOnSupply) {
