@@ -210,15 +210,11 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
     Ok(proxy)
 }
 
-/// Connect to an instance of a FIDL protocol hosted in `directory`, in the `svc/` subdir.
+/// Connect to an instance of a FIDL protocol hosted in `directory`, in the `/svc/` subdir.
 pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
     directory: &impl AsRefDirectory,
 ) -> Result<P::Proxy, Error> {
     let protocol_path = format!("{}/{}", SVC_DIR, P::PROTOCOL_NAME);
-    // TODO(https://fxbug.dev/42068248): Some Directory implementations require relative paths,
-    // even though they aren't technically supposed to, so strip the leading slash until that's
-    // resolved one way or the other.
-    let protocol_path = protocol_path.strip_prefix('/').unwrap();
     connect_to_named_protocol_at_dir_root::<P>(directory, &protocol_path)
 }
 

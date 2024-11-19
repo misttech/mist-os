@@ -177,7 +177,9 @@ fn match_prefix(match_in: &impl IterablePath, prefix: &impl IterablePath) -> Opt
 
 impl Directory for Incoming {
     fn open(&self, path: &str, flags: Flags, server_end: zx::Channel) -> Result<(), Error> {
+        let path = path.strip_prefix("/").unwrap_or(path);
         let path = RelativePath::new(path)?;
+
         for entry in &self.0 {
             if let Some(remain) = match_prefix(&path, &entry.path) {
                 return entry.directory.open(
