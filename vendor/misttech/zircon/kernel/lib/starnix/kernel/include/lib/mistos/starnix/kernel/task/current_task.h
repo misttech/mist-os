@@ -7,6 +7,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/arch/x64/lib.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/loader.h>
@@ -25,7 +26,6 @@
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
-#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
@@ -46,6 +46,11 @@ class AutoReleasableTask;
 
 class Task;
 class FsContext;
+class Kernel;
+class LookupContext;
+class NamespaceNode;
+
+struct FileSystemOptions;
 
 class TaskBuilder {
  private:
@@ -79,10 +84,6 @@ class TaskBuilder {
  private:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TaskBuilder);
 };
-
-class Kernel;
-class LookupContext;
-class NamespaceNode;
 
 // The task object associated with the currently executing thread.
 //
@@ -372,6 +373,10 @@ class CurrentTask : public TaskMemoryAccessor {
 
   // impl TaskMemoryAccessor
   UserAddress maximum_valid_address() const final;
+
+  /// impl CurrentTask (namespace.rs)
+  fit::result<Errno, FileSystemHandle> create_filesystem(const FsStr& fs_type,
+                                                         FileSystemOptions options) const;
 
   // C++
   const fbl::RefPtr<Task>& task() const { return task_; }

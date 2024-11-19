@@ -174,7 +174,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
   auto task =
       create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory) _EP(task);
-
   {
     auto init_writer = init_task->thread_group_->Write();
     auto new_process_writer = task->thread_group_->Write();
@@ -182,7 +181,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
         ThreadGroupParent::From(init_task->thread_group_->weak_factory_.GetWeakPtr());
     init_writer->children_.insert(task->thread_group_->weak_factory_.GetWeakPtr());
   }
-
   // A child process created via fork(2) inherits its parent's
   // resource limits. Resource limits are preserved across execve(2).
   auto limits = init_task->thread_group_->limits.Lock();
@@ -1092,6 +1090,11 @@ fit::result<Errno, size_t> CurrentTask::zero(UserAddress addr, size_t length) co
 
 UserAddress CurrentTask::maximum_valid_address() const {
   return task_->mm()->maximum_valid_user_address;
+}
+
+fit::result<Errno, FileSystemHandle> CurrentTask::create_filesystem(
+    const FsStr& fs_type, FileSystemOptions options) const {
+  return fit::error(errno(ENOTDIR));
 }
 
 }  // namespace starnix
