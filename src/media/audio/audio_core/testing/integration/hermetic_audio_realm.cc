@@ -132,10 +132,10 @@ class LocalDirectoryExporter : public component_testing::LocalComponentImpl {
     zx::channel local, remote;
     auto status = zx::channel::create(0, &local, &remote);
     FX_CHECK(status == ZX_OK) << status;
-    status = fdio_open(local_dir_name.c_str(),
-                       static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                             fuchsia_io::wire::OpenFlags::kDirectory),
-                       remote.release());
+    status = fdio_open3(local_dir_name.c_str(),
+                        static_cast<uint64_t>(fuchsia_io::wire::kPermReadable |
+                                              fuchsia_io::wire::Flags::kProtocolDirectory),
+                        remote.release());
     FX_CHECK(status == ZX_OK) << status;
     local_dir_ = std::move(local);
   }
