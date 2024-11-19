@@ -1261,7 +1261,7 @@ foreach(_target_type,
           # BUILDCONFIG.gn can't directly import those .gni files because
           # there's a circularity.  But the template expansion can do the
           # imports where they'll happen in an initialized toolchain context.
-          import("//build/config/clang/clang.gni")
+          import("//build/config/clang/clang_prefix.gni")
           import("//build/toolchain/zircon/gcc.gni")
         }
 

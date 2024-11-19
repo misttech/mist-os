@@ -45,4 +45,4 @@ truncate_build_info_commit_date: bool
 
 # LINT.IfChange
 clang_prefix: string
-# LINT.ThenChange(//build/config/clang/clang.gni)
+# LINT.ThenChange(//build/config/clang/clang_prefix.gni)
