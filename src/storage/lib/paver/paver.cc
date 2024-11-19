@@ -451,20 +451,20 @@ void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter:
                  std::move(request->data_sink), context_);
 }
 
-void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
-                           UseBlockDeviceCompleter::Sync& _completer) {
-  UseBlockDevice(
-      BlockAndController{
-          .device = std::move(request->block_device),
-          .controller = std::move(request->block_controller),
-      },
-      std::move(request->data_sink));
+void Paver::FindDynamicDataSink(FindDynamicDataSinkRequestView request,
+                                FindDynamicDataSinkCompleter::Sync& _completer) {
+  DynamicDataSink::Bind(dispatcher_, devices_.Duplicate(), svc_root_.borrow(),
+                        std::move(request->data_sink), context_);
 }
 
-void Paver::UseBlockDevice(BlockAndController block_device,
-                           fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink) {
+void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
+                           UseBlockDeviceCompleter::Sync& _completer) {
   DynamicDataSink::Bind(dispatcher_, devices_.Duplicate(), svc_root_.borrow(),
-                        std::move(block_device), std::move(dynamic_data_sink), context_);
+                        std::move(request->data_sink), context_,
+                        BlockAndController{
+                            .device = std::move(request->block_device),
+                            .controller = std::move(request->block_controller),
+                        });
 }
 
 void Paver::FindBootManager(FindBootManagerRequestView request,
@@ -637,11 +637,10 @@ void DataSink::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
 
 void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                            fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                           BlockAndController block_device,
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
-                           std::shared_ptr<Context> context) {
-  zx::result partitioner = DevicePartitionerFactory::Create(
-      devices, svc_root, GetCurrentArch(), std::move(context), std::move(block_device));
+                           std::shared_ptr<Context> context, BlockAndController block) {
+  zx::result partitioner = DevicePartitionerFactory::Create(devices, svc_root, GetCurrentArch(),
+                                                            std::move(context), std::move(block));
   if (partitioner.is_error()) {
     ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);

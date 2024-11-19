@@ -89,6 +89,9 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
   void FindDataSink(FindDataSinkRequestView request,
                     FindDataSinkCompleter::Sync& _completer) override;
 
+  void FindDynamicDataSink(FindDynamicDataSinkRequestView request,
+                           FindDynamicDataSinkCompleter::Sync& _completer) override;
+
   void UseBlockDevice(UseBlockDeviceRequestView request,
                       UseBlockDeviceCompleter::Sync& _completer) override;
 

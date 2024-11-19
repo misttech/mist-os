@@ -2104,51 +2104,45 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWipeWithBufferredClientLayoutUpdated)
 #if defined(__x86_64__)
 class PaverServiceBlockTest : public PaverServiceTest {
  protected:
-  static constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
-
-  void UseBlockDevice(DeviceAndController block_device) {
-    auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
-
-    auto result = client_->UseBlockDevice(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_device.device)),
-        std::move(block_device.controller), std::move(remote));
-    ASSERT_OK(result.status());
-    data_sink_ = fidl::WireSyncClient(std::move(local));
+  IsolatedDevmgr::Args DevmgrArgs() override {
+    IsolatedDevmgr::Args args;
+    args.enable_storage_host = true;
+    return args;
   }
 
-  fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink_;
+  static constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
 };
 
-TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTables) {
+TEST_F(PaverServiceBlockTest, InitializePartitionTables) {
   std::unique_ptr<BlockDevice> gpt_dev;
-  // 32GiB disk.
-  constexpr uint64_t block_count = (32LU << 30) / kBlockSize;
+  // 64GiB disk.
+  constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
   ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
+      BlockDevice::CreateWithGpt(devmgr_.devfs_root(), block_count, kBlockSize, {}, &gpt_dev));
 
-  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
-  ASSERT_OK(connections);
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
+  auto [data_sink, server] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
+  fidl::OneWayStatus find_result = client_->FindDynamicDataSink(std::move(server));
+  ASSERT_OK(find_result.status());
 
-  auto result = data_sink_->InitializePartitionTables();
+  fidl::WireResult result = fidl::WireCall(data_sink)->InitializePartitionTables();
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
 }
 
-TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTablesMultipleDevices) {
+TEST_F(PaverServiceBlockTest, InitializePartitionTablesMultipleDevicesOneGpt) {
   std::unique_ptr<BlockDevice> gpt_dev1, gpt_dev2;
-  // 32GiB disk.
-  constexpr uint64_t block_count = (32LU << 30) / kBlockSize;
+  // 64GiB disk.
+  constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
   ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev1));
+      BlockDevice::CreateWithGpt(devmgr_.devfs_root(), block_count, kBlockSize, {}, &gpt_dev1));
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev2));
 
-  zx::result connections = GetNewConnections(gpt_dev1->block_controller_interface());
-  ASSERT_OK(connections);
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
+  auto [data_sink, server] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
+  fidl::OneWayStatus find_result = client_->FindDynamicDataSink(std::move(server));
+  ASSERT_OK(find_result.status());
 
-  auto result = data_sink_->InitializePartitionTables();
+  fidl::WireResult result = fidl::WireCall(data_sink)->InitializePartitionTables();
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
 }
@@ -2163,6 +2157,10 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     block_size_ = block_size;
     ASSERT_NO_FATAL_FAILURE(BlockDevice::CreateWithGpt(devmgr_.devfs_root(), block_count,
                                                        block_size, partitions, &gpt_dev_));
+    if (!DevmgrArgs().enable_storage_host) {
+      std::string path = std::format("class/block/{:03d}", partitions.size());
+      ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), path.c_str()).status_value());
+    }
   }
 
   std::unique_ptr<BlockDevice> gpt_dev_;
@@ -2212,14 +2210,7 @@ TEST_F(PaverServiceLuisTest, SysconfigNotSupportedAndFailWithPeerClosed) {
 TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   // TODO(b/217597389): Consdier also adding an e2e test for this interface.
   auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
-
-  {
-    zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
-    ASSERT_OK(connections);
-    ASSERT_OK(client_->UseBlockDevice(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connections->device)),
-        std::move(connections->controller), std::move(remote)));
-  }
+  ASSERT_OK(client_->FindDynamicDataSink(std::move(remote)));
   fidl::WireSyncClient data_sink{std::move(local)};
 
   // Create a payload
@@ -2401,14 +2392,7 @@ SparseImageResult CreateSparseImage() {
 
 TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
-
-  {
-    zx::result connections = GetNewConnections(gpt_dev_->block_controller_interface());
-    ASSERT_OK(connections);
-    ASSERT_OK(client_->UseBlockDevice(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connections->device)),
-        std::move(connections->controller), std::move(remote)));
-  }
+  ASSERT_OK(client_->FindDynamicDataSink(std::move(remote)));
   fidl::WireSyncClient data_sink{std::move(local)};
 
   SparseImageResult image = CreateSparseImage();

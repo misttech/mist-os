@@ -32,11 +32,11 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   void FindDataSink(FindDataSinkRequestView request,
                     FindDataSinkCompleter::Sync& completer) override;
 
+  void FindDynamicDataSink(FindDynamicDataSinkRequestView request,
+                           FindDynamicDataSinkCompleter::Sync& completer) override;
+
   void UseBlockDevice(UseBlockDeviceRequestView request,
                       UseBlockDeviceCompleter::Sync& completer) override;
-
-  void UseBlockDevice(BlockAndController block_device,
-                      fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink);
 
   void FindBootManager(FindBootManagerRequestView request,
                        FindBootManagerCompleter::Sync& completer) override;
@@ -186,9 +186,8 @@ class DynamicDataSink : public fidl::WireServer<fuchsia_paver::DynamicDataSink> 
 
   static void Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                   BlockAndController block_device,
                    fidl::ServerEnd<fuchsia_paver::DynamicDataSink> server,
-                   std::shared_ptr<Context> context);
+                   std::shared_ptr<Context> context, BlockAndController block = {});
 
   void InitializePartitionTables(InitializePartitionTablesCompleter::Sync& completer) override;
 
