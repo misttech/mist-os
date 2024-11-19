@@ -61,10 +61,6 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
     return zx::ok(vn);
   }
 
-  // Recursively unlinks this Vnode's children, and detaches this node from
-  // its parent.
-  void Unlink();
-
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.
   void UnlinkFromParent();
 
@@ -119,10 +115,11 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   class Intermediate {
    public:
+    ~Intermediate();
+
     bool has_children() const { return !entries_by_id_.is_empty(); }
     void AddEntry(fbl::RefPtr<LocalVnode> vn);
     void RemoveEntry(LocalVnode* vn);
-    void UnlinkEntries();
 
     const EntryByIdMap& GetEntriesById() const { return entries_by_id_; }
 
@@ -148,12 +145,10 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
    public:
     Local(fdio_open_local_func_t on_open, void* context);
     zx::result<fdio_ptr> Open();
-    void Unlink();
 
    private:
-    fbl::Mutex lock_;
-    fdio_open_local_func_t on_open_ __TA_GUARDED(lock_);
-    void* context_ __TA_GUARDED(lock_);
+    const fdio_open_local_func_t on_open_;
+    void* const context_;
   };
 
   class Remote {

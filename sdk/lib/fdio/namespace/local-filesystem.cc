@@ -58,11 +58,6 @@ void fdio_namespace::ResetRoot() {
   root_ = std::move(vn_res.value());
 }
 
-fdio_namespace::~fdio_namespace() {
-  fbl::AutoLock lock(&lock_);
-  root_->Unlink();
-}
-
 zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
                                        std::string_view* in_out_path) const {
   fbl::RefPtr<LocalVnode> vn = *in_out_vn;
@@ -343,7 +338,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
       removable_origin_vn = vn;
     }
 
-    removable_origin_vn->Unlink();
+    removable_origin_vn->UnlinkFromParent();
     return ZX_OK;
   };
 
@@ -555,7 +550,7 @@ zx_status_t fdio_namespace::Bind(
   // before unlocking and returning.
   auto cleanup = fit::defer([&first_new_node]() {
     if (first_new_node != nullptr) {
-      first_new_node->Unlink();
+      first_new_node->UnlinkFromParent();
     }
   });
 
@@ -704,7 +699,6 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
 
   vn->UnlinkFromParent();
   std::swap(root_, vn);
-  vn->Unlink();
   return ZX_OK;
 }
 

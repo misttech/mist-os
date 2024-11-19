@@ -34,8 +34,6 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(fdio_namespace);
 
-  ~fdio_namespace();
-
   // Create a new object referring to the root of this namespace.
   //
   // Returns |nullptr| on failure.

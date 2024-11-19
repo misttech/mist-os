@@ -41,16 +41,6 @@ void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn) {
   }
 }
 
-void LocalVnode::Unlink() {
-  std::visit(fdio::overloaded{
-                 [](LocalVnode::Local& c) { c.Unlink(); },
-                 [](LocalVnode::Intermediate& c) { c.UnlinkEntries(); },
-                 [](LocalVnode::Remote& s) {},
-             },
-             node_type_);
-  UnlinkFromParent();
-}
-
 fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(std::string_view name) const {
   auto it = entries_by_name_.find(fbl::String{name});
   if (it != entries_by_name_.end()) {
@@ -73,14 +63,8 @@ LocalVnode::~LocalVnode() {
              node_type_);
 }
 
-void LocalVnode::Intermediate::UnlinkEntries() {
-  for (auto& entry : entries_by_name_) {
-    std::visit(fdio::overloaded{
-                   [](LocalVnode::Local& c) {},
-                   [](LocalVnode::Intermediate& c) { c.UnlinkEntries(); },
-                   [](LocalVnode::Remote& s) {},
-               },
-               entry.node()->node_type_);
+LocalVnode::Intermediate::~Intermediate() {
+  for (auto& entry : entries_by_id_) {
     entry.node()->parent_ = nullptr;
   }
   entries_by_name_.clear();
@@ -91,7 +75,6 @@ LocalVnode::Local::Local(fdio_open_local_func_t on_open, void* context)
     : on_open_(on_open), context_(context) {}
 
 zx::result<fdio_ptr> LocalVnode::Local::Open() {
-  fbl::AutoLock lock(&lock_);
   if (on_open_ == nullptr) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
@@ -107,12 +90,6 @@ zx::result<fdio_ptr> LocalVnode::Local::Open() {
   }
   zxio_init(&io->zxio_storage().io, ops);
   return zx::ok(io);
-}
-
-void LocalVnode::Local::Unlink() {
-  fbl::AutoLock lock(&lock_);
-  on_open_ = nullptr;
-  context_ = nullptr;
 }
 
 void LocalVnode::UnlinkFromParent() {
