@@ -64,8 +64,13 @@ fn close_inaccessible_file_descriptors(
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
         let target_sid = file.security_state.state.sid;
-        let fd_use_result =
-            check_permission(&permission_check, source_sid, target_sid, FdPermission::Use);
+        let fd_use_result: Result<(), Errno> = todo_check_permission!(
+            TODO("https://fxbug.dev/379870850", "Requires system to label all FDs correctly"),
+            &permission_check,
+            source_sid,
+            target_sid,
+            FdPermission::Use
+        );
         match fd_use_result {
             Ok(_) => None,
             _ => Some(null_file_handle.clone()),
