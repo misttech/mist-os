@@ -16,10 +16,7 @@ use crate::ie::{
 };
 use crate::mac::CapabilityInfo;
 use anyhow::{format_err, Context as _, Error};
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
-};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
 /// Capability Info is defined in IEEE Std 802.11-1026 9.4.1.4.
 /// Figure 9-68 indicates BSS and IBSS bits are reserved for client.
@@ -154,11 +151,11 @@ fn override_vht_capabilities(mut vht_cap: VhtCapabilities, cbw: Cbw) -> VhtCapab
 }
 
 // TODO(https://fxbug.dev/42172557): Using channel number to determine band is incorrect.
-fn get_band(primary_channel: u8) -> fidl_common::WlanBand {
+fn get_band(primary_channel: u8) -> fidl_ieee80211::WlanBand {
     if primary_channel <= 14 {
-        fidl_common::WlanBand::TwoGhz
+        fidl_ieee80211::WlanBand::TwoGhz
     } else {
-        fidl_common::WlanBand::FiveGhz
+        fidl_ieee80211::WlanBand::FiveGhz
     }
 }
 
@@ -235,6 +232,7 @@ mod tests {
     use super::*;
     use crate::test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw;
     use crate::{assert_variant, mac};
+    use fidl_fuchsia_wlan_common as fidl_common;
 
     #[test]
     fn test_build_cap_info() {
@@ -306,16 +304,16 @@ mod tests {
 
     #[test]
     fn band_id() {
-        assert_eq!(fidl_common::WlanBand::TwoGhz, get_band(1));
-        assert_eq!(fidl_common::WlanBand::TwoGhz, get_band(14));
-        assert_eq!(fidl_common::WlanBand::FiveGhz, get_band(36));
-        assert_eq!(fidl_common::WlanBand::FiveGhz, get_band(165));
+        assert_eq!(fidl_ieee80211::WlanBand::TwoGhz, get_band(1));
+        assert_eq!(fidl_ieee80211::WlanBand::TwoGhz, get_band(14));
+        assert_eq!(fidl_ieee80211::WlanBand::FiveGhz, get_band(36));
+        assert_eq!(fidl_ieee80211::WlanBand::FiveGhz, get_band(165));
     }
 
     #[test]
     fn test_get_band() {
-        assert_eq!(fidl_common::WlanBand::TwoGhz, get_band(14));
-        assert_eq!(fidl_common::WlanBand::FiveGhz, get_band(36));
+        assert_eq!(fidl_ieee80211::WlanBand::TwoGhz, get_band(14));
+        assert_eq!(fidl_ieee80211::WlanBand::FiveGhz, get_band(36));
     }
 
     #[test]
@@ -328,7 +326,7 @@ mod tests {
             qos_capable: true,
         };
         assert_eq!(
-            fidl_common::WlanBand::FiveGhz,
+            fidl_ieee80211::WlanBand::FiveGhz,
             get_device_band_cap(&device_info, 36).unwrap().band
         );
     }

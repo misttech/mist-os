@@ -864,7 +864,7 @@ mod tests {
     #[test]
     fn test_convert_band_cap() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::FiveGhz,
+            band: fidl_ieee80211::WlanBand::FiveGhz,
             basic_rates: vec![123; 3],
             ht_supported: true,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
@@ -877,7 +877,7 @@ mod tests {
         assert_eq!(
             convert_band_cap(fullmac),
             fidl_mlme::BandCapability {
-                band: fidl_common::WlanBand::FiveGhz,
+                band: fidl_ieee80211::WlanBand::FiveGhz,
                 basic_rates: vec![123; 3],
                 ht_cap: Some(Box::new(fidl_ieee80211::HtCapabilities { bytes: [8; 26] })),
                 vht_cap: Some(Box::new(fidl_ieee80211::VhtCapabilities { bytes: [9; 12] })),
@@ -889,7 +889,7 @@ mod tests {
     #[test]
     fn test_convert_band_cap_no_ht_vht_become_none() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_common::WlanBand::FiveGhz,
+            band: fidl_ieee80211::WlanBand::FiveGhz,
             basic_rates: vec![123; 3],
             ht_supported: false,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },

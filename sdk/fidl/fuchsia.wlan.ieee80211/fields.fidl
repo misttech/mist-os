@@ -60,3 +60,19 @@ type WlanAccessCategory = strict enum {
     VIDEO = 3;
     VOICE = 4;
 };
+
+/// Identifies a frequency band in metadata of various operations.
+///
+/// Examples of this enum in use are labeling scan results or reporting
+/// a driver capabilities from various frequency bands.
+///
+/// NOTE: This enum is similar to the Band ID field defined in
+/// IEEE Std 802.11-2016 9.4.1.46, but its values are not the same.
+///
+/// TODO(https://fxbug.dev/376442944): Create a spec-compliant Band ID type
+/// and migrate the platform to use it.
+@available(added=NEXT)
+type WlanBand = flexible enum : uint8 {
+    TWO_GHZ = 0;
+    FIVE_GHZ = 1;
+};

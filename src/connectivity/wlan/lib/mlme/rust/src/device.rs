@@ -1199,7 +1199,7 @@ pub mod test_utils {
     pub fn fake_band_caps() -> Vec<fidl_softmac::WlanSoftmacBandCapability> {
         vec![
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::TwoGhz),
+                band: Some(fidl_ieee80211::WlanBand::TwoGhz),
                 basic_rates: Some(vec![
                     0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
                 ]),
@@ -1222,7 +1222,7 @@ pub mod test_utils {
                 ..Default::default()
             },
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::FiveGhz),
+                band: Some(fidl_ieee80211::WlanBand::FiveGhz),
                 basic_rates: Some(vec![0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f]),
                 operating_channels: Some(vec![36, 40, 44, 48, 149, 153, 157, 161]),
                 ht_supported: Some(true),
@@ -1296,7 +1296,7 @@ mod tests {
 
         let expected_band_caps = [
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::TwoGhz),
+                band: Some(fidl_ieee80211::WlanBand::TwoGhz),
                 basic_rates: Some(vec![
                     0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
                 ]),
@@ -1319,7 +1319,7 @@ mod tests {
                 ..Default::default()
             },
             fidl_softmac::WlanSoftmacBandCapability {
-                band: Some(fidl_common::WlanBand::FiveGhz),
+                band: Some(fidl_ieee80211::WlanBand::FiveGhz),
                 basic_rates: Some(vec![0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f]),
                 operating_channels: Some(vec![36, 40, 44, 48, 149, 153, 157, 161]),
                 ht_supported: Some(true),

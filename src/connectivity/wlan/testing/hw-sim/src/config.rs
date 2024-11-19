@@ -63,7 +63,7 @@ pub(crate) fn create_wlantap_config(
 
 fn create_2_4_ghz_band_info() -> fidl_device::BandInfo {
     fidl_device::BandInfo {
-        band: fidl_common::WlanBand::TwoGhz,
+        band: fidl_ieee80211::WlanBand::TwoGhz,
         ht_caps: Some(Box::new(fidl_ieee80211::HtCapabilities {
             bytes: fake_ht_capabilities().as_bytes().try_into().unwrap(),
         })),

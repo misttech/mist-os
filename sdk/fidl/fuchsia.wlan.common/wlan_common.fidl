@@ -115,11 +115,6 @@ type WlanChannel = struct {
     secondary80 uint8;
 };
 
-type WlanBand = flexible enum : uint8 {
-    TWO_GHZ = 0;
-    FIVE_GHZ = 1;
-};
-
 type ScanType = strict enum {
     ACTIVE = 1;
     PASSIVE = 2;

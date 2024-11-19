@@ -55,10 +55,10 @@ TEST_F(SimTest, ClientIfcQuery) {
     wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_caps()[band];
 
     // Band id should be in valid range
-    ASSERT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
-                band_cap->band == wlan_common::WlanBand::kFiveGhz);
+    ASSERT_TRUE(band_cap->band == wlan_ieee80211::WlanBand::kTwoGhz ||
+                band_cap->band == wlan_ieee80211::WlanBand::kFiveGhz);
 
-    if (band_cap->band == wlan_common::WlanBand::kTwoGhz) {
+    if (band_cap->band == wlan_ieee80211::WlanBand::kTwoGhz) {
       ASSERT_EQ(band_cap->basic_rates.count(), std::size(kExpectedBasic2gRates));
       ASSERT_EQ(0, std::memcmp(band_cap->basic_rates.data(), kExpectedBasic2gRates,
                                band_cap->basic_rates.count()));

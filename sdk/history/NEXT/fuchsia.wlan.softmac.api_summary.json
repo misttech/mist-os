@@ -470,7 +470,7 @@
         "kind": "table/member",
         "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.band",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/WlanBand"
+        "type": "fuchsia.wlan.ieee80211/WlanBand"
     },
     {
         "kind": "table/member",

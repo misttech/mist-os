@@ -4728,10 +4728,10 @@ static void brcmf_dump_80211_vht_caps(fuchsia_wlan_ieee80211_wire::VhtCapabiliti
 static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap) {
   char band_str[32];
   switch (band_cap->band) {
-    case fuchsia_wlan_common::WlanBand::kTwoGhz:
+    case fuchsia_wlan_ieee80211::WlanBand::kTwoGhz:
       sprintf(band_str, "2GHz");
       break;
-    case fuchsia_wlan_common::WlanBand::kFiveGhz:
+    case fuchsia_wlan_ieee80211::WlanBand::kFiveGhz:
       sprintf(band_str, "5GHz");
       break;
     default:
@@ -4860,7 +4860,7 @@ void brcmf_if_query(net_device* ndev,
   for (unsigned i = 1; i <= bandlist[0] && i < std::size(bandlist); i++) {
     fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &builder.band_caps()[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
-      band_cap->band = fuchsia_wlan_common::WlanBand::kTwoGhz;
+      band_cap->band = fuchsia_wlan_ieee80211::WlanBand::kTwoGhz;
 
       constexpr uint8_t kNumSupported2GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
@@ -4873,7 +4873,7 @@ void brcmf_if_query(net_device* ndev,
              kNumSupported2GRates * sizeof(band_cap->basic_rates[0]));
       band_cap_2ghz = band_cap;
     } else if (bandlist[i] == WLC_BAND_5G) {
-      band_cap->band = fuchsia_wlan_common::WlanBand::kFiveGhz;
+      band_cap->band = fuchsia_wlan_ieee80211::WlanBand::kFiveGhz;
 
       constexpr uint8_t kNumSupported5GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);

@@ -420,7 +420,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
 
 fn band_cap_for_band(
     query_response: &fidl_softmac::WlanSoftmacQueryResponse,
-    band: fidl_common::WlanBand,
+    band: fidl_ieee80211::WlanBand,
 ) -> Option<&fidl_softmac::WlanSoftmacBandCapability> {
     query_response
         .band_caps
@@ -435,7 +435,7 @@ fn band_cap_for_band(
 // TODO(https://fxbug.dev/42172555): Zero should not mark a null rate.
 fn supported_rates_for_band(
     query_response: &fidl_softmac::WlanSoftmacQueryResponse,
-    band: fidl_common::WlanBand,
+    band: fidl_ieee80211::WlanBand,
 ) -> Result<Vec<u8>, Error> {
     let rates = band_cap_for_band(&query_response, band)
         .ok_or_else(|| format_err!("no capabilities found for band {:?}", band))?
@@ -446,11 +446,11 @@ fn supported_rates_for_band(
 }
 
 // TODO(https://fxbug.dev/42172557): This is not correct. Channel numbers do not imply band.
-fn band_from_channel_number(channel_number: u8) -> fidl_common::WlanBand {
+fn band_from_channel_number(channel_number: u8) -> fidl_ieee80211::WlanBand {
     if channel_number > 14 {
-        fidl_common::WlanBand::FiveGhz
+        fidl_ieee80211::WlanBand::FiveGhz
     } else {
-        fidl_common::WlanBand::TwoGhz
+        fidl_ieee80211::WlanBand::TwoGhz
     }
 }
 
@@ -468,13 +468,13 @@ fn active_scan_request_series(
     // TODO(https://fxbug.dev/42172557): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
     //                        and so partitioning channels must be done internally.
     struct BandChannels {
-        band: fidl_common::WlanBand,
+        band: fidl_ieee80211::WlanBand,
         channels: Vec<u8>,
     }
     let band_channels_list: [BandChannels; 2] = channels.into_iter().fold(
         [
-            BandChannels { band: fidl_common::WlanBand::FiveGhz, channels: vec![] },
-            BandChannels { band: fidl_common::WlanBand::TwoGhz, channels: vec![] },
+            BandChannels { band: fidl_ieee80211::WlanBand::FiveGhz, channels: vec![] },
+            BandChannels { band: fidl_ieee80211::WlanBand::TwoGhz, channels: vec![] },
         ],
         |mut band_channels_list, channel| {
             for band_channels in &mut band_channels_list {

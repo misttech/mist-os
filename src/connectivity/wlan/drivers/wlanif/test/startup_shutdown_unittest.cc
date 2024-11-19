@@ -52,7 +52,7 @@ struct BaseWlanFullmacServerForStartup
     fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse response;
 
     fuchsia_wlan_fullmac::WlanFullmacBandCapability band_capability;
-    band_capability.band(fuchsia_wlan_common::WlanBand::kTwoGhz)
+    band_capability.band(fuchsia_wlan_ieee80211::WlanBand::kTwoGhz)
         .basic_rates({1})
         .operating_channel_count(1)
         .operating_channel_list({1});
