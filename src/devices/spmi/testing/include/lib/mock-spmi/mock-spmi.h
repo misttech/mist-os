@@ -15,6 +15,16 @@
 
 namespace mock_spmi {
 
+namespace {
+
+// To use switch like logic for std::visitor on std::variat.
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+}  // namespace
+
 class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
  public:
   void ExpectGetProperties(uint16_t sid, std::string name) {
@@ -57,11 +67,17 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   }
 
   void ExpectWatchControllerWriteCommands(uint8_t address, uint16_t data) {
-    expectations_.push({
-        .type = CallType::kWatch,
-        .address = address,
-        .data = {data},
-    });
+    std::visit(
+        overloaded{[&](WatchControllerWriteCommandsCompleter::Async& completer) {
+                     completer.Reply(
+                         zx::ok(std::vector<fuchsia_hardware_spmi::Register8>{{address, data}}));
+                     expect_watch_ = std::monostate{};
+                   },
+                   [](std::vector<fuchsia_hardware_spmi::Register8>& data) { ZX_ASSERT(false); },
+                   [&](std::monostate&) {
+                     expect_watch_ = std::vector<fuchsia_hardware_spmi::Register8>{{address, data}};
+                   }},
+        expect_watch_);
   }
 
   void VerifyAndClear() {
@@ -76,7 +92,6 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
     kRead = 0,
     kWrite = 1,
     kGetProperties = 2,
-    kWatch = 3,
   };
 
   struct SpmiExpectation {
@@ -141,14 +156,13 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   void WatchControllerWriteCommands(
       WatchControllerWriteCommandsRequest& request,
       WatchControllerWriteCommandsCompleter::Sync& completer) override {
-    ASSERT_FALSE(expectations_.empty());
-    auto expectation = std::move(expectations_.front());
-    expectations_.pop();
-
-    ASSERT_EQ(expectation.type, CallType::kWatch);
-    ASSERT_EQ(expectation.data.size(), 1);
-    completer.Reply(zx::ok(
-        std::vector<fuchsia_hardware_spmi::Register8>{{expectation.address, expectation.data[0]}}));
+    std::visit(overloaded{[](WatchControllerWriteCommandsCompleter::Async&) { ZX_ASSERT(false); },
+                          [&](std::vector<fuchsia_hardware_spmi::Register8>& data) {
+                            completer.Reply(zx::ok(std::move(data)));
+                            expect_watch_ = std::monostate{};
+                          },
+                          [&](std::monostate&) { expect_watch_ = completer.ToAsync(); }},
+               expect_watch_);
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_spmi::Device> metadata,
@@ -161,6 +175,9 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   }
 
   std::queue<SpmiExpectation> expectations_;
+  std::variant<std::monostate, WatchControllerWriteCommandsCompleter::Async,
+               std::vector<fuchsia_hardware_spmi::Register8>>
+      expect_watch_;
 };
 
 }  // namespace mock_spmi
