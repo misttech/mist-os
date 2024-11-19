@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//go:build !build_with_native_toolchain
-
 // This library implements a *very basic* fuchsia.io implementation for directories, files, and
 // services. Most functionality is not available, nor does this library enforce any kind of
 // connection rights. However, nodes are read-only from a client perspective (e.g. writing to files
