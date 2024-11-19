@@ -11,6 +11,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <ktl/unique_ptr.h>
+#include <phys/handoff.h>
 #include <vm/pmm.h>
 
 #include "vm_priv.h"
@@ -76,7 +77,34 @@ void physmap_preserve_gaps_for_mmio() {
 }
 
 void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> func,
-                          pmm_arena_info_t* arenas, size_t num_arenas) {
+                          pmm_arena_info_t* arenas, size_t num_arenas,
+                          ktl::optional<zbi_nvram_t> nvram) {
+  // Call the provided func on the provided gap, making sure to avoid any NVRAM
+  // range. (See function docstring.)
+  auto call_on_gap = [func = ktl::move(func), nvram](vaddr_t base, size_t size) {
+    if (size == 0) {
+      return;
+    }
+    if (!nvram) {
+      func(base, size);
+      return;
+    }
+
+    vaddr_t end = base + size;
+    vaddr_t nvram_base = reinterpret_cast<vaddr_t>(paddr_to_physmap(nvram->base));
+    vaddr_t nvram_end = nvram_base + nvram->length;
+    if (nvram_end <= base || end <= nvram_base) {  // No overlap; gap is unbroken.
+      func(base, size);
+      return;
+    }
+    if (base < nvram_base) {  // Gap leading up to the NVRAM range.
+      func(base, nvram_base - base);
+    }
+    if (nvram_end < end) {  // Gap after the NVRAM range.
+      func(nvram_end, end - nvram_end);
+    }
+  };
+
   // Iterate over the arenas and invoke |func| for the gaps between them.
   //
   // |gap_base| is the base address of the last identified gap.
@@ -92,10 +120,7 @@ void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> 
             arena_base, arena_size);
 
     const size_t gap_size = arena_base - gap_base;
-    if (gap_size > 0) {
-      func(gap_base, gap_size);
-    }
-
+    call_on_gap(gap_base, gap_size);
     gap_base = arena_base + arena_size;
   }
 
@@ -103,7 +128,7 @@ void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> 
   const vaddr_t physmap_end = PHYSMAP_BASE + PHYSMAP_SIZE;
   const size_t gap_size = physmap_end - gap_base;
   if (gap_size > 0) {
-    func(gap_base, gap_size);
+    call_on_gap(gap_base, gap_size);
   }
 }
 
@@ -119,7 +144,7 @@ void physmap_protect_non_arena_regions() {
   zx_status_t status = pmm_get_arena_info(num_arenas, 0, arenas.get(), size);
   ASSERT(status == ZX_OK);
 
-  physmap_for_each_gap(physmap_protect_gap, arenas.get(), num_arenas);
+  physmap_for_each_gap(physmap_protect_gap, arenas.get(), num_arenas, gPhysHandoff->nvram);
 }
 
 void physmap_protect_arena_regions_noexecute() {
