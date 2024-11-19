@@ -72,7 +72,7 @@ const FILE_PROTOCOL_NAME string = "fuchsia.io/File";
 /// NOTE: cloned connections do not share their seek offset with their source
 /// connection.
 @discoverable
-closed(removed=24) open(added=24) protocol File {
+open protocol File {
     compose AdvisoryLocking;
     @available(added=18)
     compose Linkable;

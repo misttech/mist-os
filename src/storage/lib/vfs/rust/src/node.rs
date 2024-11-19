@@ -222,7 +222,6 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::QueryFilesystem { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), None)?;
             }
-            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::NodeRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)

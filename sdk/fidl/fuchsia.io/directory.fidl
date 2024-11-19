@@ -336,7 +336,7 @@ type WatchMask = strict bits : uint32 {
 
 /// Directory defines a node which is capable of containing other Objects.
 @discoverable
-closed(removed=24) open(added=24) protocol Directory {
+open protocol Directory {
     compose AdvisoryLocking;
     compose Node;
 

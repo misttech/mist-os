@@ -282,7 +282,7 @@ const MAX_FS_NAME_BUFFER uint64 = 32;
 
 /// Node defines the minimal interface for entities which can be accessed in a filesystem.
 @discoverable
-closed(removed=24) open(added=24) protocol Node {
+open protocol Node {
     @available(added=9)
     compose fuchsia.unknown.Cloneable;
     @available(added=9)

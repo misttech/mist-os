@@ -362,7 +362,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Directory",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -884,7 +884,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/File",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -1561,7 +1561,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Node",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

@@ -36,10 +36,8 @@ class RemoteFileConnection final : public FileConnection {
   void WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) final;
   void Seek(SeekRequestView request, SeekCompleter::Sync& completer) final;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::File> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) final {}
-#endif
 
   zx_status_t ReadInternal(void* data, size_t len, size_t* out_actual);
   zx_status_t ReadAtInternal(void* data, size_t len, size_t offset, size_t* out_actual);

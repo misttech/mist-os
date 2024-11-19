@@ -78,6 +78,9 @@ pub enum OpenError {
 
     #[error("expected node to be a {expected:?}, but got a {actual:?}")]
     UnexpectedNodeKind { expected: Kind, actual: Kind },
+
+    #[error("received unknown event (ordinal = {ordinal})")]
+    UnknownEvent { ordinal: u64 },
 }
 
 impl OpenError {
@@ -212,9 +215,10 @@ pub(crate) async fn verify_node_describe_event(
             let () = zx_status::Status::ok(status).map_err(OpenError::OpenError)?;
             info.ok_or(OpenError::MissingOnOpenInfo)?;
         }
-        fio::NodeEvent::OnRepresentation { .. } => (),
-        #[cfg(fuchsia_api_level_at_least = "24")]
-        fio::NodeEvent::_UnknownEvent { .. } => (),
+        fio::NodeEvent::OnRepresentation { .. } => {}
+        fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+            return Err(OpenError::UnknownEvent { ordinal })
+        }
     }
 
     Ok(node)
@@ -238,8 +242,9 @@ pub(crate) async fn verify_directory_describe_event(
                 OpenError::UnexpectedNodeKind { expected: Kind::Directory, actual }
             })?;
         }
-        #[cfg(fuchsia_api_level_at_least = "24")]
-        fio::DirectoryEvent::_UnknownEvent { .. } => (),
+        fio::DirectoryEvent::_UnknownEvent { ordinal, .. } => {
+            return Err(OpenError::UnknownEvent { ordinal })
+        }
     }
 
     Ok(node)
@@ -261,8 +266,9 @@ pub(crate) async fn verify_file_describe_event(
             let () = Kind::expect_file2(&payload)
                 .map_err(|actual| OpenError::UnexpectedNodeKind { expected: Kind::File, actual })?;
         }
-        #[cfg(fuchsia_api_level_at_least = "24")]
-        fio::FileEvent::_UnknownEvent { .. } => (),
+        fio::FileEvent::_UnknownEvent { ordinal, .. } => {
+            return Err(OpenError::UnknownEvent { ordinal })
+        }
     }
 
     Ok(node)

@@ -102,10 +102,8 @@ class DirectoryConnection final : public Connection,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_io::Directory> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) final {}
-#endif
   //
   // |fuchsia.io/AdvisoryLocking| operations.
   //
