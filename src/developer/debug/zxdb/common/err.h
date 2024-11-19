@@ -58,6 +58,7 @@ class Err {
 
   ErrType type() const { return type_; }
   const std::string& msg() const { return msg_; }
+  std::string ToString() const;
 
   // Equality operator is provided for tests.
   bool operator==(const Err& other) const;

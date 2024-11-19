@@ -6,6 +6,7 @@
 
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/largest_less_or_equal.h"
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/line_details.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
@@ -87,10 +88,13 @@ void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules,
   for (const auto& added_index : new_module_indices) {
     Err sym_load_err;
     ModuleInfo* info = SaveModuleInfo(modules[added_index], force_reload_symbols, &sym_load_err);
-    if (sym_load_err.has_error())
+    if (sym_load_err.has_error()) {
       load_errors.push_back(std::move(sym_load_err));
-    else if (info->symbols->module_symbols_ref())
+    } else if (info->symbols->module_symbols_ref()) {
       added_modules.push_back(info->symbols.get());
+    } else {
+      DEBUG_LOG(ProcessSymbols) << "SaveModuleInfo returned neither error nor valid reference.";
+    }
   }
 
   DoRefreshTargetSymbols();
@@ -229,8 +233,10 @@ ProcessSymbols::ModuleInfo* ProcessSymbols::SaveModuleInfo(const debug_ipc::Modu
       module.name, module.build_id, force_reload_symbols, &module_symbols);
   if (symbol_load_err->has_error()) {
     // Error, but it may be expected.
-    if (!ExpectSymbolsForName(module.name))
+    if (!ExpectSymbolsForName(module.name)) {
+      DEBUG_LOG(ProcessSymbols) << "Encountered expected error " << symbol_load_err->ToString();
       *symbol_load_err = Err();
+    }
     info.symbols = std::make_unique<LoadedModuleSymbols>(nullptr, module.build_id, module.base,
                                                          module.debug_address);
   } else {

@@ -36,7 +36,17 @@ BuildIDIndex::Entry BuildIDIndex::EntryForBuildID(const std::string& build_id) {
 
   // No matter whether SearchBuildIdDirs found the symbol or not, build_id_to_files_[build_id] will
   // always create the entry so next time no search will be performed.
-  return build_id_to_files_[build_id];
+  Entry found = build_id_to_files_[build_id];
+  if (found.build_dir.empty()) {
+    DEBUG_LOG(BuildIDIndex) << "Entry for " << build_id << " has no build dir.";
+  }
+  if (found.debug_info.empty()) {
+    DEBUG_LOG(BuildIDIndex) << "Entry for " << build_id << " has no debug info.";
+  }
+  if (found.binary.empty()) {
+    DEBUG_LOG(BuildIDIndex) << "Entry for " << build_id << " has no binary.";
+  }
+  return found;
 }
 
 void BuildIDIndex::SearchBuildIdDirs(const std::string& build_id) {

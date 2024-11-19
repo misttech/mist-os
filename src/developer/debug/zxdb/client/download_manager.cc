@@ -286,6 +286,8 @@ Download* DownloadManager::GetDownload(std::string build_id, DebugSymbolFileType
 
     // Add all configured servers to the new download object.
     DownloadStarted(download_id, download);
+  } else {
+    DEBUG_LOG(DownloadManager) << "No symbol servers for download for " << build_id;
   }
 
   return download;
@@ -314,6 +316,8 @@ void DownloadManager::DownloadStarted(const DownloadIdentifier& dl_id, Download*
   for (auto& server : system_->GetSymbolServers()) {
     if (server->state() == SymbolServer::State::kReady) {
       download->AddServer(server);
+    } else {
+      DEBUG_LOG(DownloadManager) << "Symbol server " << server->name() << " is not ready.";
     }
   }
 

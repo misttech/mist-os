@@ -83,8 +83,14 @@ const char* LogCategoryToString(LogCategory category) {
       return "DebugAdapter";
     case LogCategory::kBuildIDIndex:
       return "BuildIDIndex";
+    case LogCategory::kProcessSymbols:
+      return "ProcessSymbols";
     case LogCategory::kModuleSymbols:
       return "ModuleSymbols";
+    case LogCategory::kSystemSymbols:
+      return "SystemSymbols";
+    case LogCategory::kDownloadManager:
+      return "DownloadManager";
     case LogCategory::kAll:
       return "All";
     case LogCategory::kNone:
