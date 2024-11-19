@@ -18,6 +18,41 @@
 namespace dl::testing {
 namespace {
 
+// This class is a wrapper around the ld::ModuleMemory object that handles
+// addresses read from the .dynamic section in memory as modified by glibc.
+//
+// This "adaptive" memory object will attempt to perform a read on the memory
+// object using the initial `ptr` value passed in: if that read fails, it will
+// try to read again with `ptr - load_bias`, as is needed for linux.
+class AdjustLoadBiasAdaptor : public ld::ModuleMemory {
+ public:
+  using Base = ld::ModuleMemory;
+
+  explicit AdjustLoadBiasAdaptor(const AbiModule& module, size_t load_bias)
+      : Base(module), load_bias_(load_bias) {}
+
+  template <typename T>
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
+    auto result = Base::ReadArray<T>(ptr, count);
+    if (!result) {
+      return Base::ReadArray<T>(ptr - load_bias_);
+    }
+    return result;
+  }
+
+  template <typename T>
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr) {
+    auto result = Base::ReadArray<T>(ptr);
+    if (!result) {
+      return Base::ReadArray<T>(ptr - load_bias_);
+    }
+    return result;
+  }
+
+ private:
+  Elf::Addr load_bias_ = 0;
+};
+
 // Decode an AbiModule from the provided `struct dl_phdr_info`.
 AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
   static const size_t kPageSize = sysconf(_SC_PAGE_SIZE);
@@ -54,9 +89,7 @@ AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
       .tls_modid = phdr_info.dlpi_tls_modid,
   };
 
-  // TODO(https://fxbug.dev/376354868): Use an adaptor wrapper that will adjust
-  // for redundant load bias additions to module.vaddr_start.
-  auto memory = ld::ModuleMemory{module};
+  AdjustLoadBiasAdaptor memory(module, phdr_info.dlpi_addr);
   elfldltl::DecodePhdrs(diag, phdrs, PhdrMemoryBuildIdObserver(memory, module));
 
   auto count = dyn_phdr->filesz() / sizeof(Elf::Dyn);
@@ -80,12 +113,6 @@ int AddModule(struct dl_phdr_info* phdr_info, size_t size, void* data) {
 // This function decodes the loaded modules at startup to populate a list of
 // ld::abi::Abi<>::Module data structures to return to the caller.
 LoadedAbiModulesList PopulateLoadedAbiModules() {
-// TODO(https://fxbug.dev/376354868): Don't register startup modules on glibc
-// until a load-bias adaptor memory object is introduced.
-#ifdef __GLIBC__
-  return {};
-#endif
-
   LoadedAbiModulesList modules;
   ZX_ASSERT(!dl_iterate_phdr(AddModule, &modules));
 
