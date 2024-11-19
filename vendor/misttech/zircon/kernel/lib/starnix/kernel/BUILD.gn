@@ -55,6 +55,7 @@ zx_library("starnix_core") {
     "vfs/fs_context.cc",
     "vfs/fs_node.cc",
     "vfs/fs_node_ops.cc",
+    "vfs/fs_registry.cc",
     "vfs/memory_file.cc",
     "vfs/module.cc",
     "vfs/mount.cc",
