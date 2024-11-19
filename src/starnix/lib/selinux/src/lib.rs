@@ -640,7 +640,7 @@ pub struct FileSystemLabel {
 #[derive(Clone, Debug, PartialEq)]
 pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
-    Mountpoint,
+    Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
     /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
     /// identifies the context to use for unlabeled files in the filesystem (the "default

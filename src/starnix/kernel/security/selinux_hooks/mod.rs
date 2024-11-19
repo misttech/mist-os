@@ -94,7 +94,7 @@ where
 
     let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
-        FileSystemLabelingScheme::Mountpoint => label.sid,
+        FileSystemLabelingScheme::Mountpoint { sid } => sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
@@ -276,7 +276,7 @@ pub(super) fn fs_node_init_on_create(
                 (sid, xattr)
             }
         }
-        FileSystemLabelingScheme::Mountpoint | FileSystemLabelingScheme::GenFsCon => {
+        FileSystemLabelingScheme::Mountpoint { .. } | FileSystemLabelingScheme::GenFsCon => {
             // The label in this case is decided in the `fs_node_init_with_dentry` hook.
             return Ok(None);
         }
@@ -716,7 +716,7 @@ where
 
     // If the "mountpoint"-labeling is used by this filesystem then setting labels is not supported.
     // TODO: https://fxbug.dev/377915469 - Is re-labeling of "genfscon" nodes allowed?
-    if fs_label.scheme == FileSystemLabelingScheme::Mountpoint {
+    if let FileSystemLabelingScheme::Mountpoint { .. } = fs_label.scheme {
         return error!(ENOTSUP);
     }
 
@@ -870,11 +870,9 @@ pub(super) fn file_system_init_security(
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
     let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
 
-    // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
-    // security context options would be meaningful to combine with it.
-    if context.is_some()
-        && (def_context.is_some() || fs_context.is_some() || root_context.is_some())
-    {
+    // If a "context" is specified then it is used for all nodes in the filesystem, so the other
+    // security context options would not be meaningful to combine with it, except "fscontext".
+    if context.is_some() && (def_context.is_some() || root_context.is_some()) {
         return error!(EINVAL);
     }
 

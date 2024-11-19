@@ -319,9 +319,13 @@ impl SecurityServer {
             sid_from_mount_option(active_policy, &mount_options.root_context);
 
         if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
-            // `mount_options.context` is set, so the file-system and the nodes it contains
-            // have the specified read-only security label set.
-            FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
+            // `mount_options` has `context` set, so the file-system and the nodes it contains are
+            // labeled with that value, which is not modifiable. The `fs_context` option, if set,
+            // overrides the file-system label.
+            FileSystemLabel {
+                sid: fs_sid_from_mount_option.unwrap_or(mountpoint_sid),
+                scheme: FileSystemLabelingScheme::Mountpoint { sid: mountpoint_sid },
+            }
         } else if let Some(FsUseLabelAndType { context, use_type }) =
             active_policy.parsed.fs_use_label_and_type(fs_type)
         {
