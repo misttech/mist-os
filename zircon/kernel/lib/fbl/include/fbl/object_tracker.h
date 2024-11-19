@@ -360,11 +360,10 @@ class ObjectTracker {
     // The page id is the WAVL key and it is never zero.
     uint32_t page_id() const { return page_id_; }
 
+    Lock<SpinLock>* lock() const TA_RET_CAP(page_lock_) { return &page_lock_; }
+
     // Make a holder from a valid |index| that points to a tracked object.
-    zx::result<HolderType> get(uint32_t index, uint32_t user_tag, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
+    zx::result<HolderType> get_locked(uint32_t index, uint32_t user_tag) TA_REQ(page_lock_) {
       if (!node_tracker_.exists(index)) {
         return zx::error(ZX_ERR_NOT_FOUND);
       }
@@ -376,12 +375,8 @@ class ObjectTracker {
     }
 
     // Batch get. Note that the input |ids| contain the page, which we must strip.
-    zx_status_t get(ktl::span<const uint32_t> indirect_map, ktl::span<const uint32_t> ids,
-                    ktl::span<HolderType> holders, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
-
+    zx_status_t get_locked(ktl::span<const uint32_t> indirect_map, ktl::span<const uint32_t> ids,
+                           ktl::span<HolderType> holders) TA_REQ(page_lock_) {
       // Loop over the indirect map if exists or over the ids directly if not.
 
       if (indirect_map.empty()) {
@@ -414,19 +409,9 @@ class ObjectTracker {
       return ZX_OK;
     }
 
-    // Add a tracked object to this page.
-    zx::result<uint32_t> add(TrackedType&& object, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
-      return add_locked(ktl::move(object));
-    }
-
     // Batch-add. Stops at the first error.
-    zx_status_t add(ktl::span<TrackedType> objects, ktl::span<uint32_t> ids, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
+    zx_status_t add_locked(ktl::span<TrackedType> objects, ktl::span<uint32_t> ids)
+        TA_REQ(page_lock_) {
       zx_status_t status = ZX_OK;
       for (size_t ix = 0; ix != objects.size(); ix++) {
         auto res = add_locked(ktl::move(objects[ix]));
@@ -456,20 +441,10 @@ class ObjectTracker {
       uint32_t object_count;
     };
 
-    zx::result<RemoveResult> remove(uint32_t index, uint32_t user_tag, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
-      return remove_locked(index, user_tag, &guard);
-    }
-
     // Batch remove. Note |ids| contain the page, not just the index so we need
     // to strip it.
-    zx_status_t remove(ktl::span<const uint32_t> indirect_map, ktl::span<const uint32_t> ids,
-                       ktl::span<TrackedType> objects, Guard<Mutex>&& mutex) {
-      Guard<Mutex> caller_guard{AdoptLock, ktl::move(mutex)};
-      Guard<SpinLock, IrqSave> guard{&page_lock_};
-      caller_guard.Release();
+    zx_status_t remove_locked(ktl::span<const uint32_t> indirect_map, ktl::span<const uint32_t> ids,
+                              ktl::span<TrackedType> objects) TA_REQ(page_lock_) {
       const auto write = !objects.empty();
 
       // Loop over all input indexes via the indirect map if present or directly if not.
@@ -480,7 +455,7 @@ class ObjectTracker {
         size_t ix = 0;
         for (auto id : ids) {
           auto dec = Tracker::decode(id);
-          auto res = remove_locked(dec.index, dec.user_tag, &guard);
+          auto res = remove_locked(dec.index, dec.user_tag);
           if (res.is_error()) {
             status = res.error_value();
           } else if (write) {
@@ -491,7 +466,7 @@ class ObjectTracker {
       } else {
         for (auto si : indirect_map) {
           auto dec = Tracker::decode(ids[si]);
-          auto res = remove_locked(dec.index, dec.user_tag, &guard);
+          auto res = remove_locked(dec.index, dec.user_tag);
           if (res.is_error()) {
             status = res.error_value();
           } else if (write) {
@@ -502,8 +477,7 @@ class ObjectTracker {
       return status;
     }
 
-    zx::result<RemoveResult> remove_locked(uint32_t index, uint32_t user_tag,
-                                           Guard<SpinLock, IrqSave>* guard) TA_REQ(page_lock_) {
+    zx::result<RemoveResult> remove_locked(uint32_t index, uint32_t user_tag) TA_REQ(page_lock_) {
       if (!node_tracker_.exists(index)) {
         return zx::error(ZX_ERR_NOT_FOUND);
       }
@@ -544,7 +518,7 @@ class ObjectTracker {
 
     WAVLTreeNodeState<PageObject*, NodeOptions::AllowClearUnsafe> wavl_node_state_;
     const uint32_t page_id_;
-    DECLARE_SPINLOCK(PageObject) page_lock_;
+    mutable DECLARE_SPINLOCK(PageObject) page_lock_;
     // The |node_tracker_| must be at this spot for the size calculations to work.
     IntSet<num_objects> node_tracker_ TA_GUARDED(page_lock_);
     alignas(TrackedType) uint8_t storage_[sizeof(TrackedType) * num_objects];
@@ -596,7 +570,9 @@ zx::result<HolderType> ObjectTracker<TrackedType, HolderType, utb>::get(uint32_t
   if (page == page_map_.end()) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  return page->get(dec.index, dec.user_tag, tracker_guard.take());
+  Guard<SpinLock, IrqSave> page_guard{page->lock()};
+  tracker_guard.Release();
+  return page->get_locked(dec.index, dec.user_tag);
 }
 
 template <typename TrackedType, typename HolderType, size_t utb>
@@ -629,7 +605,10 @@ zx::result<uint32_t> ObjectTracker<TrackedType, HolderType, utb>::add(TrackedTyp
         Guard<Mutex> tracker_guard{&tracker_lock_};
         if ((top_page_ != nullptr) && (top_page_->free_count_locking() > 0u)) {
           auto page_id = top_page_->page_id();
-          auto result = top_page_->add(ktl::move(object), tracker_guard.take());
+          PageObj* top_page = top_page_;
+          Guard<SpinLock, IrqSave> page_guard{top_page->lock()};
+          tracker_guard.Release();
+          auto result = top_page->add_locked(ktl::move(object));
           if (result.is_error()) {
             return result.take_error();
           }
@@ -686,8 +665,10 @@ zx_status_t ObjectTracker<TrackedType, HolderType, utb>::add(ktl::span<TrackedTy
         // om the top page even if we are not holding its lock.
         if (free > 0u) {
           auto count = ktl::min(static_cast<size_t>(free), left);
-          auto st = top_page_->add(objects.subspan(start, count), ids.subspan(start, count),
-                                   tracker_guard.take());
+          PageObj* top_page = top_page_;
+          Guard<SpinLock, IrqSave> page_guard{top_page->lock()};
+          tracker_guard.Release();
+          auto st = top_page->add_locked(objects.subspan(start, count), ids.subspan(start, count));
           // Outside any locks here.
           if (st != ZX_OK) {
             return st;
@@ -732,9 +713,9 @@ zx::result<TrackedType> ObjectTracker<TrackedType, HolderType, utb>::remove(uint
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   size_t page_count = page_map_.size();
-  auto result = page->remove(dec.index, dec.user_tag, tracker_guard.take());
-  // tracker_guard is released inside remove(). We are not holding any
-  // locks here.
+  Guard<SpinLock, IrqSave> page_guard{page->lock()};
+  tracker_guard.Release();
+  auto result = page->remove_locked(dec.index, dec.user_tag);
   if (result.is_error()) {
     return result.take_error();
   }
@@ -817,10 +798,13 @@ zx_status_t ObjectTracker<TrackedType, HolderType, utb>::get_or_remove_batch(
     AutoPreemptDisabler apd;
     Guard<Mutex> tracker_guard{&tracker_lock_};
     if (page_map_.size() == 1u) {
+      PageObj* top_page = top_page_;
+      Guard<SpinLock, IrqSave> page_guard{top_page->lock()};
+      tracker_guard.Release();
       if constexpr (ktl::is_same_v<TrackedType, Tout>) {
-        return top_page_->remove(ktl::span<uint32_t>(), ids, objects, tracker_guard.take());
+        return top_page->remove_locked(ktl::span<uint32_t>(), ids, objects);
       } else if constexpr (ktl::is_same_v<HolderType, Tout>) {
-        return top_page_->get(ktl::span<uint32_t>(), ids, objects, tracker_guard.take());
+        return top_page->get_locked(ktl::span<uint32_t>(), ids, objects);
       }
     }
   }
@@ -868,12 +852,14 @@ zx_status_t ObjectTracker<TrackedType, HolderType, utb>::get_or_remove_batch(
       st = ZX_ERR_NOT_FOUND;
     } else {
       auto count = end - start;
+      Guard<SpinLock, IrqSave> page_guard{page->lock()};
+      tracker_guard.Release();
       if constexpr (ktl::is_same_v<TrackedType, Tout>) {
-        auto st2 = page->remove(smap.subspan(start, count), ids, objects, tracker_guard.take());
+        auto st2 = page->remove_locked(smap.subspan(start, count), ids, objects);
         // Ignore, but record the first error.
         st = (st != ZX_OK) ? st : st2;
       } else if constexpr (ktl::is_same_v<HolderType, Tout>) {
-        st = page->get(smap.subspan(start, count), ids, objects, tracker_guard.take());
+        st = page->get_locked(smap.subspan(start, count), ids, objects);
         if (st != ZX_OK) {
           return st;
         }
