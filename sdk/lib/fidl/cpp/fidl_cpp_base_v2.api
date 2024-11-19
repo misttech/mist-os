@@ -1,7 +1,7 @@
 {
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/box.h": "ce058ee11638668f6ac4655a247be601",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/internal/framework_err.h": "de8eb0a8aa7c9e8dfa80e2cd2bf0ed81",
-  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/internal/natural_types.h": "6f59f70ff9f52e19f7955fc126b40422",
+  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/internal/natural_types.h": "2c9b6354686e6787d285f44e63d6f4b8",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_coding_traits.h": "c01ef3ecffd35208920858006c274e3f",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_decoder.h": "4e483a994d8830987d71a80be8a84fd8",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_encoder.h": "5d8f475cabaf0162e8fedbb971a448ae",
