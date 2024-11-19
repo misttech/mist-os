@@ -38,8 +38,6 @@ ffx_plugin("ffx_test") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:walkdir",
-    "//third_party/rust_crates:zstd",
-    "//third_party/zstd",
   ]
 
   args_deps = [

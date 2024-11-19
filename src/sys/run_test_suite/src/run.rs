@@ -830,25 +830,16 @@ mod test {
             fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>();
         let debug_data_fut = async move {
             let (client, server) = zx::Socket::create_stream();
-            let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
-            let bytes = compressor.compress(b"Not a real profile").unwrap();
-            let _ = server.write(bytes.as_slice()).unwrap();
+            let _ = server.write(b"Not a real profile").unwrap();
             let mut service = debug_service.into_stream().unwrap();
             let mut data = vec![ftest_manager::DebugData {
                 name: Some("test_file.profraw".to_string()),
                 socket: Some(client.into()),
                 ..Default::default()
             }];
-            drop(server);
             while let Ok(Some(request)) = service.try_next().await {
                 match request {
-                    ftest_manager::DebugDataIteratorRequest::GetNext { .. } => {
-                        panic!("Not Implemented");
-                    }
-                    ftest_manager::DebugDataIteratorRequest::GetNextCompressed {
-                        responder,
-                        ..
-                    } => {
+                    ftest_manager::DebugDataIteratorRequest::GetNext { responder, .. } => {
                         let _ = responder.send(std::mem::take(&mut data));
                     }
                 }

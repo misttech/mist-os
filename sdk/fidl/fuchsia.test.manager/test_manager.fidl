@@ -460,16 +460,7 @@ closed protocol DebugDataIterator {
     /// Retrieve the next batch of debug data. This is a hanging get; if no data is
     /// immediately available, the call hangs until data is available. After all data has
     /// been returned, the call returns an empty vector.
-    @available(removed=HEAD)
     strict GetNext() -> (resource struct {
-        data vector<DebugData>:MAX;
-    });
-
-    /// Retrieve the next batch of debug data (compressed using zstd). This is
-    /// a hanging get; if no data is immediately available, the call hangs until
-    /// data is available. After all data has been returned, the call returns an empty vector.
-    @available(added=HEAD)
-    strict GetNextCompressed() -> (resource struct {
         data vector<DebugData>:MAX;
     });
 };

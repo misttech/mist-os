@@ -306,7 +306,7 @@ mod test {
     use maplit::hashset;
     use std::collections::HashSet;
     use std::task::Poll;
-    use test_manager_test_lib::collect_string_from_socket_helper;
+    use test_diagnostics::collect_string_from_socket;
 
     const VMO_SIZE: u64 = 4096;
 
@@ -475,11 +475,11 @@ mod test {
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
             let iterator_proxy = iterator.into_proxy().unwrap();
-            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
+            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
+                        collect_string_from_socket(debug_data.socket.unwrap())
                             .await
                             .expect("Cannot read socket"),
                     ))
@@ -541,11 +541,11 @@ mod test {
                 events.pop().unwrap().unwrap().into_payload()
             {
                 let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
+                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
                     .and_then(|debug_data| async move {
                         Ok((
                             debug_data.name.unwrap(),
-                            collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
+                            collect_string_from_socket(debug_data.socket.unwrap())
                                 .await
                                 .expect("Cannot read socket"),
                         ))
@@ -613,11 +613,11 @@ mod test {
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
             let iterator_proxy = iterator.into_proxy().unwrap();
-            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
+            let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
+                        collect_string_from_socket(debug_data.socket.unwrap())
                             .await
                             .expect("read socket"),
                     ))
@@ -684,11 +684,11 @@ mod test {
                 events.pop().unwrap().unwrap().into_payload()
             {
                 let iterator_proxy = iterator.into_proxy().unwrap();
-                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
+                let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next())
                     .and_then(|debug_data| async move {
                         Ok((
                             debug_data.name.unwrap(),
-                            collect_string_from_socket_helper(debug_data.socket.unwrap(), true)
+                            collect_string_from_socket(debug_data.socket.unwrap())
                                 .await
                                 .expect("read socket"),
                         ))

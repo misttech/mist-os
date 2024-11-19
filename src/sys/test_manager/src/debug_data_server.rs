@@ -9,8 +9,6 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::stream::FusedStream;
 use futures::{pin_mut, StreamExt, TryStreamExt};
-use itertools::Either;
-use test_diagnostics::zstd_compress::{Encoder, Error as CompressionError};
 use tracing::warn;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
@@ -50,63 +48,22 @@ async fn filter_map_filename(
     }
 }
 
-async fn serve_file_over_socket(
-    file_name: String,
-    file: fio::FileProxy,
-    socket: zx::Socket,
-    compress: bool,
-) {
+async fn serve_file_over_socket(file: fio::FileProxy, socket: zx::Socket) {
     let mut socket = fasync::Socket::from_socket(socket);
 
     // We keep a buffer of 20 MB (2MB buffer * channel size 10) while reading the file
     let num_bytes: u64 = 1024 * 1024 * 2;
-    let (mut sender, mut recv) = match compress {
-        true => {
-            let (encoder, recv) = Encoder::new(0);
-            (Either::Left(encoder), recv)
-        }
-        false => {
-            let (sender, recv) = mpsc::channel(10);
-            (Either::Right(sender), recv)
-        }
-    };
-    let filename = file_name.clone();
+    let (mut sender, mut recv) = mpsc::channel(10);
     let _file_read_task = fasync::Task::spawn(async move {
         loop {
             let bytes = fuchsia_fs::file::read_num_bytes(&file, num_bytes).await.unwrap();
             let len = bytes.len();
-            match sender {
-                Either::Left(ref mut e) => {
-                    if let Err(e) = e.compress(&bytes).await {
-                        match e {
-                            CompressionError::Send(_) => { /* means client is gone, ignore */ }
-                            e => {
-                                warn!("Error compressing file '{}':, {:?}", &filename, e);
-                            }
-                        }
-                        break;
-                    }
-                }
-                Either::Right(ref mut s) => {
-                    if let Err(_) = s.send(bytes).await {
-                        // no recv, don't read rest of the file.
-                        break;
-                    }
-                }
+            if let Err(_) = sender.send(bytes).await {
+                // no recv, don't read rest of the file.
+                break;
             }
-
             if len != usize::try_from(num_bytes).unwrap() {
-                if let Either::Left(e) = sender {
-                    // This is EOF as fuchsia.io.Readable does not return short reads
-                    if let Err(e) = e.finish().await {
-                        match e {
-                            CompressionError::Send(_) => { /* means client is gone, ignore */ }
-                            e => {
-                                warn!("Error compressing file '{}':, {:?}", &filename, e);
-                            }
-                        }
-                    }
-                }
+                // This is EOF as fuchsia.io.Readable does not return short reads
                 break;
             }
         }
@@ -114,7 +71,7 @@ async fn serve_file_over_socket(
 
     while let Some(bytes) = recv.next().await {
         if let Err(e) = socket.write_all(bytes.as_slice()).await {
-            warn!("cannot serve file '{}': {:?}", &file_name, e);
+            warn!("cannot serve file: {:?}", e);
             return;
         }
     }
@@ -193,16 +150,7 @@ pub(crate) async fn serve_iterator(
 
     let mut file_tasks = vec![];
     while let Some(request) = iterator.try_next().await? {
-        let mut compress = false;
-        let responder = match request {
-            ftest_manager::DebugDataIteratorRequest::GetNext { responder } => {
-                Either::Left(responder)
-            }
-            ftest_manager::DebugDataIteratorRequest::GetNextCompressed { responder } => {
-                compress = true;
-                Either::Right(responder)
-            }
-        };
+        let ftest_manager::DebugDataIteratorRequest::GetNext { responder } = request;
         let next_files = match file_stream.is_terminated() {
             true => vec![],
             false => file_stream.by_ref().take(ITERATOR_BATCH_SIZE).collect().await,
@@ -221,12 +169,7 @@ pub(crate) async fn serve_iterator(
 
                 tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
                 let (client, server) = zx::Socket::create_stream();
-                let t = fasync::Task::spawn(serve_file_over_socket(
-                    file_name.clone(),
-                    file,
-                    server,
-                    compress,
-                ));
+                let t = fasync::Task::spawn(serve_file_over_socket(file, server));
                 file_tasks.push(t);
                 Ok(ftest_manager::DebugData {
                     socket: Some(client.into()),
@@ -235,10 +178,7 @@ pub(crate) async fn serve_iterator(
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;
-        let _ = match responder {
-            Either::Left(responder) => responder.send(debug_data),
-            Either::Right(responder) => responder.send(debug_data),
-        };
+        let _ = responder.send(debug_data);
     }
 
     // make sure all tasks complete
@@ -250,12 +190,10 @@ pub(crate) async fn serve_iterator(
 mod test {
     use super::*;
     use crate::run_events::{RunEventPayload, SuiteEventPayload};
-    use ftest_manager::{DebugData, DebugDataIteratorProxy};
     use fuchsia_async as fasync;
     use std::collections::HashSet;
     use tempfile::tempdir;
-    use test_case::test_case;
-    use test_manager_test_lib::collect_string_from_socket_helper;
+    use test_diagnostics::collect_string_from_socket;
 
     async fn serve_iterator_from_tmp(
         dir: &tempfile::TempDir,
@@ -278,20 +216,8 @@ mod test {
         task.await.expect("iterator server should not fail");
     }
 
-    async fn get_next_debug_data(
-        proxy: &DebugDataIteratorProxy,
-        compressed: bool,
-    ) -> Vec<DebugData> {
-        match compressed {
-            true => proxy.get_next_compressed().await.expect("get next compressed"),
-            false => proxy.get_next().await.expect("get next"),
-        }
-    }
-
-    #[test_case(true; "compressed debug_data")]
-    #[test_case(false; "uncompressed debug_data")]
     #[fuchsia::test]
-    async fn serve_iterator_single_response(compressed: bool) {
+    async fn serve_iterator_single_response() {
         let dir = tempdir().unwrap();
         fuchsia_fs::file::write_in_namespace(&dir.path().join("file").to_string_lossy(), "test")
             .await
@@ -301,30 +227,26 @@ mod test {
 
         let proxy = client.expect("client to be returned");
 
-        let mut values = get_next_debug_data(&proxy, compressed).await;
+        let mut values = proxy.get_next().await.expect("get next");
         assert_eq!(1usize, values.len());
         let ftest_manager::DebugData { name, socket, .. } = values.pop().unwrap();
         assert_eq!(Some("file".to_string()), name);
-        let contents = collect_string_from_socket_helper(socket.unwrap(), compressed)
-            .await
-            .expect("read socket");
+        let contents = collect_string_from_socket(socket.unwrap()).await.expect("read socket");
         assert_eq!("test", contents);
 
-        let values = get_next_debug_data(&proxy, compressed).await;
+        let values = proxy.get_next().await.expect("get next");
         assert_eq!(values, vec![]);
 
         // Calling again is okay and should also return empty vector.
-        let values = get_next_debug_data(&proxy, compressed).await;
+        let values = proxy.get_next().await.expect("get next");
         assert_eq!(values, vec![]);
 
         drop(proxy);
         task.await.expect("iterator server should not fail");
     }
 
-    #[test_case(true; "compressed debug_data")]
-    #[test_case(false; "uncompressed debug_data")]
     #[fuchsia::test]
-    async fn serve_iterator_multiple_responses(compressed: bool) {
+    async fn serve_iterator_multiple_responses() {
         let num_files_served = ITERATOR_BATCH_SIZE * 2;
 
         let dir = tempdir().unwrap();
@@ -343,7 +265,7 @@ mod test {
 
         let mut all_files = vec![];
         loop {
-            let mut next = get_next_debug_data(&proxy, compressed).await;
+            let mut next = proxy.get_next().await.expect("get next");
             if next.is_empty() {
                 break;
             }
@@ -352,9 +274,8 @@ mod test {
 
         let file_contents: HashSet<_> = futures::stream::iter(all_files)
             .then(|ftest_manager::DebugData { name, socket, .. }| async move {
-                let contents = collect_string_from_socket_helper(socket.unwrap(), compressed)
-                    .await
-                    .expect("read socket");
+                let contents =
+                    collect_string_from_socket(socket.unwrap()).await.expect("read socket");
                 (name.unwrap(), contents)
             })
             .collect()
@@ -395,10 +316,8 @@ mod test {
         task.await.expect("iterator server should not fail");
     }
 
-    #[test_case(true; "compressed debug_data")]
-    #[test_case(false; "uncompressed debug_data")]
     #[fuchsia::test]
-    async fn serve_iterator_for_suite_single_response(compressed: bool) {
+    async fn serve_iterator_for_suite_single_response() {
         let dir = tempdir().unwrap();
         fuchsia_fs::file::write_in_namespace(&dir.path().join("file").to_string_lossy(), "test")
             .await
@@ -408,30 +327,26 @@ mod test {
 
         let proxy = client.expect("client to be returned");
 
-        let mut values = get_next_debug_data(&proxy, compressed).await;
+        let mut values = proxy.get_next().await.expect("get next");
         assert_eq!(1usize, values.len());
         let ftest_manager::DebugData { name, socket, .. } = values.pop().unwrap();
         assert_eq!(Some("file".to_string()), name);
-        let contents = collect_string_from_socket_helper(socket.unwrap(), compressed)
-            .await
-            .expect("read socket");
+        let contents = collect_string_from_socket(socket.unwrap()).await.expect("read socket");
         assert_eq!("test", contents);
 
-        let values = get_next_debug_data(&proxy, compressed).await;
+        let values = proxy.get_next().await.expect("get next");
         assert_eq!(values, vec![]);
 
         // Calling again is okay and should also return empty vector.
-        let values = get_next_debug_data(&proxy, compressed).await;
+        let values = proxy.get_next().await.expect("get next");
         assert_eq!(values, vec![]);
 
         drop(proxy);
         task.await.expect("iterator server should not fail");
     }
 
-    #[test_case(true; "compressed debug_data")]
-    #[test_case(false; "uncompressed debug_data")]
     #[fuchsia::test]
-    async fn serve_iterator_for_suite_multiple_responses(compressed: bool) {
+    async fn serve_iterator_for_suite_multiple_responses() {
         let num_files_served = ITERATOR_BATCH_SIZE * 2;
 
         let dir = tempdir().unwrap();
@@ -450,7 +365,7 @@ mod test {
 
         let mut all_files = vec![];
         loop {
-            let mut next = get_next_debug_data(&proxy, compressed).await;
+            let mut next = proxy.get_next().await.expect("get next");
             if next.is_empty() {
                 break;
             }
@@ -459,9 +374,8 @@ mod test {
 
         let file_contents: HashSet<_> = futures::stream::iter(all_files)
             .then(|ftest_manager::DebugData { name, socket, .. }| async move {
-                let contents = collect_string_from_socket_helper(socket.unwrap(), compressed)
-                    .await
-                    .expect("read socket");
+                let contents =
+                    collect_string_from_socket(socket.unwrap()).await.expect("read socket");
                 (name.unwrap(), contents)
             })
             .collect()
