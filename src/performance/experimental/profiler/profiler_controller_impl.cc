@@ -518,19 +518,19 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   FX_LOGS(DEBUG) << "Stopping profiler.";
+
+  if (zx::result stop_res = sampler_->Stop(); stop_res.is_error()) {
+    FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
+    completer.Close(stop_res.status_value());
+    Reset();
+    return;
+  }
+
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
     FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules";
     Reset();
     completer.Close(modules.status_value());
-    return;
-  }
-
-  zx::result<> stop_res = sampler_->Stop();
-  if (stop_res.is_error()) {
-    FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
-    completer.Close(stop_res.status_value());
-    Reset();
     return;
   }
 
