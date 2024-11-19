@@ -295,9 +295,9 @@ void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
     FX_LOGS(ERROR) << "Failed to create endpoints: " << metadata_endpoints.status_string();
     return;
   }
-  zx_status_t status = fdio_open_at(out_dir.channel().get(), "metadata",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                                    metadata_endpoints->server.TakeChannel().release());
+  zx_status_t status = fdio_open3_at(out_dir.channel().get(), "metadata",
+                                     static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                                     metadata_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed opening metadata dir";
     return;
@@ -307,10 +307,10 @@ void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
     FX_LOGS(ERROR) << "Failed to create endpoints: " << contents_endpoints.status_string();
     return;
   }
-  status = fdio_open_at(out_dir.channel().get(), "contents",
-                        static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
-                                              fuchsia_io::OpenFlags::kRightExecutable),
-                        contents_endpoints->server.TakeChannel().release());
+  status =
+      fdio_open3_at(out_dir.channel().get(), "contents",
+                    static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::kPermExecutable),
+                    contents_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed opening pkg dir";
     return;
@@ -356,10 +356,10 @@ void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
   fbl::unique_fd fd;
 
   initialization_status_.Set("opening VMO");
-  status = fdio_open_fd_at(contents_dir_fd.get(), file_path.c_str(),
-                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
-                                                 fuchsia_io::OpenFlags::kRightExecutable),
-                           fd.reset_and_get_address());
+  status = fdio_open3_fd_at(
+      contents_dir_fd.get(), file_path.c_str(),
+      static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::kPermExecutable),
+      fd.reset_and_get_address());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Could not open path " << file_path;
     return;

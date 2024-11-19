@@ -55,11 +55,11 @@ zx_status_t LoaderApp::InitDeviceFs() {
   for (const char* dev_class : kDevClassList) {
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string input_path = std::string("/dev/class/") + dev_class;
-    // NB: RIGHT_READABLE is needed here because downstream code in OpenCL will attempt to open this
+    // NB: PERM_READABLE is needed here because downstream code in OpenCL will attempt to open this
     // directory using POSIX APIs which cannot express opening without any rights.
     zx_status_t status =
-        fdio_open(input_path.c_str(), static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                  endpoints.server.TakeChannel().release());
+        fdio_open3(input_path.c_str(), static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                   endpoints.server.TakeChannel().release());
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
       return status;
