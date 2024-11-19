@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_RUNNER_CONTAINER_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_RUNNER_CONTAINER_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_RUNNER_CONTAINER_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_RUNNER_CONTAINER_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/runner/config.h>
@@ -12,14 +12,16 @@
 #include <fbl/ref_ptr.h>
 
 namespace starnix {
-
 class Kernel;
 class FsContext;
+}  // namespace starnix
+
 using starnix_uapi::Errno;
+namespace starnix_kernel_runner {
 
 struct Container {
   /// The `Kernel` object that is associated with the container.
-  fbl::RefPtr<Kernel> kernel;
+  fbl::RefPtr<starnix::Kernel> kernel;
 
   /// Inspect node holding information about the state of the container.
   //_node: inspect::Node,
@@ -34,9 +36,9 @@ struct Container {
 
 fit::result<Errno, Container> create_container(const Config& config);
 
-fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
-    const fbl::RefPtr<Kernel>& kernel, const Config& config);
+fit::result<zx_status_t, fbl::RefPtr<starnix::FsContext>> create_fs_context(
+    const fbl::RefPtr<starnix::Kernel>& kernel, const Config& config);
 
-}  // namespace starnix
+}  // namespace starnix_kernel_runner
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_RUNNER_CONTAINER_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_RUNNER_CONTAINER_H_

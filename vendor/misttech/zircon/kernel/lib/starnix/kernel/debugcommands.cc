@@ -27,7 +27,7 @@ int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    starnix::Config config;
+    starnix_kernel_runner::Config config;
     int idx = 2;
     int remain = argc - idx;
     while (remain-- > 0) {
@@ -36,7 +36,7 @@ int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
       ZX_ASSERT(ac.check());
     }
     config.name = "starnix-container";
-    auto container = starnix::create_container(config);
+    auto container = starnix_kernel_runner::create_container(config);
     if (container.is_error()) {
       printf("Starnix errno: %d", container.error_value().error_code());
       return -1;

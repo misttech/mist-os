@@ -31,13 +31,21 @@
 #include <object/process_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 
-#include "../kernel_priv.h"
+#include "private.h"
 
 #include <ktl/enforce.h>
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
+#define LOCAL_TRACE STARNIX_KERNEL_RUNNER_GLOBAL_TRACE(0)
 
-namespace starnix {
+namespace starnix_kernel_runner {
+
+using starnix::CurrentTask;
+using starnix::FdNumber;
+using starnix::FsContext;
+using starnix::Kernel;
+using starnix::Namespace;
+using starnix::SyslogFile;
+using starnix::WhatToMount;
 
 Container::~Container() { LTRACE_ENTRY_OBJ; }
 
@@ -154,8 +162,8 @@ fit::result<Errno, Container> create_container(const Config& config) {
 
 fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
     const fbl::RefPtr<Kernel>& kernel, const Config& config) {
-  auto rootfs = BootFs::new_fs(kernel, GetZbi());
+  auto rootfs = starnix::BootFs::new_fs(kernel, GetZbi());
   return fit::ok(ktl::move(FsContext::New(Namespace::new_with_flags(rootfs, MountFlags::empty()))));
 }
 
-}  // namespace starnix
+}  // namespace starnix_kernel_runner
