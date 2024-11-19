@@ -305,7 +305,6 @@ enum UdpCacheInvalidationReason {
     InterfaceDisabled,
     AddressRemoved,
     SetConfigurationCalled,
-    SetInterfaceIpForwardingDeprecatedCalled,
     RouteRemoved,
     RouteAdded,
 }
@@ -461,7 +460,6 @@ trait UdpSendMsgPreflightTestIpExt: Ip {
     const REACHABLE_ADDR2: fnet::SocketAddress;
     const UNREACHABLE_ADDR: fnet::SocketAddress;
     const OTHER_SUBNET: fnet::Subnet;
-    const FIDL_IP_VERSION: fnet::IpVersion;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration;
 }
@@ -486,7 +484,6 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
             port: Self::PORT,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V4;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
@@ -522,7 +519,6 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
             zone_index: 0,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
-    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V6;
 
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
@@ -619,10 +615,6 @@ fn assert_preflights_invalidated(
 #[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
 #[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
 #[test_case("Control.SetConfiguration", UdpCacheInvalidationReason::SetConfigurationCalled)]
-#[test_case(
-    "Stack.SetInterfaceIpForwardingDeprecated",
-    UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
-)]
 #[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
 #[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
 async fn udp_send_msg_preflight_fidl<N: Netstack, I: UdpSendMsgPreflightTestIpExt>(
@@ -682,15 +674,6 @@ async fn udp_send_msg_preflight_fidl<N: Netstack, I: UdpSendMsgPreflightTestIpEx
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration");
-        }
-        UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled => {
-            let () = iface
-                .connect_stack()
-                .expect("connect stack")
-                .set_interface_ip_forwarding_deprecated(iface.id(), I::FIDL_IP_VERSION, true)
-                .await
-                .expect("set_interface_ip_forwarding_deprecated fidl error")
-                .expect("failed to set IP forwarding on interface");
         }
     }
 

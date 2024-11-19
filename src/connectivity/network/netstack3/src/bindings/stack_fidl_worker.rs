@@ -10,7 +10,7 @@ use fidl_fuchsia_net_stack::{
     self as fidl_net_stack, ForwardingEntry, StackRequest, StackRequestStream,
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
-use log::{debug, error, warn};
+use log::{debug, error};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::routes::{AddableEntry, AddableEntryEither};
 
@@ -43,22 +43,6 @@ impl StackFidlWorker {
                     } => {
                         responder
                             .send(worker.fidl_del_forwarding_entry(subnet).await)
-                            .unwrap_or_log("failed to respond");
-                    }
-                    StackRequest::SetInterfaceIpForwardingDeprecated {
-                        id,
-                        ip_version,
-                        enabled,
-                        responder,
-                    } => {
-                        warn!(
-                            "not updating {ip_version:?} forwarding on interface {id} to \
-                            enabled={enabled}; not supported via fuchsia.net.stack"
-                        );
-                        // TODO(https://fxbug.dev/42156951): Support configuring
-                        // per-NIC forwarding.
-                        responder
-                            .send(Err(fidl_net_stack::Error::NotSupported))
                             .unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
