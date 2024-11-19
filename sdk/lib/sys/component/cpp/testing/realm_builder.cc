@@ -41,10 +41,9 @@ constexpr char kChildPathSeparator[] = "/";
 fidl::InterfaceHandle<fuchsia::io::Directory> CreatePkgDirHandle() {
   int fd;
   ZX_COMPONENT_ASSERT_STATUS_OK(
-      "fdio_open_fd", fdio_open_fd("/pkg",
-                                   static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                         fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                                   &fd));
+      "fdio_open3_fd",
+      // It's okay to cast Rights to Flags as there is a direct mapping.
+      fdio_open3_fd("/pkg", static_cast<uint64_t>(fuchsia::io::RX_STAR_DIR), &fd));
   zx_handle_t handle;
   ZX_COMPONENT_ASSERT_STATUS_OK("fdio_fd_transfer", fdio_fd_transfer(fd, &handle));
   auto channel = zx::channel(handle);
