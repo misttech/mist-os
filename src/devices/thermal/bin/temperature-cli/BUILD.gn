@@ -10,6 +10,7 @@ executable("temperature-cli") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_cpp",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp",
+    "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint_cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
