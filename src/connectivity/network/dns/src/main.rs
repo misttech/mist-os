@@ -168,20 +168,16 @@ struct UnhandledResolveErrorKindStats {
 }
 
 impl UnhandledResolveErrorKindStats {
-    fn increment(&mut self, resolve_error_kind: &ResolveErrorKind) {
+    /// Increments the counter for the given error kind. Returns a string
+    /// containing the name of that kind so the caller doesn't have to perform
+    /// the processing if they want to log it.
+    fn increment(&mut self, resolve_error_kind: &ResolveErrorKind) -> String {
         let Self { resolve_error_kind_counts } = self;
-        // We just want to keep the part of the debug string that indicates
-        // which enum variant this is.
-        // See https://doc.rust-lang.org/reference/identifiers.html
-        let truncated_debug = {
-            let debug = format!("{:?}", resolve_error_kind);
-            match debug.find(|c: char| !c.is_xid_continue() && !c.is_xid_start()) {
-                Some(i) => debug[..i].to_string(),
-                None => debug,
-            }
-        };
-        let count = resolve_error_kind_counts.entry(truncated_debug).or_insert(0);
-        *count += 1
+        let truncated_debug = enum_variant_string(resolve_error_kind);
+        let count = resolve_error_kind_counts.entry(truncated_debug.clone()).or_insert(0);
+        *count += 1;
+
+        truncated_debug
     }
 }
 
@@ -243,8 +239,8 @@ impl FailureStats {
             // TODO(https://github.com/rust-lang/rust/issues/89554): remove once
             // we're able to apply the non_exhaustive_omitted_patterns lint
             kind => {
-                error!("unhandled variant {:?}", kind);
-                unhandled_resolve_error_kind.increment(kind)
+                let variant = unhandled_resolve_error_kind.increment(kind);
+                error!("unhandled variant: {variant}");
             }
         }
     }
@@ -301,6 +297,18 @@ impl QueryWindow {
         *failure_count += 1;
         *failure_elapsed_time += elapsed_time;
         failure_stats.increment(error)
+    }
+}
+
+/// Returns the name of the enum variant that was set.
+fn enum_variant_string(variant: &impl std::fmt::Debug) -> String {
+    let debug = format!("{:?}", variant);
+    // We just want to keep the part of the debug string that indicates
+    // which enum variant this is.
+    // See https://doc.rust-lang.org/reference/identifiers.html
+    match debug.find(|c: char| !c.is_xid_continue() && !c.is_xid_start()) {
+        Some(i) => debug[..i].to_string(),
+        None => debug,
     }
 }
 
@@ -382,7 +390,7 @@ impl ResolverLookup for Resolver {
 fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
     use trust_dns_proto::error::ProtoErrorKind;
 
-    let (lookup_err, ioerr) = match err.kind() {
+    let (lookup_err, ioerr): (_, Option<(std::io::ErrorKind, _)>) = match err.kind() {
         // The following mapping is based on the analysis of `ResolveError` enumerations.
         // For cases that are not obvious such as `ResolveErrorKind::Msg` and
         // `ResolveErrorKind::Message`, I (chunyingw) did code searches to have more insights.
@@ -405,7 +413,9 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
             ProtoErrorKind::Busy | ProtoErrorKind::Canceled(_) | ProtoErrorKind::Timeout => {
                 (fname::LookupError::Transient, None)
             }
-            ProtoErrorKind::Io(inner) => (fname::LookupError::Transient, Some(inner)),
+            ProtoErrorKind::Io(inner) => {
+                (fname::LookupError::Transient, Some((inner.kind(), inner.raw_os_error())))
+            }
             ProtoErrorKind::BadQueryCount(_)
             | ProtoErrorKind::CharacterDataTooLong { max: _, len: _ }
             | ProtoErrorKind::LabelOverlapsWithOther { label: _, other: _ }
@@ -441,11 +451,13 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
             // https://github.com/bluejekyll/trust-dns/blob/v0.21.0-alpha.1/crates/proto/src/error.rs#L66
             // So we have to include a wildcard match.
             kind => {
-                error!("unhandled variant {:?}", kind);
+                error!("unhandled variant {:?}", enum_variant_string(kind));
                 (fname::LookupError::InternalError, None)
             }
         },
-        ResolveErrorKind::Io(inner) => (fname::LookupError::Transient, Some(inner)),
+        ResolveErrorKind::Io(inner) => {
+            (fname::LookupError::Transient, Some((inner.kind(), inner.raw_os_error())))
+        }
         ResolveErrorKind::Timeout => (fname::LookupError::Transient, None),
         ResolveErrorKind::Msg(_)
         | ResolveErrorKind::Message(_)
@@ -454,18 +466,20 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
         // https://github.com/bluejekyll/trust-dns/blob/v0.21.0-alpha.1/crates/resolver/src/error.rs#L29
         // So we have to include a wildcard match.
         kind => {
-            error!("unhandled variant {:?}", kind);
+            error!("unhandled variant {:?}", enum_variant_string(kind));
             (fname::LookupError::InternalError, None)
         }
     };
 
-    if let Some(ioerr) = ioerr {
-        match ioerr.raw_os_error() {
-            Some(libc::EHOSTUNREACH) => debug!("{} error: {}; (IO error {:?})", source, err, ioerr),
-            _ => warn!("{} error: {}; (IO error {:?})", source, err, ioerr),
+    if let Some((ioerr, raw_os_error)) = ioerr {
+        match raw_os_error {
+            Some(libc::EHOSTUNREACH) => {
+                debug!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr)
+            }
+            _ => warn!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr),
         }
     } else {
-        warn!("{} error: {}", source, err)
+        warn!("{} error: {:?}", source, lookup_err);
     }
 
     lookup_err
@@ -897,8 +911,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     };
                     let addrs = if addrs.len() > fname::MAX_ADDRESSES.into() {
                         warn!(
-                            "Lookup({}, {:?}): {} addresses, truncating to {}",
-                            hostname, options, addrs.len(), fname::MAX_ADDRESSES
+                            "Lookup(_, {:?}): {} addresses, truncating to {}",
+                            options, addrs.len(), fname::MAX_ADDRESSES
                         );
                         let mut addrs = addrs;
                         addrs.truncate(fname::MAX_ADDRESSES.into());
@@ -919,8 +933,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                                 acc
                             });
                         warn!(
-                            "Lookup({}, {:?}): multiple CNAMEs: {:?}",
-                            hostname, options, cnames
+                            "Lookup(_, {:?}): multiple CNAMEs: {:?}",
+                            options, cnames
                         )
                     }
                     let cname = {
@@ -936,8 +950,8 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                 .await;
                 responder.send(lookup_result.as_ref().map_err(|e| *e)).unwrap_or_else(|e|
                     warn!(
-                        "failed to send IP lookup result {:?} due to FIDL error: {}",
-                        lookup_result, e
+                        "failed to send IP lookup result due to FIDL error: {}",
+                        e
                     )
                 )
             }
@@ -1962,9 +1976,15 @@ mod tests {
     fn test_unhandled_resolve_error_kind_stats() {
         use ResolveErrorKind::{Msg, Timeout};
         let mut unhandled_resolve_error_kind_stats = UnhandledResolveErrorKindStats::default();
-        unhandled_resolve_error_kind_stats.increment(&Msg(String::from("abcdefgh")));
-        unhandled_resolve_error_kind_stats.increment(&Msg(String::from("ijklmn")));
-        unhandled_resolve_error_kind_stats.increment(&Timeout);
+        assert_eq!(
+            unhandled_resolve_error_kind_stats.increment(&Msg(String::from("abcdefgh"))),
+            "Msg"
+        );
+        assert_eq!(
+            unhandled_resolve_error_kind_stats.increment(&Msg(String::from("ijklmn"))),
+            "Msg"
+        );
+        assert_eq!(unhandled_resolve_error_kind_stats.increment(&Timeout), "Timeout");
         assert_eq!(
             unhandled_resolve_error_kind_stats,
             UnhandledResolveErrorKindStats {
