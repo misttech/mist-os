@@ -58,8 +58,9 @@ fuchsia_unittest_package("builtin-runner-test") {
 
 fuchsia_component(
     "component-manager-realm-builder-debug-with-builtin-runner-cmp") {
+  testonly = true
   deps = [
-    "//src/sys/component_manager:bin",
+    "//src/sys/component_manager:bin_eng",
     "//src/sys/component_manager:component_id_index_for_debug_config",
     "//src/sys/component_manager:component_manager_realm_builder_debug_config",
   ]
