@@ -37,6 +37,7 @@ pub fn serve(
     new_telemetry_fidl_clients: mpsc::UnboundedReceiver<
         fidl::endpoints::ServerEnd<fidl_sme::TelemetryMarker>,
     >,
+    inspector: fuchsia_inspect::Inspector,
     inspect_node: fuchsia_inspect::Node,
     persistence_req_sender: auto_persist::PersistenceReqSender,
 ) -> (MlmeSink, MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
@@ -47,6 +48,7 @@ pub fn serve(
     let (sme, mlme_sink, mlme_stream, time_stream) = Sme::new(
         cfg,
         device_info,
+        inspector,
         inspect_node,
         persistence_req_sender,
         mac_sublayer_support,
@@ -129,6 +131,14 @@ async fn handle_telemetry_fidl_request(
                     fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(err) => Err(err),
                 });
             responder.send(histogram_stats.as_ref().map_err(|e| *e))
+        }
+        TelemetryRequest::CloneInspectVmo { responder } => {
+            let inspect_vmo = sme
+                .lock()
+                .unwrap()
+                .on_clone_inspect_vmo()
+                .ok_or_else(|| zx::Status::INTERNAL.into_raw());
+            responder.send(inspect_vmo)
         }
     }
 }

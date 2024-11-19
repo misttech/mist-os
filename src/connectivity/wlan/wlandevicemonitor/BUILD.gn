@@ -57,6 +57,7 @@ wlandevicemonitor_srcs = [
 wlandevicemonitor_test_deps = [
   "//src/connectivity/wlan/lib/common/rust/:wlan-common",
   "//src/connectivity/wlan/lib/ieee80211",
+  "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
   "//src/lib/fdio/rust:fdio",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",

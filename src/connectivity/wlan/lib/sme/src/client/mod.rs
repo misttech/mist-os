@@ -585,6 +585,7 @@ impl ClientSme {
     pub fn new(
         cfg: ClientConfig,
         info: fidl_mlme::DeviceInfo,
+        inspector: fuchsia_inspect::Inspector,
         inspect_node: fuchsia_inspect::Node,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         mac_sublayer_support: fidl_common::MacSublayerSupport,
@@ -595,6 +596,7 @@ impl ClientSme {
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (mut timer, time_stream) = timer::create_timer();
         let inspect = Arc::new(inspect::SmeTree::new(
+            inspector,
             inspect_node,
             &device_info,
             &spectrum_management_support,
@@ -751,6 +753,10 @@ impl ClientSme {
             self.send_scan_request(req);
         }
         receiver
+    }
+
+    pub fn on_clone_inspect_vmo(&self) -> Option<fidl::Vmo> {
+        self.context.inspect.clone_vmo_data()
     }
 
     pub fn status(&self) -> ClientSmeStatus {
@@ -1471,6 +1477,7 @@ mod tests {
         let (mut sme, _mlme_sink, mut mlme_stream, _time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
+            inspector,
             sme_root_node,
             persistence_req_sender,
             mac_sublayer_support,
@@ -1977,6 +1984,7 @@ mod tests {
         let (mut sme, _mlme_sink, _mlme_stream, mut time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
+            inspector,
             sme_root_node,
             persistence_req_sender,
             fake_mac_sublayer_support(),
@@ -2061,6 +2069,7 @@ mod tests {
         let (client_sme, _mlme_sink, mlme_stream, time_stream) = ClientSme::new(
             ClientConfig::default(),
             test_utils::fake_device_info(*CLIENT_ADDR),
+            inspector,
             sme_root_node,
             persistence_req_sender,
             mac_sublayer_support,

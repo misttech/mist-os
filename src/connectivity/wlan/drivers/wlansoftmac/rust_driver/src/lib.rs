@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::{ProtocolMarker, Proxy};
 use fuchsia_async::{MonotonicDuration, Task};
-use fuchsia_inspect::{Inspector, Node as InspectNode};
+use fuchsia_inspect::Inspector;
 use futures::channel::mpsc;
 use futures::channel::oneshot::{self, Canceled};
 use futures::{Future, FutureExt, StreamExt};
@@ -115,7 +115,7 @@ async fn start<D: DeviceOps + 'static>(
             })?;
 
     // Bootstrap USME
-    let BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspect_node } =
+    let BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspector } =
         bootstrap_generic_sme(&mut device, driver_event_sink, softmac_ifc_bridge_proxy).await?;
 
     info!("Querying device information...");
@@ -179,7 +179,7 @@ async fn start<D: DeviceOps + 'static>(
         mac_sublayer_support,
         security_support,
         spectrum_management_support,
-        inspect_node,
+        inspector,
         persistence_req_sender,
         generic_sme_request_stream,
     ) {
@@ -410,7 +410,7 @@ async fn serve(
 struct BootstrappedGenericSme {
     pub generic_sme_request_stream: fidl_sme::GenericSmeRequestStream,
     pub legacy_privacy_support: fidl_sme::LegacyPrivacySupport,
-    pub inspect_node: InspectNode,
+    pub inspector: Inspector,
 }
 
 /// Call WlanSoftmac.Start() to retrieve the server end of UsmeBootstrap channel and wait
@@ -487,7 +487,6 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
 
     let inspector =
         Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
-    let inspect_node = inspector.root().create_child("usme");
 
     let inspect_vmo = match inspector.duplicate_vmo() {
         Some(vmo) => vmo,
@@ -508,7 +507,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
         }
     };
 
-    Ok(BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspect_node })
+    Ok(BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspector })
 }
 
 async fn serve_wlan_softmac_ifc_bridge(
@@ -709,7 +708,7 @@ mod tests {
         let BootstrappedGenericSme {
             mut generic_sme_request_stream,
             legacy_privacy_support: received_legacy_privacy_support,
-            inspect_node,
+            inspector,
         } = match TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await {
             Poll::Pending => panic!("bootstrap_generic_sme_fut() did not complete!"),
             Poll::Ready(x) => x.unwrap(),
@@ -733,11 +732,11 @@ mod tests {
 
         assert_eq!(received_legacy_privacy_support, sent_legacy_privacy_support);
 
-        // Add a child node through inspect_node and verify the node appears inspect_vmo.
-        let inspector = Inspector::new(InspectorConfig::default().vmo(inspect_vmo));
-        let _a = inspect_node.create_child("a");
-        assert_data_tree!(inspector, root: {
-            usme: { a: {} },
+        // Add a child node through the bootstrapped inspector and verify the node appears inspect_vmo.
+        let returned_inspector = Inspector::new(InspectorConfig::default().vmo(inspect_vmo));
+        let _a = inspector.root().create_child("a");
+        assert_data_tree!(returned_inspector, root: {
+            a: {},
         });
     }
 

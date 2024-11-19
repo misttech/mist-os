@@ -156,7 +156,6 @@ where
     let driver_event_sender_clone = driver_event_sender.clone();
     let inspector =
         Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
-    let inspect_usme_node = inspector.root().create_child("usme");
 
     let (startup_sender, startup_receiver) = oneshot::channel();
     let mlme_loop_join_handle = std::thread::spawn(move || {
@@ -171,7 +170,6 @@ where
             driver_event_sender_clone,
             driver_event_stream,
             inspector,
-            inspect_usme_node,
             startup_sender,
         );
         let result = executor.run(future);
@@ -222,13 +220,10 @@ async fn start_and_serve<D: DeviceOps + Send + 'static>(
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
     inspector: Inspector,
-    inspect_usme_node: fuchsia_inspect::Node,
     startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
 ) -> Result<(), zx::Status> {
     let StartedDriver { mlme_main_loop_fut, sme_fut } =
-        match start(device, driver_event_stream, driver_event_sender, inspector, inspect_usme_node)
-            .await
-        {
+        match start(device, driver_event_stream, driver_event_sender, inspector).await {
             Ok(initialized_mlme) => {
                 startup_sender.send(Ok(())).unwrap();
                 initialized_mlme
@@ -265,7 +260,6 @@ async fn start<D: DeviceOps + Send + 'static>(
     driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     inspector: Inspector,
-    inspect_usme_node: fuchsia_inspect::Node,
 ) -> Result<StartedDriver, FullmacMlmeError> {
     let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
         fidl::endpoints::create_request_stream()
@@ -356,7 +350,7 @@ async fn start<D: DeviceOps + Send + 'static>(
         mac_sublayer_support,
         security_support,
         spectrum_management_support,
-        inspect_usme_node,
+        inspector,
         persistence_req_sender,
         generic_sme_stream,
     )
@@ -641,7 +635,6 @@ mod tests {
 
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
             let inspector = Inspector::default();
-            let inspect_usme_node = inspector.root().create_child("usme");
             let (startup_sender, startup_receiver) = oneshot::channel();
 
             let mocks = fake_device.mocks.clone();
@@ -651,7 +644,6 @@ mod tests {
                 driver_event_sender.clone(),
                 driver_event_stream,
                 inspector,
-                inspect_usme_node,
                 startup_sender,
             ));
 

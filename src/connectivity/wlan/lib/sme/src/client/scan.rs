@@ -915,6 +915,7 @@ mod tests {
     fn sme_inspect() -> (Inspector, Arc<inspect::SmeTree>) {
         let inspector = Inspector::default();
         let sme_inspect = Arc::new(inspect::SmeTree::new(
+            inspector.clone(),
             inspector.root().create_child("usme"),
             &test_utils::fake_device_info([1u8; 6].into()),
             &fake_spectrum_management_support_empty(),

@@ -128,12 +128,13 @@ pub fn create_sme(
     mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
-    inspect_node: fuchsia_inspect::Node,
+    inspector: fuchsia_inspect::Inspector,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_request_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
 ) -> Result<(MlmeStream, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), anyhow::Error>
 {
     let device_info = device_info.clone();
+    let inspect_node = inspector.root().create_child("usme");
     let (server, mlme_req_sink, mlme_req_stream, telemetry_sender, sme_fut) = match device_info.role
     {
         fidl_common::WlanMacRole::Client => {
@@ -148,6 +149,7 @@ pub fn create_sme(
                 mlme_event_stream,
                 receiver,
                 telemetry_endpoint_receiver,
+                inspector,
                 inspect_node,
                 persistence_req_sender,
             );
@@ -333,7 +335,6 @@ mod tests {
         let mut _exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (_generic_sme_proxy, generic_sme_stream) =
@@ -350,7 +351,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector,
             persistence_req_sender,
             generic_sme_stream,
         );
@@ -363,7 +364,6 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let inspector = Inspector::default();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
@@ -376,7 +376,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector,
             persistence_req_sender,
             generic_sme_stream,
         )
@@ -413,7 +413,6 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let inspect_node = inspector.root().create_child("sme");
         let (persistence_req_sender, persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
@@ -428,7 +427,7 @@ mod tests {
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
-            inspect_node,
+            inspector.clone(),
             persistence_req_sender,
             generic_sme_stream,
         )?;

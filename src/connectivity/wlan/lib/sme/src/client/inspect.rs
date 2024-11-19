@@ -4,7 +4,8 @@
 
 use crate::client::{ClientSmeStatus, ServingApInfo};
 use fuchsia_inspect::{
-    BoolProperty, BytesProperty, IntProperty, Node, Property, StringProperty, UintProperty,
+    BoolProperty, BytesProperty, Inspector, IntProperty, Node, Property, StringProperty,
+    UintProperty,
 };
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::{InspectListClosure, InspectUintArray};
@@ -31,6 +32,8 @@ const IDLE_STR: &'static str = "idle";
 
 /// Wrapper struct SME inspection nodes
 pub struct SmeTree {
+    /// Top level inspector that contains the SmeTree root node.
+    pub inspector: Inspector,
     /// Base SME inspection node that holds all other nodes in the SmeTree.
     pub _root_node: Node,
     /// Inspection node to log recent state transitions, or cases where an event would that would
@@ -60,6 +63,7 @@ pub struct SmeTree {
 
 impl SmeTree {
     pub fn new(
+        inspector: Inspector,
         node: Node,
         device_info: &fidl_mlme::DeviceInfo,
         spectrum_management_support: &fidl_common::SpectrumManagementSupport,
@@ -92,6 +96,7 @@ impl SmeTree {
             }
         });
         Self {
+            inspector,
             _root_node: node,
             state_events: Mutex::new(state_events),
             rsn_events: Mutex::new(rsn_events),
@@ -104,6 +109,10 @@ impl SmeTree {
 
     pub fn update_pulse(&self, new_status: ClientSmeStatus) {
         self.last_pulse.lock().update(new_status)
+    }
+
+    pub fn clone_vmo_data(&self) -> Option<fidl::Vmo> {
+        self.inspector.copy_vmo()
     }
 }
 
