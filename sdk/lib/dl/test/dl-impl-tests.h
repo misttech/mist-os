@@ -16,6 +16,11 @@
 
 namespace dl::testing {
 
+// The list of abi modules (i.e. startup modules) loaded with this test.
+using LoadedAbiModulesList = std::vector<AbiModule>;
+
+const extern LoadedAbiModulesList gLoadedAbiModules;
+
 // The Base class provides testing facilities and logic specific to the platform
 // the test is running on. DlImplTests invokes Base methods when functions
 // need to operate differently depending on the OS.
@@ -68,6 +73,8 @@ class DlImplTests : public Base {
   void CleanUpOpenedFile(void* ptr) override {}
 
  private:
+  // TODO(https://fxbug.dev/324136831): Make RuntimeDynamicLink ctor take reference to
+  // const ld::Abi<>&.
   RuntimeDynamicLinker dynamic_linker_;
 };
 

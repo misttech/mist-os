@@ -19,6 +19,7 @@
 
 namespace dl {
 
+using AbiModule = ld::AbiModule<>;
 using Elf = elfldltl::Elf<>;
 using Soname = elfldltl::Soname<>;
 
@@ -73,7 +74,6 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
  public:
   using Addr = Elf::Addr;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
-  using AbiModule = ld::AbiModule<>;
   using TlsModule = ld::abi::Abi<>::TlsModule;
   using size_type = Elf::size_type;
 
