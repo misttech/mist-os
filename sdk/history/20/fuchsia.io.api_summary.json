@@ -2549,6 +2549,24 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.io/PERM_EXECUTABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "201"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/PERM_READABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "211"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/PERM_WRITABLE",
+        "type": "fuchsia.io/Flags",
+        "value": "485"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.io/RW_STAR_DIR",
         "type": "fuchsia.io/Operations",
         "value": "503"
