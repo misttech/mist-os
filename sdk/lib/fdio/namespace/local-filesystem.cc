@@ -43,9 +43,9 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
       status != ZX_OK) {
     return zx::error(status);
   }
-  return fdio_internal::LocalVnode::Create(
+  return zx::ok(fdio_internal::LocalVnode::Create(
       parent, std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
-      remote_storage);
+      remote_storage));
 }
 
 }  // namespace
@@ -53,9 +53,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
 fdio_namespace::fdio_namespace() { ResetRoot(); }
 
 void fdio_namespace::ResetRoot() {
-  zx::result vn_res = LocalVnode::Create({}, {}, std::in_place_type_t<LocalVnode::Intermediate>());
-  ZX_ASSERT_MSG(vn_res.is_ok(), "%s", vn_res.status_string());
-  root_ = std::move(vn_res.value());
+  root_ = LocalVnode::Create({}, {}, std::in_place_type_t<LocalVnode::Intermediate>());
 }
 
 zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
@@ -485,8 +483,8 @@ zx_status_t fdio_namespace::Bind(std::string_view path, fidl::ClientEnd<fio::Dir
 zx_status_t fdio_namespace::Bind(std::string_view path, fdio_open_local_func_t on_open,
                                  void* context) {
   return Bind(path, [on_open, context](LocalVnode::Intermediate* parent, fbl::String name) {
-    return LocalVnode::Create(parent, std::move(name), std::in_place_type_t<LocalVnode::Local>(),
-                              on_open, context);
+    return zx::ok(LocalVnode::Create(parent, std::move(name),
+                                     std::in_place_type_t<LocalVnode::Local>(), on_open, context));
   });
 }
 
@@ -596,13 +594,8 @@ zx_status_t fdio_namespace::Bind(
               }
 
               // Create a new intermediate node.
-              zx::result vn_res =
-                  LocalVnode::Create(&c, fbl::String(next_path_segment),
-                                     std::in_place_type_t<LocalVnode::Intermediate>());
-              if (vn_res.is_error()) {
-                return vn_res.error_value();
-              }
-              vn = std::move(vn_res.value());
+              vn = LocalVnode::Create(&c, fbl::String(next_path_segment),
+                                      std::in_place_type_t<LocalVnode::Intermediate>());
 
               // Keep track of the first node we create. If any subsequent
               // operation fails during bind, we will need to delete all nodes

@@ -48,9 +48,8 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   //
   // The parent must outlive the child.
   template <class T, class... Args>
-  static zx::result<fbl::RefPtr<LocalVnode>> Create(Intermediate* parent, fbl::String name,
-                                                    std::in_place_type_t<T> in_place,
-                                                    Args&&... args) {
+  static fbl::RefPtr<LocalVnode> Create(Intermediate* parent, fbl::String name,
+                                        std::in_place_type_t<T> in_place, Args&&... args) {
     fbl::RefPtr vn = fbl::MakeRefCounted<LocalVnode>(parent, std::move(name), in_place,
                                                      std::forward<Args>(args)...);
 
@@ -58,7 +57,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
       vn->parent_->AddEntry(vn);
     }
 
-    return zx::ok(vn);
+    return vn;
   }
 
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.
