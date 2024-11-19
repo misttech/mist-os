@@ -22,25 +22,6 @@
 
 namespace fdio_internal {
 
-zx_status_t LocalVnode::AddChild(fbl::RefPtr<LocalVnode> child) {
-  return std::visit(fdio::overloaded{
-                        [](LocalVnode::Local& c) {
-                          // Calling AddChild on a Local node is invalid.
-                          return ZX_ERR_NOT_DIR;
-                        },
-                        [&child](LocalVnode::Intermediate& c) {
-                          c.AddEntry(child);
-                          return ZX_OK;
-                        },
-                        [](LocalVnode::Remote& s) {
-                          // Calling AddChild on a Storage node is invalid, and implies
-                          // a poorly formed path.
-                          return ZX_ERR_BAD_PATH;
-                        },
-                    },
-                    node_type_);
-}
-
 void LocalVnode::Intermediate::AddEntry(fbl::RefPtr<LocalVnode> vn) {
   // |fdio_namespace| already checked that the entry does not exist.
   ZX_DEBUG_ASSERT(entries_by_name_.find(vn->Name()) == entries_by_name_.end());
@@ -49,25 +30,6 @@ void LocalVnode::Intermediate::AddEntry(fbl::RefPtr<LocalVnode> vn) {
   entries_by_name_.insert(entry.get());
   entries_by_id_.insert(std::move(entry));
   next_node_id_++;
-}
-
-zx_status_t LocalVnode::RemoveChild(LocalVnode* child) {
-  return std::visit(fdio::overloaded{
-                        [](LocalVnode::Local& c) {
-                          // Calling RemoveChild on a Local node fails.
-                          return ZX_ERR_NOT_FOUND;
-                        },
-                        [&child](LocalVnode::Intermediate& c) {
-                          c.RemoveEntry(child);
-                          return ZX_OK;
-                        },
-                        [](LocalVnode::Remote& s) {
-                          // Calling RemoveChild on a Storage node is invalid, and implies
-                          // a poorly formed path.
-                          return ZX_ERR_BAD_PATH;
-                        },
-                    },
-                    node_type_);
 }
 
 void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn) {
@@ -154,10 +116,10 @@ void LocalVnode::Local::Unlink() {
 }
 
 void LocalVnode::UnlinkFromParent() {
-  if (parent_) {
-    parent_->RemoveChild(this);
+  if (parent_ != nullptr) {
+    parent_->RemoveEntry(this);
+    parent_ = nullptr;
   }
-  parent_ = nullptr;
 }
 
 zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const {

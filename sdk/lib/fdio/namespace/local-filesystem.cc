@@ -36,7 +36,7 @@ std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
 }
 
 zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
-    fbl::RefPtr<fdio_internal::LocalVnode> parent, fbl::String name,
+    fdio_internal::LocalVnode::Intermediate* parent, fbl::String name,
     fidl::ClientEnd<fio::Directory> remote) {
   zxio_storage_t remote_storage;
   if (zx_status_t status = zxio::CreateDirectory(&remote_storage, std::move(remote));
@@ -44,7 +44,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
     return zx::error(status);
   }
   return fdio_internal::LocalVnode::Create(
-      std::move(parent), std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
+      parent, std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
       remote_storage);
 }
 
@@ -481,23 +481,23 @@ zx_status_t fdio_namespace::Bind(std::string_view path, fidl::ClientEnd<fio::Dir
   if (!remote.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return Bind(
-      path, [remote = std::move(remote)](fbl::RefPtr<LocalVnode> parent, fbl::String name) mutable {
-        return CreateRemoteVnode(std::move(parent), std::move(name), std::move(remote));
-      });
+  return Bind(path, [remote = std::move(remote)](LocalVnode::Intermediate* parent,
+                                                 fbl::String name) mutable {
+    return CreateRemoteVnode(parent, std::move(name), std::move(remote));
+  });
 }
 
 zx_status_t fdio_namespace::Bind(std::string_view path, fdio_open_local_func_t on_open,
                                  void* context) {
-  return Bind(path, [on_open, context](fbl::RefPtr<LocalVnode> parent, fbl::String name) {
-    return LocalVnode::Create(std::move(parent), std::move(name),
-                              std::in_place_type_t<LocalVnode::Local>(), on_open, context);
+  return Bind(path, [on_open, context](LocalVnode::Intermediate* parent, fbl::String name) {
+    return LocalVnode::Create(parent, std::move(name), std::in_place_type_t<LocalVnode::Local>(),
+                              on_open, context);
   });
 }
 
 zx_status_t fdio_namespace::Bind(
     std::string_view path,
-    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(fbl::RefPtr<LocalVnode>, fbl::String name)>
+    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(LocalVnode::Intermediate*, fbl::String)>
         builder) {
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_INVALID_ARGS;
@@ -584,8 +584,7 @@ zx_status_t fdio_namespace::Bind(
                   return ZX_ERR_ALREADY_EXISTS;
                 }
 
-                zx::result vn_res = builder(vn, fbl::String(next_path_segment));
-
+                zx::result vn_res = builder(&c, fbl::String(next_path_segment));
                 if (vn_res.is_error()) {
                   return vn_res.error_value();
                 }
@@ -594,9 +593,7 @@ zx_status_t fdio_namespace::Bind(
                 return ZX_OK;
               }
 
-              fbl::RefPtr<LocalVnode> child = c.Lookup(next_path_segment);
-
-              if (child != nullptr) {
+              if (fbl::RefPtr<LocalVnode> child = c.Lookup(next_path_segment); child != nullptr) {
                 // Re-use an existing intermediate node, and continue
                 // the search.
                 vn = child;
@@ -605,7 +602,7 @@ zx_status_t fdio_namespace::Bind(
 
               // Create a new intermediate node.
               zx::result vn_res =
-                  LocalVnode::Create(vn, fbl::String(next_path_segment),
+                  LocalVnode::Create(&c, fbl::String(next_path_segment),
                                      std::in_place_type_t<LocalVnode::Intermediate>());
               if (vn_res.is_error()) {
                 return vn_res.error_value();
