@@ -33,7 +33,7 @@
 
 namespace fhdt = fuchsia_hardware_display_types;
 
-namespace display {
+namespace display_coordinator {
 
 namespace {
 
@@ -47,14 +47,14 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
 
 }  // namespace
 
-Layer::Layer(DriverLayerId id) {
+Layer::Layer(display::DriverLayerId id) {
   this->id = id;
   memset(&pending_layer_, 0, sizeof(layer_t));
   memset(&current_layer_, 0, sizeof(layer_t));
   config_change_ = false;
   pending_node_.layer = this;
   current_node_.layer = this;
-  current_display_id_ = kInvalidDisplayId;
+  current_display_id_ = display::kInvalidDisplayId;
   is_skipped_ = false;
 }
 
@@ -91,7 +91,7 @@ bool Layer::ResolvePendingLayerProperties() {
   return true;
 }
 
-bool Layer::ResolvePendingImage(FenceCollection* fences, ConfigStamp stamp) {
+bool Layer::ResolvePendingImage(FenceCollection* fences, display::ConfigStamp stamp) {
   if (pending_image_) {
     auto wait_fence = fences->GetFence(pending_wait_event_id_);
     if (wait_fence && wait_fence->InContainer()) {
@@ -161,7 +161,7 @@ bool Layer::CleanUpImage(const Image& image) {
   return false;
 }
 
-std::optional<ConfigStamp> Layer::GetCurrentClientConfigStamp() const {
+std::optional<display::ConfigStamp> Layer::GetCurrentClientConfigStamp() const {
   if (displayed_image_ != nullptr) {
     return displayed_image_->latest_client_config_stamp();
   }
@@ -213,7 +213,7 @@ bool Layer::AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list) {
 
 void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.image_handle = INVALID_DISPLAY_ID;
-  pending_layer_.image_metadata = ImageMetadata(image_metadata).ToBanjo();
+  pending_layer_.image_metadata = display::ImageMetadata(image_metadata).ToBanjo();
   const rect_u_t image_area = {
       .x = 0, .y = 0, .width = image_metadata.width, .height = image_metadata.height};
   pending_layer_.image_source = image_area;
@@ -226,8 +226,8 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
 void Layer::SetPrimaryPosition(fhdt::wire::CoordinateTransformation image_source_transformation,
                                fuchsia_math::wire::RectU image_source,
                                fuchsia_math::wire::RectU display_destination) {
-  pending_layer_.image_source = Rectangle::From(image_source).ToBanjo();
-  pending_layer_.display_destination = Rectangle::From(display_destination).ToBanjo();
+  pending_layer_.image_source = display::Rectangle::From(image_source).ToBanjo();
+  pending_layer_.display_destination = display::Rectangle::From(display_destination).ToBanjo();
   pending_layer_.image_source_transformation = static_cast<uint8_t>(image_source_transformation);
 
   config_change_ = true;
@@ -265,7 +265,8 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
   config_change_ = true;
 }
 
-void Layer::SetImage(fbl::RefPtr<Image> image, EventId wait_event_id, EventId signal_event_id) {
+void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id,
+                     display::EventId signal_event_id) {
   if (pending_image_) {
     pending_image_->DiscardAcquire();
   }
@@ -305,4 +306,4 @@ bool Layer::RetireDisplayedImage() {
   return current_node_.InContainer();
 }
 
-}  // namespace display
+}  // namespace display_coordinator

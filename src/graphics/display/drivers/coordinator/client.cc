@@ -112,7 +112,7 @@ void AssertHeld(fbl::Mutex& mutex) __TA_ASSERT(mutex) {
 
 }  // namespace
 
-namespace display {
+namespace display_coordinator {
 
 void DisplayConfig::InitializeInspect(inspect::Node* parent) {
   static std::atomic_uint64_t inspect_count;
@@ -131,8 +131,8 @@ void DisplayConfig::DiscardNonLayerPendingConfig() {
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
-  const ImageId image_id = ToImageId(request->image_id);
-  if (image_id == kInvalidImageId) {
+  const display::ImageId image_id = display::ToImageId(request->image_id);
+  if (image_id == display::kInvalidImageId) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -147,15 +147,15 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
 
-  if (!ImageMetadata::IsValid(request->image_metadata)) {
+  if (!display::ImageMetadata::IsValid(request->image_metadata)) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
-  const ImageMetadata image_metadata(request->image_metadata);
+  const display::ImageMetadata image_metadata(request->image_metadata);
 
-  if (image_metadata.tiling_type() == ImageTilingType::kCapture) {
+  if (image_metadata.tiling_type() == display::ImageTilingType::kCapture) {
     zx_status_t import_status =
-        ImportImageForCapture(image_metadata, ToBufferId(request->buffer_id), image_id);
+        ImportImageForCapture(image_metadata, display::ToBufferId(request->buffer_id), image_id);
     if (import_status == ZX_OK) {
       completer.ReplySuccess();
     } else {
@@ -165,7 +165,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 
   zx_status_t import_status =
-      ImportImageForDisplay(image_metadata, ToBufferId(request->buffer_id), image_id);
+      ImportImageForDisplay(image_metadata, display::ToBufferId(request->buffer_id), image_id);
   if (import_status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -173,9 +173,9 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 }
 
-zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, BufferId buffer_id,
-                                          ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type() != ImageTilingType::kCapture);
+zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_metadata,
+                                          display::BufferId buffer_id, display::ImageId image_id) {
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() != display::ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -185,13 +185,13 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
   }
   const Collections& collections = collection_map_it->second;
 
-  zx::result<DriverImageId> result = controller_->engine_driver_client()->ImportImage(
+  zx::result<display::DriverImageId> result = controller_->engine_driver_client()->ImportImage(
       image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (result.is_error()) {
     return result.error_value();
   }
 
-  const DriverImageId driver_image_id = result.value();
+  const display::DriverImageId driver_image_id = result.value();
   auto release_image =
       fit::defer([this, driver_image_id]() { controller_->ReleaseImage(driver_image_id); });
 
@@ -212,7 +212,7 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
 
 void Client::ReleaseImage(ReleaseImageRequestView request,
                           ReleaseImageCompleter::Sync& /*_completer*/) {
-  const ImageId image_id = ToImageId(request->image_id);
+  const display::ImageId image_id = display::ToImageId(request->image_id);
   auto image = images_.find(image_id);
   if (image.IsValid()) {
     if (CleanUpImage(*image)) {
@@ -240,8 +240,8 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
 
 void Client::ImportEvent(ImportEventRequestView request,
                          ImportEventCompleter::Sync& /*_completer*/) {
-  const EventId event_id = ToEventId(request->id);
-  if (event_id == kInvalidEventId) {
+  const display::EventId event_id = display::ToEventId(request->id);
+  if (event_id == display::kInvalidEventId) {
     FDF_LOG(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
     TearDown();
   } else if (fences_.ImportEvent(std::move(request->event), event_id) != ZX_OK) {
@@ -252,7 +252,7 @@ void Client::ImportEvent(ImportEventRequestView request,
 void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
                                     ImportBufferCollectionCompleter::Sync& completer) {
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->buffer_collection_id);
+      display::ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
   if (collection_map_.count(buffer_collection_id)) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -279,7 +279,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
                                      ReleaseBufferCollectionCompleter::Sync& /*_completer*/) {
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->buffer_collection_id);
+      display::ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     return;
@@ -299,7 +299,7 @@ void Client::SetBufferCollectionConstraints(
     SetBufferCollectionConstraintsRequestView request,
     SetBufferCollectionConstraintsCompleter::Sync& completer) {
   const display::BufferCollectionId buffer_collection_id =
-      ToBufferCollectionId(request->buffer_collection_id);
+      display::ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -307,7 +307,8 @@ void Client::SetBufferCollectionConstraints(
   }
   auto& collections = it->second;
 
-  const ImageBufferUsage image_buffer_usage = ToImageBufferUsage(request->buffer_usage);
+  const display::ImageBufferUsage image_buffer_usage =
+      display::ToImageBufferUsage(request->buffer_usage);
   zx::result<> result = controller_->engine_driver_client()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {
@@ -321,7 +322,7 @@ void Client::SetBufferCollectionConstraints(
 
 void Client::ReleaseEvent(ReleaseEventRequestView request,
                           ReleaseEventCompleter::Sync& /*_completer*/) {
-  const EventId event_id = ToEventId(request->id);
+  const display::EventId event_id = display::ToEventId(request->id);
   // TODO(https://fxbug.dev/42080337): Check if the ID is valid (i.e. imported but not
   // yet released) before calling ReleaseEvent().
   fences_.ReleaseEvent(event_id);
@@ -336,7 +337,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   }
 
   fbl::AllocChecker alloc_checker;
-  DriverLayerId driver_layer_id = next_driver_layer_id++;
+  display::DriverLayerId driver_layer_id = next_driver_layer_id++;
   auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, driver_layer_id);
   if (!alloc_checker.check()) {
     --driver_layer_id;
@@ -350,17 +351,17 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // https://fxbug.dev/42079482 tracks having client-managed IDs. When that
   // happens, Client instances will be responsible for translating between
   // driver-side and client-side IDs.
-  LayerId layer_id(driver_layer_id.value());
+  display::LayerId layer_id(driver_layer_id.value());
   completer.ReplySuccess(ToFidlLayerId(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
                           DestroyLayerCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
 
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
@@ -379,7 +380,7 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
                             SetDisplayModeCompleter::Sync& /*_completer*/) {
-  const DisplayId display_id = ToDisplayId(request->display_id);
+  const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
@@ -388,7 +389,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   fit::deferred_action tear_down_on_error = fit::defer([this] { TearDown(); });
 
   fbl::AutoLock lock(controller_->mtx());
-  zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+  zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
       controller_->GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
@@ -396,10 +397,11 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  cpp20::span<const DisplayTiming> display_timings = std::move(display_timings_result).value();
+  cpp20::span<const display::DisplayTiming> display_timings =
+      std::move(display_timings_result).value();
   auto display_timing_it = std::find_if(
       display_timings.begin(), display_timings.end(),
-      [&mode = request->mode](const DisplayTiming& timing) {
+      [&mode = request->mode](const display::DisplayTiming& timing) {
         const int vertical_field_refresh_rate_centihertz =
             (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
         if (timing.horizontal_active_px != static_cast<int32_t>(mode.horizontal_resolution)) {
@@ -435,7 +437,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
                                        SetDisplayColorConversionCompleter::Sync& /*_completer*/) {
-  const DisplayId display_id = ToDisplayId(request->display_id);
+  const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
@@ -469,7 +471,7 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
                               SetDisplayLayersCompleter::Sync& /*_completer*/) {
-  const DisplayId display_id = ToDisplayId(request->display_id);
+  const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
@@ -479,11 +481,11 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   config->pending_layer_change_property_.Set(true);
   config->pending_layers_.clear();
   for (uint64_t i = request->layer_ids.count() - 1; i != UINT64_MAX; i--) {
-    LayerId layer_id = ToLayerId(request->layer_ids[i]);
+    display::LayerId layer_id = display::ToLayerId(request->layer_ids[i]);
 
     // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
     // the driver-side ID will have to be looked up in a map.
-    DriverLayerId driver_layer_id(layer_id.value());
+    display::DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
       FDF_LOG(ERROR, "Unknown layer %lu", request->layer_ids[i].value);
@@ -503,11 +505,11 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
 
 void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
                                    SetLayerPrimaryConfigCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryConfig on invalid layer");
@@ -522,11 +524,11 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
 
 void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
                                      SetLayerPrimaryPositionCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryPosition on invalid layer");
@@ -547,11 +549,11 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
 
 void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                                   SetLayerPrimaryAlphaCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerPrimaryAlpha on invalid layer");
@@ -572,11 +574,11 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
 
 void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
+  display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerColorConfig on invalid layer");
@@ -599,15 +601,15 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
 void Client::SetLayerImage2(SetLayerImage2RequestView request,
                             SetLayerImage2Completer::Sync& /*_completer*/) {
-  SetLayerImageImpl(ToLayerId(request->layer_id), ToImageId(request->image_id),
-                    ToEventId(request->wait_event_id), kInvalidEventId);
+  SetLayerImageImpl(display::ToLayerId(request->layer_id), display::ToImageId(request->image_id),
+                    display::ToEventId(request->wait_event_id), display::kInvalidEventId);
 }
 
-void Client::SetLayerImageImpl(LayerId layer_id, ImageId image_id, EventId wait_event_id,
-                               EventId signal_event_id) {
+void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
+                               display::EventId wait_event_id, display::EventId signal_event_id) {
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
+  display::DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, layer_id.value());
@@ -655,7 +657,7 @@ void Client::SetLayerImageImpl(LayerId layer_id, ImageId image_id, EventId wait_
   // It is now illegal to provide a valid `signal_event_id`.
   // TODO(https://fxbug.dev/370839049) This is temporary, until a subsequent CL modifies the FIDL
   // API to make it impossible to provide a signal event.
-  if (signal_event_id.value() != kInvalidEventId.value()) {
+  if (signal_event_id.value() != display::kInvalidEventId.value()) {
     FDF_LOG(ERROR, "SetLayerImage only accepts invalid `signal_event_id`");
     TearDown();
     return;
@@ -681,7 +683,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
 }
 
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
-  ApplyConfigFromFidl(latest_config_stamp_ + ConfigStamp(1));
+  ApplyConfigFromFidl(latest_config_stamp_ + display::ConfigStamp(1));
 }
 
 void Client::ApplyConfig3(ApplyConfig3RequestView request, ApplyConfigCompleter::Sync& _completer) {
@@ -690,10 +692,10 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request, ApplyConfigCompleter:
     TearDown();
     return;
   }
-  ApplyConfigFromFidl(ConfigStamp(request->stamp().value));
+  ApplyConfigFromFidl(display::ConfigStamp(request->stamp().value));
 }
 
-void Client::ApplyConfigFromFidl(ConfigStamp new_config_stamp) {
+void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
   if (!pending_config_valid_) {
     pending_config_valid_ = CheckConfig(nullptr, nullptr);
     if (!pending_config_valid_) {
@@ -819,9 +821,9 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
   completer.ReplySuccess(controller_->supports_capture());
 }
 
-zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, BufferId buffer_id,
-                                          ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type() == ImageTilingType::kCapture);
+zx_status_t Client::ImportImageForCapture(const display::ImageMetadata& image_metadata,
+                                          display::BufferId buffer_id, display::ImageId image_id) {
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() == display::ImageTilingType::kCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -836,13 +838,13 @@ zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, B
     return ZX_ERR_INVALID_ARGS;
   }
   const Client::Collections& collections = it->second;
-  zx::result<DriverCaptureImageId> import_result =
+  zx::result<display::DriverCaptureImageId> import_result =
       controller_->engine_driver_client()->ImportImageForCapture(
           collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (import_result.is_error()) {
     return import_result.error_value();
   }
-  const DriverCaptureImageId driver_capture_image_id = import_result.value();
+  const display::DriverCaptureImageId driver_capture_image_id = import_result.value();
   auto release_image = fit::defer([this, driver_capture_image_id]() {
     // TODO(https://fxbug.dev/42180237): Consider handling the error instead of ignoring it.
     [[maybe_unused]] zx::result<> result =
@@ -871,20 +873,20 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   // Don't start capture if one is in progress
-  if (current_capture_image_id_ != kInvalidImageId) {
+  if (current_capture_image_id_ != display::kInvalidImageId) {
     completer.ReplyError(ZX_ERR_SHOULD_WAIT);
     return;
   }
 
   // Ensure we have a capture fence for the request signal event.
-  auto signal_fence = fences_.GetFence(ToEventId(request->signal_event_id));
+  auto signal_fence = fences_.GetFence(display::ToEventId(request->signal_event_id));
   if (signal_fence == nullptr) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   // Ensure we are capturing into a valid image buffer
-  const ImageId capture_image_id = ToImageId(request->image_id);
+  const display::ImageId capture_image_id = display::ToImageId(request->image_id);
   auto image = capture_images_.find(capture_image_id);
   if (!image.IsValid()) {
     FDF_LOG(ERROR, "Invalid Capture Image ID requested for capture");
@@ -892,7 +894,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
     return;
   }
 
-  capture_fence_id_ = ToEventId(request->signal_event_id);
+  capture_fence_id_ = display::ToEventId(request->signal_event_id);
   zx::result<> result =
       controller_->engine_driver_client()->StartCapture(image->driver_capture_image_id());
   if (result.is_error()) {
@@ -925,7 +927,7 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
-  const DisplayId display_id = ToDisplayId(request->display_id);
+  const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   zx::result<> result =
       controller_->engine_driver_client()->SetDisplayPower(display_id, request->power_on);
   if (result.is_error()) {
@@ -958,7 +960,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   bool config_fail = false;
   size_t config_idx = 0;
   size_t layer_idx = 0;
-  for (display::DisplayConfig& source_display_config : configs_) {
+  for (DisplayConfig& source_display_config : configs_) {
     if (source_display_config.pending_layers_.is_empty()) {
       continue;
     }
@@ -983,7 +985,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     // Do any work that needs to be done to make sure that the pending layer_t structs
     // are up to date, and validate that the configuration doesn't violate any API
     // constraints.
-    for (display::LayerNode& source_layer_node : source_display_config.pending_layers_) {
+    for (LayerNode& source_layer_node : source_display_config.pending_layers_) {
       layer_t& banjo_layer = layers[layer_idx];
       ++layer_idx;
 
@@ -1092,7 +1094,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
       // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
       // the client-side ID will have to be looked up in a map.
-      const LayerId layer_id(layer_node.layer->id.value());
+      const display::LayerId layer_id(layer_node.layer->id.value());
 
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
@@ -1129,7 +1131,7 @@ void Client::ApplyConfig() {
   //
   // The final config_stamp sent to |Controller| will be the minimum of all
   // per-layer stamps.
-  ConfigStamp current_applied_config_stamp = latest_config_stamp_;
+  display::ConfigStamp current_applied_config_stamp = latest_config_stamp_;
 
   for (auto& display_config : configs_) {
     display_config.current_.layer_count = 0;
@@ -1146,7 +1148,8 @@ void Client::ApplyConfig() {
         display_config.pending_apply_layer_change_property_.Set(true);
       }
 
-      std::optional<ConfigStamp> layer_client_config_stamp = layer->GetCurrentClientConfigStamp();
+      std::optional<display::ConfigStamp> layer_client_config_stamp =
+          layer->GetCurrentClientConfigStamp();
       if (layer_client_config_stamp) {
         current_applied_config_stamp =
             std::min(current_applied_config_stamp, *layer_client_config_stamp);
@@ -1195,7 +1198,7 @@ fidl::Status Client::NotifyDisplayChanges(
     cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
     cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
   // TODO(https://fxbug.dev/42052765): OnDisplayChanged() takes VectorViews
-  // of non-const display Info and DisplayId types though it doesn't modify
+  // of non-const display Info and display::DisplayId types though it doesn't modify
   // the vectors. We have to perform a const_cast to drop their constness.
   cpp20::span<fuchsia_hardware_display::wire::Info> non_const_added_display_infos(
       const_cast<fuchsia_hardware_display::wire::Info*>(added_display_infos.data()),
@@ -1235,8 +1238,9 @@ fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
   return send_event_result;
 }
 
-fidl::Status Client::NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
-                                 VsyncAckCookie vsync_ack_cookie) {
+fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timestamp,
+                                 display::ConfigStamp config_stamp,
+                                 display::VsyncAckCookie vsync_ack_cookie) {
   if (coordinator_listener_.is_valid()) {
     fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
         ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
@@ -1251,12 +1255,12 @@ fidl::Status Client::NotifyVsync(DisplayId display_id, zx::time timestamp, Confi
   return send_event_result;
 }
 
-void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
-                               cpp20::span<const DisplayId> removed_display_ids) {
+void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
+                               cpp20::span<const display::DisplayId> removed_display_ids) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
 
   controller_->AssertMtxAliasHeld(*controller_->mtx());
-  for (DisplayId added_display_id : added_display_ids) {
+  for (display::DisplayId added_display_id : added_display_ids) {
     fbl::AllocChecker ac;
     auto config = fbl::make_unique_checked<DisplayConfig>(&ac);
     if (!ac.check()) {
@@ -1275,7 +1279,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
-    zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+    zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
         controller_->GetDisplayTimings(config->id);
     if (display_timings_result.is_error()) {
       FDF_LOG(WARNING, "Failed to get display timings when processing hotplug: %s",
@@ -1287,7 +1291,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     config->current_.layer_list = nullptr;
     config->current_.layer_count = 0;
 
-    cpp20::span<const DisplayTiming> display_timings = std::move(display_timings_result).value();
+    cpp20::span<const display::DisplayTiming> display_timings =
+        std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
     config->current_.mode = ToBanjoDisplayMode(display_timings[0]);
 
@@ -1309,7 +1314,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   std::vector<std::vector<fhd::wire::Mode>> modes_vector;
 
   fidl::Arena arena;
-  for (DisplayId added_display_id : added_display_ids) {
+  for (display::DisplayId added_display_id : added_display_ids) {
     auto config = configs_.find(added_display_id);
     if (!config.IsValid()) {
       continue;
@@ -1318,17 +1323,17 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fhd::wire::Info info;
     info.id = ToFidlDisplayId(config->id);
 
-    zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+    zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
         controller_->GetDisplayTimings(config->id);
     ZX_DEBUG_ASSERT(display_timings_result.is_ok());
 
-    cpp20::span<const DisplayTiming> display_timings = display_timings_result.value();
+    cpp20::span<const display::DisplayTiming> display_timings = display_timings_result.value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
 
     std::vector<fhd::wire::Mode> modes;
 
     modes.reserve(display_timings.size());
-    for (const DisplayTiming& timing : display_timings) {
+    for (const display::DisplayTiming& timing : display_timings) {
       modes.emplace_back(fhd::wire::Mode{
           .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
           .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
@@ -1381,7 +1386,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   std::vector<fhdt::wire::DisplayId> fidl_removed_display_ids;
   fidl_removed_display_ids.reserve(removed_display_ids.size());
 
-  for (DisplayId removed_display_id : removed_display_ids) {
+  for (display::DisplayId removed_display_id : removed_display_ids) {
     auto display = configs_.erase(removed_display_id);
     if (display) {
       display->pending_layers_.clear();
@@ -1417,14 +1422,14 @@ void Client::CaptureCompleted() {
   }
 
   // release any pending capture images
-  if (pending_release_capture_image_id_ != kInvalidImageId) {
+  if (pending_release_capture_image_id_ != display::kInvalidImageId) {
     auto image = capture_images_.find(pending_release_capture_image_id_);
     if (image.IsValid()) {
       capture_images_.erase(image);
     }
-    pending_release_capture_image_id_ = kInvalidImageId;
+    pending_release_capture_image_id_ = display::kInvalidImageId;
   }
-  current_capture_image_id_ = kInvalidImageId;
+  current_capture_image_id_ = display::kInvalidImageId;
 }
 
 void Client::TearDown() {
@@ -1447,7 +1452,7 @@ void Client::TearDown() {
   FDF_LOG(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
           capture_images_.size(), current_capture_image_id_.value(),
           pending_release_capture_image_id_.value());
-  current_capture_image_id_ = pending_release_capture_image_id_ = kInvalidImageId;
+  current_capture_image_id_ = pending_release_capture_image_id_ = display::kInvalidImageId;
   capture_images_.clear();
 
   fences_.Clear();
@@ -1508,8 +1513,8 @@ bool Client::CleanUpImage(Image& image) {
   return current_config_changed;
 }
 
-void Client::CleanUpCaptureImage(ImageId id) {
-  if (id == kInvalidImageId) {
+void Client::CleanUpCaptureImage(display::ImageId id) {
+  if (id == display::kInvalidImageId) {
     return;
   }
   // If the image is currently active, the underlying driver will retain a
@@ -1560,7 +1565,7 @@ void Client::DiscardConfig() {
 
 void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                               AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
-  VsyncAckCookie ack_cookie = ToVsyncAckCookie(request->cookie);
+  display::VsyncAckCookie ack_cookie = display::ToVsyncAckCookie(request->cookie);
   acked_cookie_ = ack_cookie;
   FDF_LOG(TRACE, "Cookie %" PRIu64 " Acked\n", ack_cookie.value());
 }
@@ -1639,8 +1644,8 @@ void ClientProxy::SetOwnership(bool is_owner) {
   }
 }
 
-void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
-                                    cpp20::span<const DisplayId> removed_display_ids) {
+void ClientProxy::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
+                                    cpp20::span<const display::DisplayId> removed_display_ids) {
   handler_.OnDisplaysChanged(added_display_ids, removed_display_ids);
 }
 
@@ -1691,12 +1696,12 @@ zx_status_t ClientProxy::OnCaptureComplete() {
   return ZX_OK;
 }
 
-zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestamp,
-                                        ConfigStamp controller_stamp) {
+zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+                                        display::ConfigStamp controller_stamp) {
   AssertHeld(*controller_->mtx());
   fidl::Status event_sending_result = fidl::Status::Ok();
 
-  ConfigStamp client_stamp = {};
+  display::ConfigStamp client_stamp = {};
   auto it =
       std::find_if(pending_applied_config_stamps_.begin(), pending_applied_config_stamps_.end(),
                    [controller_stamp](const ConfigStampPair& stamp) {
@@ -1704,7 +1709,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
                    });
 
   if (it == pending_applied_config_stamps_.end() || it->controller_stamp != controller_stamp) {
-    client_stamp = kInvalidConfigStamp;
+    client_stamp = display::kInvalidConfigStamp;
   } else {
     client_stamp = it->client_stamp;
     pending_applied_config_stamps_.erase(pending_applied_config_stamps_.begin(), it);
@@ -1717,7 +1722,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     }
   }
 
-  VsyncAckCookie vsync_ack_cookie = kInvalidVsyncAckCookie;
+  display::VsyncAckCookie vsync_ack_cookie = display::kInvalidVsyncAckCookie;
   if (number_of_vsyncs_sent_ >= (kVsyncMessagesWatermark - 1)) {
     // Number of  vsync events sent exceed the watermark level.
     // Check to see if client has been notified already that acknowledgement is needed
@@ -1729,12 +1734,12 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
       vsync_ack_cookie = initial_cookie_ ^ cookie_sequence_;
     } else {
       // Client has already been notified. let's check if client has acknowledged it
-      ZX_DEBUG_ASSERT(last_cookie_sent_ != kInvalidVsyncAckCookie);
+      ZX_DEBUG_ASSERT(last_cookie_sent_ != display::kInvalidVsyncAckCookie);
       if (handler_.LatestAckedCookie() == last_cookie_sent_) {
         // Client has acknowledged cookie. Reset vsync tracking states
         number_of_vsyncs_sent_ = 0;
         acknowledge_request_sent_ = false;
-        last_cookie_sent_ = kInvalidVsyncAckCookie;
+        last_cookie_sent_ = display::kInvalidVsyncAckCookie;
       }
     }
   }
@@ -1743,7 +1748,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     // We have reached/exceeded maximum allowed vsyncs without any acknowledgement. At this point,
     // start storing them
     FDF_LOG(TRACE, "Vsync not sent due to none acknowledgment.\n");
-    ZX_DEBUG_ASSERT(vsync_ack_cookie == kInvalidVsyncAckCookie);
+    ZX_DEBUG_ASSERT(vsync_ack_cookie == display::kInvalidVsyncAckCookie);
     if (buffered_vsync_messages_.full()) {
       buffered_vsync_messages_.pop();  // discard
     }
@@ -1756,7 +1761,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   }
 
   auto cleanup = fit::defer([&]() {
-    if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+    if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
       cookie_sequence_--;
     }
     // Make sure status is not ZX_ERR_BAD_HANDLE, otherwise, depending on
@@ -1785,7 +1790,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     buffered_vsync_messages_.pop();
     event_sending_result =
         handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
-                             vsync_message_data.config_stamp, kInvalidVsyncAckCookie);
+                             vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
       FDF_LOG(ERROR, "Failed to send all buffered vsync messages: %s\n",
               event_sending_result.FormatDescription().c_str());
@@ -1802,7 +1807,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   }
 
   // Update vsync tracking states
-  if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+  if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
     acknowledge_request_sent_ = true;
     last_cookie_sent_ = vsync_ack_cookie;
   }
@@ -1836,10 +1841,10 @@ void ClientProxy::CloseOnControllerLoop() {
   // Tasks only fail to post if the looper is dead. That can happen if the
   // controller is unbinding and shutting down active clients, but if it does
   // then it's safe to call Reset on this thread anyway.
-  [[maybe_unused]] zx::result<> post_task_result = PostTask<kDisplayTaskTargetSize>(
+  [[maybe_unused]] zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
       *controller_->client_dispatcher()->async_dispatcher(),
       // Client::TearDown() must be called even if the task fails to post.
-      [_ = CallFromDestructor([this]() { handler_.TearDown(); })]() {});
+      [_ = display::CallFromDestructor([this]() { handler_.TearDown(); })]() {});
 }
 
 zx_status_t ClientProxy::Init(
@@ -1853,7 +1858,7 @@ zx_status_t ClientProxy::Init(
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
-  initial_cookie_ = VsyncAckCookie(rand_r(&seed));
+  initial_cookie_ = display::VsyncAckCookie(rand_r(&seed));
 
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,
@@ -1898,7 +1903,7 @@ ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority,
 
 ClientProxy::~ClientProxy() {}
 
-}  // namespace display
+}  // namespace display_coordinator
 
 // Checks the FIDL ClientCompositionOpcode enum matches the corresponding bits
 // in banjo ClientCompositionOpcode bitfield.

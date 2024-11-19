@@ -46,7 +46,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 
-namespace display {
+namespace display_coordinator {
 
 class ClientProxy;
 class Controller;
@@ -113,11 +113,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
+  void ApplyConfig(DisplayConfig* configs[], int32_t count, display::ConfigStamp config_stamp,
                    uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
 
-  void ReleaseImage(DriverImageId driver_image_id);
-  void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
+  void ReleaseImage(display::DriverImageId driver_image_id);
+  void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
 
   // On success, the span of DisplayTiming objects is guaranteed to be
   // non-empty.
@@ -126,11 +126,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // `display_id` is valid.
   //
   // `mtx()` must be held for as long as the return value is retained.
-  zx::result<cpp20::span<const DisplayTiming>> GetDisplayTimings(DisplayId display_id)
-      __TA_REQUIRES(mtx());
+  zx::result<cpp20::span<const display::DisplayTiming>> GetDisplayTimings(
+      display::DisplayId display_id) __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
-      __TA_REQUIRES(mtx());
+  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(
+      display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   // Calls `callback` with a const DisplayInfo& matching the given `display_id`.
   //
@@ -139,7 +139,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   //
   // The controller mutex is guaranteed to be held while `callback` is called.
   template <typename Callback>
-  bool FindDisplayInfo(DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
+  bool FindDisplayInfo(display::DisplayId display_id, Callback callback) __TA_REQUIRES(mtx());
 
   EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
@@ -160,7 +160,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   // Test helpers
   size_t TEST_imported_images_count() const;
-  ConfigStamp TEST_controller_stamp() const;
+  display::ConfigStamp TEST_controller_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -192,7 +192,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
   zx::result<> AddDisplay(const raw_display_info_t& banjo_display_info);
-  zx::result<> RemoveDisplay(DisplayId display_id);
+  zx::result<> RemoveDisplay(display::DisplayId display_id);
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
@@ -209,7 +209,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
   uint32_t applied_layer_stamp_ = UINT32_MAX;
   ClientId applied_client_id_ = kInvalidClientId;
-  DriverCaptureImageId pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
+  display::DriverCaptureImageId pending_release_capture_image_id_ =
+      display::kInvalidDriverCaptureImageId;
 
   bool supports_capture_ = false;
 
@@ -238,11 +239,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
-  ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStamp;
+  display::ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = display::kInvalidConfigStamp;
 };
 
 template <typename Callback>
-bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
+bool Controller::FindDisplayInfo(display::DisplayId display_id, Callback callback) {
   for (const DisplayInfo& display : displays_) {
     if (display.id == display_id) {
       callback(display);
@@ -252,6 +253,6 @@ bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
   return false;
 }
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONTROLLER_H_

@@ -29,10 +29,10 @@ namespace fhdt = fuchsia_hardware_display_types;
 namespace sysmem1 = fuchsia_sysmem;
 namespace sysmem2 = fuchsia_sysmem2;
 
-namespace display {
+namespace display_coordinator {
 
 TestFidlClient::Display::Display(const fhd::wire::Info& info) {
-  id_ = ToDisplayId(info.id);
+  id_ = display::ToDisplayId(info.id);
 
   for (size_t i = 0; i < info.pixel_format.count(); i++) {
     pixel_formats_.push_back(info.pixel_format[i]);
@@ -48,7 +48,7 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   image_metadata_.tiling_type = fhdt::wire::kImageTilingTypeLinear;
 }
 
-DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
+display::DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
 zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Provider>& provider,
                                              ClientPriority client_priority,
@@ -92,11 +92,11 @@ zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Pro
   return zx::ok();
 }
 
-zx::result<ImageId> TestFidlClient::CreateImage() {
+zx::result<display::ImageId> TestFidlClient::CreateImage() {
   return ImportImageWithSysmem(displays_[0].image_metadata_);
 }
 
-zx::result<LayerId> TestFidlClient::CreateLayer() {
+zx::result<display::LayerId> TestFidlClient::CreateLayer() {
   fbl::AutoLock lock(mtx());
   return CreateLayerLocked();
 }
@@ -106,7 +106,7 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   return CreateEventLocked();
 }
 
-zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
+zx::result<display::LayerId> TestFidlClient::CreateLayerLocked() {
   ZX_DEBUG_ASSERT(dc_);
   auto reply = dc_->CreateLayer();
   if (!reply.ok()) {
@@ -119,7 +119,7 @@ zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
   EXPECT_EQ(
       dc_->SetLayerPrimaryConfig(reply.value()->layer_id, displays_[0].image_metadata_).status(),
       ZX_OK);
-  return zx::ok(ToLayerId(reply.value()->layer_id));
+  return zx::ok(display::ToLayerId(reply.value()->layer_id));
 }
 
 zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
@@ -142,7 +142,7 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
     return zx::error(status);
   }
 
-  const EventId event_id(info.koid);
+  const display::EventId event_id(info.koid);
   auto import_result = dc_->ImportEvent(std::move(event), ToFidlEventId(event_id));
   if (!import_result.ok()) {
     FDF_LOG(ERROR, "Failed to import event to display controller: %d", import_result.status());
@@ -181,7 +181,8 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
 
   for (const auto& info : present_layers) {
     const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
-    const EventId wait_event_id = info.image_ready_wait_event_id.value_or(kInvalidEventId);
+    const display::EventId wait_event_id =
+        info.image_ready_wait_event_id.value_or(display::kInvalidEventId);
     if (auto reply = dc_->SetLayerImage2(fidl_layer_id, ToFidlImageId(info.image_id),
                                          /*wait_event_id=*/ToFidlEventId(wait_event_id));
         !reply.ok()) {
@@ -204,17 +205,17 @@ fhdt::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
   return result.value().stamp;
 }
 
-zx::result<ImageId> TestFidlClient::ImportImageWithSysmem(
+zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     const fhdt::wire::ImageMetadata& image_metadata) {
   fbl::AutoLock lock(mtx());
   return ImportImageWithSysmemLocked(image_metadata);
 }
 
 std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
-  zx::result<LayerId> layer_result = CreateLayer();
+  zx::result<display::LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result);
 
-  zx::result<ImageId> image_result = ImportImageWithSysmem(displays_[0].image_metadata_);
+  zx::result<display::ImageId> image_result = ImportImageWithSysmem(displays_[0].image_metadata_);
   EXPECT_OK(image_result);
 
   return {
@@ -224,7 +225,7 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
   };
 }
 
-zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
+zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     const fhdt::wire::ImageMetadata& image_metadata) {
   // Create all the tokens.
   fidl::WireSyncClient<sysmem2::BufferCollectionToken> local_token;
@@ -255,8 +256,8 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   // Set display buffer constraints.
-  static BufferCollectionId next_display_collection_id(0);
-  const BufferCollectionId display_collection_id = ++next_display_collection_id;
+  static display::BufferCollectionId next_display_collection_id(0);
+  const display::BufferCollectionId display_collection_id = ++next_display_collection_id;
   if (auto result = local_token->Sync(); !result.ok()) {
     FDF_LOG(ERROR, "Failed to sync token %d %s", result.status(),
             result.FormatDescription().c_str());
@@ -356,7 +357,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  const ImageId image_id = next_image_id_++;
+  const display::ImageId image_id = next_image_id_++;
   const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
   const auto import_result =
       dc_->ImportImage(image_metadata,
@@ -383,7 +384,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
 void TestFidlClient::OnDisplaysChanged(
     std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-    std::vector<DisplayId> removed_display_ids) {
+    std::vector<display::DisplayId> removed_display_ids) {
   for (const fuchsia_hardware_display::wire::Info& added_display : added_displays) {
     displays_.push_back(Display(added_display));
   }
@@ -391,14 +392,15 @@ void TestFidlClient::OnDisplaysChanged(
 
 void TestFidlClient::OnClientOwnershipChange(bool has_ownership) { has_ownership_ = has_ownership; }
 
-void TestFidlClient::OnVsync(DisplayId display_id, zx::time timestamp,
-                             ConfigStamp applied_config_stamp, VsyncAckCookie vsync_ack_cookie) {
+void TestFidlClient::OnVsync(display::DisplayId display_id, zx::time timestamp,
+                             display::ConfigStamp applied_config_stamp,
+                             display::VsyncAckCookie vsync_ack_cookie) {
   fbl::AutoLock lock(mtx());
   vsync_count_++;
   recent_presented_config_stamp_ = applied_config_stamp;
-  if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+  if (vsync_ack_cookie != display::kInvalidVsyncAckCookie) {
     vsync_ack_cookie_ = vsync_ack_cookie;
   }
 }
 
-}  // namespace display
+}  // namespace display_coordinator

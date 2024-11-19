@@ -51,10 +51,10 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
-namespace display {
+namespace display_coordinator {
 
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
-class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayId> {
+class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display::DisplayId> {
  public:
   void InitializeInspect(inspect::Node* parent);
 
@@ -123,16 +123,17 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
           coordinator_listener_client_end,
       fidl::OnUnboundFn<Client> unbound_callback);
 
-  void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
-                         cpp20::span<const DisplayId> removed_display_ids);
+  void OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
+                         cpp20::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
 
   fidl::Status NotifyDisplayChanges(
       cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
       cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
   fidl::Status NotifyOwnershipChange(bool client_has_ownership);
-  fidl::Status NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
-                           VsyncAckCookie vsync_ack_cookie);
+  fidl::Status NotifyVsync(display::DisplayId display_id, zx::time timestamp,
+                           display::ConfigStamp config_stamp,
+                           display::VsyncAckCookie vsync_ack_cookie);
 
   void ApplyConfig();
 
@@ -154,7 +155,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
-  VsyncAckCookie LatestAckedCookie() const { return acked_cookie_; }
+  display::VsyncAckCookie LatestAckedCookie() const { return acked_cookie_; }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -214,7 +215,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
  private:
   // Called by FIDL entrypoints such as `ApplyConfig()` and `ApplyConfig3()`;
-  void ApplyConfigFromFidl(ConfigStamp new_config_stamp);
+  void ApplyConfigFromFidl(display::ConfigStamp new_config_stamp);
 
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
@@ -223,7 +224,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Cleans up layer state associated with an Image. `image` must be valid.
   // Returns true if a current layer has been modified.
   bool CleanUpImage(Image& image);
-  void CleanUpCaptureImage(ImageId id);
+  void CleanUpCaptureImage(display::ImageId id);
 
   // Displays' pending layers list may have been changed by pending
   // SetDisplayLayers() operations.
@@ -238,22 +239,22 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   //
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for display.
-  zx_status_t ImportImageForDisplay(const ImageMetadata& image_metadata, BufferId buffer_id,
-                                    ImageId image_id);
+  zx_status_t ImportImageForDisplay(const display::ImageMetadata& image_metadata,
+                                    display::BufferId buffer_id, display::ImageId image_id);
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
   // images.
   //
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for capture.
-  zx_status_t ImportImageForCapture(const ImageMetadata& image_metadata, BufferId buffer_id,
-                                    ImageId image_id);
+  zx_status_t ImportImageForCapture(const display::ImageMetadata& image_metadata,
+                                    display::BufferId buffer_id, display::ImageId image_id);
 
   // Discards all the pending config on all Displays and Layers.
   void DiscardConfig();
 
-  void SetLayerImageImpl(LayerId layer_id, ImageId image_id, EventId wait_event_id,
-                         EventId signal_event_id);
+  void SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
+                         display::EventId wait_event_id, display::EventId signal_event_id);
 
   Controller* const controller_;
   ClientProxy* const proxy_;
@@ -271,7 +272,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // A counter for the number of times the client has successfully applied
   // a configuration. This does not account for changes due to waiting images.
   uint32_t client_apply_count_ = 0;
-  ConfigStamp latest_config_stamp_ = kInvalidConfigStamp;
+  display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
 
   // This is the client's clamped RGB value.
   uint8_t client_minimum_rgb_ = 0;
@@ -289,9 +290,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   Layer::Map layers_;
 
   // TODO(fxbug.com/129082): Move to Controller, so values issued using this
-  // counter are globally unique. Do not pass to DriverLayerId values to drivers
+  // counter are globally unique. Do not pass to display::DriverLayerId values to drivers
   // until this issue is fixed.
-  DriverLayerId next_driver_layer_id = DriverLayerId(1);
+  display::DriverLayerId next_driver_layer_id = display::DriverLayerId(1);
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
@@ -302,12 +303,12 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_;
 
   // Capture related book keeping
-  EventId capture_fence_id_ = kInvalidEventId;
+  display::EventId capture_fence_id_ = display::kInvalidEventId;
 
   // Points to the image whose contents is modified by the current capture.
   //
   // Invalid when no is capture in progress.
-  ImageId current_capture_image_id_ = kInvalidImageId;
+  display::ImageId current_capture_image_id_ = display::kInvalidImageId;
 
   // Tracks an image released by the client while used by a capture.
   //
@@ -315,9 +316,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // engine is writing to it. If a client attempts to release the image used by
   // an in-progress capture, we defer the release operation until the capture
   // completes. The deferred release is tracked here.
-  ImageId pending_release_capture_image_id_ = kInvalidImageId;
+  display::ImageId pending_release_capture_image_id_ = display::kInvalidImageId;
 
-  VsyncAckCookie acked_cookie_ = kInvalidVsyncAckCookie;
+  display::VsyncAckCookie acked_cookie_ = display::kInvalidVsyncAckCookie;
 };
 
 // ClientProxy manages interactions between its Client instance and the
@@ -344,10 +345,10 @@ class ClientProxy {
   void CloseOnControllerLoop();
 
   // Requires holding controller_->mtx() lock
-  zx_status_t OnDisplayVsync(DisplayId display_id, zx_time_t timestamp,
-                             ConfigStamp controller_stamp);
-  void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
-                         cpp20::span<const DisplayId> removed_display_ids);
+  zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
+                             display::ConfigStamp controller_stamp);
+  void OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
+                         cpp20::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ReapplyConfig();
   zx_status_t OnCaptureComplete();
@@ -373,8 +374,8 @@ class ClientProxy {
   inspect::Node& node() { return node_; }
 
   struct ConfigStampPair {
-    ConfigStamp controller_stamp;
-    ConfigStamp client_stamp;
+    display::ConfigStamp controller_stamp;
+    display::ConfigStamp client_stamp;
   };
   std::list<ConfigStampPair>& pending_applied_config_stamps() {
     return pending_applied_config_stamps_;
@@ -426,17 +427,17 @@ class ClientProxy {
   uint64_t total_oom_errors_ = 0;
 
   struct VsyncMessageData {
-    DisplayId display_id;
+    display::DisplayId display_id;
     zx_time_t timestamp;
-    ConfigStamp config_stamp;
+    display::ConfigStamp config_stamp;
   };
 
   fbl::RingBuffer<VsyncMessageData, kVsyncBufferSize> buffered_vsync_messages_;
-  VsyncAckCookie initial_cookie_ = VsyncAckCookie(0);
-  VsyncAckCookie cookie_sequence_ = VsyncAckCookie(0);
+  display::VsyncAckCookie initial_cookie_ = display::VsyncAckCookie(0);
+  display::VsyncAckCookie cookie_sequence_ = display::VsyncAckCookie(0);
 
   uint64_t number_of_vsyncs_sent_ = 0;
-  VsyncAckCookie last_cookie_sent_ = kInvalidVsyncAckCookie;
+  display::VsyncAckCookie last_cookie_sent_ = display::kInvalidVsyncAckCookie;
   bool acknowledge_request_sent_ = false;
 
   fit::function<void()> on_client_disconnected_;
@@ -450,6 +451,6 @@ class ClientProxy {
   inspect::BoolProperty is_owner_property_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CLIENT_H_

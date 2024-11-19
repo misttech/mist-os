@@ -30,7 +30,7 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
-namespace display {
+namespace display_coordinator {
 
 class TestFidlClient {
  public:
@@ -38,7 +38,7 @@ class TestFidlClient {
    public:
     explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
-    DisplayId id_;
+    display::DisplayId id_;
     fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
     fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
 
@@ -50,7 +50,7 @@ class TestFidlClient {
   };
 
   struct EventInfo {
-    EventId id;
+    display::EventId id;
     zx::event event;
   };
 
@@ -67,19 +67,19 @@ class TestFidlClient {
 
   zx::result<> EnableVsync();
 
-  zx::result<ImageId> ImportImageWithSysmem(
+  zx::result<display::ImageId> ImportImageWithSysmem(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_EXCL(mtx());
 
-  zx::result<ImageId> CreateImage() TA_EXCL(mtx());
-  zx::result<LayerId> CreateLayer() TA_EXCL(mtx());
+  zx::result<display::ImageId> CreateImage() TA_EXCL(mtx());
+  zx::result<display::LayerId> CreateLayer() TA_EXCL(mtx());
   zx::result<EventInfo> CreateEvent() TA_EXCL(mtx());
 
   fuchsia_hardware_display_types::wire::ConfigStamp GetRecentAppliedConfigStamp() TA_EXCL(mtx());
 
   struct PresentLayerInfo {
-    LayerId layer_id;
-    ImageId image_id;
-    std::optional<EventId> image_ready_wait_event_id;
+    display::LayerId layer_id;
+    display::ImageId image_id;
+    std::optional<display::EventId> image_ready_wait_event_id;
   };
 
   std::vector<PresentLayerInfo> CreateDefaultPresentLayerInfo();
@@ -89,14 +89,14 @@ class TestFidlClient {
   zx_status_t PresentLayers(std::vector<PresentLayerInfo> layers);
 
   void OnDisplaysChanged(std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-                         std::vector<DisplayId> removed_display_ids);
+                         std::vector<display::DisplayId> removed_display_ids);
 
   void OnClientOwnershipChange(bool has_ownership);
 
-  void OnVsync(DisplayId display_id, zx::time timestamp, ConfigStamp applied_config_stamp,
-               VsyncAckCookie vsync_ack_cookie);
+  void OnVsync(display::DisplayId display_id, zx::time timestamp,
+               display::ConfigStamp applied_config_stamp, display::VsyncAckCookie vsync_ack_cookie);
 
-  DisplayId display_id() const;
+  display::DisplayId display_id() const;
 
   fbl::Vector<Display> displays_;
   fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> dc_ TA_GUARDED(mtx());
@@ -107,21 +107,21 @@ class TestFidlClient {
     return vsync_count_;
   }
 
-  ConfigStamp recent_presented_config_stamp() const {
+  display::ConfigStamp recent_presented_config_stamp() const {
     fbl::AutoLock lock(mtx());
     return recent_presented_config_stamp_;
   }
 
-  VsyncAckCookie vsync_ack_cookie() const { return vsync_ack_cookie_; }
+  display::VsyncAckCookie vsync_ack_cookie() const { return vsync_ack_cookie_; }
 
   fbl::Mutex* mtx() const { return &mtx_; }
 
  private:
   mutable fbl::Mutex mtx_;
   uint64_t vsync_count_ TA_GUARDED(mtx()) = 0;
-  VsyncAckCookie vsync_ack_cookie_ = kInvalidVsyncAckCookie;
-  ImageId next_image_id_ TA_GUARDED(mtx()) = ImageId(1);
-  ConfigStamp recent_presented_config_stamp_;
+  display::VsyncAckCookie vsync_ack_cookie_ = display::kInvalidVsyncAckCookie;
+  display::ImageId next_image_id_ TA_GUARDED(mtx()) = display::ImageId(1);
+  display::ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem_;
 
   MockCoordinatorListener coordinator_listener_{
@@ -129,12 +129,12 @@ class TestFidlClient {
       fit::bind_member<&TestFidlClient::OnVsync>(this),
       fit::bind_member<&TestFidlClient::OnClientOwnershipChange>(this)};
 
-  zx::result<ImageId> ImportImageWithSysmemLocked(
+  zx::result<display::ImageId> ImportImageWithSysmemLocked(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_REQ(mtx());
-  zx::result<LayerId> CreateLayerLocked() TA_REQ(mtx());
+  zx::result<display::LayerId> CreateLayerLocked() TA_REQ(mtx());
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_FIDL_CLIENT_H_

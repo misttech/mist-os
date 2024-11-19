@@ -31,9 +31,9 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
-namespace display {
+namespace display_coordinator {
 
-class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
+class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::DisplayId>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
   static zx::result<fbl::RefPtr<DisplayInfo>> Create(const raw_display_info_t& banjo_display_info);
@@ -73,7 +73,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
   // Exactly one of `edid` and `mode` can be non-nullopt.
   std::optional<Edid> edid;
-  std::optional<DisplayTiming> mode;
+  std::optional<display::DisplayTiming> mode;
 
   fbl::Vector<CoordinatorPixelFormat> pixel_formats;
 
@@ -92,7 +92,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   // If a configuration applied by Controller has layer change to occur on the
   // display (i.e. |pending_layer_change| is true), this stores the Controller's
   // config stamp for that configuration; otherwise it stores an invalid stamp.
-  ConfigStamp pending_layer_change_controller_config_stamp;
+  display::ConfigStamp pending_layer_change_controller_config_stamp;
 
   // Flag indicating that a new configuration was delayed during a layer change
   // and should be reapplied after the layer change completes.
@@ -112,10 +112,10 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   //
   // TODO(https://fxbug.dev/42152065): Remove once we remove image IDs in OnVsync() events.
   struct ConfigImages {
-    const ConfigStamp config_stamp;
+    const display::ConfigStamp config_stamp;
 
     struct ImageMetadata {
-      ImageId image_id;
+      display::ImageId image_id;
       ClientId client_id;
     };
     std::vector<ImageMetadata> images;
@@ -129,6 +129,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   inspect::ValueList properties;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DISPLAY_INFO_H_

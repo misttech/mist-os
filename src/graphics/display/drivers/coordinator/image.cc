@@ -24,12 +24,12 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 
-namespace display {
+namespace display_coordinator {
 
-Image::Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
-             inspect::Node* parent_node, ClientId client_id)
+Image::Image(Controller* controller, const display::ImageMetadata& metadata,
+             display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id)
     : driver_id_(driver_id), metadata_(metadata), controller_(controller), client_id_(client_id) {
-  ZX_DEBUG_ASSERT(metadata.tiling_type() != ImageTilingType::kCapture);
+  ZX_DEBUG_ASSERT(metadata.tiling_type() != display::ImageTilingType::kCapture);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
@@ -152,4 +152,4 @@ void Image::ResetFences() {
   retire_fence_ = nullptr;
 }
 
-}  // namespace display
+}  // namespace display_coordinator

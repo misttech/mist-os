@@ -27,7 +27,7 @@
 
 namespace fhdt = fuchsia_hardware_display_types;
 
-namespace display {
+namespace display_coordinator {
 
 class LayerTest : public TestBase {
  public:
@@ -37,14 +37,15 @@ class LayerTest : public TestBase {
   }
 
   fbl::RefPtr<Image> CreateReadyImage() {
-    zx::result<DriverImageId> import_result = display()->ImportVmoImageForTesting(zx::vmo(0), 0);
+    zx::result<display::DriverImageId> import_result =
+        display()->ImportVmoImageForTesting(zx::vmo(0), 0);
     EXPECT_OK(import_result);
-    EXPECT_NE(import_result.value(), kInvalidDriverImageId);
+    EXPECT_NE(import_result.value(), display::kInvalidDriverImageId);
 
-    static constexpr ImageMetadata image_metadata({
+    static constexpr display::ImageMetadata image_metadata({
         .width = kDisplayWidth,
         .height = kDisplayHeight,
-        .tiling_type = ImageTilingType::kLinear,
+        .tiling_type = display::ImageTilingType::kLinear,
     });
     fbl::RefPtr<Image> image = fbl::AdoptRef(
         new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
@@ -62,11 +63,11 @@ class LayerTest : public TestBase {
   static constexpr uint32_t kDisplayHeight = 600;
 
   std::unique_ptr<FenceCollection> fences_;
-  ImageId next_image_id_ = ImageId(1);
+  display::ImageId next_image_id_ = display::ImageId(1);
 };
 
 TEST_F(LayerTest, PrimaryBasic) {
-  Layer layer(DriverLayerId(1));
+  Layer layer(display::DriverLayerId(1));
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
@@ -76,12 +77,12 @@ TEST_F(LayerTest, PrimaryBasic) {
                            display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
-  layer.SetImage(image, kInvalidEventId, kInvalidEventId);
+  layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
 }
 
 TEST_F(LayerTest, CleanUpImage) {
-  Layer layer(DriverLayerId(1));
+  Layer layer(display::DriverLayerId(1));
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
@@ -92,22 +93,22 @@ TEST_F(LayerTest, CleanUpImage) {
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, kInvalidEventId, kInvalidEventId);
+  layer.SetImage(displayed_image, display::kInvalidEventId, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
-  constexpr EventId kWaitFenceId(1);
+  constexpr display::EventId kWaitFenceId(1);
   fences_->ImportEvent(std::move(event), kWaitFenceId);
   auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId, kInvalidEventId);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
+  layer.SetImage(waiting_image, kWaitFenceId, display::kInvalidEventId);
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, kInvalidEventId, kInvalidEventId);
+  layer.SetImage(pending_image, display::kInvalidEventId, display::kInvalidEventId);
 
   ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
@@ -156,7 +157,7 @@ TEST_F(LayerTest, CleanUpImage) {
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(DriverLayerId(1));
+  Layer layer(display::DriverLayerId(1));
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
@@ -169,9 +170,9 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   // Clean up images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, kInvalidEventId, kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -188,9 +189,9 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     MakeLayerCurrent(layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, kInvalidEventId, kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -205,7 +206,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 }
 
 TEST_F(LayerTest, CleanUpAllImages) {
-  Layer layer(DriverLayerId(1));
+  Layer layer(display::DriverLayerId(1));
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
@@ -216,22 +217,22 @@ TEST_F(LayerTest, CleanUpAllImages) {
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, kInvalidEventId, kInvalidEventId);
+  layer.SetImage(displayed_image, display::kInvalidEventId, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
-  constexpr EventId kWaitFenceId(1);
+  constexpr display::EventId kWaitFenceId(1);
   fences_->ImportEvent(std::move(event), kWaitFenceId);
   auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId, kInvalidEventId);
-  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
+  layer.SetImage(waiting_image, kWaitFenceId, display::kInvalidEventId);
+  ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, kInvalidEventId, kInvalidEventId);
+  layer.SetImage(pending_image, display::kInvalidEventId, display::kInvalidEventId);
 
   ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
@@ -257,7 +258,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(DriverLayerId(1));
+  Layer layer(display::DriverLayerId(1));
   fhdt::wire::ImageMetadata image_config = {.width = kDisplayWidth,
                                             .height = kDisplayHeight,
                                             .tiling_type = fhdt::wire::kImageTilingTypeLinear};
@@ -270,9 +271,9 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   // Clean up all images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, kInvalidEventId, kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(1)));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -289,9 +290,9 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     MakeLayerCurrent(layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, kInvalidEventId, kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), ConfigStamp(2)));
+    ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
     EXPECT_TRUE(layer.current_image());
@@ -305,4 +306,4 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   }
 }
 
-}  // namespace display
+}  // namespace display_coordinator

@@ -24,15 +24,15 @@
 #include "src/graphics/display/lib/driver-utils/post-task.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace display {
+namespace display_coordinator {
 
 class ImageTest : public TestBase, public FenceCallback {
  public:
   void OnFenceFired(FenceReference* f) override {}
   void OnRefForFenceDead(Fence* fence) override { fence->OnRefDead(); }
 
-  fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const ImageMetadata& image_metadata) {
-    zx::result<DriverImageId> import_result =
+  fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const display::ImageMetadata& image_metadata) {
+    zx::result<display::DriverImageId> import_result =
         display()->ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
     if (!import_result.is_ok()) {
       return nullptr;
@@ -45,16 +45,16 @@ class ImageTest : public TestBase, public FenceCallback {
   }
 
  private:
-  ImageId next_image_id_ = ImageId(1);
+  display::ImageId next_image_id_ = display::ImageId(1);
 };
 
 TEST_F(ImageTest, MultipleAcquiresAllowed) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  static constexpr ImageMetadata image_metadata({
+  static constexpr display::ImageMetadata image_metadata({
       .width = 1024,
       .height = 600,
-      .tiling_type = ImageTilingType::kLinear,
+      .tiling_type = display::ImageTilingType::kLinear,
   });
   fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
 
@@ -69,10 +69,10 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  static constexpr ImageMetadata image_metadata({
+  static constexpr display::ImageMetadata image_metadata({
       .width = 1024,
       .height = 600,
-      .tiling_type = ImageTilingType::kLinear,
+      .tiling_type = display::ImageTilingType::kLinear,
   });
   fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
   auto image_cleanup = fit::defer([image]() {
@@ -84,7 +84,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   ASSERT_OK(zx::event::create(0, &signal_event));
   zx::event signal_event_dup;
   signal_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &signal_event_dup);
-  constexpr EventId kEventId(1);
+  constexpr display::EventId kEventId(1);
   auto signal_fence =
       fbl::AdoptRef(new Fence(this, loop.dispatcher(), kEventId, std::move(signal_event_dup)));
   signal_fence->CreateRef();
@@ -111,7 +111,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
       image->PrepareFences(nullptr, signal_fence->GetReference());
     }
     zx::result<> post_task_result =
-        PostTask<kDisplayTaskTargetSize>(*loop.dispatcher(), [image, &retire_count]() {
+        display::PostTask<kDisplayTaskTargetSize>(*loop.dispatcher(), [image, &retire_count]() {
           fbl::AutoLock l(image->mtx());
           image->StartPresent();
           retire_count++;
@@ -140,4 +140,4 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   image->EarlyRetire();
 }
 
-}  // namespace display
+}  // namespace display_coordinator

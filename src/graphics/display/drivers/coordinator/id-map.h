@@ -11,7 +11,7 @@
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
 
-namespace display {
+namespace display_coordinator {
 
 // Helper for allowing structs which are identified by unique ids to be put in a hashmap.
 template <typename PtrType, typename IdType>
@@ -36,6 +36,6 @@ class IdMappable {
   IdMappableNodeState id_mappable_state_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ID_MAP_H_

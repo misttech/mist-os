@@ -16,7 +16,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 
-namespace display {
+namespace display_coordinator {
 
 // static
 CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(
@@ -42,4 +42,4 @@ CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
 
 fuchsia_images2::wire::PixelFormat CoordinatorPixelFormat::ToFidl() const { return format; }
 
-}  // namespace display
+}  // namespace display_coordinator

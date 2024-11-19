@@ -22,7 +22,7 @@
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace display {
+namespace display_coordinator {
 
 void TestBase::SetUp() {
   loop_.StartThread("display::TestBase::loop_", &loop_thrd_);
@@ -35,8 +35,8 @@ void TestBase::SetUp() {
       .manual_vsync_trigger = true,
       .no_buffer_access = false,
   };
-  tree_ = std::make_unique<FakeDisplayStack>(std::move(create_sysmem_provider_result).value(),
-                                             kDeviceConfig);
+  tree_ = std::make_unique<display::FakeDisplayStack>(
+      std::move(create_sysmem_provider_result).value(), kDeviceConfig);
 }
 
 void TestBase::TearDown() {
@@ -77,8 +77,8 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
     // Retaining `predicate_eval_state` by reference is safe because this method
     // will block on a ConditionVariable::Wait() call, which is only fired at
     // the end of the task handler.
-    zx::result post_task_result =
-        PostTask(std::move(post_task_state), *loop_.dispatcher(), [&predicate_eval_state]() {
+    zx::result post_task_result = display::PostTask(
+        std::move(post_task_state), *loop_.dispatcher(), [&predicate_eval_state]() {
           fbl::AutoLock lock(&predicate_eval_state.mutex);
 
           predicate_eval_state.result = predicate_eval_state.predicate();
@@ -121,4 +121,4 @@ const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& TestBase::displa
   return tree_->display_client();
 }
 
-}  // namespace display
+}  // namespace display_coordinator

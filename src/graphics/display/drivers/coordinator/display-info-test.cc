@@ -16,7 +16,7 @@
 #include "src/graphics/display/lib/edid-values/edid-values.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace display {
+namespace display_coordinator {
 
 namespace {
 
@@ -167,4 +167,4 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
 
 }  // namespace
 
-}  // namespace display
+}  // namespace display_coordinator

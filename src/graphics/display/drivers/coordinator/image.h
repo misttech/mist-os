@@ -24,7 +24,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
-namespace display {
+namespace display_coordinator {
 
 class Controller;
 
@@ -45,7 +45,8 @@ class Controller;
 //
 // One special transition exists: upon the owning Client's death/disconnection, the
 // ImageUse will move from ACQUIRED to NOT_READY.
-class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image>, ImageId> {
+class Image : public fbl::RefCounted<Image>,
+              public IdMappable<fbl::RefPtr<Image>, display::ImageId> {
  private:
   // Private forward declaration.
   template <typename PtrType, typename TagType>
@@ -66,12 +67,12 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   using DoublyLinkedList = fbl::DoublyLinkedList<DoublyLinkedListPointer, fbl::DefaultObjectTag,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
-  Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
-        inspect::Node* parent_node, ClientId client_id);
+  Image(Controller* controller, const display::ImageMetadata& metadata,
+        display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id);
   ~Image();
 
-  DriverImageId driver_id() const { return driver_id_; }
-  const ImageMetadata& metadata() const { return metadata_; }
+  display::DriverImageId driver_id() const { return driver_id_; }
+  const display::ImageMetadata& metadata() const { return metadata_; }
 
   // The client that owns the image.
   ClientId client_id() const { return client_id_; }
@@ -102,13 +103,17 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
 
   bool IsReady() const { return wait_fence_ == nullptr; }
 
-  void set_latest_controller_config_stamp(ConfigStamp stamp) {
+  void set_latest_controller_config_stamp(display::ConfigStamp stamp) {
     latest_controller_config_stamp_ = stamp;
   }
-  ConfigStamp latest_controller_config_stamp() const { return latest_controller_config_stamp_; }
+  display::ConfigStamp latest_controller_config_stamp() const {
+    return latest_controller_config_stamp_;
+  }
 
-  void set_latest_client_config_stamp(ConfigStamp stamp) { latest_client_config_stamp_ = stamp; }
-  ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
+  void set_latest_client_config_stamp(display::ConfigStamp stamp) {
+    latest_client_config_stamp_ = stamp;
+  }
+  display::ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
   // Aliases controller_->mtx() for the purpose of thread-safety analysis.
   fbl::Mutex* mtx() const;
@@ -147,14 +152,14 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
                                  fbl::NodeOptions::AllowRemoveFromContainer>
       doubly_linked_list_node_state_ __TA_GUARDED(mtx());
 
-  const DriverImageId driver_id_;
-  const ImageMetadata metadata_;
+  const display::DriverImageId driver_id_;
+  const display::ImageMetadata metadata_;
 
   Controller* const controller_;
   const ClientId client_id_;
 
   // Stamp of the latest Controller display configuration that uses this image.
-  ConfigStamp latest_controller_config_stamp_ = kInvalidConfigStamp;
+  display::ConfigStamp latest_controller_config_stamp_ = display::kInvalidConfigStamp;
 
   // Stamp of the latest display configuration in Client (the DisplayController
   // FIDL service) that uses this image.
@@ -163,7 +168,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // doesn't match the |latest_controller_config_stamp_|. This could happen when
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
-  ConfigStamp latest_client_config_stamp_ = kInvalidConfigStamp;
+  display::ConfigStamp latest_client_config_stamp_ = display::kInvalidConfigStamp;
 
   // Indicates that the image contents are ready for display.
   // Only ever accessed on loop thread, so no synchronization
@@ -191,6 +196,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   inspect::BoolProperty retiring_property_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_IMAGE_H_

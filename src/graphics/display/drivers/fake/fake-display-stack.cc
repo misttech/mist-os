@@ -47,9 +47,11 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
 
   ddk::DisplayEngineProtocolClient display_engine_client(display_->display_engine_banjo_protocol());
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(display_engine_client);
-  zx::result<std::unique_ptr<Controller>> create_controller_result =
-      Controller::Create(std::move(engine_driver_client), coordinator_client_dispatcher_.borrow());
+  auto engine_driver_client =
+      std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
+  zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
+      display_coordinator::Controller::Create(std::move(engine_driver_client),
+                                              coordinator_client_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     ZX_PANIC("Failed to create display coordinator Controller device: %s",
              create_controller_result.status_string());

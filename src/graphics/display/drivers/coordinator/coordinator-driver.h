@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
-namespace display {
+namespace display_coordinator {
 
 // Interfaces with the Driver Framework v2 and manages the driver lifetime of
 // the display coordinator Controller device.
@@ -50,6 +50,6 @@ class CoordinatorDriver : public fdf::DriverBase {
   driver_devfs::Connector<fuchsia_hardware_display::Provider> devfs_connector_;
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_COORDINATOR_DRIVER_H_

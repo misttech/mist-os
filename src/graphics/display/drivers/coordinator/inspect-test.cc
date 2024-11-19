@@ -15,7 +15,7 @@
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 
-namespace display {
+namespace display_coordinator {
 
 namespace {
 
@@ -102,4 +102,4 @@ TEST_F(InspectTest, VsyncMonitorHierarchy) {
 
 }  // namespace
 
-}  // namespace display
+}  // namespace display_coordinator

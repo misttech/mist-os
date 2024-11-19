@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 
-namespace display {
+namespace display_coordinator {
 
 // Maintains statistics about Vsync stalls.
 class VsyncMonitor {
@@ -36,7 +36,7 @@ class VsyncMonitor {
   void Deinitialize();
 
   // Called when a display engine driver sends a Vsync event.
-  void OnVsync(zx::time vsync_timestamp, ConfigStamp vsync_config_stamp);
+  void OnVsync(zx::time vsync_timestamp, display::ConfigStamp vsync_config_stamp);
 
  private:
   // Periodically reads `last_vsync_timestamp_` and increments
@@ -59,6 +59,6 @@ class VsyncMonitor {
   async::TaskClosureMethod<VsyncMonitor, &VsyncMonitor::UpdateStatistics> updater_{this};
 };
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_VSYNC_MONITOR_H_

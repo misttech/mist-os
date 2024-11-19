@@ -13,17 +13,17 @@
 
 #include "src/graphics/display/lib/driver-utils/post-task.h"
 
-namespace display {
+namespace display_coordinator {
 
 // The maximum capacity for display tasks.
 //
 // The coordinator only uses this value as the `inline_target_size` argument for
-// `PostTask()` and `PostTaskState`. Using a single value trades off a bit of
+// `display::PostTask()` and `PostTaskState`. Using a single value trades off a bit of
 // dynamic memory consumption for a smaller binary size.
 constexpr size_t kDisplayTaskTargetSize = 56;
 
-using DisplayTaskState = PostTaskState<kDisplayTaskTargetSize>;
+using DisplayTaskState = display::PostTaskState<kDisplayTaskTargetSize>;
 
-}  // namespace display
+}  // namespace display_coordinator
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_POST_DISPLAY_TASK_H_

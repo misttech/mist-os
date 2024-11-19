@@ -37,12 +37,12 @@
 
 namespace sysmem2 = fuchsia_sysmem2;
 
-namespace display {
+namespace display_coordinator {
 
 class IntegrationTest : public TestBase, public testing::WithParamInterface<bool> {
  public:
   // Returns -1 if no display exists with the given ID.
-  int64_t DisplayLayerCount(DisplayId id) {
+  int64_t DisplayLayerCount(display::DisplayId id) {
     fbl::AutoLock lock(controller()->mtx());
     auto displays_it = controller()->displays_.find(id);
     if (!displays_it.IsValid()) {
@@ -68,13 +68,13 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
             controller()->virtcon_client_ == controller()->active_client_);
   }
 
-  bool vsync_acknowledge_delivered(VsyncAckCookie vsync_ack_cookie) {
+  bool vsync_acknowledge_delivered(display::VsyncAckCookie vsync_ack_cookie) {
     fbl::AutoLock l(controller()->mtx());
     fbl::AutoLock cl(&controller()->primary_client_->mtx_);
     return controller()->primary_client_->handler_.LatestAckedCookie() == vsync_ack_cookie;
   }
 
-  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, DisplayId display_id) {
+  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock l(controller()->mtx());
     // Reseting client will *start* client tear down.
     //
@@ -85,7 +85,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     ClientProxy* client_ptr = controller()->active_client_;
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
     // EnableVsync(false) has not completed here, because we are still holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, kInvalidConfigStamp);
+    client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidConfigStamp);
   }
 
   bool primary_client_dead() {
@@ -100,7 +100,8 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   void client_proxy_send_vsync() {
     fbl::AutoLock l(controller()->mtx());
-    controller()->active_client_->OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp);
+    controller()->active_client_->OnDisplayVsync(display::kInvalidDisplayId, 0,
+                                                 display::kInvalidConfigStamp);
   }
 
   void SendDisplayVsync() { display()->SendVsync(); }
@@ -174,7 +175,7 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
   ASSERT_OK(zx::event::create(0, &event_c));
   {
     fbl::AutoLock lock(client->mtx());
-    static constexpr EventId kEventId(123);
+    static constexpr display::EventId kEventId(123);
     EXPECT_OK(client->dc_->ImportEvent(std::move(event_a), ToFidlEventId(kEventId)).status());
     // ImportEvent is one way. Expect the next call to fail.
     EXPECT_OK(client->dc_->ImportEvent(std::move(event_b), ToFidlEventId(kEventId)).status());
@@ -190,7 +191,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
@@ -215,7 +216,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
             .status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  ConfigStamp empty_config_stamp = controller()->TEST_controller_stamp();
+  display::ConfigStamp empty_config_stamp = controller()->TEST_controller_stamp();
   // Wait for it to apply
   ASSERT_TRUE(
       PollUntilOnLoop([&]() { return DisplayLayerCount(primary_client->display_id()) == 0; }));
@@ -250,7 +251,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
@@ -267,7 +268,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
 
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->vsync_count() == 1; }));
   // Send the controller a vsync for an image / a config it won't recognize anymore.
-  ConfigStamp invalid_config_stamp = controller()->TEST_controller_stamp() - ConfigStamp{1};
+  display::ConfigStamp invalid_config_stamp =
+      controller()->TEST_controller_stamp() - display::ConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
   controller()->DisplayEngineListenerOnDisplayVsync(ToBanjoDisplayId(primary_client->display_id()),
                                                     0u, &invalid_banjo_config_stamp);
@@ -297,7 +299,7 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
     client_proxy_send_vsync();
   }
   ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return primary_client->vsync_ack_cookie() != kInvalidVsyncAckCookie; }));
+      [&]() { return primary_client->vsync_ack_cookie() != display::kInvalidVsyncAckCookie; }));
   EXPECT_EQ(ClientProxy::kVsyncMessagesWatermark, primary_client->vsync_count());
 
   // acknowledge
@@ -327,7 +329,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
         PollUntilOnLoop([&]() { return (primary_client->vsync_count() == expected_vsync_count); }));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
+  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -368,7 +370,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages; }));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
+  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a lot
   constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
@@ -410,7 +412,7 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return (primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages); }));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
+  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -472,7 +474,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
         PollUntilOnLoop([&]() { return primary_client->vsync_count() == expected_vsync_count; }));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
+  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -501,7 +503,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   }
 
   // save old cookie
-  VsyncAckCookie old_vsync_ack_cookie = primary_client->vsync_ack_cookie();
+  display::VsyncAckCookie old_vsync_ack_cookie = primary_client->vsync_ack_cookie();
 
   // send vsyncs until max vsync
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
@@ -514,7 +516,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
         PollUntilOnLoop([&]() { return (primary_client->vsync_count() == expected_vsync_count); }));
     EXPECT_EQ(expected_vsync_count, primary_client->vsync_count());
   }
-  EXPECT_NE(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
+  EXPECT_NE(display::kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
@@ -598,8 +600,8 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
       OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
   fbl::AutoLock lock(client->mtx());
-  constexpr ImageId image_id = kInvalidImageId;
-  constexpr BufferCollectionId buffer_collection_id(0xffeeeedd);
+  constexpr display::ImageId image_id = display::kInvalidImageId;
+  constexpr display::BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client->dc_->ImportImage(
           client->displays_[0].image_metadata_,
@@ -617,8 +619,8 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
       OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
   fbl::AutoLock lock(client->mtx());
-  constexpr BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
-  constexpr ImageId image_id(1);
+  constexpr display::BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
+  constexpr display::ImageId image_id(1);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client->dc_->ImportImage(
           client->displays_[0].image_metadata_,
@@ -665,7 +667,7 @@ TEST_F(IntegrationTest, ClampRgb) {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
@@ -689,7 +691,7 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
@@ -744,13 +746,13 @@ TEST_F(IntegrationTest, VsyncEvent) {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(
         primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_0);
+  auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   {
@@ -764,17 +766,17 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
-  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
+  zx::result<display::LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<display::ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<display::ImageId> create_image_1_result = primary_client->CreateImage();
 
   EXPECT_OK(create_default_layer_result);
   EXPECT_OK(create_image_0_result);
   EXPECT_OK(create_image_1_result);
 
-  LayerId default_layer_id = create_default_layer_result.value();
-  ImageId image_0_id = create_image_0_result.value();
-  ImageId image_1_id = create_image_1_result.value();
+  display::LayerId default_layer_id = create_default_layer_result.value();
+  display::ImageId image_0_id = create_image_0_result.value();
+  display::ImageId image_1_id = create_image_1_result.value();
 
   // Present one single image without wait.
   EXPECT_OK(primary_client->PresentLayers({
@@ -782,8 +784,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
        .image_id = image_0_id,
        .image_ready_wait_event_id = std::nullopt},
   }));
-  auto apply_config_stamp_1 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_1);
+  auto apply_config_stamp_1 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   {
@@ -803,8 +805,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
        .image_id = image_1_id,
        .image_ready_wait_event_id = std::nullopt},
   }));
-  auto apply_config_stamp_2 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_2);
+  auto apply_config_stamp_2 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   {
@@ -823,13 +825,13 @@ TEST_F(IntegrationTest, VsyncEvent) {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(
         primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  auto apply_config_stamp_3 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_3);
+  auto apply_config_stamp_3 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_3);
   EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
   {
@@ -870,13 +872,13 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(
         primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_0);
+  auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   {
@@ -890,9 +892,9 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
-  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
+  zx::result<display::LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<display::ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<display::ImageId> create_image_1_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
 
@@ -901,9 +903,9 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_OK(create_image_1_result);
   EXPECT_OK(create_image_1_ready_fence_result);
 
-  LayerId default_layer_id = create_default_layer_result.value();
-  ImageId image_0_id = create_image_0_result.value();
-  ImageId image_1_id = create_image_1_result.value();
+  display::LayerId default_layer_id = create_default_layer_result.value();
+  display::ImageId image_0_id = create_image_0_result.value();
+  display::ImageId image_1_id = create_image_1_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
 
@@ -913,8 +915,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
        .image_id = image_0_id,
        .image_ready_wait_event_id = std::nullopt},
   }));
-  auto apply_config_stamp_1 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_1);
+  auto apply_config_stamp_1 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   {
@@ -936,8 +938,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
        .image_id = image_1_id,
        .image_ready_wait_event_id = std::make_optional(image_1_ready_fence.id)},
   }));
-  auto apply_config_stamp_2 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_2);
+  auto apply_config_stamp_2 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GE(apply_config_stamp_2, apply_config_stamp_1);
 
   {
@@ -999,13 +1001,13 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(
         primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_0);
+  auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   {
@@ -1019,9 +1021,9 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value());
 
-  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
-  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
+  zx::result<display::LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<display::ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<display::ImageId> create_image_1_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
 
@@ -1030,9 +1032,9 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_OK(create_image_1_result);
   EXPECT_OK(create_image_1_ready_fence_result);
 
-  LayerId default_layer_id = create_default_layer_result.value();
-  ImageId image_0_id = create_image_0_result.value();
-  ImageId image_1_id = create_image_1_result.value();
+  display::LayerId default_layer_id = create_default_layer_result.value();
+  display::ImageId image_0_id = create_image_0_result.value();
+  display::ImageId image_1_id = create_image_1_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
 
@@ -1042,8 +1044,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
        .image_id = image_0_id,
        .image_ready_wait_event_id = std::nullopt},
   }));
-  auto apply_config_stamp_1 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_1);
+  auto apply_config_stamp_1 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   {
@@ -1065,8 +1067,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
        .image_id = image_1_id,
        .image_ready_wait_event_id = image_1_ready_fence.id},
   }));
-  auto apply_config_stamp_2 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_2);
+  auto apply_config_stamp_2 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   {
@@ -1086,13 +1088,13 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     fbl::AutoLock lock(primary_client->mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
-    const DisplayId virtcon_display_id(1);
+    const display::DisplayId virtcon_display_id(1);
     EXPECT_OK(
         primary_client->dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
-  auto apply_config_stamp_3 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_3);
+  auto apply_config_stamp_3 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_3);
   EXPECT_GE(apply_config_stamp_3, apply_config_stamp_2);
 
   // On Vsync, the configuration stamp client receives on Vsync event message
@@ -1139,10 +1141,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   std::unique_ptr<TestFidlClient> primary_client =
       OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
-  zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
-  zx::result<ImageId> create_image_0_result = primary_client->CreateImage();
-  zx::result<ImageId> create_image_1_result = primary_client->CreateImage();
-  zx::result<ImageId> create_image_2_result = primary_client->CreateImage();
+  zx::result<display::LayerId> create_default_layer_result = primary_client->CreateLayer();
+  zx::result<display::ImageId> create_image_0_result = primary_client->CreateImage();
+  zx::result<display::ImageId> create_image_1_result = primary_client->CreateImage();
+  zx::result<display::ImageId> create_image_2_result = primary_client->CreateImage();
   zx::result<TestFidlClient::EventInfo> create_image_1_ready_fence_result =
       primary_client->CreateEvent();
   zx::result<TestFidlClient::EventInfo> create_image_2_ready_fence_result =
@@ -1155,10 +1157,10 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_OK(create_image_1_ready_fence_result);
   EXPECT_OK(create_image_2_ready_fence_result);
 
-  LayerId default_layer_id = create_default_layer_result.value();
-  ImageId image_0_id = create_image_0_result.value();
-  ImageId image_1_id = create_image_1_result.value();
-  ImageId image_2_id = create_image_2_result.value();
+  display::LayerId default_layer_id = create_default_layer_result.value();
+  display::ImageId image_0_id = create_image_0_result.value();
+  display::ImageId image_1_id = create_image_1_result.value();
+  display::ImageId image_2_id = create_image_2_result.value();
   TestFidlClient::EventInfo image_1_ready_fence =
       std::move(create_image_1_ready_fence_result.value());
   TestFidlClient::EventInfo image_2_ready_fence =
@@ -1170,8 +1172,8 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
        .image_id = image_0_id,
        .image_ready_wait_event_id = std::nullopt},
   }));
-  auto apply_config_stamp_0 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_0);
+  auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   {
@@ -1194,8 +1196,8 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
        .image_id = image_1_id,
        .image_ready_wait_event_id = image_1_ready_fence.id},
   }));
-  auto apply_config_stamp_1 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_1);
+  auto apply_config_stamp_1 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   {
@@ -1216,8 +1218,8 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
        .image_id = image_2_id,
        .image_ready_wait_event_id = image_2_ready_fence.id},
   }));
-  auto apply_config_stamp_2 = ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
-  EXPECT_NE(kInvalidConfigStamp, apply_config_stamp_2);
+  auto apply_config_stamp_2 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
+  EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   {
@@ -1273,4 +1275,4 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 // we should make fake-display driver support multi-layer configurations and
 // then we could add more multi-layer tests.
 
-}  // namespace display
+}  // namespace display_coordinator

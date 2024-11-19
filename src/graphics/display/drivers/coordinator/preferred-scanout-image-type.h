@@ -17,11 +17,11 @@
 constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 1;
 #elif defined(__aarch64__)
 // `fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR` from the FIDL API.
-// `fuchsia.hardware.display.controller/ImageTilingType.SIMPLE` from the Banjo API.
+// `fuchsia.hardware.display.controller/display::ImageTilingType.SIMPLE` from the Banjo API.
 constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 0;
 #elif defined(__riscv)
 // `fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR` from the FIDL API.
-// `fuchsia.hardware.display.controller/ImageTilingType.SIMPLE` from the Banjo API.
+// `fuchsia.hardware.display.controller/display::ImageTilingType.SIMPLE` from the Banjo API.
 //
 // This may be revisited, depending on the hardware that we end supporting.
 constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 0;
