@@ -73,7 +73,7 @@ class UsbCdcAcmTest : public zxtest::Test {
     ASSERT_OK(bus_->SetupPeripheralDevice(std::move(device_desc), std::move(config_descs)));
 
     fbl::unique_fd fd;
-    ASSERT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/serial", 0, fd.reset_and_get_address()));
+    ASSERT_OK(fdio_open3_fd_at(bus_->GetRootFd(), "class/serial", 0, fd.reset_and_get_address()));
     ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
                   ZX_ERR_STOP);
     devpath = fbl::String::Concat({fbl::String("class/serial/"), devpath});

@@ -112,7 +112,7 @@ void VirtualBusTest::InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusT
 
   fbl::unique_fd fd;
   ASSERT_OK(
-      fdio_open_fd_at(bus_->GetRootFd(), "class/virtual-bus-test", 0, fd.reset_and_get_address()));
+      fdio_open3_fd_at(bus_->GetRootFd(), "class/virtual-bus-test", 0, fd.reset_and_get_address()));
   ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForDevice, ZX_TIME_INFINITE, &test),
                 ZX_ERR_STOP);
 }

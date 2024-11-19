@@ -84,9 +84,10 @@ TEST(PbusTest, Enumeration) {
 
   auto svc_dir = devmgr->svc_dir();
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto flags = static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDirectory);
-  ASSERT_OK(fdio_open_at(svc_dir.channel().get(), "fuchsia.sysinfo.Service", flags,
-                         server_end.TakeChannel().release()));
+  auto flags =
+      static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::Flags::kProtocolDirectory);
+  ASSERT_OK(fdio_open3_at(svc_dir.channel().get(), "fuchsia.sysinfo.Service", flags,
+                          server_end.TakeChannel().release()));
   fbl::unique_fd dir_fd;
   ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), dir_fd.reset_and_get_address()));
   std::vector<std::string> entries;

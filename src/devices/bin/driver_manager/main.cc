@@ -89,10 +89,9 @@ int main(int argc, char** argv) {
     return driver_index_result.error_value();
   }
   fbl::unique_fd lib_fd;
-  constexpr uint32_t kOpenFlags = static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
-                                                        fio::wire::OpenFlags::kRightReadable |
-                                                        fio::wire::OpenFlags::kRightExecutable);
-  if (zx_status_t status = fdio_open_fd("/pkg/lib/", kOpenFlags, lib_fd.reset_and_get_address());
+  constexpr uint64_t kOpenFlags = static_cast<uint64_t>(
+      fio::wire::Flags::kProtocolDirectory | fio::wire::kPermReadable | fio::wire::kPermExecutable);
+  if (zx_status_t status = fdio_open3_fd("/pkg/lib/", kOpenFlags, lib_fd.reset_and_get_address());
       status != ZX_OK) {
     LOGF(ERROR, "Failed to open /pkg/lib/ : %s", zx_status_get_string(status));
     return status;

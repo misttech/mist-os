@@ -44,17 +44,16 @@ namespace fkernel = fuchsia_kernel;
 namespace flogger = fuchsia_logger;
 namespace frunner = fuchsia_component_runner;
 
-constexpr auto kOpenFlags = fio::wire::OpenFlags::kRightReadable |
-                            fio::wire::OpenFlags::kRightExecutable |
-                            fio::wire::OpenFlags::kNotDirectory;
+constexpr auto kOpenFlags =
+    fio::wire::kPermReadable | fio::wire::kPermExecutable | fio::wire::Flags::kProtocolFile;
 constexpr auto kVmoFlags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute;
 
 namespace {
 
 zx::vmo GetVmo(std::string_view path) {
   auto endpoints = fidl::Endpoints<fio::File>::Create();
-  zx_status_t status = fdio_open(path.data(), static_cast<uint32_t>(kOpenFlags),
-                                 endpoints.server.channel().release());
+  zx_status_t status = fdio_open3(path.data(), static_cast<uint64_t>(kOpenFlags),
+                                  endpoints.server.channel().release());
   EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
   fidl::WireResult result = fidl::WireCall(endpoints.client)->GetBackingMemory(kVmoFlags);
   EXPECT_TRUE(result.ok()) << result.FormatDescription();

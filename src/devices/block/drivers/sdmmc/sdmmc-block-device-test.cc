@@ -470,8 +470,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
         // Add our package
         {
           auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-          ASSERT_OK(fdio_open("/pkg/", static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                              server.TakeChannel().release()));
+          ASSERT_OK(fdio_open3("/pkg/", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                               server.TakeChannel().release()));
           ASSERT_OK(incoming->env.incoming_directory().AddDirectory(std::move(client), "pkg"));
         }
       }
@@ -523,9 +523,10 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string path = std::string(component::kServiceDirectory) + "/" +
                        fuchsia_hardware_block_volume::Service::Name;
-    if (zx_status_t status = fdio_open_at(outgoing_directory_client_.channel().get(), path.c_str(),
-                                          static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                          service_server.TakeChannel().release());
+    if (zx_status_t status =
+            fdio_open3_at(outgoing_directory_client_.channel().get(), path.c_str(),
+                          static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                          service_server.TakeChannel().release());
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -556,8 +557,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     auto [volume_client, volume_server] =
         fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
     std::string volume_path = instance_name + "/volume";
-    if (zx_status_t status = fdio_open_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
-                                          0, volume_server.TakeChannel().release());
+    if (zx_status_t status = fdio_open3_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
+                                           0, volume_server.TakeChannel().release());
         status != ZX_OK) {
       return zx::error(status);
     }

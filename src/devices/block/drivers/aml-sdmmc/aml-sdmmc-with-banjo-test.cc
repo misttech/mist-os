@@ -552,9 +552,10 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
       // Open the svc directory in the driver's outgoing, and store a client to it.
       auto [svc_client_end, svc_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-      zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
-                                        static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                        svc_server_end.TakeChannel().release());
+      zx_status_t status =
+          fdio_open3_at(outgoing_directory_client_.handle()->get(), "/svc",
+                        static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                        svc_server_end.TakeChannel().release());
       ASSERT_EQ(ZX_OK, status);
       client_end = std::move(svc_client_end);
     }();

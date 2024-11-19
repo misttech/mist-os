@@ -123,9 +123,10 @@ class TiTca6408aTest : public zxtest::Test {
     // Connect to PinImpl.
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx_status_t status = fdio_open_at(outgoing_directory_client.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints.server.TakeChannel().release());
+    zx_status_t status =
+        fdio_open3_at(outgoing_directory_client.handle()->get(), "/svc",
+                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
+                      svc_endpoints.server.TakeChannel().release());
     EXPECT_EQ(ZX_OK, status);
 
     auto connect_result =

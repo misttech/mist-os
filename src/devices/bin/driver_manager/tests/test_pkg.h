@@ -27,10 +27,10 @@ class TestFile : public fuchsia::io::testing::File_TestBase {
                   fuchsia::io::VmoFlags::PRIVATE_CLONE,
               flags);
     auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
-    EXPECT_EQ(ZX_OK, fdio_open(path_.data(),
-                               static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                     fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                               endpoints.server.channel().release()));
+    EXPECT_EQ(ZX_OK, fdio_open3(path_.data(),
+                                static_cast<uint64_t>(fuchsia::io::PERM_READABLE |
+                                                      fuchsia::io::PERM_EXECUTABLE),
+                                endpoints.server.channel().release()));
 
     fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints.client));
     fidl::WireResult result = file->GetBackingMemory(fuchsia_io::wire::VmoFlags(uint32_t(flags)));
