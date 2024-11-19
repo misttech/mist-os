@@ -10,9 +10,10 @@ use {
     anyhow::Result,
     display_utils::{
         Coordinator, DisplayConfig, DisplayId, Image, ImageId, ImageParameters, Layer, LayerConfig,
-        LayerId, PixelFormat,
+        LayerId, PixelFormat, VsyncEvent,
     },
     fuchsia_trace::duration,
+    futures::StreamExt,
     std::{borrow::Borrow, io::Write},
 };
 
@@ -120,7 +121,9 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
     pub async fn run(&mut self) -> Result<()> {
         // Apply the first config.
         let mut current_config = 0;
-        self.coordinator.apply_config(&self.build_display_configs(current_config)).await?;
+        let _ = self.coordinator.apply_config(&self.build_display_configs(current_config)).await?;
+
+        let mut vsync_listener = self.coordinator.add_vsync_listener(None)?;
 
         let mut counter = Counter::new();
         loop {
@@ -138,6 +141,7 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
             current_config ^= 1;
             let current_presentation = &mut self.presentations[current_config];
 
+            let applied_stamp; // Config stamp of the about-to-be-applied config.
             {
                 duration!(c"gfx", c"frame", "id" => stats.num_frames);
                 {
@@ -154,19 +158,20 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
                 // Request the swap.
                 {
                     duration!(c"gfx", c"apply config");
-                    self.coordinator
+                    applied_stamp = self
+                        .coordinator
                         .apply_config(&self.build_display_configs(current_config))
                         .await?;
                 }
             }
 
             // Wait for the previous frame image to retire before drawing on it.
-            // TODO(https://fxbug.dev/42097581): this was inadvertently broken when we removed
-            // support for signal events in `Coordinator.SetLayerImage`.  This needs to be updated
-            // to wait for a vsync stamp that indicates the image is ready to use.  The following is
-            // the old, broken code:
-            // let previous_presentation = &self.presentations[current_config ^ 1];
-            // previous_presentation.retirement_event.wait().await?;
+            while let Some(VsyncEvent { id: _, timestamp: _, config }) = vsync_listener.next().await
+            {
+                if config.value == applied_stamp {
+                    break;
+                }
+            }
         }
     }
 }
