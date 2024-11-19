@@ -7,8 +7,9 @@
 ### Create pb.zip suitable for flashing based on product_bundles.json file.
 ## The created zip file will default to ${pwd}/pb.zip
 
-## usage: fx create-pb-zip [-o <output>]
+## usage: fx create-pb-zip [-b <product_bundle>] [-o <output>]
 ##   -o     Output location of built zip file
+##   -b     Name of product bundle to zip
 
 set -o errexit
 
@@ -17,11 +18,24 @@ fx-config-read
 
 main() {
     local output="$(pwd)"
+    local product_name=""
+    local product_bundle_path=""
+    local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+
     while [[ $# -ge 1 ]]; do
         case "$1" in
         -o)
             shift
             output=$(realpath "$1")
+            ;;
+        -b)
+            shift
+            product_name="$1"
+            product_bundle_path=$(fx-command-run jq -r ".[] | select(.name==\"${product_name}\") | .path" ${product_bundles_path})
+            if [[ $product_bundle_path == "" ]]; then
+                fx-error "Invalid product bundle $product_name"
+                exit 1
+            fi
             ;;
         esac
         shift
@@ -31,19 +45,23 @@ main() {
         output="${output}/pb.zip"
     fi
 
-    local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+    if [[ ! -d ${FUCHSIA_BUILD_DIR}/${product_bundle_path} ]]; then
+        fx-error "Product bundle $product_name not found at path ${FUCHSIA_BUILD_DIR}/${product_bundle_path//\"}"
+        exit 1
+    fi
 
-    # Determine the name of main product
-    local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
-    local product=$(fx-command-run jq .build_info_product ${args_json_path})
-    local board=$(fx-command-run jq .build_info_board ${args_json_path})
-    local product_name="\"${product//\"}.${board//\"}\""
-
-    local product_bundle_path=$(fx-command-run jq ".[] | select(.name==${product_name}) | .path" ${product_bundles_path})
+    if [[ -z "${product_name}" ]]; then
+        # Determine the name of main product
+        local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
+        local product=$(fx-command-run jq .build_info_product ${args_json_path})
+        local board=$(fx-command-run jq .build_info_board ${args_json_path})
+        product_name="\"${product//\"}.${board//\"}\""
+        product_bundle_path=$(fx-command-run jq -r ".[] | select(.name==${product_name}) | .path" ${product_bundles_path})
+    fi
 
     fx-info "Start creating ${output} ..."
     (
-        cd "${FUCHSIA_BUILD_DIR}/${product_bundle_path//\"}/.."
+        cd "${FUCHSIA_BUILD_DIR}/${product_bundle_path}/.."
         local tmpfile_path="${FUCHSIA_BUILD_DIR}/tmp-pb-zip-$$"
 
         # get the list of files needed for flashing
