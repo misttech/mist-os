@@ -413,6 +413,34 @@ TEST(Bti, DecommitRace) {
   thread.join();
 }
 
+TEST(Bti, PinTooManyAddresses) {
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_EQ(zx_iommu_create(iommu_resource.get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+                            iommu.reset_and_get_address()),
+            ZX_OK);
+  ASSERT_EQ(zx::bti::create(iommu, 0, 0xdeadbeef, &bti), ZX_OK);
+
+  const size_t page_size = zx_system_get_page_size();
+  const uint64_t kPageCount = (page_size * 64) / sizeof(uint64_t) + 1;
+  const uint64_t kVmoSize = page_size * kPageCount;
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
+
+  std::vector<zx_paddr_t> paddrs(kPageCount);
+  zx::pmt pmt;
+  ASSERT_EQ(bti.pin(ZX_BTI_PERM_READ, vmo, 0, kVmoSize, paddrs.data(), kPageCount, &pmt),
+            ZX_ERR_INVALID_ARGS);
+}
+
 // TODO(https://fxbug.dev/42133919): Re-enable this test when enforcement of the "no pinning
 // while there are quarantined pages" rule has been turned on in the kernel.
 #if 0

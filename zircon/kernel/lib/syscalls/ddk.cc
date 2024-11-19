@@ -362,7 +362,11 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
     return status;
   }
 
-  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(size)) {
+  // Address count is currently limited to the amount of addresses that can fit on 64 pages. This
+  // is large enough for all current usage of bti_pin, but protects against the case of an
+  // arbitrarily large array being allocated on the heap.
+  constexpr size_t kMaxAddrs = (PAGE_SIZE * 64) / sizeof(dev_vaddr_t);
+  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(size) || addrs_count > kMaxAddrs) {
     return ZX_ERR_INVALID_ARGS;
   }
 
