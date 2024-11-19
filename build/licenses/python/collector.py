@@ -433,7 +433,7 @@ class Collector:
             ) or is_resource_of_target_with_licenses
 
             logging.debug(
-                "No licenses found for %s so looking at README.fuchsia files instead (empty_ok)...",
+                "No licenses found for %s so looking at README.fuchsia files instead (empty_ok == %s)...",
                 label,
                 is_empty_readme_ok,
             )
