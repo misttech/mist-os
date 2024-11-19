@@ -641,20 +641,23 @@ PlatformResult AddRemoveRouteInternal(InterfaceType interface_type, const Inet::
   // now. Long term, this bug tracks proposing upstream changes that would create a
   // targeted action to enable forwarding / border-routing to clarify this contract.
   if (add && ShouldEnableV6Forwarding(interface_type)) {
-    // TODO(https://fxbug.dev/42176447): Migrate to
-    // fuchsia.net.interfaces.admin/Control.SetConfiguration.
-    fuchsia::net::stack::Stack_SetInterfaceIpForwardingDeprecated_Result forwarding_result;
-    if (zx_status_t status = net_stack_sync_ptr->SetInterfaceIpForwardingDeprecated(
-            interface_id.value(), fuchsia::net::IpVersion::V6, true /* enable */,
-            &forwarding_result);
-        status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to enable IPv6 forwarding on interface id "
-                              << interface_id.value();
+    std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> control_client =
+        GetInterfaceControlViaRoot(interface_id.value());
+    if (!control_client) {
+      FX_LOGS(ERROR)
+          << "Failed to acquire |fuchsia.net.interfaces.admin/Control| handle for interface "
+          << interface_id.value();
       return kPlatformResultFailure;
     }
-    if (forwarding_result.is_err()) {
-      FX_LOGS(ERROR) << "Unable to enable IPv6 forwarding on interface id " << interface_id.value()
-                     << ": " << static_cast<uint32_t>(forwarding_result.err());
+    auto ipv6_config = fuchsia_net_interfaces_admin::Ipv6Configuration();
+    ipv6_config.unicast_forwarding(true);
+    auto config = fuchsia_net_interfaces_admin::Configuration();
+    config.ipv6(std::move(ipv6_config));
+    ::fidl::Result<fuchsia_net_interfaces_admin::Control::SetConfiguration> result =
+        control_client.value()->SetConfiguration(std::move(config));
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Failed to enable IPv6 forwarding on interface id " << interface_id.value()
+                     << ": " << result.error_value();
       return kPlatformResultFailure;
     }
   }
