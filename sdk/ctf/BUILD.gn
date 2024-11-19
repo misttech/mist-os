@@ -19,6 +19,17 @@ build_api_module("ctf_artifacts") {
     ":host_test_manifest",
     "tests:e2e_tests",
   ]
+
+  metadata = {
+    ctf_artifacts_path =
+        [ rebase_path("$root_out_dir/ctf_artifacts.json", root_build_dir) ]
+  }
+}
+
+build_api_module("ctf_artifacts_path") {
+  testonly = true
+  data_keys = [ "ctf_artifacts_path" ]
+  deps = [ ":ctf_artifacts" ]
 }
 
 group("ctf") {
