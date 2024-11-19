@@ -109,6 +109,10 @@ type RunCommand struct {
 
 	// Whether the product bundle is expected to support SSH.
 	expectsSSH bool
+
+	// The scale factor to multiply test timeouts by. This may be set if the bot environment
+	// is known to be slower than usual.
+	testTimeoutScaleFactor int
 }
 
 func (*RunCommand) Name() string {
@@ -149,6 +153,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
 	f.DurationVar(&r.bootupTimeout, "bootup-timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will fall back to the default.")
 	f.BoolVar(&r.expectsSSH, "expects-ssh", false, "if set, botanist will try to establish an SSH connection before running tests.")
+	f.IntVar(&r.testTimeoutScaleFactor, "test-timeout-scale-factor", 1, "Factor to scale test timeouts by (used for slow bot environments)")
 
 	// Parsing of testrunner options.
 	f.StringVar(&r.testrunnerOptions.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
@@ -598,10 +603,11 @@ func (r *RunCommand) dumpSyslogOverSerial(ctx context.Context, socketPath string
 
 func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarget, testsPath string, testbedConfig string) error {
 	testrunnerEnv := map[string]string{
-		constants.NodenameEnvKey:      t.Nodename(),
-		constants.SerialSocketEnvKey:  t.SerialSocketPath(),
-		constants.ECCableEnvKey:       os.Getenv(constants.ECCableEnvKey),
-		constants.TestbedConfigEnvKey: testbedConfig,
+		constants.NodenameEnvKey:                   t.Nodename(),
+		constants.SerialSocketEnvKey:               t.SerialSocketPath(),
+		constants.ECCableEnvKey:                    os.Getenv(constants.ECCableEnvKey),
+		constants.TestbedConfigEnvKey:              testbedConfig,
+		testrunnerconstants.TestTimeoutScaleFactor: strconv.Itoa(r.testTimeoutScaleFactor),
 	}
 
 	if r.expectsSSH {

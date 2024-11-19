@@ -15,6 +15,7 @@ go_library("main") {
     "//tools/lib/logger",
     "//tools/lib/osmisc",
     "//tools/testing/testrunner:constants",
+    "//tools/testing/testrunner:lib",
   ]
 }
 

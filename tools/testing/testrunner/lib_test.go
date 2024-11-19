@@ -27,6 +27,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
+	"go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 )
 
 const (
@@ -1117,6 +1118,47 @@ func TestExecute(t *testing.T) {
 			}
 			if diff := cmp.Diff(expectedLastCalls, lastCalls); diff != "" {
 				t.Errorf("Unexpected command run (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestScaleTestTimeout(t *testing.T) {
+	testcases := []struct {
+		name            string
+		scaleFactor     string
+		timeout         time.Duration
+		expectedTimeout time.Duration
+	}{
+		{
+			name:            "no scale factor",
+			timeout:         time.Minute,
+			expectedTimeout: time.Minute,
+		}, {
+			name:            "scale by 10",
+			scaleFactor:     "10",
+			timeout:         time.Minute,
+			expectedTimeout: 10 * time.Minute,
+		}, {
+			name:            "invalid scale factor just returns orig timeout",
+			scaleFactor:     "not a number",
+			timeout:         time.Minute,
+			expectedTimeout: time.Minute,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			origScaleFactor := os.Getenv(constants.TestTimeoutScaleFactor)
+			defer func() {
+				if err := os.Setenv(constants.TestTimeoutScaleFactor, origScaleFactor); err != nil {
+					t.Logf("failed to reset %s to %s", constants.TestTimeoutScaleFactor, origScaleFactor)
+				}
+			}()
+			os.Setenv(constants.TestTimeoutScaleFactor, tc.scaleFactor)
+			got := ScaleTestTimeout(tc.timeout)
+			if got != tc.expectedTimeout {
+				t.Errorf("got: %v, want: %v", got, tc.expectedTimeout)
 			}
 		})
 	}
