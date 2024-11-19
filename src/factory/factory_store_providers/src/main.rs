@@ -273,11 +273,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
         }
         FactoryConfig::FactoryVerity => {
             tracing::info!("reading from factory verity");
-            fdio::open_deprecated(
-                "/factory",
-                fio::OpenFlags::RIGHT_READABLE,
-                directory_server_end.into_channel(),
-            )?;
+            fdio::open("/factory", fio::PERM_READABLE, directory_server_end.into_channel())?;
             Ok(directory_proxy)
         }
     }
