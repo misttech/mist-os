@@ -359,7 +359,7 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
     // we can repeatedly perform this request correctly.
     if (continuous_eviction_active_) {
       pmm_evictor()->EvictAsynchronous(0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest,
-                                       Evictor::Output::Print);
+                                       Evictor::Output::NoPrint);
     }
     // In the case where we raced with additional pmm actions keep looping unless the deadline was
     // reached.
