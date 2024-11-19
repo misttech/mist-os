@@ -47,15 +47,15 @@ class SymbolName : public std::string_view {
   // When constructing from a constant, precompute the hashes since it can be
   // done entirely in constexpr context.
   template <size_t N>
-  constexpr explicit SymbolName(const char (&name)[N])
+  constexpr explicit(false) SymbolName(const char (&name)[N])
       : std::string_view(name),
         compat_hash_(CompatHashString(*this)),
         gnu_hash_(GnuHashString(*this)) {}
 
   // This will precompute the hashes in constexpr context, see below.
-  constexpr explicit SymbolName(std::string_view name) { *this = name; }
+  constexpr explicit(false) SymbolName(std::string_view name) { *this = name; }
 
-  constexpr explicit SymbolName(const char* name) { *this = name; }
+  constexpr explicit(false) SymbolName(const char* name) { *this = name; }
 
   // Convenient constructor using a symbol table entry (see below).
   template <class SymbolInfo, class Sym>

@@ -47,6 +47,7 @@ library_headers("headers") {
     "lib/elfldltl/machine.h",
     "lib/elfldltl/memory.h",
     "lib/elfldltl/note.h",
+    "lib/elfldltl/perfect-symbol-table.h",
     "lib/elfldltl/phdr.h",
     "lib/elfldltl/preallocated-vector.h",
     "lib/elfldltl/relocation.h",
