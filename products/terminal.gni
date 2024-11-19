@@ -29,8 +29,5 @@ zedboot_product_assembly_config_label = "//products/zedboot"
 
 discoverable_package_labels = [ "//bundles/tools" ]
 
-# TODO(jayzhuang): Flip this to true when terminal Bazel assembly is stable.
-use_bazel_images_only = false
+use_bazel_images_only = true
 bazel_product_bundle_prefix = "//products/terminal:product_bundle"
-extra_bazel_assembly_targets =
-    [ "//build/bazel/assembly/assembly_outputs:verifications" ]
