@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
-#![allow(dead_code, unused_variables, unreachable_code)]
 
 use std::collections::{HashMap, HashSet};
 use std::convert::From as _;
@@ -270,14 +269,6 @@ async fn exchange_dgram(
     assert_eq!(rcvd, PAYLOAD.as_bytes().len());
     assert_eq!(&buf[..rcvd], PAYLOAD.as_bytes());
     assert_eq!(from, socket_addr_with_scope_id(alice_addr, ALICE_PORT, bob.ep.id()));
-}
-
-/// Helper function to exchange an IPv4 and IPv6 datagram between `alice` and
-/// `bob`.
-async fn exchange_dgrams(alice: &NeighborRealm<'_>, bob: &NeighborRealm<'_>) {
-    let () = exchange_dgram(alice, ALICE_IP, bob, BOB_IP).await;
-
-    let () = exchange_dgram(alice, alice.ipv6, bob, bob.ipv6).await;
 }
 
 #[derive(Debug, Clone)]
