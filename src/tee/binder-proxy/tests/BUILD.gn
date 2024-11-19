@@ -79,7 +79,9 @@ fuchsia_structured_config_rust_lib("binder_proxy_tests_config") {
 }
 
 binder_proxy_test("binder-proxy-enumerate-empty-tests") {
-  ta_manager_config_sources = []
+  ta_manager_config_sources = [
+    # Intentionally empty.
+  ]
 }
 
 binder_proxy_test("binder-proxy-enumerate-two-tas-tests") {
@@ -96,6 +98,7 @@ if (is_host) {
       "//sdk/lib/syslog/cpp",
       "//src/lib/android/binder",
       "//src/lib/fxl:cli",
+      "//src/tee/binder-proxy:android_system_microfuchsia_trusted_app_cpp",
       "//src/tee/binder-proxy:android_system_microfuchsia_vm_service_cpp",
     ]
   }

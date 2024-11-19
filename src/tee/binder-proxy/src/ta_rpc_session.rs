@@ -3,27 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-
-use crate::bound_virtio_socket::create_bound_virtio_socket;
-use crate::microfuchsia_control;
 use binder_proxy_config::Config;
 
-use rpcbinder;
+use crate::bound_virtio_socket::create_bound_virtio_socket;
+use crate::trusted_app;
 
-pub struct BinderProxy {
+pub struct RPCSession {
     server: rpcbinder::RpcServer,
 }
 
-impl BinderProxy {
-    pub fn new(config: &Config, port: u32) -> Result<Self, Error> {
+impl RPCSession {
+    pub fn new(config: &Config, port: u32, uuid: &str) -> Result<Self, Error> {
         let socket_fd = create_bound_virtio_socket(config, port)?;
-        let service = microfuchsia_control::new_binder();
+        let service = trusted_app::TrustedApp::new_binder(uuid);
         let server = rpcbinder::RpcServer::new_bound_socket(service, socket_fd)?;
-        Ok(Self { server })
+
+        Ok(RPCSession { server })
     }
 
-    pub fn run(&self) -> Result<(), Error> {
-        self.server.join();
-        Ok(())
+    pub fn start(&self) {
+        self.server.start();
     }
 }

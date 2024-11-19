@@ -16,6 +16,4 @@ interface IMicrofuchsia {
 
   // Enumerate the Trusted Apps within the VM.
   @utf8InCpp String[] trustedAppUuids();
-
-  // TODO: Add API to connect to a particular TA.
 }

@@ -17,17 +17,23 @@ rustc_binary("bin") {
 
   sources = [
     "src/binder_proxy.rs",
+    "src/bound_virtio_socket.rs",
     "src/main.rs",
     "src/microfuchsia_control.rs",
+    "src/ta_rpc_session.rs",
+    "src/trusted_app.rs",
   ]
 
   deps = [
+    ":android_system_microfuchsia_trusted_app",
     ":android_system_microfuchsia_vm_service",
     ":binder_proxy_config",
+    "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
     "//sdk/rust/zx",
     "//src/lib/android/binder/rust:binder",
     "//src/lib/android/binder/rust/rpcbinder",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
     "//src/paravirtualization/lib/vsock/vsock_sys",
     "//src/tee/lib/dev_urandom_compat",
@@ -35,6 +41,19 @@ rustc_binary("bin") {
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:tracing",
   ]
+}
+
+trusted_app_aidl_interface_files =
+    [ "aidl/android/system/microfuchsia/trusted_app/ITrustedApp.aidl" ]
+
+aidl_rust("android_system_microfuchsia_trusted_app") {
+  base = "aidl"
+  interfaces = trusted_app_aidl_interface_files
+}
+
+aidl_cpp("android_system_microfuchsia_trusted_app_cpp") {
+  base = "aidl"
+  interfaces = trusted_app_aidl_interface_files
 }
 
 android_system_microfuchsia_vm_service_aidl_interfaces = [

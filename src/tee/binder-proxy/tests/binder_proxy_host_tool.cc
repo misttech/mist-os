@@ -8,6 +8,7 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
+#include <android/system/microfuchsia/trusted_app/ITrustedApp.h>
 #include <android/system/microfuchsia/vm_service/IMicrofuchsia.h>
 #include <binder/Binder.h>
 #include <binder/RpcSession.h>
@@ -18,9 +19,14 @@
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
+#if defined(__linux__)
+#include <linux/vm_sockets.h>
+#endif
+
 namespace {
 
 using IMicrofuchsia = android::system::microfuchsia::vm_service::IMicrofuchsia;
+using ITrustedApp = android::system::microfuchsia::trusted_app::ITrustedApp;
 
 fit::result<int, android::sp<android::RpcSession>> ConnectToBinderRPCSession(bool inet,
                                                                              unsigned port,
@@ -125,14 +131,32 @@ int BinderProxyHostTool(const fxl::CommandLine& command_line) {
 
   auto microfuchsia = android::checked_interface_cast<IMicrofuchsia>(root_object);
 
-  std::vector<std::string> uuids;
-  auto result = microfuchsia->trustedAppUuids(&uuids);
+  {
+    std::vector<std::string> uuids;
+    auto result = microfuchsia->trustedAppUuids(&uuids);
 
-  FX_LOGS(INFO) << "trustedAppUuids result: " << result;
-  FX_LOGS(INFO) << "uuids len: " << uuids.size();
-  for (const auto& uuid : uuids) {
-    FX_LOGS(INFO) << "uuid: " << uuid;
+    FX_LOGS(INFO) << "trustedAppUuids result: " << result;
+    FX_LOGS(INFO) << "uuids len: " << uuids.size();
+    for (const auto& uuid : uuids) {
+      FX_LOGS(INFO) << "uuid: " << uuid;
+    }
   }
+
+  int ta_port = port + 1;
+
+  auto ta_session = ConnectToBinderRPCSession(inet, ta_port, cid);
+  if (ta_session.is_error()) {
+    FX_LOGS(ERROR) << "Could not connect to RPC session for first TA over port " << ta_port
+                   << " using " << (inet ? "inet" : "vsock") << " socket and cid " << cid;
+    return EXIT_FAILURE;
+  }
+
+  auto ta_root_object = ta_session->getRootObject();
+
+  auto ta_binder = android::checked_interface_cast<ITrustedApp>(ta_root_object);
+
+  auto result = ta_binder->openSession();
+  FX_LOGS(INFO) << "openSession result: " << result;
 
   return EXIT_SUCCESS;
 }
