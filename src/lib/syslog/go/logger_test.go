@@ -39,12 +39,12 @@ type logSinkImpl struct {
 	waitForInterestChange <-chan logger.LogSinkWaitForInterestChangeResult
 }
 
-func (impl *logSinkImpl) Connect(ctx fidl.Context, socket zx.Socket) error {
-	impl.onConnect(ctx, socket)
+func (*logSinkImpl) Connect(fidl.Context, zx.Socket) error {
 	return nil
 }
 
-func (*logSinkImpl) ConnectStructured(fidl.Context, zx.Socket) error {
+func (impl *logSinkImpl) ConnectStructured(ctx fidl.Context, socket zx.Socket) error {
+	impl.onConnect(ctx, socket)
 	return nil
 }
 
@@ -145,6 +145,21 @@ func setup(t *testing.T, tags ...string) (chan<- logger.LogSinkWaitForInterestCh
 	return waitForInterestChange, s, log
 }
 
+func decodeStringArg(t *testing.T, data []byte) (string, string, int) {
+	header := binary.LittleEndian.Uint64(data[0:8])
+	if header&0xffff_8000_8000_000f != 0x0000_8000_8000_0006 {
+		t.Fatalf("got bad string arg header: %x", header)
+	}
+	wordCount := header >> 4 & 0xfff
+	nameLen := (header >> 16) & 0x7fff
+	valueLen := (header >> 32) & 0x7fff
+	if wordCount != 1+(nameLen+7)/8+(valueLen+7)/8 {
+		t.Fatalf("bad word count: %x", header)
+	}
+	roundedNameLen := (nameLen + 7) &^ 7
+	return string(data[8 : 8+nameLen]), string(data[8+roundedNameLen : 8+roundedNameLen+valueLen]), int(wordCount * 8)
+}
+
 func checkoutput(t *testing.T, sin zx.Socket, expectedMsg string, severity syslog.LogLevel, tags ...string) {
 	var data [logger.MaxDatagramLenBytes]byte
 	n, err := sin.Read(data[:], 0)
@@ -154,55 +169,76 @@ func checkoutput(t *testing.T, sin zx.Socket, expectedMsg string, severity syslo
 	if n <= 32 {
 		t.Fatalf("got invalid data: %x", data[:n])
 	}
-	gotpid := binary.LittleEndian.Uint64(data[0:8])
-	gotTid := binary.LittleEndian.Uint64(data[8:16])
-	gotTime := binary.LittleEndian.Uint64(data[16:24])
-	gotSeverity := int32(binary.LittleEndian.Uint32(data[24:28]))
-	gotDroppedLogs := int32(binary.LittleEndian.Uint32(data[28:32]))
 
-	if pid != gotpid {
-		t.Errorf("pid error, got: %d, want: %d", gotpid, pid)
-	}
-
-	if 0 != gotTid {
-		t.Errorf("tid error, got: %d, want: %d", gotTid, 0)
-	}
+	header := binary.LittleEndian.Uint64(data[0:8])
+	gotSeverity := int32(header >> 56)
 
 	if int32(severity) != gotSeverity {
 		t.Errorf("severity error, got: %d, want: %d", gotSeverity, severity)
 	}
 
+	gotTime := binary.LittleEndian.Uint64(data[8:16])
 	if gotTime <= 0 {
 		t.Errorf("time %d should be greater than zero", gotTime)
 	}
 
-	if 0 != gotDroppedLogs {
-		t.Errorf("dropped logs error, got: %d, want: %d", gotDroppedLogs, 0)
+	// This only works for arguments that have a 3 byte name
+	const expectedUint64ArgHeader = 4 | 3<<4 | 0x8003<<16
+
+	pidArgHeader := binary.LittleEndian.Uint64(data[16:24])
+	if pidArgHeader != expectedUint64ArgHeader {
+		t.Errorf("expected pid arg header, got: %x, want: %x", pidArgHeader, expectedUint64ArgHeader)
 	}
-	pos := 32
+	pidArgName := binary.LittleEndian.Uint64(data[24:32])
+	if pidArgName != binary.LittleEndian.Uint64([]byte{'p', 'i', 'd', 0, 0, 0, 0, 0}) {
+		t.Errorf("expected pid arg name, got: %x", pidArgName)
+	}
+	gotPid := binary.LittleEndian.Uint64(data[32:40])
+
+	if pid != gotPid {
+		t.Errorf("pid error, got: %d, want: %d", gotPid, pid)
+	}
+
+	tidArgHeader := binary.LittleEndian.Uint64(data[40:48])
+	if tidArgHeader != expectedUint64ArgHeader {
+		t.Errorf("expected tid arg header, got: %x, want: %x", tidArgHeader, expectedUint64ArgHeader)
+	}
+	tidArgName := binary.LittleEndian.Uint64(data[48:56])
+	if tidArgName != binary.LittleEndian.Uint64([]byte{'t', 'i', 'd', 0, 0, 0, 0, 0}) {
+		t.Errorf("expected tid arg name, got: %x", tidArgName)
+	}
+	gotTid := binary.LittleEndian.Uint64(data[56:64])
+
+	if 0 != gotTid {
+		t.Errorf("tid error, got: %d, want: %d", gotTid, 0)
+	}
+
+	// If there were any dropped logs, that would follow, but we don't expect any dropped logs so just continue and we'll fail later if the dropped argument is present
+	var pos = 64
 	for i, tag := range tags {
 		length := len(tag)
-		if data[pos] != byte(length) {
-			t.Fatalf("tag iteration %d: expected data to be %d at pos %d, got %d", i, length, pos, data[pos])
+
+		name, gotTag, length := decodeStringArg(t, data[pos:])
+		if name != "tag" {
+			t.Errorf("expected tag header, got: %s", name)
 		}
-		pos = pos + 1
-		gotTag := string(data[pos : pos+length])
 		if tag != gotTag {
-			t.Fatalf("tag iteration %d: expected tag %q , got %q", i, tag, gotTag)
+			t.Fatalf("tag iteration %d: expected tag %q, got %q", i, tag, gotTag)
 		}
-		pos = pos + length
+		pos += length
 	}
 
-	if data[pos] != 0 {
-		t.Fatalf("byte before msg start should be zero, got: %d, %x", data[pos], data[pos:n])
-	}
+	name, msgGot, length := decodeStringArg(t, data[pos:])
 
-	msgGot := string(data[pos+1 : n-1])
+	if name != "message" {
+		t.Fatalf("expected message argument, got '%s' argument", name)
+	}
 	if expectedMsg != msgGot {
 		t.Fatalf("expected msg:%q, got %q", expectedMsg, msgGot)
 	}
-	if data[n-1] != 0 {
-		t.Fatalf("last byte should be zero, got: %d, %x", data[pos], data[32:n])
+	pos += length
+	if pos != n {
+		t.Fatalf("extra data in log message: %x", data[pos:n])
 	}
 }
 
@@ -456,8 +492,8 @@ func TestMessageLenLimit(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	// 1 for starting and ending null bytes.
-	msgLen := int(logger.MaxDatagramLenBytes) - 32 - 1 - 1
+	// Without tags, it's 64 bytes to the message argument plus 16 bytes for the message argument header
+	msgLen := int(logger.MaxDatagramLenBytes) - 80
 
 	const stripped = '𠜎'
 	// Ensure only part of stripped fits.
