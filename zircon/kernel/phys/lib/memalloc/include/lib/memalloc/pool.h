@@ -240,6 +240,9 @@ class Pool {
   // simulate physical memory constraints of smaller devices. Any allocations
   // (including pool bookkeeping) past the cut-off are destructively
   // reallocated (via UpdateRamSubranges()).
+  //
+  // kNvram is excluded from this truncation, as such ranges are special and
+  // are of diagnostic value even when simulating physical memory constraints.
   fit::result<fit::failed> TruncateTotalRam(uint64_t new_capacity_bytes);
 
   // Returns `fit::success` if the provided range was succesully marked as peripheral. This requires

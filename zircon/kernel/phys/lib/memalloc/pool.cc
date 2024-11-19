@@ -587,36 +587,32 @@ fit::result<fit::failed> Pool::UpdateRamSubranges(Type type, uint64_t addr, uint
 }
 
 fit::result<fit::failed> Pool::TruncateTotalRam(uint64_t new_capacity_bytes) {
-  // Iterate to where the new capacity is satisfied, possibly truncating the
-  // last of those ranges.
-  mutable_iterator it = ranges_.begin();
-  for (; it != ranges_.end() && new_capacity_bytes > 0; ++it) {
-    if (!IsRamType(it->type)) {
+  for (mutable_iterator it = ranges_.begin(); it != ranges_.end(); ++it) {
+    if (!IsRamType(it->type) || it->type == Type::kNvram) {
       continue;
     }
+
+    // RAM fits within budget.
     if (it->size <= new_capacity_bytes) {
       new_capacity_bytes -= it->size;
-    } else {
-      uint64_t truncated_start = it->addr + new_capacity_bytes;
-      Range truncated_tail{
-          .addr = truncated_start,
-          .size = it->end() - truncated_start,
-          .type = Type::kTruncatedRam,
-      };
-      if (auto result = InsertSubrange(truncated_tail, it); result.is_error()) {
-        return result.take_error();
-      } else {
-        it = result.value();
-      }
-      new_capacity_bytes = 0;
+      continue;
     }
-  }
 
-  // Now truncate the rest.
-  if (it != ranges_.end()) {
-    return UpdateRamSubranges(Type::kTruncatedRam, it->addr, kMax - it->addr);
+    // RAM does not wholly fit within budget. We fit the head of the range if
+    // appropriate and truncate the rest.
+    uint64_t start = it->addr + new_capacity_bytes;
+    Range truncated_tail{
+        .addr = start,
+        .size = it->end() - start,
+        .type = Type::kTruncatedRam,
+    };
+    if (auto result = InsertSubrange(truncated_tail, it); result.is_error()) {
+      return result.take_error();
+    } else {
+      it = Coalesce(result.value());
+    }
+    new_capacity_bytes = 0;
   }
-
   return fit::ok();
 }
 

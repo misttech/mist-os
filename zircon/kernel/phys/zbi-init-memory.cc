@@ -57,7 +57,7 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
   // If there is a boot option to restrict the amount of available physical RAM,
   // apply it after we have the identity mapping in place for all actually
   // present RAM. Even if the pool forgets about certain regions, we might still
-  // deliberately touch sthem (e.g., the ZBI or the pool's own bookkeeping).
+  // deliberately touch them (e.g., the ZBI or the pool's own bookkeeping).
   memalloc::Pool& pool = Allocation::GetPool();
   if (gBootOptions->memory_limit_mb > 0) {
     constexpr uint64_t kBytesPerMib = 0x100'000;

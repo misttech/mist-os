@@ -86,21 +86,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
 
       case ZBI_TYPE_NVRAM: {
         ZX_ASSERT(payload.size() >= sizeof(zbi_nvram_t));
-        const zbi_nvram_t& nvram = *reinterpret_cast<const zbi_nvram_t*>(payload.data());
-
-        // We may have truncated the address range (per kernel.memory-limit-mb),
-        // so be sure to truncate the NVRAM range accordingly.
-        auto back = ktl::prev(Allocation::GetPool().end());
-        while (!memalloc::IsRamType(back->type) || back->type == memalloc::Type::kTruncatedRam) {
-          --back;
-        }
-        uint64_t addr_cutoff = back->end();
-        if (nvram.base >= addr_cutoff) {
-          break;
-        }
-        handoff_->nvram = nvram;
-        handoff_->nvram->length = ktl::min(nvram.length, addr_cutoff - nvram.base);
-
+        handoff_->nvram = *reinterpret_cast<const zbi_nvram_t*>(payload.data());
         SaveForMexec(*header, payload);
         break;
       }

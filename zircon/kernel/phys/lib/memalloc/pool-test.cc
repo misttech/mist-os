@@ -1948,7 +1948,7 @@ TEST(MemallocPoolTests, TotalRamTruncation) {
                                              {}, {}, /*alloc_error=*/true));
 }
 
-TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
+TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralAndNvramRanges) {
   PoolContext ctx;
   Range ranges[] = {
       // free RAM: [0, 2*kChunkSize)
@@ -1975,11 +1975,11 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
           .size = kChunkSize,
           .type = Type::kFreeRam,
       },
-      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      // NVRAM: [20*kChunkSize, 21*kChunkSize)
       {
           .addr = 20 * kChunkSize,
           .size = kChunkSize,
-          .type = Type::kPeripheral,
+          .type = Type::kNvram,
       },
       // free RAM: [30*kChunkSize, 31*kChunkSize)
       {
@@ -1992,8 +1992,8 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
 
   //
   // Truncating to 3 chunks should result in the following set of ranges,
-  // leaving the peripheral ranges in place and reallocating all RAM midway
-  // through the test payload.
+  // leaving the peripheral and NVRAM ranges in place and reallocating all RAM
+  // midway through the test payload.
   //
 
   ASSERT_TRUE(ctx.pool.TruncateTotalRam(3 * kChunkSize).is_ok());
@@ -2029,11 +2029,11 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
           .size = 2 * kChunkSize,
           .type = Type::kTruncatedRam,
       },
-      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      // NVRAM: [20*kChunkSize, 21*kChunkSize)
       {
           .addr = 20 * kChunkSize,
           .size = kChunkSize,
-          .type = Type::kPeripheral,
+          .type = Type::kNvram,
       },
       // truncated RAM: [30*kChunkSize, 31*kChunkSize)
       {
@@ -2046,11 +2046,12 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kExpected}));
 
   //
-  // Even after removing all RAM, we should still track the peripheral ranges.
+  // Even after removing all RAM, we should still track the peripheral and
+  // NVRAM ranges.
   //
   ASSERT_TRUE(ctx.pool.TruncateTotalRam(0).is_ok());
 
-  constexpr Range kJustPeripheral[] = {
+  constexpr Range kJustPeripheralAndNvram[] = {
       // truncated RAM: [0, 2*kChunkSize)
       {
           .addr = 0,
@@ -2069,11 +2070,11 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
           .size = 3 * kChunkSize,
           .type = Type::kTruncatedRam,
       },
-      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      // NVRAM: [20*kChunkSize, 21*kChunkSize)
       {
           .addr = 20 * kChunkSize,
           .size = kChunkSize,
-          .type = Type::kPeripheral,
+          .type = Type::kNvram,
       },
       // truncated RAM: [30*kChunkSize, 31*kChunkSize)
       {
@@ -2083,7 +2084,7 @@ TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
       },
   };
 
-  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kJustPeripheral}));
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kJustPeripheralAndNvram}));
 }
 
 TEST(MemallocPoolTests, OutOfMemory) {
