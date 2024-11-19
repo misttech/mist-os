@@ -90,6 +90,7 @@ zx_library("starnix_runner") {
   sources = [
     "debugcommands.cc",
     "runner/container.cc",
+    "runner/mounts.cc",
   ]
 
   deps = [
