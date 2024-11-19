@@ -22,7 +22,7 @@ pub fn bootpkg(boot_dir: File, args: Args) -> Result<()> {
 type PackageList = HashMap<String, fuchsia_merkle::Hash>;
 
 fn read_file(boot_dir: &File, path: &str) -> Result<Vec<u8>> {
-    let mut file = fdio::open_fd_at_deprecated(boot_dir, path, fio::OpenFlags::RIGHT_READABLE)?;
+    let mut file = fdio::open_fd_at(boot_dir, path, fio::Flags::PERM_READ)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
     Ok(buffer)
