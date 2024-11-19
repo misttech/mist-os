@@ -425,12 +425,11 @@ int main(int argv, char** argc) {
   fs::ManagedVfs vfs(dispatcher);
 
   fbl::unique_fd lib_fd;
-  if (zx_status_t status =
-          fdio_open_fd("/boot/lib/",
-                       static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
-                                             fio::wire::OpenFlags::kRightReadable |
-                                             fio::wire::OpenFlags::kRightExecutable),
-                       lib_fd.reset_and_get_address());
+  if (zx_status_t status = fdio_open3_fd(
+          "/boot/lib/",
+          static_cast<uint64_t>(fio::wire::Flags::kProtocolDirectory | fio::wire::kPermReadable |
+                                fio::wire::kPermExecutable),
+          lib_fd.reset_and_get_address());
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "VFS loop exited";
   }
