@@ -511,28 +511,28 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
-  kernel_package("elf-physboot-test-data") {
+  kernel_package("physboot-zbi-kernel-test-data") {
     visibility = [ ":*" ]
     testonly = true
 
     # Just "physboot" at top level is the default for `kernel.phys.next`.
     prefix = ""
-    deps = [ "..:elf-physboot" ]
+    deps = [ "..:physboot-zbi-kernel" ]
   }
 
-  zbi("elf-physboot-test-zircon") {
+  zbi("physboot-zbi-kernel-test-zircon") {
     visibility = [ ":*" ]
     testonly = true
 
     deps = [
-      ":elf-physboot-test-data($phys_toolchain)",
+      ":physboot-zbi-kernel-test-data($phys_toolchain)",
       "//zircon/kernel:zircon(//zircon/kernel:kernel_$current_cpu)",
     ]
   }
 
-  zbi_test("elf-physboot-core-tests") {
+  zbi_test("physboot-zbi-kernel-core-tests") {
     deps = [
-      ":elf-physboot-test-zircon",
+      ":physboot-zbi-kernel-test-zircon",
       "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
     ]
   }
@@ -632,7 +632,7 @@ if (current_toolchain != default_toolchain) {
     }
     if (current_cpu != "riscv64") {  # TODO(mcgrathr): kernel not ready
       deps += [
-        ":elf-physboot-core-tests",
+        ":physboot-zbi-kernel-core-tests",
         ":zbi-chain-load-core-tests",
       ]
     }
