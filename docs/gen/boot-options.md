@@ -212,14 +212,15 @@ have the `ZX_PROP_JOB_KILL_ON_OOM` bit set to recover memory.
 If set to `reboot`, when encountering OOM, the kernel signals an out-of-memory
 event (see `zx_system_get_event()`), waits some period, and then reboots the
 system. The length of the wait period is set by the
-`kernel.oom.reboot-timeout-ms` boot option.
+`kernel.oom.reboot-timeout-ms` boot option, and the expectation is that during this wait period,
+userspace will trigger a shutdown upon receiving the OOM signal.
 
 ### kernel.oom.reboot-timeout-ms=\<uint32_t>
 
 **Default:** `0xc350`
 
 This option sets the amount of time the kernel will wait before rebooting the
-system when it encounters an out-of-memory (OOM) situation. This option is
+system after it has signaled an out-of-memory (OOM) event. This option is
 only relevant when `kernel.oom.behavior` is set to `reboot`.
 
 ### kernel.mexec-force-high-ramdisk=\<bool>
@@ -240,13 +241,13 @@ If false, this option leaves PCI devices running when calling mexec.
 
 **Default:** `true`
 
-This option turns on the out-of-memory (OOM) kernel thread, which kills
-processes or reboots the system (per `kernel.oom.behavior`), when the PMM has
-less than `kernel.oom.outofmemory-mb` free memory.
+This option turns on out-of-memory (OOM) monitoring in the kernel, which takes action
+per `kernel.oom.behavior` when the PMM has less than `kernel.oom.outofmemory-mb` free memory,
+and no memory can be reclaimed.
 
-An OOM can be manually triggered by the command `k pmm oom`, which will cause
+An OOM can be manually triggered by the command `k mem oom`, which will cause
 free memory to fall below the `kernel.oom.outofmemory-mb` threshold. An
-allocation rate can be provided with `k pmm oom <rate>`, where `<rate>` is in MB.
+allocation rate can be provided with `k mem oom <rate>`, where `<rate>` is in MB.
 This will cause the specified amount of memory to be allocated every second,
 which can be useful for observing memory pressure state transitions.
 
@@ -261,32 +262,30 @@ The current memory availability state can be queried with the command
 
 **Default:** `0x32`
 
-This option specifies the free-memory threshold at which the out-of-memory (OOM)
-thread will trigger an out-of-memory event and begin killing processes, or
-rebooting the system.
+This option specifies the free memory threshold at which the kernel will signal an out-of-memory
+event and take action as specified by `kernel.oom.behavior`, if there is no reclaimable memory that
+can be freed up.
 
 ### kernel.oom.critical-mb=\<uint64_t>
 
 **Default:** `0x96`
 
-This option specifies the free-memory threshold at which the out-of-memory
-(OOM) thread will trigger a critical memory pressure event, signaling that
-processes should free up memory.
+This option specifies the free memory threshold at which the kernel will signal a Critical memory
+pressure event, signaling that processes should free up memory.
 
 ### kernel.oom.warning-mb=\<uint64_t>
 
 **Default:** `0x12c`
 
-This option specifies the free-memory threshold at which the out-of-memory
-(OOM) thread will trigger a warning memory pressure event, signaling that
-processes should slow down memory allocations.
+This option specifies the free memory threshold at which the kernel will signal a Warning memory
+pressure event, signaling that processes should slow down memory allocations.
 
 ### kernel.oom.debounce-mb=\<uint64_t>
 
 **Default:** `0x1`
 
 This option specifies the memory debounce value used when computing the memory
-pressure state based on the free-memory thresholds
+pressure state based on the free memory thresholds
 (`kernel.oom.outofmemory-mb`, `kernel.oom.critical-mb` and
 `kernel.oom.warning-mb`). Transitions between memory availability states are
 debounced by not leaving a state until the amount of free memory is at least
@@ -302,9 +301,9 @@ Critical to Warning.
 
 **Default:** `false`
 
-This option triggers eviction of file pages at the Warning pressure state,
-in addition to the default behavior, which is to evict at the Critical and OOM
-states.
+If set to `true`, this option triggers kernel eviction of reclaimable memory at the Warning memory
+pressure state. If set to `false`, eviction is instead triggered at the Critical memory pressure
+state.
 
 ### kernel.oom.evict-continuous=\<bool>
 
@@ -312,7 +311,7 @@ states.
 
 This option configures kernel eviction to run continually in the background to try and
 keep the system out of memory pressure, as opposed to triggering one-shot eviction only at
-memory pressure level transitions.
+memory pressure state transitions.
 
 ### kernel.oom.hysteresis-seconds=\<uint64_t>
 
@@ -643,9 +642,9 @@ less physical memory than it actually has.
 
 **Default:** `true`
 
-When set, allows the page scanner to evict user pager backed pages. Eviction can
-reduce memory usage and prevent out of memory scenarios, but removes some
-timing predictability from system behavior.
+When set, allows the kernel to free up reclaimable memory, by evicting file pages and unlocked
+discardable VMOs, or by performing page compressions. Reclamation can reduce memory usage and
+prevent out of memory scenarios, but removes some timing predictability from system behavior.
 
 ### kernel.page-scanner.page-table-eviction-policy=\[always | never | on_request\]
 
@@ -677,7 +676,7 @@ This option only has an effect if `kernel.page-scanner.page-table-eviction-polic
 Sets the minimum time, in milliseconds, between successive aging events. Higher values here will
 provide a more stable active set with less chance of thrashing like behavior and less time spent
 harvesting page access information. Lower values will allow for smaller active sets, increasing
-opportunities for eviction.
+opportunities for reclamation.
 
 This value should be less than or equal to `kernel.page-scanner.max-aging-interval-ms`.
 
@@ -687,9 +686,9 @@ This value should be less than or equal to `kernel.page-scanner.max-aging-interv
 
 Sets the maximum time, in milliseconds, between successive aging events. This time is the potential
 worst case coarseness of page age information, and higher values can result in not having
-sufficient age information to perform eviction if system behavior rapidly changes. Lower values
+sufficient age information to perform reclamation if system behavior rapidly changes. Lower values
 will cause pages to lose fidelity information by accumulating in the oldest bucket increasing the
-chance that when eviction happens a sub-optimal page is chosen.
+chance that when reclamation happens a sub-optimal page is chosen.
 
 This value should be greater than or equal to `kernel.page-scanner.min-aging-interval-ms`.
 
@@ -725,7 +724,7 @@ and as such has no effect if the intervals are equal.
 This option causes the kernels active memory scanner to be initially
 enabled on startup. You can also enable and disable it using the kernel
 console. If you disable the scanner, you can have additional system
-predictability since it removes time based and background memory eviction.
+predictability since it removes time based and background memory reclamation.
 
 Every action the scanner performs can be individually configured and disabled.
 If all actions are disabled then enabling the scanner has no effect.
