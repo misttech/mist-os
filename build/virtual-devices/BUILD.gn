@@ -37,7 +37,12 @@ if (board_is_emu) {
     }
     cpu = {
       arch = target_cpu
-      count = 2
+
+      # The 1cpu environment depends on this device spec having a cpu count of 1.
+      # LINT.IfChange
+      count = 1
+
+      # LINT.ThenChange(//build/testing/environments.gni)
     }
   }
 
@@ -45,8 +50,28 @@ if (board_is_emu) {
   virtual_device_specification("virtual_device_specification_large") {
     testonly = true
     name = "${device_name}-large"
-    description = "Larger configuration for running this product with extra storage and memory"
+    description =
+        "Larger configuration for running this product with extra memory"
     output = "$root_build_dir/virtual_device_large.json"
+    memory = {
+      # The max amount of memory supported on arm64 in infra is 8GB. If a larger
+      # memory size is needed for a specific use case, either use the xlarge
+      # configuration or create a new device spec.
+      quantity = 8192
+      units = "megabytes"
+    }
+    cpu = {
+      arch = target_cpu
+      count = 4
+    }
+  }
+
+  # Add an X-Large configuration
+  virtual_device_specification("virtual_device_specification_xlarge") {
+    testonly = true
+    name = "${device_name}-xlarge"
+    description = "Larger configuration for running this product with extra storage and memory"
+    output = "$root_build_dir/virtual_device_xlarge.json"
     storage = {
       quantity = 10
       units = "gigabytes"

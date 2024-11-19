@@ -86,6 +86,12 @@ type EmulatorConfig struct {
 	// Memory is the amount of memory (in MB) to provide.
 	Memory int `json:"memory"`
 
+	// VirtualDeviceSpec is the name of the virtual device spec to pass to
+	// `ffx emu start --device`. Setting this value will cause ffx emu to be
+	// called directly with the product bundle and virtual device spec instead
+	// of a custom config.
+	VirtualDeviceSpec string `json:"virtual_device"`
+
 	// KVM specifies whether to enable hardware virtualization acceleration.
 	KVM bool `json:"kvm"`
 
@@ -431,8 +437,18 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			ZBI:      t.config.ZBITool,
 			UEFI:     code,
 		}
-		startArgs := ffxutil.EmuStartArgs{
-			Config: absFFXConfigFile,
+		startArgs := ffxutil.EmuStartArgs{}
+		if t.config.VirtualDeviceSpec != "" {
+			startArgs.ProductBundle = filepath.Join(cwd, pbPath)
+			startArgs.KernelArgs = ffxConfig.KernelArgs
+			startArgs.Device = t.config.VirtualDeviceSpec
+			if t.config.KVM {
+				startArgs.Accel = "hyper"
+			} else {
+				startArgs.Accel = "none"
+			}
+		} else {
+			startArgs.Config = absFFXConfigFile
 		}
 
 		isQEMU := false // Versus "is AEMU" or "is crosvm"

@@ -90,7 +90,7 @@ template("virtual_device_specification") {
     _memory = invoker.memory
   } else {
     _memory = {
-      quantity = 8192
+      quantity = 4096
       units = "megabytes"
     }
   }

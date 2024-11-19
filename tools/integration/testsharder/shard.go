@@ -401,6 +401,11 @@ func environmentName(env build.Environment) string {
 	if env.Netboot {
 		addToken("netboot")
 	}
+	if env.VirtualDeviceSpec.EnvName != "" {
+		addToken(env.VirtualDeviceSpec.EnvName)
+	} else if env.VirtualDeviceSpec.Name != "" {
+		addToken(env.VirtualDeviceSpec.Name)
+	}
 	return strings.Join(tokens, "-")
 }
 

@@ -53,6 +53,9 @@ type EmuStartArgs struct {
 	// TODO(https://fxbug.dev/329144967): Add more fields as necessary
 	// to provide as flags to `ffx emu start`.
 	ProductBundle string
+	KernelArgs    []string
+	Accel         string
+	Device        string
 }
 
 // EmuStartConsole returns a command to launch the emulator.
@@ -98,6 +101,15 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 		args = append(args, "--config", startArgs.Config)
 	} else {
 		args = append(args, startArgs.ProductBundle)
+		for _, k := range startArgs.KernelArgs {
+			args = append(args, "--kernel-args", k)
+		}
+		if startArgs.Accel != "" {
+			args = append(args, "--accel", startArgs.Accel)
+		}
+		if startArgs.Device != "" {
+			args = append(args, "--device", startArgs.Device)
+		}
 	}
 	if qemu {
 		args = append(args, "--engine", "qemu")
