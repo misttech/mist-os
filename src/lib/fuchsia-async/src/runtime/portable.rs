@@ -192,7 +192,7 @@ pub mod executor {
 
     impl WakeupTime for MonotonicInstant {
         fn into_timer(self) -> Timer {
-            Timer(async_io::Timer::at(self))
+            Timer::from(self)
         }
     }
 
@@ -223,6 +223,7 @@ pub mod executor {
         {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(self.num_threads)
+                .enable_time()
                 .enable_io()
                 .build()
                 .expect("Could not start tokio runtime on current thread");
@@ -259,6 +260,7 @@ pub mod executor {
         {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_io()
+                .enable_time()
                 .build()
                 .expect("Could not start tokio runtime on current thread");
             self.0.block_on(&rt, main_future)
@@ -307,10 +309,13 @@ pub mod timer {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    /// An asynchronous timer.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless polled"]
-    pub struct Timer(pub async_io::Timer);
+    /// An asynchronous timer.
+    pub struct Timer {
+        inner: Option<Pin<Box<tokio::time::Sleep>>>,
+        deadline: std::time::Instant,
+    }
 
     impl Timer {
         /// Create a new timer scheduled to fire at `time`.
@@ -319,10 +324,25 @@ pub mod timer {
         }
     }
 
+    impl From<std::time::Duration> for Timer {
+        fn from(duration: std::time::Duration) -> Self {
+            Self::from(crate::MonotonicInstant::now() + duration)
+        }
+    }
+
+    impl From<crate::MonotonicInstant> for Timer {
+        fn from(instant: crate::MonotonicInstant) -> Self {
+            Timer { inner: None, deadline: instant.into() }
+        }
+    }
+
     impl Future for Timer {
         type Output = ();
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            self.0.poll_unpin(cx).map(drop)
+            if self.inner.is_none() {
+                self.inner = Some(Box::pin(tokio::time::sleep_until(self.deadline.into())))
+            }
+            self.inner.as_mut().unwrap().poll_unpin(cx).map(drop)
         }
     }
 }

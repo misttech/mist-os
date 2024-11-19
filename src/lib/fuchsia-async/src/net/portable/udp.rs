@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_io::Async;
-use async_net::UdpSocket as AsyncUdpSocket;
 use std::io::Result;
 use std::net::{SocketAddr, UdpSocket as StdUdpSocket};
+use tokio::net::UdpSocket as AsyncUdpSocket;
 
 #[derive(Debug)]
 pub struct UdpSocket(AsyncUdpSocket);
 
 impl UdpSocket {
     pub fn bind(addr: &SocketAddr) -> Result<UdpSocket> {
-        Ok(UdpSocket(Async::new(StdUdpSocket::bind(addr)?)?.into()))
+        Ok(UdpSocket::from_socket(StdUdpSocket::bind(addr)?)?)
     }
 
     pub fn from_socket(socket: StdUdpSocket) -> Result<UdpSocket> {
-        Ok(UdpSocket(Async::new(socket)?.into()))
+        socket.set_nonblocking(true)?;
+        Ok(UdpSocket(AsyncUdpSocket::from_std(socket)?))
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr> {

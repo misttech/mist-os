@@ -25,10 +25,10 @@ mod udp_tests {
     fn send_recv_same_socket(addr: std::net::IpAddr) {
         let mut exec = TestExecutor::new();
 
-        let addr = std::net::SocketAddr::new(addr, 0);
-        let socket = UdpSocket::bind(&addr).expect("could not create socket");
-        let addr = socket.local_addr().expect("could not get local address");
         let fut = async move {
+            let addr = std::net::SocketAddr::new(addr, 0);
+            let socket = UdpSocket::bind(&addr).expect("could not create socket");
+            let addr = socket.local_addr().expect("could not get local address");
             assert_eq!(socket.send_to(MESSAGE, addr).await.expect("send_to failed"), MESSAGE.len());
             let mut recvbuf = [0; MESSAGE.len()];
             assert_eq!(
@@ -54,14 +54,17 @@ mod udp_tests {
     fn send_recv(addr: std::net::IpAddr) {
         let mut exec = TestExecutor::new();
 
-        let socket_addr = std::net::SocketAddr::new(addr.into(), 0);
-        let client_socket = UdpSocket::bind(&socket_addr).expect("could not create client socket");
-        let server_socket = UdpSocket::bind(&socket_addr).expect("could not create server socket");
-        let client_addr =
-            client_socket.local_addr().expect("could not get client socket's local address");
-        let server_addr =
-            server_socket.local_addr().expect("could not get server socket's local address");
         let fut = async move {
+            let socket_addr = std::net::SocketAddr::new(addr.into(), 0);
+            let client_socket =
+                UdpSocket::bind(&socket_addr).expect("could not create client socket");
+            let server_socket =
+                UdpSocket::bind(&socket_addr).expect("could not create server socket");
+            let client_addr =
+                client_socket.local_addr().expect("could not get client socket's local address");
+            let server_addr =
+                server_socket.local_addr().expect("could not get server socket's local address");
+
             assert_eq!(
                 client_socket.send_to(MESSAGE, server_addr).await.expect("send_to failed"),
                 MESSAGE.len()
@@ -89,22 +92,25 @@ mod udp_tests {
 
     #[test]
     fn broadcast() {
-        let mut _exec = TestExecutor::new();
-
-        let addr = "127.0.0.1:0".parse().expect("could not parse test address");
-        let socket = UdpSocket::bind(&addr).expect("could not create socket");
-        let initial = socket.broadcast().expect("could not get broadcast");
-        assert!(!initial);
-        socket.set_broadcast(true).expect("could not set broadcast");
-        let set = socket.broadcast().expect("could not get broadcast");
-        assert!(set);
+        let mut exec = TestExecutor::new();
+        exec.run_singlethreaded(async move {
+            let addr = "127.0.0.1:0".parse().expect("could not parse test address");
+            let socket = UdpSocket::bind(&addr).expect("could not create socket");
+            let initial = socket.broadcast().expect("could not get broadcast");
+            assert!(!initial);
+            socket.set_broadcast(true).expect("could not set broadcast");
+            let set = socket.broadcast().expect("could not get broadcast");
+            assert!(set);
+        });
     }
 
     #[test]
     fn test_local_addr() {
-        let mut _exec = TestExecutor::new();
-        let addr = "127.0.0.1:5432".parse().expect("could not parse test address");
-        let socket = UdpSocket::bind(&addr).expect("could not create socket");
-        assert_eq!(socket.local_addr().expect("could not get local address"), addr);
+        let mut exec = TestExecutor::new();
+        exec.run_singlethreaded(async move {
+            let addr = "127.0.0.1:5432".parse().expect("could not parse test address");
+            let socket = UdpSocket::bind(&addr).expect("could not create socket");
+            assert_eq!(socket.local_addr().expect("could not get local address"), addr);
+        });
     }
 }

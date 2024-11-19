@@ -81,7 +81,7 @@ impl WakeupTime for std::time::Duration {
 #[cfg(not(target_os = "fuchsia"))]
 impl WakeupTime for std::time::Duration {
     fn into_timer(self) -> Timer {
-        Timer(async_io::Timer::at(MonotonicInstant::now() + self.into()))
+        Timer::from(self)
     }
 }
 
