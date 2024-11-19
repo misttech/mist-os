@@ -15,7 +15,7 @@ tmp2 .req x10
 FUNCTION(ImageFixup)
     // The fixup code appears right after the kernel image (at __data_end in
     // our view).  Note this code overlaps with the kernel's bss!  It
-    // expects x0 to contain the actual runtime address of __code_start.
+    // expects x0 to contain the actual runtime address of __executable_start.
     bl      __data_end
 
     /* clear out the kernel's bss using current physical location */

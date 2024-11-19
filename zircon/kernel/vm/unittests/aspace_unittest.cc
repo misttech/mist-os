@@ -2008,7 +2008,7 @@ static bool vm_kernel_region_test() {
           reinterpret_cast<vaddr_t>(__executable_start));
   EXPECT_NE(kernel_vmar.get(), nullptr);
   EXPECT_FALSE(kernel_vmar->is_mapping());
-  for (vaddr_t base = reinterpret_cast<vaddr_t>(__code_start);
+  for (vaddr_t base = reinterpret_cast<vaddr_t>(__executable_start);
        base < reinterpret_cast<vaddr_t>(_end); base += PAGE_SIZE) {
     bool within_region = false;
     for (const auto& kernel_region : kernel_regions) {

@@ -17,9 +17,9 @@
 # COUNT addresses separated by STRIDE bytes (so STRIDE=8 if contiguous).
 # Both 0xADDR and the address value it points to are "link-time absolute",
 # meaning the first byte of the kernel image has the address that the ELF
-# symbol __code_start says.  Each address word is incremented by the
+# symbol __executable_start says.  Each address word is incremented by the
 # difference between the chosen run-time virtual address of the kernel
-# and the link-time __code_start value.
+# and the link-time __executable_start value.
 #
 # kernel/arch/CPU/image.S implements the `fixup` assembly macro to apply
 # each run of adjustments, and then #include's the output of this script.
