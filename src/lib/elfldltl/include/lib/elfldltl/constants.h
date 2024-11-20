@@ -7,6 +7,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <string_view>
 
 namespace elfldltl {
 
@@ -234,6 +235,26 @@ enum class ElfMachine : uint16_t {
         return kNone;
       }()
 };
+
+// This is used by diagnostics-ostream.h and diagnostics-printf.h to handle
+// ElfMachine arguments nicely.
+constexpr std::string_view ElfMachineName(ElfMachine machine) {
+  switch (machine) {
+    case ElfMachine::kNone:
+      return "EM_NONE";
+    case ElfMachine::k386:
+      return "EM_386";
+    case ElfMachine::kArm:
+      return "EM_ARM";
+    case ElfMachine::kX86_64:
+      return "EM_X86_64";
+    case ElfMachine::kAarch64:
+      return "EM_AARCH64";
+    case ElfMachine::kRiscv:
+      return "EM_RISCV";
+  }
+  return "<unknown>";
+}
 
 // These are types used in notes.  Other types might appear in note headers.
 // Only those used by the library are listed here.

@@ -81,15 +81,12 @@ class LoadModule {
   using LoadInfo = typename Decoded::LoadInfo;
   using RelocationInfo = typename Decoded::RelocationInfo;
   using Soname = typename Decoded::Soname;
+  using LookupResult = typename Decoded::LookupResult;
 
   static constexpr bool kMutableDecoded = !std::is_const_v<Decoded>;
 
   // This is returned by the name_ref() and soname_ref() methods.
   using Ref = LoadModuleRef<LoadModule>;
-
-  // This is the return value that the <lib/elfldltl/resolve.h> Module API
-  // requires for the Lookup method.
-  using LookupResult = fit::result<bool, const Sym*>;
 
   constexpr LoadModule() = default;
 
@@ -264,7 +261,7 @@ class LoadModule {
 
   // This can be overridden in a subclass for custom semantics.
   constexpr LookupResult Lookup(auto& diag, elfldltl::SymbolName& name) const {
-    return fit::ok(name.Lookup(symbol_info()));
+    return decoded().Lookup(diag, name);
   }
 
  protected:

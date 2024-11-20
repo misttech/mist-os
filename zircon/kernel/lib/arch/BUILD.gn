@@ -4,6 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/config/zircon/standard.gni")
 import("//build/cpp/library_headers.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
@@ -13,12 +14,15 @@ group("headers") {
   # (and overrides) the <lib/arch/...> header name space and users of this
   # library need never realize it's distinct.
 
-  if (is_host) {
+  if (is_host || standard_fuchsia_cpus + [ current_cpu ] - [ current_cpu ] ==
+                 standard_fuchsia_cpus) {
+    assert(!is_fuchsia)
     public_deps = [ "host" ]
   } else {
-    public_deps = [
-      "$zircon_cpu:headers",
-
+    public_deps = [ "$zircon_cpu:headers" ]
+  }
+  if (!is_host) {
+    public_deps += [
       # These would be circular dependencies on the host, since that's where
       # the generator programs are built and they need the library's headers.
       # Since these headers are meant to be used by assembly code, they should
