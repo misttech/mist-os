@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/dma-buffer/buffer.h>
+#include <lib/dma-buffer/phys-iter.h>
 #include <lib/fake-object/object.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -11,7 +12,7 @@
 #include <memory>
 #include <mutex>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -158,7 +159,7 @@ TEST(DmaBufferTests, InitWithCacheEnabled) {
     const size_t size = zx_system_get_page_size() * 4;
     const size_t alignment = 2;
     auto factory = CreateBufferFactory();
-    ASSERT_OK(factory->CreateContiguous(kFakeBti, size, alignment, &buffer));
+    ASSERT_EQ(ZX_OK, factory->CreateContiguous(kFakeBti, size, alignment, &buffer));
     auto test_f = [&buffer, size](fake_object::Object* obj) -> bool {
       auto vmo = static_cast<VmoWrapper*>(obj);
       ZX_ASSERT(vmo->metadata().alignment_log2 == alignment);
@@ -180,7 +181,7 @@ TEST(DmaBufferTests, InitWithCacheDisabled) {
   {
     std::unique_ptr<PagedBuffer> buffer;
     auto factory = CreateBufferFactory();
-    ASSERT_OK(factory->CreatePaged(kFakeBti, zx_system_get_page_size(), false, &buffer));
+    ASSERT_EQ(ZX_OK, factory->CreatePaged(kFakeBti, zx_system_get_page_size(), false, &buffer));
     auto test_f = [&buffer](fake_object::Object* object) -> bool {
       auto vmo = static_cast<VmoWrapper*>(object);
       ZX_ASSERT(vmo->metadata().alignment_log2 == 0);
@@ -201,7 +202,8 @@ TEST(DmaBufferTests, InitCachedMultiPageBuffer) {
   {
     std::unique_ptr<ContiguousBuffer> buffer;
     auto factory = CreateBufferFactory();
-    ASSERT_OK(factory->CreateContiguous(kFakeBti, zx_system_get_page_size() * 4, 0, &buffer));
+    ASSERT_EQ(ZX_OK,
+              factory->CreateContiguous(kFakeBti, zx_system_get_page_size() * 4, 0, &buffer));
     auto test_f = [&buffer](fake_object::Object* object) -> bool {
       auto vmo = static_cast<VmoWrapper*>(object);
       ZX_ASSERT(vmo->metadata().alignment_log2 == 0);
@@ -217,5 +219,167 @@ TEST(DmaBufferTests, InitCachedMultiPageBuffer) {
   }
   ASSERT_TRUE(unpinned);
 }
+
+using Param = struct {
+  // The description here will get rendered in the test name, along with a stringified variant of
+  // the testing input. In total, it can be used to identify each individual test case in the suite.
+  const char* test_desc;
+
+  // PhysIter ctor inputs.
+  zx_paddr_t* chunk_list;
+  uint64_t chunk_count;
+  size_t chunk_size;
+  zx_off_t vmo_offset;
+  size_t buf_length;
+  size_t max_length;
+
+  // Expected outputs.
+  uint loop_ct;  // Number of times to increment iterator for full buffer.
+  zx_paddr_t* want_addr;
+  size_t* want_size;
+};
+
+const size_t kPageSize{4096};  // Page size, for maximum brevity.
+const size_t kHalfPage{2048};  // Half a page.
+
+// clang-format off
+const auto kCases = testing::Values(
+    Param(/* test_desc   */ "SimplePageBoundary",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 2 * kPageSize},
+          /* chunk_count */ 2,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 2 * kPageSize,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 2,
+          /* want_addr   */ (zx_paddr_t[]){kPageSize, 2 * kPageSize},
+          /* want_size   */ (size_t[]){kPageSize, kPageSize}),
+
+    Param(/* test_desc   */ "NonContiguousPages",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 3 * kPageSize, 5 * kPageSize},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 3 * kPageSize,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){kPageSize, 3 * kPageSize, 5 * kPageSize},
+          /* want_size   */ (size_t[]){kPageSize, kPageSize, kPageSize}),
+
+    Param(/* test_desc   */ "PartialFirstPageContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 2 * kPageSize, 3 * kPageSize},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ kPageSize - 5,
+          /* buf_length  */ 2 * kPageSize + 5,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){2 * kPageSize - 5, 2 * kPageSize, 3 * kPageSize},
+          /* want_size   */ (size_t[]){5UL, kPageSize, kPageSize}),
+
+    Param(/* test_desc   */ "PartialFirstPageNonContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 3 * kPageSize, 5 * kPageSize},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ kPageSize - 5,
+          /* buf_length  */ 2 * kPageSize + 5,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){2 * kPageSize - 5, 3 * kPageSize, 5 * kPageSize},
+          /* want_size   */ (size_t[]){5UL, kPageSize, kPageSize}),
+
+    Param(/* test_desc   */ "PartialLastPageContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 2 * kPageSize, 3 * kPageSize},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 2 * kPageSize + 5,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){kPageSize, 2 * kPageSize, 3 * kPageSize},
+          /* want_size   */ (size_t[]){kPageSize, kPageSize, 5UL}),
+
+    Param(/* test_desc   */ "PartialLastPageNonContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 3 * kPageSize, 5 * kPageSize},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 2 * kPageSize + 5,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){kPageSize, 3 * kPageSize, 5 * kPageSize},
+          /* want_size   */ (size_t[]){kPageSize, kPageSize, 5UL}),
+
+    Param(/* test_desc   */ "SubChunkMaxLength",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize, 2 * kPageSize},
+          /* chunk_count */ 2,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 2 * kPageSize,
+          /* max_length  */ kHalfPage,
+          /* loop_ct     */ 4,
+          /* want_addr   */ (zx_paddr_t[]){2 * kHalfPage, 3 * kHalfPage, 4 * kHalfPage, 5 * kHalfPage},
+          /* want_size   */ (size_t[]){kHalfPage, kHalfPage, kHalfPage, kHalfPage}),
+
+    Param(/* test_desc   */ "ZxBtiContiguousLargeBuffer",
+          /* chunk_list  */ (zx_paddr_t[]){kPageSize},
+          /* chunk_count */ 1,
+          /* chunk_size  */ kPageSize,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 1UL << 20, // 1MiB.
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 1,
+          /* want_addr   */ (zx_paddr_t[]){kPageSize},
+          /* want_size   */ (size_t[]){1UL << 20}),
+
+    Param(/* test_desc   */ "ZxBtiCompressContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kHalfPage, 2 * kHalfPage, 3 * kHalfPage},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kHalfPage,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 3 * kHalfPage,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){kHalfPage, 2 * kHalfPage, 3 * kHalfPage},
+          /* want_size   */ (size_t[]){kHalfPage, kHalfPage, kHalfPage}),
+
+    Param(/* test_desc   */ "ZxBtiCompressNonContiguous",
+          /* chunk_list  */ (zx_paddr_t[]){kHalfPage, 3 * kHalfPage, 5 * kHalfPage},
+          /* chunk_count */ 3,
+          /* chunk_size  */ kHalfPage,
+          /* vmo_offset  */ 0,
+          /* buf_length  */ 3 * kHalfPage,
+          /* max_length  */ UINT64_MAX,
+          /* loop_ct     */ 3,
+          /* want_addr   */ (zx_paddr_t[]){kHalfPage, 3 * kHalfPage, 5 * kHalfPage},
+          /* want_size   */ (size_t[]){kHalfPage, kHalfPage, kHalfPage}));
+// clang-format on
+
+class Parameterized : public testing::TestWithParam<Param> {};
+
+TEST_P(Parameterized, TestRun) {
+  auto p = GetParam();
+
+  PhysIter phys_iter{p.chunk_list, p.chunk_count, p.chunk_size,
+                     p.vmo_offset, p.buf_length,  p.max_length};
+  auto itr = phys_iter.begin();
+
+  uint i;
+  for (i = 0; i < p.loop_ct; i++) {
+    EXPECT_NE(itr, phys_iter.end()) << "i=" << i << std::endl;
+    auto [addr, size] = *(itr++);
+    EXPECT_EQ(p.want_addr[i], addr) << "i=" << i << std::endl;
+    EXPECT_EQ(p.want_size[i], size) << "i=" << i << std::endl;
+  }
+
+  EXPECT_EQ(itr, phys_iter.end()) << "i=" << i << std::endl;
+}
+
+INSTANTIATE_TEST_SUITE_P(PhysIterTest, Parameterized, kCases,
+                         [](const testing::TestParamInfo<Parameterized::ParamType>& info) {
+                           std::stringstream test_name;
+                           test_name << info.index << "_" << info.param.test_desc;
+                           return test_name.str();
+                         });
 
 }  // namespace dma_buffer

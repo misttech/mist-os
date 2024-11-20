@@ -12,9 +12,10 @@ test("dma-buffer-test-bin") {
     "//sdk/lib/fdio",
     "//src/devices/lib/dma-buffer",
     "//src/devices/testing/fake-object",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
