@@ -4655,10 +4655,6 @@ assembly_input_bundle("kernel_logs_in_reboot_info") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
 }
 
-assembly_input_bundle("kernel_arm64_event_stream_disable") {
-  kernel_cmdline = [ "kernel.arm64.event-stream.enable=false" ]
-}
-
 assembly_input_bundle("kernel_page_table_eviction_never") {
   kernel_cmdline = [ "kernel.page-scanner.page-table-eviction-policy=never" ]
 }

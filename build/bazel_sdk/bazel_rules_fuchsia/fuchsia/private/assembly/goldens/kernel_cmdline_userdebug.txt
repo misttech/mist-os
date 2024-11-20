@@ -1,6 +1,5 @@
 ?console.shell=false
 ?console.shell=true
-?kernel.arm64.event-stream.enable=false
 ?kernel.compression.at_memory_pressure=true
 ?kernel.compression.reclaim_anonymous=true
 ?kernel.compression.reclaim_zero_forks=true

@@ -206,12 +206,6 @@ pub struct BoardKernelConfig {
     #[serde(default)]
     pub quiet_early_boot: bool,
 
-    /// When enabled, each ARM cpu will enable an event stream generator, which
-    /// per-cpu sets the hidden event flag at a particular rate. This has the
-    /// effect of kicking cpus out of any WFE states they may be sitting in.
-    #[serde(default = "arm64_event_stream_enable_default")]
-    pub arm64_event_stream_enable: bool,
-
     /// This controls what serial port is used.  If provided, it overrides the
     /// serial port described by the system's bootdata.  The kernel debug serial
     /// port is a reserved resource and may not be used outside of the kernel.
@@ -235,10 +229,6 @@ pub struct BoardKernelConfig {
     /// OOM related configurations.
     #[serde(default)]
     pub oom: Option<OOM>,
-}
-
-fn arm64_event_stream_enable_default() -> bool {
-    true
 }
 
 /// This struct defines supported Out of memory features.
@@ -424,7 +414,6 @@ mod test {
             "kernel": {
                 "contiguous_physical_pages": true,
                 "scheduler_prefer_little_cpus": true,
-                "arm64_event_stream_enable": false,
             },
             "platform": {
                 "development_support": {
@@ -458,7 +447,6 @@ mod test {
                 scheduler_prefer_little_cpus: true,
                 halt_on_panic: false,
                 oom: None,
-                arm64_event_stream_enable: false,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),
