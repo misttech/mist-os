@@ -9,6 +9,14 @@
             on_terminate: "reboot",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "required",
+        },
+    ],
     expose: [
         {
             protocol: [
@@ -17,6 +25,12 @@
             ],
             from: "void",
             availability: "optional",
+        },
+        {
+            directory: "diagnostics",
+            from: "#netstack",
+            as: "netstack-diagnostics",
+            availability: "required",
         },
     ],
 }

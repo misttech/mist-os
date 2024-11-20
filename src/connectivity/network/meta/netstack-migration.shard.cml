@@ -34,6 +34,14 @@
             from: "parent",
             to: [ "#netstack-migration" ],
         },
+        {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+
+            // NS3 will not implement fuchsia.net.filter.deprecated, mark as optional.
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "optional",
+        },
     ],
     expose: [
         {
@@ -42,6 +50,14 @@
                 "fuchsia.net.stackmigrationdeprecated.State",
             ],
             from: "#netstack-migration",
+        },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
+            from: "#netstack",
+            as: "netstack-diagnostics",
+            availability: "optional",
         },
     ],
 }
