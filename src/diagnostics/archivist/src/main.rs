@@ -26,15 +26,12 @@ const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 
 fn main() -> Result<(), Error> {
     let config = Config::take_from_startup_handle();
-    let num_threads = config.num_threads;
-    debug!("Running executor with {} threads.", num_threads);
-    if num_threads == 1 {
-        let mut executor = fasync::LocalExecutor::new();
-        executor.run_singlethreaded(async_main(config)).context("async main")?;
-    } else {
-        let mut executor = fasync::SendExecutor::new(num_threads as usize - 1);
-        executor.run(async_main(config)).context("async main")?;
-    }
+    // The executor will spin up an extra thread which is only for monitoring, so we ignore that.
+    // Non-legacy sockets are serviced from a dedicated thread (which isn't counted here).  We
+    // *must* always use a multi-threaded executor because we use `fasync::EHandle::poll_tasks`
+    // which requires it.
+    let mut executor = fasync::SendExecutor::new(config.num_threads as usize);
+    executor.run(async_main(config)).context("async main")?;
     debug!("Exiting.");
     Ok(())
 }

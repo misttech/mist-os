@@ -51,12 +51,16 @@ TEST_F(SyslogTest, SyslogReadAll) {
   int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
   std::string buf;
   buf.resize(size);
-  int size_read = klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf.data(), static_cast<int>(buf.size()));
-  if (size_read <= 0) {
-    fprintf(stderr, "Failed to read: %s\n", strerror(errno));
-    FAIL();
-  }
-  EXPECT_NE(buf.find("Hello from the read-all test"), std::string::npos);
+
+  // Logging is an asynchronous process, so we must loop.
+  do {
+    int size_read =
+        klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf.data(), static_cast<int>(buf.size()));
+    if (size_read <= 0) {
+      fprintf(stderr, "Failed to read: %s\n", strerror(errno));
+      FAIL();
+    }
+  } while (buf.find("Hello from the read-all test") == std::string::npos);
 }
 
 TEST_F(SyslogTest, Read) {

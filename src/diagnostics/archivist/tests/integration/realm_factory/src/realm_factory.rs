@@ -122,7 +122,6 @@ impl ArchivistRealmFactory {
             .capability(Capability::configuration(
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
             ))
-            .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
             .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));

@@ -32,7 +32,6 @@
                 "fuchsia.diagnostics.ExceptionHandlerAvailable",
                 "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
-                "fuchsia.diagnostics.NumThreads",
                 "fuchsia.driver.BaseDrivers",
                 "fuchsia.driver.BindEager",
                 "fuchsia.driver.BootDrivers",

@@ -6,7 +6,6 @@ declare_args() {
   archivist_max_cached_logs_bytes = 4194304
 }
 
-# LINT.IfChange
 default_config = {
   bind_services = [
     "fuchsia.component.DetectBinder",
@@ -18,7 +17,7 @@ default_config = {
   log_to_debuglog = true
   logs_max_cached_original_bytes = archivist_max_cached_logs_bytes
   maximum_concurrent_snapshots_per_reader = 4
-  num_threads = 4
+  num_threads = 1
   pipelines_path = "/config/data"
   allow_serial_logs = []
   deny_serial_log_tags = []
@@ -26,14 +25,11 @@ default_config = {
   per_component_batch_timeout_seconds = 10
 }
 
-# LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
-
 embedded_config = {
   forward_variables_from(default_config, "*")
 
   bind_services = []
   enable_klog = false
   log_to_debuglog = false
-  num_threads = 1
   per_component_batch_timeout_seconds = -1
 }

@@ -111,14 +111,14 @@ impl LogsRepository {
                     initial_interests,
                     scope,
                 )),
-                shared_buffer: Arc::new(SharedBuffer::new(
+                shared_buffer: SharedBuffer::new(
                     logs_max_cached_original_bytes as usize,
                     Box::new(move |identity| {
                         if let Some(this) = me.upgrade() {
                             this.on_container_inactive(&identity);
                         }
                     }),
-                )),
+                ),
             }
         })
     }
@@ -205,6 +205,9 @@ impl LogsRepository {
         scope.join().await;
         // Process messages from log sink.
         debug!("Log ingestion stopped.");
+        // Terminate the shared buffer first so that pending messages are processed before we
+        // terminate all the containers.
+        self.shared_buffer.terminate().await;
         let mut repo = self.mutable_state.lock();
         for container in repo.logs_data_store.values() {
             container.terminate();

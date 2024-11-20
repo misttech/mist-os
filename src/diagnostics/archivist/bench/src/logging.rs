@@ -43,6 +43,8 @@ fn get_component_identity() -> Arc<ComponentIdentity> {
 }
 
 fn bench_fill(b: &mut criterion::Bencher, size: usize) {
+    // SharedBuffer needs an executor even though we don't use it in the benchmark.
+    let _executor = fasync::SendExecutor::new(1);
     let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {})));
     let msg =
         make_message(std::str::from_utf8(&[65; 100]).unwrap(), zx::BootInstant::from_nanos(1));
@@ -62,6 +64,7 @@ struct IterateArgs {
 }
 
 fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
+    let mut executor = fasync::SendExecutor::new(1);
     let done = Arc::new(AtomicBool::new(false));
     // Messages take up a a little less than 200 bytes in the buffer.
     let buffer = Arc::new(SharedBuffer::new(200 * args.size, Box::new(|_| {})));
@@ -94,10 +97,9 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     }
 
     // measure how long it takes to read |size| entries from the list
-    let mut executor = fasync::LocalExecutor::new();
     b.iter(|| {
         let container = Arc::clone(&container);
-        executor.run_singlethreaded(async move {
+        executor.run(async move {
             let mut items_read = 0;
             let mut cursor = pin!(container.cursor(StreamMode::SnapshotThenSubscribe).unwrap());
             while items_read < args.size {

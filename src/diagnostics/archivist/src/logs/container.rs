@@ -75,8 +75,9 @@ type InterestSender = oneshot::Sender<Result<FidlInterest, InterestChangeError>>
 
 #[derive(Debug)]
 struct ContainerState {
-    /// Number of sockets currently being drained for this component.
-    num_active_sockets: u64,
+    /// Number of legacy sockets currently being drained for this component.  Sockets that use
+    /// structured messages use the buffer's socket handling.
+    num_active_legacy_sockets: u64,
 
     /// Number of LogSink channels currently being listened to for this component.
     num_active_channels: u64,
@@ -115,7 +116,7 @@ impl LogsArtifactsContainer {
             buffer,
             state: Arc::new(Mutex::new(ContainerState {
                 num_active_channels: 0,
-                num_active_sockets: 0,
+                num_active_legacy_sockets: 0,
                 interests,
                 hanging_gets: BTreeMap::new(),
                 is_initializing: true,
@@ -245,22 +246,18 @@ impl LogsArtifactsContainer {
         let previous_interest_sent = Arc::new(Mutex::new(None));
         debug!(%self.identity, "Draining LogSink channel.");
 
-        macro_rules! handle_socket {
-            ($ctor:ident($socket:ident)) => {{
-                let socket = fasync::Socket::from_socket($socket);
-                let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
-                self.state.lock().num_active_sockets += 1;
-                scope.spawn(self.clone().drain_messages(log_stream));
-            }};
-        }
-
         while let Some(next) = stream.next().await {
             match next {
                 Ok(LogSinkRequest::Connect { socket, .. }) => {
-                    handle_socket! {new(socket)};
+                    // TODO(https://fxbug.dev/378977533): Add support for ingesting
+                    // the legacy log format directly to the shared buffer.
+                    let socket = fasync::Socket::from_socket(socket);
+                    let log_stream = LogMessageSocket::new(socket, Arc::clone(&self.stats));
+                    self.state.lock().num_active_legacy_sockets += 1;
+                    scope.spawn(Arc::clone(&self).drain_messages(log_stream));
                 }
                 Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
-                    handle_socket! {new_structured(socket)};
+                    self.buffer.add_socket(socket);
                 }
                 Ok(LogSinkRequest::WaitForInterestChange { responder }) => {
                     // Check if we sent latest data to the client
@@ -382,7 +379,7 @@ impl LogsArtifactsContainer {
             }
         }
         debug!(%self.identity, "Socket closed.");
-        self.state.lock().num_active_sockets -= 1;
+        self.state.lock().num_active_legacy_sockets -= 1;
         self.check_inactive();
     }
 
@@ -485,9 +482,9 @@ impl LogsArtifactsContainer {
     pub fn is_active(&self) -> bool {
         let state = self.state.lock();
         state.is_initializing
-            || state.num_active_sockets > 0
+            || state.num_active_legacy_sockets > 0
             || state.num_active_channels > 0
-            || !self.buffer.is_empty()
+            || self.buffer.is_active()
     }
 
     /// Called whenever there's a transition that means the component might no longer be active.
@@ -650,7 +647,7 @@ mod tests {
                 .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
                 .expect("failed to attach component log stats"),
         );
-        let buffer = Arc::new(SharedBuffer::new(1024 * 1024, Box::new(|_| {})));
+        let buffer = SharedBuffer::new(1024 * 1024, Box::new(|_| {}));
         let container = Arc::new(LogsArtifactsContainer::new(
             identity,
             std::iter::empty(),

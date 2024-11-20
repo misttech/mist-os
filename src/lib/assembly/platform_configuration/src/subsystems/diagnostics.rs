@@ -53,8 +53,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             "fuchsia.component.PersistenceBinder",
             "fuchsia.component.SamplerBinder",
         ]);
-        let mut num_threads = 4;
+        // fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader default:
         let mut maximum_concurrent_snapshots_per_reader = 4;
+        // fuchsia.diagnostics.LogsMaxCachedOriginalBytes default:
         let mut logs_max_cached_original_bytes = 4194304;
 
         match (context.build_type, context.feature_set_level) {
@@ -76,7 +77,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         match archivist {
             Some(ArchivistConfig::Default) | None => {}
             Some(ArchivistConfig::LowMem) => {
-                num_threads = 2;
                 logs_max_cached_original_bytes = 2097152;
                 maximum_concurrent_snapshots_per_reader = 2;
             }
@@ -107,10 +107,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         builder.set_config_capability(
             "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
             Config::new(ConfigValueType::Uint64, maximum_concurrent_snapshots_per_reader.into()),
-        )?;
-        builder.set_config_capability(
-            "fuchsia.diagnostics.NumThreads",
-            Config::new(ConfigValueType::Uint64, num_threads.into()),
         )?;
         builder.set_config_capability(
             "fuchsia.diagnostics.AllowSerialLogs",
@@ -334,10 +330,6 @@ mod tests {
             Value::Number(Number::from(4))
         );
         assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(4))
-        );
-        assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.AllowSerialLogs"].value(),
             Value::Array(ALLOWED_SERIAL_LOG_COMPONENTS.iter().cloned().map(Into::into).collect())
         );
@@ -401,10 +393,6 @@ mod tests {
         let config = builder.build();
 
         assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(2))
-        );
-        assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.LogsMaxCachedOriginalBytes"]
                 .value(),
             Value::Number(Number::from(2097152))
@@ -441,10 +429,6 @@ mod tests {
         .unwrap();
         let config = builder.build();
 
-        assert_eq!(
-            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
-            Value::Number(Number::from(4))
-        );
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
             Value::Array(Vec::new())
