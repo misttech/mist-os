@@ -160,6 +160,10 @@ if (current_toolchain == default_toolchain) {
       if (cpu == "riscv64") {
         # TODO(https://fxbug.dev/42076027): no asan for riscv64 yet
         exclude_variant_tags += [ "asan" ]
+      } else if (cpu == "arm64") {
+        # TODO(https://fxbug.dev/379891035): arm64 KASan support was
+        # temporarily removed and is to be reimplemeted.
+        exclude_variant_tags += [ "asan" ]
       }
 
       # Always enable frame pointers in the kernel so there are panic
