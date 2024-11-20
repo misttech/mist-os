@@ -81,9 +81,8 @@ class Image : public fbl::RefCounted<Image>,
   bool Acquire();
   // Marks the image as not in use. Should only be called before PrepareFences.
   void DiscardAcquire();
-  // Prepare the image for display. It will not be READY until `wait` is
-  // signaled, and once the image is no longer displayed `retire` will be signaled.
-  void PrepareFences(fbl::RefPtr<FenceReference>&& wait, fbl::RefPtr<FenceReference>&& retire);
+  // Prepare the image for display. It will not be READY until `wait` is signaled.
+  void PrepareFences(fbl::RefPtr<FenceReference>&& wait);
   // Called to immediately retire the image if StartPresent hasn't been called yet.
   void EarlyRetire();
   // Called when the image is passed to the display hardware.
@@ -136,8 +135,6 @@ class Image : public fbl::RefCounted<Image>,
   };
   friend DoublyLinkedListTraits<DoublyLinkedListPointer, fbl::DefaultObjectTag>;
 
-  // Retires the image and signals |fence|.
-  void RetireWithFence(fbl::RefPtr<FenceReference>&& fence);
   void InitializeInspect(inspect::Node* parent_node);
 
   // This NodeState allows the Image to be placed in an intrusive
@@ -173,13 +170,6 @@ class Image : public fbl::RefCounted<Image>,
   // Indicates that the image contents are ready for display.
   // Only ever accessed on loop thread, so no synchronization
   fbl::RefPtr<FenceReference> wait_fence_ = nullptr;
-
-  // retire_fence_ is signaled when an image is no longer used on a display.
-  // retire_fence_ is only accessed on the loop. armed_retire_fence_ is accessed
-  // under the controller mutex. See comment in ::OnRetire for more details.
-  // All retires are performed by the Controller's ApplyConfig/OnDisplayVsync loop.
-  fbl::RefPtr<FenceReference> retire_fence_ = nullptr;
-  fbl::RefPtr<FenceReference> armed_retire_fence_ __TA_GUARDED(mtx()) = nullptr;
 
   // Flag which indicates that the image is currently in some display configuration.
   std::atomic_bool in_use_ = {};

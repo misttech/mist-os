@@ -131,8 +131,6 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
 
   zx_status_t StartReadyWait();
   void ResetReadyWait();
-  // Sets the fence which will be signaled immediately when this fence is ready.
-  void SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence);
 
   void OnReady();
 

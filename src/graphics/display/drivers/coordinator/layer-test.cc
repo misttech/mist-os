@@ -77,7 +77,7 @@ TEST_F(LayerTest, PrimaryBasic) {
                            display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
-  layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
+  layer.SetImage(image, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
 }
 
@@ -93,7 +93,7 @@ TEST_F(LayerTest, CleanUpImage) {
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, display::kInvalidEventId, display::kInvalidEventId);
+  layer.SetImage(displayed_image, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
   ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
 
@@ -104,11 +104,11 @@ TEST_F(LayerTest, CleanUpImage) {
   auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId, display::kInvalidEventId);
+  layer.SetImage(waiting_image, kWaitFenceId);
   ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, display::kInvalidEventId, display::kInvalidEventId);
+  layer.SetImage(pending_image, display::kInvalidEventId);
 
   ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
@@ -170,7 +170,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   // Clean up images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
     ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
@@ -189,7 +189,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     MakeLayerCurrent(layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
     ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
@@ -217,7 +217,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
-  layer.SetImage(displayed_image, display::kInvalidEventId, display::kInvalidEventId);
+  layer.SetImage(displayed_image, display::kInvalidEventId);
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
   ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
 
@@ -228,11 +228,11 @@ TEST_F(LayerTest, CleanUpAllImages) {
   auto fence_release = fit::defer([this, kWaitFenceId] { fences_->ReleaseEvent(kWaitFenceId); });
 
   auto waiting_image = CreateReadyImage();
-  layer.SetImage(waiting_image, kWaitFenceId, display::kInvalidEventId);
+  layer.SetImage(waiting_image, kWaitFenceId);
   ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
 
   auto pending_image = CreateReadyImage();
-  layer.SetImage(pending_image, display::kInvalidEventId, display::kInvalidEventId);
+  layer.SetImage(pending_image, display::kInvalidEventId);
 
   ASSERT_TRUE(layer.ActivateLatestReadyImage());
 
@@ -271,7 +271,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   // Clean up all images, which doesn't change the current config.
   {
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
     ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(1)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());
@@ -290,7 +290,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     MakeLayerCurrent(layer, current_layers);
 
     auto image = CreateReadyImage();
-    layer.SetImage(image, display::kInvalidEventId, display::kInvalidEventId);
+    layer.SetImage(image, display::kInvalidEventId);
     layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
     ASSERT_TRUE(layer.ResolvePendingImage(fences_.get(), display::ConfigStamp(2)));
     ASSERT_TRUE(layer.ActivateLatestReadyImage());

@@ -104,8 +104,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
       fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
   void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
-  void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id,
-                display::EventId signal_event_id);
+  void SetImage(fbl::RefPtr<Image> image_id, display::EventId wait_event_id);
 
  private:
   // Retires the `pending_image_`.
@@ -127,7 +126,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   // Event ids passed to SetLayerImage which haven't been applied yet.
   display::EventId pending_wait_event_id_;
-  display::EventId pending_signal_event_id_;
 
   // The image given to SetLayerImage which hasn't been applied yet.
   fbl::RefPtr<Image> pending_image_;

@@ -129,10 +129,6 @@ void FenceReference::ResetReadyWait() {
   fence_->OnRefDisarmed(this);
 }
 
-void FenceReference::SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence) {
-  release_fence_ = std::move(fence);
-}
-
 void FenceReference::OnReady() {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   if (release_fence_) {

@@ -254,7 +254,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void DiscardConfig();
 
   void SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
-                         display::EventId wait_event_id, display::EventId signal_event_id);
+                         display::EventId wait_event_id);
 
   Controller* const controller_;
   ClientProxy* const proxy_;

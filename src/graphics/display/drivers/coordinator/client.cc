@@ -602,11 +602,11 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 void Client::SetLayerImage2(SetLayerImage2RequestView request,
                             SetLayerImage2Completer::Sync& /*_completer*/) {
   SetLayerImageImpl(display::ToLayerId(request->layer_id), display::ToImageId(request->image_id),
-                    display::ToEventId(request->wait_event_id), display::kInvalidEventId);
+                    display::ToEventId(request->wait_event_id));
 }
 
 void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
-                               display::EventId wait_event_id, display::EventId signal_event_id) {
+                               display::EventId wait_event_id) {
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   display::DriverLayerId driver_layer_id(layer_id.value());
@@ -654,18 +654,9 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
     return;
   }
 
-  // It is now illegal to provide a valid `signal_event_id`.
-  // TODO(https://fxbug.dev/370839049) This is temporary, until a subsequent CL modifies the FIDL
-  // API to make it impossible to provide a signal event.
-  if (signal_event_id.value() != display::kInvalidEventId.value()) {
-    FDF_LOG(ERROR, "SetLayerImage only accepts invalid `signal_event_id`");
-    TearDown();
-    return;
-  }
-
   // TODO(https://fxbug.dev/42080337): Check if the IDs are valid (i.e. imported but not
   // yet released) before calling SetImage().
-  layer->SetImage(image_it.CopyPointer(), wait_event_id, signal_event_id);
+  layer->SetImage(image_it.CopyPointer(), wait_event_id);
   // no Reply defined
 }
 

@@ -98,8 +98,7 @@ bool Layer::ResolvePendingImage(FenceCollection* fences, display::ConfigStamp st
       FDF_LOG(ERROR, "Tried to wait with a busy event");
       return false;
     }
-    pending_image_->PrepareFences(std::move(wait_fence),
-                                  fences->GetFence(pending_signal_event_id_));
+    pending_image_->PrepareFences(std::move(wait_fence));
     {
       fbl::AutoLock lock(pending_image_->mtx());
       waiting_images_.push_back(std::move(pending_image_));
@@ -265,15 +264,13 @@ void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
   config_change_ = true;
 }
 
-void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id,
-                     display::EventId signal_event_id) {
+void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id) {
   if (pending_image_) {
     pending_image_->DiscardAcquire();
   }
 
   pending_image_ = std::move(image);
   pending_wait_event_id_ = wait_event_id;
-  pending_signal_event_id_ = signal_event_id;
 }
 
 void Layer::RetirePendingImage() {
