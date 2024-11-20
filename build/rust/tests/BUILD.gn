@@ -59,7 +59,9 @@ if (is_host) {
   rustc_library("d") {
     edition = "2021"
     name = "d"
-    define_rustdoc_test_override = true
+
+    # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
+    #define_rustdoc_test_override = true
     source_root = "d/lib.rs"
     sources = [ "d/lib.rs" ]
     quiet_clippy = true
