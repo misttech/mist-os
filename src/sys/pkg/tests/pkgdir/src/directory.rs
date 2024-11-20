@@ -700,7 +700,6 @@ async fn clone_per_package_source(source: PackageSource) {
         fio::OpenFlags::RIGHT_EXECUTABLE,
         fio::OpenFlags::APPEND,
         fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::CLONE_SAME_RIGHTS,
     ] {
         if flag.intersects(fio::OpenFlags::APPEND) {
             continue;
@@ -798,8 +797,7 @@ async fn assert_clone_directory_no_overflow(
     let (clone, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone(flags_deprecated, node_request).expect("cloned node");
-
+    parent.open(flags_deprecated, fio::ModeType::empty(), ".", node_request).expect("cloned node");
     assert_read_dirents_no_overflow(&clone, expected_dirents).await;
 }
 

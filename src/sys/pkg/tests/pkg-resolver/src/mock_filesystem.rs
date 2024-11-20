@@ -28,6 +28,7 @@ fn handle_directory_request_stream(
 
 async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenCounter) {
     match req {
+        // TODO(https://fxbug.dev/378924331): Implement Clone2, migrate callers, and remove Clone1.
         fio::DirectoryRequest::Clone { flags, object, control_handle: _control_handle } => {
             reopen_self_deprecated(object, flags, Arc::clone(&open_counts));
         }

@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
 use blobfs_ramdisk::BlobfsRamdisk;
-use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_paver::{Asset, Configuration};
 use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs};
 use fuchsia_component_test::{
@@ -498,110 +498,62 @@ pub async fn test_updater_succeeds() -> Result<(), Error> {
     Ok(())
 }
 
-fn launch_cloned_blobfs(
-    end: ServerEnd<fio::NodeMarker>,
-    flags: fio::OpenFlags,
-    parent_flags: fio::OpenFlags,
-) {
-    let flags =
-        if flags.contains(fio::OpenFlags::CLONE_SAME_RIGHTS) { parent_flags } else { flags };
+fn launch_cloned_blobfs(end: ServerEnd<fio::NodeMarker>) {
     fasync::Task::spawn(async move {
-        serve_failing_blobfs(end.into_stream().unwrap().cast_stream(), flags)
+        serve_failing_blobfs(end.into_stream().unwrap().cast_stream())
             .await
             .unwrap_or_else(|e| panic!("Failed to serve cloned blobfs handle: {e:?}"));
     })
     .detach();
 }
 
-async fn serve_failing_blobfs(
-    mut stream: fio::DirectoryRequestStream,
-    open_flags: fio::OpenFlags,
-) -> Result<(), Error> {
-    if open_flags.contains(fio::OpenFlags::DESCRIBE) {
-        stream
-            .control_handle()
-            .send_on_open_(
-                zx::Status::OK.into_raw(),
-                Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
-            )
-            .context("sending on open")?;
-    }
+async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result<(), Error> {
     while let Some(req) = stream.try_next().await? {
         match req {
-            fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
-                launch_cloned_blobfs(object, flags, open_flags)
+            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
+                launch_cloned_blobfs(ServerEnd::new(request.into_channel()))
             }
-            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => launch_cloned_blobfs(
-                ServerEnd::new(request.into_channel()),
-                fio::OpenFlags::CLONE_SAME_RIGHTS,
-                open_flags & fio::OPEN_RIGHTS,
-            ),
             fio::DirectoryRequest::Close { responder } => {
-                responder.send(Err(zx::Status::IO.into_raw())).context("failing close")?
-            }
-            fio::DirectoryRequest::GetConnectionInfo { responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/324112547");
+                responder.send(Err(zx::Status::IO.into_raw()))?
             }
             fio::DirectoryRequest::Sync { responder } => {
-                responder.send(Err(zx::Status::IO.into_raw())).context("failing sync")?
+                responder.send(Err(zx::Status::IO.into_raw()))?
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
             }
-            fio::DirectoryRequest::GetAttr { responder } => responder
-                .send(
-                    zx::Status::IO.into_raw(),
-                    &fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0,
-                    },
-                )
-                .context("failing getattr")?,
+            fio::DirectoryRequest::GetAttr { responder } => responder.send(
+                zx::Status::IO.into_raw(),
+                &fio::NodeAttributes {
+                    mode: 0,
+                    id: 0,
+                    content_size: 0,
+                    storage_size: 0,
+                    link_count: 0,
+                    creation_time: 0,
+                    modification_time: 0,
+                },
+            )?,
             fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
-                responder.send(zx::Status::IO.into_raw()).context("failing setattr")?
+                responder.send(zx::Status::IO.into_raw())?
             }
-            fio::DirectoryRequest::GetAttributes { query, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/324112547: query={:?}", query);
+            fio::DirectoryRequest::GetAttributes { query: _, responder } => {
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
             }
-            fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/324112547: payload={:?}", payload);
+            fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
             }
-            fio::DirectoryRequest::ListExtendedAttributes { iterator: _, control_handle: _ } => {
-                todo!("https://fxbug.dev/42073111");
+            fio::DirectoryRequest::GetFlags { responder } => {
+                responder.send(zx::Status::IO.into_raw(), fio::OpenFlags::empty())?
             }
-            fio::DirectoryRequest::GetExtendedAttribute { name, responder: _ } => {
-                todo!("https://fxbug.dev/42073111: name={:?}", name);
-            }
-            fio::DirectoryRequest::SetExtendedAttribute { name, value, mode, responder: _ } => {
-                todo!(
-                    "https://fxbug.dev/42073111: name={:?} value={:?} mode={:?}",
-                    name,
-                    value,
-                    mode
-                );
-            }
-            fio::DirectoryRequest::RemoveExtendedAttribute { name, responder: _ } => {
-                todo!("https://fxbug.dev/42073111: name={:?}", name);
-            }
-            fio::DirectoryRequest::GetFlags { responder } => responder
-                .send(zx::Status::IO.into_raw(), fio::OpenFlags::empty())
-                .context("failing getflags")?,
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
-                responder.send(zx::Status::IO.into_raw()).context("failing setflags")?
+                responder.send(zx::Status::IO.into_raw())?
             }
-            fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
+            fio::DirectoryRequest::Open { flags: _, mode: _, path, object, control_handle: _ } => {
                 if &path == "." {
-                    launch_cloned_blobfs(object, flags, open_flags);
+                    launch_cloned_blobfs(object);
                 } else {
-                    object.close_with_epitaph(zx::Status::IO).context("failing open")?;
+                    object.close_with_epitaph(zx::Status::IO)?;
                 }
             }
             fio::DirectoryRequest::Open2 { path, protocols, object_request, control_handle: _ } => {
@@ -611,22 +563,7 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
                 vfs::ObjectRequest::new3(flags, &options, object).handle(|request| {
                     if path == "." {
-                        let mut open1_flags = fio::OpenFlags::empty();
-                        if flags.contains(fio::PERM_READABLE) {
-                            open1_flags |= fio::OpenFlags::RIGHT_READABLE;
-                        }
-                        if flags.contains(fio::PERM_WRITABLE) {
-                            open1_flags |= fio::OpenFlags::RIGHT_WRITABLE;
-                        }
-                        if flags.contains(fio::PERM_EXECUTABLE) {
-                            open1_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-                        }
-
-                        launch_cloned_blobfs(
-                            request.take().into_server_end(),
-                            open1_flags,
-                            open_flags,
-                        );
+                        launch_cloned_blobfs(request.take().into_server_end());
                         Ok(())
                     } else {
                         Err(zx::Status::IO)
@@ -634,36 +571,31 @@ async fn serve_failing_blobfs(
                 });
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
-                responder.send(Err(zx::Status::IO.into_raw())).context("failing unlink")?
+                responder.send(Err(zx::Status::IO.into_raw()))?
             }
             fio::DirectoryRequest::ReadDirents { max_bytes: _, responder } => {
-                responder.send(zx::Status::IO.into_raw(), &[]).context("failing readdirents")?
+                responder.send(zx::Status::IO.into_raw(), &[])?
             }
             fio::DirectoryRequest::Rewind { responder } => {
-                responder.send(zx::Status::IO.into_raw()).context("failing rewind")?
+                responder.send(zx::Status::IO.into_raw())?
             }
             fio::DirectoryRequest::GetToken { responder } => {
-                responder.send(zx::Status::IO.into_raw(), None).context("failing gettoken")?
-            }
-            fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
-                responder.send(Err(zx::Status::IO.into_raw())).context("failing rename")?
-            }
-            fio::DirectoryRequest::Link { src: _, dst_parent_token: _, dst: _, responder } => {
-                responder.send(zx::Status::IO.into_raw()).context("failing link")?
+                responder.send(zx::Status::IO.into_raw(), None)?
             }
             fio::DirectoryRequest::Watch { mask: _, options: _, watcher: _, responder } => {
-                responder.send(zx::Status::IO.into_raw()).context("failing watch")?
+                responder.send(zx::Status::IO.into_raw())?
             }
             fio::DirectoryRequest::Query { responder } => {
-                responder.send(fio::DIRECTORY_PROTOCOL_NAME.as_bytes())?;
+                responder.send(fio::DirectoryMarker::PROTOCOL_NAME.as_bytes())?;
             }
-            fio::DirectoryRequest::QueryFilesystem { responder } => responder
-                .send(zx::Status::IO.into_raw(), None)
-                .context("failing queryfilesystem")?,
-            fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?
+            fio::DirectoryRequest::QueryFilesystem { responder } => {
+                responder.send(zx::Status::IO.into_raw(), None)?
             }
-            fio::DirectoryRequest::_UnknownMethod { .. } => (),
+            _ => {
+                // To avoid making these tests to fragile, we only handle the fuchsia.io/Directory
+                // requests that we need to.
+                panic!("Unhandled fuchsia.io/Directory request.")
+            }
         };
     }
 
@@ -684,7 +616,7 @@ pub async fn test_blobfs_broken() -> Result<(), Error> {
         .context("Building TestEnv")?;
 
     fasync::Task::spawn(async move {
-        serve_failing_blobfs(server, fio::OpenFlags::empty())
+        serve_failing_blobfs(server)
             .await
             .unwrap_or_else(|e| panic!("Failed to serve blobfs: {e:?}"));
     })

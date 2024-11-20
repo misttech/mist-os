@@ -7,7 +7,7 @@
 
 use anyhow::{anyhow, format_err, Error, Result};
 use async_trait::async_trait;
-use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{open_directory_async, open_file_async, readdir, DirEntry};
 use fuchsia_fs::file::{close, read, read_to_string, write};
@@ -201,13 +201,9 @@ impl RemoteDirectory {
     }
 
     pub fn clone_proxy(&self) -> Result<fio::DirectoryProxy> {
-        let (clone, clone_server) = create_endpoints::<fio::NodeMarker>();
-        self.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, clone_server)?;
-
-        match ClientEnd::<fio::DirectoryMarker>::new(clone.into_channel()).into_proxy() {
-            Ok(cloned_proxy) => Ok(cloned_proxy),
-            Err(e) => Err(format_err!("Could not clone proxy. {}", e)),
-        }
+        let (cloned_proxy, clone_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        self.proxy.clone2(clone_server.into_channel().into())?;
+        Ok(cloned_proxy)
     }
 
     async fn entries(&self) -> Result<Vec<DirEntry>, Error> {

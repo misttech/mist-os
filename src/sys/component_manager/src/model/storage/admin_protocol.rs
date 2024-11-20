@@ -198,7 +198,7 @@ impl StorageAdmin {
                         .await
                         .map_err(|_| fcomponent::Error::Internal)?;
                         directory
-                            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            .clone2(object.into_channel().into())
                             .map_err(|_| fcomponent::Error::Internal)?;
                         Ok(())
                     };
@@ -255,7 +255,7 @@ impl StorageAdmin {
                     .await
                     {
                         Ok(dir) => responder.send(
-                            dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            dir.clone2(object.into_channel().into())
                                 .map_err(|_| fcomponent::Error::Internal),
                         )?,
                         Err(_) => responder.send(Err(fcomponent::Error::Internal))?,
