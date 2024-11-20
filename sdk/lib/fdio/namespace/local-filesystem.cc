@@ -43,7 +43,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
       status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(fdio_internal::LocalVnode::Create(
+  return zx::ok(fbl::MakeRefCounted<fdio_internal::LocalVnode>(
       parent, std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
       remote_storage));
 }
@@ -53,7 +53,8 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
 fdio_namespace::fdio_namespace() { ResetRoot(); }
 
 void fdio_namespace::ResetRoot() {
-  root_ = LocalVnode::Create({}, {}, std::in_place_type_t<LocalVnode::Intermediate>());
+  root_ = fbl::MakeRefCounted<LocalVnode>(nullptr, fbl::String{},
+                                          std::in_place_type_t<LocalVnode::Intermediate>());
 }
 
 zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
@@ -483,8 +484,8 @@ zx_status_t fdio_namespace::Bind(std::string_view path, fidl::ClientEnd<fio::Dir
 zx_status_t fdio_namespace::Bind(std::string_view path, fdio_open_local_func_t on_open,
                                  void* context) {
   return Bind(path, [on_open, context](LocalVnode::Intermediate* parent, fbl::String name) {
-    return zx::ok(LocalVnode::Create(parent, std::move(name),
-                                     std::in_place_type_t<LocalVnode::Local>(), on_open, context));
+    return zx::ok(fbl::MakeRefCounted<LocalVnode>(
+        parent, std::move(name), std::in_place_type_t<LocalVnode::Local>(), on_open, context));
   });
 }
 
@@ -595,8 +596,9 @@ zx_status_t fdio_namespace::Bind(
               }
 
               // Create a new intermediate node.
-              vn = LocalVnode::Create(&c, fbl::String(next_path_segment),
-                                      std::in_place_type_t<LocalVnode::Intermediate>());
+              vn =
+                  fbl::MakeRefCounted<LocalVnode>(&c, fbl::String(next_path_segment),
+                                                  std::in_place_type_t<LocalVnode::Intermediate>());
               c.AddEntry(vn);
 
               // Keep track of the first node we create. If any subsequent

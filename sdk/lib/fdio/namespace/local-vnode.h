@@ -41,18 +41,6 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
  public:
   DISALLOW_COPY_ASSIGN_AND_MOVE(LocalVnode);
 
-  class Intermediate;
-
-  // Initializes a new vnode.
-  //
-  // The parent must outlive the child.
-  template <class T, class... Args>
-  static fbl::RefPtr<LocalVnode> Create(Intermediate* parent, fbl::String name,
-                                        std::in_place_type_t<T> in_place, Args&&... args) {
-    return fbl::MakeRefCounted<LocalVnode>(parent, std::move(name), in_place,
-                                           std::forward<Args>(args)...);
-  }
-
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.
   void UnlinkFromParent();
 
@@ -160,6 +148,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   zx_status_t EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const;
 
+  // The parent must outlive the child.
   template <class T, class... Args>
   LocalVnode(Intermediate* parent, fbl::String name, std::in_place_type_t<T> in_place,
              Args&&... args)
