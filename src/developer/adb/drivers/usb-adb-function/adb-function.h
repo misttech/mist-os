@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 #define SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 
+#include <endian.h>
 #include <fidl/fuchsia.hardware.adb/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
@@ -20,6 +21,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <usb-endpoint/usb-endpoint-client.h>
+#include <usb/descriptors.h>
 
 namespace usb_adb_function {
 
