@@ -32,7 +32,7 @@ use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcDuration, Ut
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
@@ -62,6 +62,8 @@ pub struct Config {
 }
 
 const MILLION: u64 = 1_000_000;
+
+const MAX_CONCURRENT_HANDLERS: usize = 10;
 
 impl From<timekeeper_config::Config> for Config {
     fn from(source_config: timekeeper_config::Config) -> Self {
@@ -276,36 +278,48 @@ async fn main() -> Result<()> {
         inspect_runtime::PublishOptions::default(),
     );
 
+    let mut fs = ServiceFs::new();
     if serve_test_protocols {
-        let mut fs = ServiceFs::new();
         fs.dir("svc").add_fidl_service(Rpcs::TimeTest);
-        fs.take_and_serve_directory_handle()?;
         info!("serving test protocols: fuchsia.test.time/RTC");
+    }
+    fs.take_and_serve_directory_handle()?;
 
-        let allow_update_rtc_fn = || allow_update_rtc.clone();
+    // Ensures that only one handler of fuchsia.time.test/RPC is active at
+    // any one time.
+    let time_test_mutex: Rc<RefCell<()>> = Rc::new(RefCell::new(()));
 
-        // Serves one client at a time.  Multiple clients at a time could produce conflicting
-        // results.
-        return Ok(fs
-            .for_each(|request: Rpcs| async move {
-                match request {
-                    Rpcs::TimeTest(stream) => {
-                        rtc_testing::serve(allow_update_rtc_fn(), stream)
+    let match_loop = |request: Rpcs| {
+        let time_test_mutex = time_test_mutex.clone();
+        let allow_update_rtc = allow_update_rtc.clone();
+        async move {
+            match request {
+                Rpcs::TimeTest(stream) => {
+                    // Accepts only one client for fuchsia.time.test/RPC at a time.
+                    // This is because conflicting instructions from different clients
+                    // can end up being confusing for the test fixture.
+                    if let Ok(_only_one_please) = time_test_mutex.try_borrow_mut() {
+                        rtc_testing::serve(allow_update_rtc, stream)
                             .await
                             .map_err(|e| {
                                 tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
                             })
                             .unwrap_or(());
+                    } else {
+                        // Your request to connect was rejected.
+                        //
+                        // Not a bug in this code, but could be a bug in the
+                        // test fixture that calls into here.
+                        warn!("prevented a second client for fuchsia.time.test/RPC");
                     }
-                };
-            })
-            .await);
-    } else {
-        // fuchsia::main can only return () or Result<()>.
-        let mut fs = ServiceFs::new();
-        fs.take_and_serve_directory_handle()?;
-        Ok(fs.collect().await)
-    }
+                }
+            };
+        }
+    };
+
+    // fuchsia::main can only return () or Result<()>.
+    let result = fs.for_each_concurrent(MAX_CONCURRENT_HANDLERS, match_loop).await;
+    Ok(result)
 }
 
 /// Creates a new userspace clock for use in the monitor track, set to the same backstop time as
