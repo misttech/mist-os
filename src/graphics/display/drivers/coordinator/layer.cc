@@ -215,6 +215,9 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.image_metadata = display::ImageMetadata(image_metadata).ToBanjo();
   const rect_u_t image_area = {
       .x = 0, .y = 0, .width = image_metadata.width, .height = image_metadata.height};
+  pending_layer_.fallback_color = {
+      .format = static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+      .bytes = {0, 0, 0, 0, 0, 0, 0, 0}};
   pending_layer_.image_source = image_area;
   pending_layer_.display_destination = image_area;
   pending_image_config_gen_++;
