@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -35,12 +35,17 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
-  std::unique_ptr<sys::ComponentContext> context =
-      sys::ComponentContext::CreateAndServeOutgoingDirectory();
-
+  auto client_end = component::Connect<fuchsia_feedback::CrashReporter>();
+  if (!client_end.is_ok()) {
+    FX_LOGS(ERROR) << "Failed to connect to fuchsia.feedback::CrashReporter: "
+                   << client_end.status_string();
+    return -1;
+  }
+  auto crash_reporter =
+      fidl::Client<fuchsia_feedback::CrashReporter>(std::move(client_end.value()), dispatcher);
   auto notifier = std::make_unique<pressure_signaler::PressureNotifier>(
-      /* watch_for_changes = */ true, SendCriticalMemoryPressureCrashReports(), context.get(),
-      dispatcher);
+      /* watch_for_changes = */ true, SendCriticalMemoryPressureCrashReports(),
+      std::move(crash_reporter), dispatcher);
   auto debugger = std::make_unique<pressure_signaler::MemoryDebugger>(notifier.get());
 
   result = outgoing.AddProtocol<fuchsia_memorypressure::Provider>(std::move(notifier));

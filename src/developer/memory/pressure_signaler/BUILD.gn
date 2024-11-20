@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 
 _common_deps = [
-  "//sdk/lib/async-default",
   "//sdk/lib/async-loop:async-loop-cpp",
   "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/sys/cpp",
@@ -32,7 +31,7 @@ source_set("lib") {
            "//sdk/lib/syslog/cpp",
          ] + _common_deps
   public_deps = [
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_cpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
@@ -44,6 +43,7 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
            ":lib",
+           "//sdk/lib/component/incoming/cpp:cpp",
            "//sdk/lib/component/outgoing/cpp:cpp",
            "//sdk/lib/syslog/cpp",
          ] + _common_deps

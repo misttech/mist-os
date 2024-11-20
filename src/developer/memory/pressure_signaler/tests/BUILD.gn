@@ -16,6 +16,7 @@ executable("memory_pressure_signaler_unittests") {
     "pressure_observer_unittest.cc",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp_testing",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/developer/memory/pressure_signaler:lib",
     "//src/lib/fxl/test:gtest_main",

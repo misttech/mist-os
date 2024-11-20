@@ -4,12 +4,12 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
+#include <fidl/fuchsia.feedback/cpp/fidl.h>
+#include <fidl/fuchsia.feedback/cpp/test_base.h>
 #include <fidl/fuchsia.memory.debug/cpp/fidl.h>
-#include <fuchsia/feedback/cpp/fidl_test_base.h>
 #include <lib/async/default.h>
-#include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/clock.h>
+#include <lib/zx/time.h>
 
 #include <cstddef>
 
@@ -21,31 +21,20 @@ namespace pressure_signaler::test {
 
 namespace fmp = fuchsia_memorypressure;
 
-class CrashReporterForTest : public fuchsia::feedback::testing::CrashReporter_TestBase {
+class CrashReporterForTest : public fidl::testing::TestBase<fuchsia_feedback::CrashReporter> {
  public:
-  CrashReporterForTest() : binding_(this) {}
-
-  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override {
+  void FileReport(FileReportRequest& request, FileReportCompleter::Sync& completer) override {
     num_crash_reports_++;
-    fuchsia::feedback::CrashReporter_FileReport_Result result;
-    result.set_response({});
-    callback(std::move(result));
+    completer.Reply(fit::ok(fuchsia_feedback::CrashReporterFileReportResponse{}));
   }
 
-  fidl::InterfaceRequestHandler<fuchsia::feedback::CrashReporter> GetHandler() {
-    return [this](fidl::InterfaceRequest<fuchsia::feedback::CrashReporter> request) {
-      binding_.Bind(std::move(request));
-    };
-  }
-
-  void NotImplemented_(const std::string& name) override {
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     FX_NOTIMPLEMENTED() << name << " is not implemented";
   }
 
   size_t num_crash_reports() const { return num_crash_reports_; }
 
  private:
-  fidl::Binding<fuchsia::feedback::CrashReporter> binding_;
   size_t num_crash_reports_ = 0;
 };
 
@@ -53,26 +42,28 @@ class PressureNotifierUnitTest : public fidl::Server<fuchsia_memory_debug::Memor
                                  public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    context_provider_ =
-        std::make_unique<sys::testing::ComponentContextProvider>(async_get_default_dispatcher());
-    context_provider_->service_directory_provider()->AddService(crash_reporter_.GetHandler());
-    SetUpNewPressureNotifier(true /*notify_crash_reproter*/);
+    SetUpNewPressureNotifier(true /*notify_crash_reporter*/);
     last_level_ = Level::kNormal;
   }
 
  protected:
   void SetUpNewPressureNotifier(bool send_critical_pressure_crash_reports) {
-    notifier_ = std::make_unique<PressureNotifier>(false, send_critical_pressure_crash_reports,
-                                                   context_provider_->context(),
-                                                   async_get_default_dispatcher());
+    auto endpoints = fidl::CreateEndpoints<fuchsia_feedback::CrashReporter>().value();
+    auto _ = fidl::BindServer<fuchsia_feedback::CrashReporter>(
+        dispatcher(), std::move(std::move(endpoints.server)), &crash_reporter_);
+    auto client =
+        fidl::Client<fuchsia_feedback::CrashReporter>(std::move(endpoints.client), dispatcher());
+    notifier_ =
+        std::make_unique<PressureNotifier>(false, send_critical_pressure_crash_reports,
+                                           std::move(client), async_get_default_dispatcher());
     // Set up initial pressure level.
     notifier_->observer_.WaitOnLevelChange();
   }
 
   fidl::Client<fmp::Provider> Provider() {
     auto endpoints = fidl::CreateEndpoints<fmp::Provider>().value();
-    auto _ = fidl::BindServer<fmp::Provider>(dispatcher(), std::move(std::move(endpoints.server)),
-                                             notifier_.get());
+    auto _ =
+        fidl::BindServer<fmp::Provider>(dispatcher(), std::move(endpoints.server), notifier_.get());
     return fidl::Client<fmp::Provider>(std::move(endpoints.client), dispatcher());
   }
 
@@ -123,7 +114,6 @@ class PressureNotifierUnitTest : public fidl::Server<fuchsia_memory_debug::Memor
     notifier_->DebugNotify(request.level());
   }
 
-  std::unique_ptr<sys::testing::ComponentContextProvider> context_provider_;
   std::unique_ptr<PressureNotifier> notifier_;
   CrashReporterForTest crash_reporter_;
   Level last_level_;

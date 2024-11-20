@@ -4,6 +4,7 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
+#include <fidl/fuchsia.feedback/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -45,13 +46,13 @@ Level ConvertFromMemoryPressureServiceLevel(fuchsia_memorypressure::Level level)
 // on this thread.
 PressureNotifier::PressureNotifier(bool watch_for_changes,
                                    bool send_critical_pressure_crash_reports,
-                                   sys::ComponentContext* context, async_dispatcher_t* dispatcher)
+                                   fidl::Client<fuchsia_feedback::CrashReporter> crash_reporter,
+                                   async_dispatcher_t* dispatcher)
     : provider_dispatcher_(dispatcher),
-      context_(context),
       observer_(watch_for_changes, this),
-      send_critical_pressure_crash_reports_(send_critical_pressure_crash_reports) {
+      send_critical_pressure_crash_reports_(send_critical_pressure_crash_reports),
+      crash_reporter_(std::move(crash_reporter)) {
   FX_CHECK(dispatcher);
-  FX_CHECK(context);
 }
 
 void PressureNotifier::Notify() {
@@ -99,7 +100,13 @@ void PressureNotifier::DebugNotify(fuchsia_memorypressure::Level level) const {
   FX_LOGS(INFO) << "Simulating memory pressure level "
                 << kLevelNames[ConvertFromMemoryPressureServiceLevel(level)];
   for (auto& watcher : watchers_) {
-    watcher->proxy.value()->OnLevelChanged({{.level = level}}).Then([](auto) {});
+    watcher->proxy.value()
+        ->OnLevelChanged({{.level = level}})
+        .Then([](fidl::Result<fuchsia_memorypressure::Watcher::OnLevelChanged> result) {
+          if (!result.is_ok()) {
+            FX_LOGS(ERROR) << "Failed to simulate pressure level signal: " << result.error_value();
+          }
+        });
   }
 }
 
@@ -120,7 +127,13 @@ void PressureNotifier::NotifyWatcher(WatcherState* watcher, Level level) {
   ZX_ASSERT(level_or_error.is_ok());
   watcher->proxy.value()
       ->OnLevelChanged({{.level = level_or_error.value()}})
-      .Then([watcher, this](auto) { OnLevelChangedCallback(watcher); });
+      .Then([watcher, this](fidl::Result<fuchsia_memorypressure::Watcher::OnLevelChanged> result) {
+        if (result.is_ok()) {
+          OnLevelChangedCallback(watcher);
+        } else {
+          FX_LOGS(ERROR) << "Failed to signal pressure change: " << result.error_value();
+        }
+      });
 }
 
 void PressureNotifier::OnLevelChangedCallback(WatcherState* watcher) {
@@ -207,29 +220,23 @@ bool PressureNotifier::CanGenerateNewCriticalCrashReports() {
 }
 
 void PressureNotifier::FileCrashReport(CrashReportType type) {
-  if (context_ == nullptr) {
-    return;
-  }
-  auto crash_reporter = context_->svc()->Connect<fuchsia::feedback::CrashReporter>();
-  if (!crash_reporter) {
-    return;
-  }
-
-  fuchsia::feedback::CrashReport report;
-  report.set_program_name("system");
+  fuchsia_feedback::CrashReport report{
+      {.program_name = "system", .program_uptime = zx_clock_get_monotonic(), .is_fatal = false}};
   switch (type) {
     case CrashReportType::kImminentOOM:
-      report.set_crash_signature("fuchsia-imminent-oom");
+      report.crash_signature("fuchsia-imminent-oom");
       break;
     case CrashReportType::kCritical:
-      report.set_crash_signature("fuchsia-critical-memory-pressure");
+      report.crash_signature("fuchsia-critical-memory-pressure");
       break;
   }
-  report.set_program_uptime(zx_clock_get_monotonic());
-  report.set_is_fatal(false);
 
-  crash_reporter->FileReport(std::move(report),
-                             [](fuchsia::feedback::CrashReporter_FileReport_Result unused) {});
+  crash_reporter_->FileReport({{.report = std::move(report)}})
+      .Then([](fidl::Result<fuchsia_feedback::CrashReporter::FileReport> result) {
+        if (!result.is_ok()) {
+          FX_LOGS(ERROR) << "Failed to file a report: " << result.error_value();
+        };
+      });
 
   // Logic to control rate of Critical crash report generation.
   if (type == CrashReportType::kCritical) {

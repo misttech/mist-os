@@ -5,10 +5,8 @@
 #ifndef SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
 #define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
 
+#include <fidl/fuchsia.feedback/cpp/fidl.h>
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
-#include <fuchsia/feedback/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
 
 #include <vector>
 
@@ -35,7 +33,7 @@ class PressureNotifier : public fidl::Server<fuchsia_memorypressure::Provider> {
   };
 
   explicit PressureNotifier(bool watch_for_changes, bool send_critical_pressure_crash_reports,
-                            sys::ComponentContext* context = nullptr,
+                            fidl::Client<fuchsia_feedback::CrashReporter> crash_reporter,
                             async_dispatcher_t* dispatcher = nullptr);
 
   PressureNotifier(const PressureNotifier&) = delete;
@@ -66,7 +64,6 @@ class PressureNotifier : public fidl::Server<fuchsia_memorypressure::Provider> {
 
   async::TaskClosureMethod<PressureNotifier, &PressureNotifier::PostLevelChange> post_task_{this};
   async_dispatcher_t* const provider_dispatcher_;
-  sys::ComponentContext* const context_;
   std::vector<std::unique_ptr<WatcherState>> watchers_;
   PressureObserver observer_;
 
@@ -74,6 +71,7 @@ class PressureNotifier : public fidl::Server<fuchsia_memorypressure::Provider> {
   zx::time prev_critical_crash_report_time_ = zx::time(ZX_TIME_INFINITE_PAST);
   zx::duration critical_crash_report_interval_ = zx::min(30);
   const bool send_critical_pressure_crash_reports_;
+  fidl::Client<fuchsia_feedback::CrashReporter> crash_reporter_;
 
   friend class test::PressureNotifierUnitTest;
 };

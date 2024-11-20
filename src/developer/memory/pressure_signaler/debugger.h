@@ -6,8 +6,6 @@
 #define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_DEBUGGER_H_
 
 #include <fidl/fuchsia.memory.debug/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
