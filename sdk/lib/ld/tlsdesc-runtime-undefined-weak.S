@@ -53,57 +53,6 @@
 
 .end_function
 
-#elif defined(__arm__)
-
-// Read $tp into \reg (as __builtin_thread_pointer() does).
-.macro read_tp reg
-  mrc p15, #0, \reg, c13, c0, #3
-.endm
-
-// Return -$tp so that adding $tp yields zero, i.e. nullptr.
-.function _ld_tlsdesc_runtime_undefined_weak, global, retain=TLSDESC_RETAIN
-  .tlsdesc.cfi
-  .tlsdesc.lsda kUndefinedWeak
-
-  read_tp r0
-  neg r0, r0
-
-  bx lr
-
-.end_function
-
-// Return addend-$tp so that adding $tp looks like nullptr+addend.
-.function _ld_tlsdesc_runtime_undefined_weak_addend, global, retain=TLSDESC_RETAIN
-  .tlsdesc.cfi
-  .tlsdesc.lsda kUndefinedWeakAddend
-
-  // Only r0 and lr can be clobbered, so another register must be saved.
-  push {r1-r2}
-  .cfi_adjust_cfa_offset 8
-  .cfi_offset r1, -8
-  .cfi_offset r2, -4
-
-  // On entry r0 contains the argument: the address of the GOT slot pair.
-  // Fetch the addend.
-  ldr r0, [r0, #4]
-
-  // On exit r0 contains the return value: offset from $tp (TPIDR_EL0).
-  .cfi_undefined r0
-
-  // Fetch the thread pointer.
-  read_tp r0
-
-  // Subtract the thread pointer from the addend.
-  sub r0, r0, r1
-
-  pop {r1-r2}
-  .cfi_same_value r1
-  .cfi_same_value r2
-  .cfi_adjust_cfa_offset -8
-  bx lr
-
-.end_function
-
 #elif defined(__riscv)
 
 // Return -$tp so that adding $tp yields zero, i.e. nullptr.

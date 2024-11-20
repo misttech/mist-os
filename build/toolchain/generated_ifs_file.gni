@@ -9,7 +9,7 @@
 # Parameters:
 #
 #   * soname
-#     - Optional: The name of the linkable library file to write. This should
+#     - Required: The name of the linkable library file to write. This should
 #     include a `lib` prefix (if applicable) and the `.so` extension.
 #     - Type: string
 #
@@ -17,29 +17,40 @@
 #     - Required: The list of symbols defined by this generated ELF file. Each
 #     symbol must have a $name and a $type. The object may optionally have a
 #     $size or $weak boolean, if applicable.
-#     - Type: list(scope or string)
-#       - A string is shorthand for a scope `{ name = "..." type = "Func" }`.
-#       - A scope must have the following schema:
-#         * name
-#           - Required: The symbol name.
-#           - Type: string
-#         * type
-#           - Required: The symbol type.
-#           - Type: `Func`, `Object`, `TLS`
-#         * size
-#           - Optional: The symbol size (st_size) field.
-#           - Type: integer
-#           - Default: 0
-#         * weak
-#           - Optional: If true, STB_WEAK rather than STB_GLOBAL.
-#           - Type: boolean
-#           - Default: false
+#     For example:
+#     ```
+#     symbols = [
+#       {
+#         name = "foo",
+#         type = "Func"
+#       },
+#       {
+#         name = "bar",
+#         type = "Func"
+#         weak = true
+#       },
+#       {
+#         name = "my_struct",
+#         type = "Object"
+#         size = 8
+#       },
+#       {
+#         name = "tls_ie_weak",
+#         type = "TLS"
+#         size = 4
+#       },
+#    ]
+#    ```
+#     - Type: list(scope)
 #
 #  * needed_libs
-#    - Optional: The list of DT_NEEDEDs of this generated ELF file.
-#    Each element is a full SONAME, such as `libfoo.so`.
-#    - Type: list(string)
-#
+#   - Optional: The list of DT_NEEDEDs of this generated ELF file. Each entry is
+#   a full SONAME, such as `libfoo.so`.
+#   For example:
+#   ```
+#   needed_libs = [ "libfoo.so", "libbar.so" ]
+#   ```
+#   - Type: list(string)
 template("generated_ifs_file") {
   generated_file(target_name) {
     outputs = [ "$target_gen_dir/$target_name.ifs" ]
@@ -48,20 +59,11 @@ template("generated_ifs_file") {
     contents = [
       "--- !ifs-v1",
       "IfsVersion:  3.0",
+      "SoName:      ${invoker.soname}",
+      "Symbols:",
     ]
-    if (defined(invoker.soname)) {
-      contents += [ "SoName:      ${invoker.soname}" ]
-    }
-
-    contents += [ "Symbols:" ]
 
     foreach(symbol, invoker.symbols) {
-      if (symbol == "$symbol") {  # String shorthand for common Func case.
-        symbol = {
-          name = symbol
-          type = "Func"
-        }
-      }
       symbol_string = "  - { Name: ${symbol.name}, Type: ${symbol.type}"
       if (defined(symbol.size)) {
         symbol_string += ", Size: ${symbol.size}"

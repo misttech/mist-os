@@ -424,9 +424,8 @@ class RemoteDynamicLinker {
   // initial module's place in the load order.  The modules() list is complete,
   // remote_abi() has been initialized, and abi_stub_module() can be used.
   template <class Diagnostics, typename GetDep>
-  std::optional<InitResult> Init(
-      Diagnostics& diag, InitModuleList initial_modules, GetDep&& get_dep,
-      std::optional<elfldltl::ElfMachine> machine = elfldltl::ElfMachine::kNative) {
+  std::optional<InitResult> Init(Diagnostics& diag, InitModuleList initial_modules,
+                                 GetDep&& get_dep) {
     static_assert(std::is_invocable_r_v<GetDepResult, GetDep, Soname>);
 
     assert(abi_stub_);
@@ -439,21 +438,12 @@ class RemoteDynamicLinker {
 
     auto next_modid = [this]() -> uint32_t { return static_cast<uint32_t>(modules_.size()); };
 
-    auto check_machine = [machine, &diag](const DecodedModule& decoded) {
-      return !machine || decoded.machine() == *machine ||
-             // TODO(mcgrathr): module-prefixed diagnostics here?
-             diag.FormatError("wrong e_machine for architecture: ", decoded.machine());
-    };
-
     // Start the list with the root modules.  The first one is the main
     // executable if there is such a thing.  It gets symbolizer module ID 0.
     std::vector<uint32_t> initial_modules_modid(initial_modules.size(), static_cast<uint32_t>(-1));
     size_t implicit_module_count = 1;  // The stub counts specially.
     for (size_t i = 0; i < initial_modules.size(); ++i) {
       InitModule& init_module = initial_modules[i];
-      if (!check_machine(*init_module.decoded_module)) [[unlikely]] {
-        return std::nullopt;
-      }
       if (init_module.visible_name) {
         initial_modules_modid[i] = next_modid();
         EmplaceModule(*init_module.visible_name, std::nullopt,
@@ -532,12 +522,9 @@ class RemoteDynamicLinker {
             // The get_dep function failed, but said to keep going anyway.
             continue;
           }
-          if (!check_machine(**result)) [[unlikely]] {
-            return std::nullopt;
-          }
           mod.set_decoded(std::move(*result), modid, true, max_tls_modid_);
         } else {
-          return std::nullopt;
+          return {};
         }
       }
 

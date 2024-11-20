@@ -29,22 +29,6 @@
   ret
 .end_function
 
-#elif defined(__arm__)
-
-.function _ld_tlsdesc_runtime_static, global, retain=TLSDESC_RETAIN
-  .tlsdesc.cfi
-  .tlsdesc.lsda kStatic
-
-  // On entry r0 contains the argument: the address of the GOT slot pair.
-  // The first word holds our own PC, the second the static TLS offset.
-  ldr r0, [r0, #4]
-
-  // On exit r0 contains the return value: offset from $tp.
-  .cfi_undefined r0
-
-  bx lr
-.end_function
-
 #elif defined(__x86_64__)
 
 // The GOT slot contains the offset from %fs.base.  Just return it.

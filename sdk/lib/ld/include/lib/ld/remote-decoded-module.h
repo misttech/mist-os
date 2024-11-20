@@ -124,10 +124,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   // After Init, this has the information relevant for a main executable.
   const ExecInfo& exec_info() const { return exec_info_; }
 
-  // After Init, this reports the e_machine field.  Decoding does not care
-  // which machine it's for, but consuming it likely will.
-  elfldltl::ElfMachine machine() const { return machine_; }
-
   // After Init, this is the list of direct DT_NEEDED dependencies in this
   // object.  Each element's .str() / .c_str() pointers point into the mapped
   // file image and are valid for the lifetime of this RemoteDecodedModule (or
@@ -166,8 +162,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // Get direct pointers to the file header and the program headers inside
     // the mapped file image.
     constexpr elfldltl::NoArrayFromFile<Phdr> kNoPhdrAllocator;
-    auto headers =
-        elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo_, kNoPhdrAllocator, std::nullopt);
+    auto headers = elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo_, kNoPhdrAllocator);
     if (!headers) [[unlikely]] {
       // TODO(mcgrathr): LoadHeadersFromFile doesn't propagate Diagnostics
       // return value on failure.
@@ -185,7 +180,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     const Ehdr& ehdr = ehdr_owner;
     const std::span<const Phdr> phdrs = phdrs_owner;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
-    auto result = DecodeModulePhdrs<Elf>(  //
+    auto result = DecodeModulePhdrs(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
         PhdrFileBuildIdObserver<Elf>(mapped_vmo_, kNoBuildIdAllocator, this->module()));
     if (!result) [[unlikely]] {
@@ -196,7 +191,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     auto [dyn_phdr, tls_phdr, relro_phdr, stack_size] = *result;
 
     exec_info_ = {.relative_entry = ehdr.entry, .stack_size = stack_size};
-    machine_ = ehdr.machine;
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
     if (!this->load_info().ApplyRelro(diag, relro_phdr, page_size, false)) [[unlikely]] {
@@ -215,7 +209,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     }
 
     auto memory = metadata_memory();
-    SetModulePhdrs<Elf>(this->module(), ehdr, this->load_info(), memory);
+    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory);
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     // The TLS module ID is not meaningful here, it just has to be nonzero.
@@ -264,7 +258,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   NeededList needed_;
   ExecInfo exec_info_;
   zx::vmo vmo_;
-  elfldltl::ElfMachine machine_ = elfldltl::ElfMachine::kNone;
 };
 
 }  // namespace ld

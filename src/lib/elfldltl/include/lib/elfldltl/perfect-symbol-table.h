@@ -229,12 +229,7 @@ class PerfectSymbolFilter : public PerfectSymbolMap<const typename ElfLayout::Sy
   // symbols were found or the diagnostics object said to keep going.
   constexpr bool Init(auto& diag, const auto& module, bool undef_ok = false) {
     for (auto [name, sym] : symbols_.Enumerate()) {
-      // The Lookup API requires a mutable SymbolName so it can always cache
-      // the on-demand hash calculation for a runtime SymbolName.  The name
-      // here is constexpr with precomputed hashes so that won't actually be
-      // required, but a mutable copy must be passed to the Lookup call.
-      elfldltl::SymbolName mutable_name = name;
-      auto result = module.Lookup(diag, mutable_name);
+      auto result = module.Lookup(diag, name);
       if (result.is_error()) [[unlikely]] {
         return result.error_value();
       }

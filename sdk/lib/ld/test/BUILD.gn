@@ -5,10 +5,8 @@
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/test.gni")
-import("//build/testing/golden_files.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/c_utils.gni")
-import("//sdk/lib/ld/remote_perfect_symbol_filter.gni")
 import("//sdk/lib/ld/testing/test_elf_object.gni")
 
 group("tests") {
@@ -101,19 +99,12 @@ source_set("load-tests") {
       "remote-tests.cc",
     ]
     deps += [
-      ":remote-perfect-symbol-filter-test",
       "..:fuchsia-debugdata",
       "..:remote",
       "../testing",
       "//sdk/lib/fdio",
       "//zircon/system/ulib/zx",
     ]
-
-    # LdRemoteTests.RemotePerfectSymbolFilterTestElf32 needs an Elf32 object,
-    # but it doesn't really matter what machine or OS it's for.  The Elf32
-    # target that conveniently works out of the box is armv7-linux-gnu.
-    elf32_tc = "//build/toolchain:linux_arm"
-    data_deps += [ "modules:symbol-filter-elf32.fuchsia-test-data($elf32_tc)" ]
   } else {
     sources += [
       "ld-load-tests-posix-base.cc",
@@ -215,45 +206,4 @@ source_set("test-chdir-guard") {
     "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",
   ]
-}
-
-remote_perfect_symbol_filter("remote-perfect-symbol-filter-test") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  includes = [ "<lib/elfldltl/testing/diagnostics.h>" ]
-  deps = [ "//src/lib/elfldltl/testing" ]
-  diagnostics = "elfldltl::testing::ExpectOkDiagnostics"
-
-  namespace = "ld::testing"
-  output_name = "PerfectSymbolFilterTest"
-  soname = "libsymbol-filter-dep17.so"
-  symbols = [
-    "first",
-    "third",
-  ]
-  elves = [
-    "elfldltl::Elf64<>",
-    "elfldltl::Elf32<>",
-  ]
-
-  data_deps =
-      [ ":remote-perfect-symbol-filter-test.ifs-check($default_toolchain)" ]
-}
-
-if (current_toolchain == default_toolchain) {
-  golden_files("remote-perfect-symbol-filter-test.ifs-check") {
-    visibility = [ ":*" ]
-    testonly = true
-
-    deps = [ ":remote-perfect-symbol-filter-test.ifs" ]
-    ifs_outputs = get_target_outputs(deps[0])
-
-    comparisons = [
-      {
-        golden = "goldens/remote-perfect-symbol-filter-test.ifs"
-        candidate = ifs_outputs[0]
-      },
-    ]
-  }
 }

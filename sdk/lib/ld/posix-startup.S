@@ -46,14 +46,6 @@
   mov %rbx, -8(%rsp)
   jmp *%rax
 
-#elif defined(__arm__)
-
-  mov r0, sp
-  bl StartLd
-  mov r4, r0
-  mov r0, #0
-  bx r4
-
 #else
 #error "unsupported machine"
 #endif

@@ -5,19 +5,18 @@
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-dynamic-linker.h>
-#include <lib/ld/remote-perfect-symbol-filter.h>
 #include <lib/ld/remote-zygote.h>
 
 #include <gtest/gtest.h>
 
 #include "ld-remote-process-tests.h"
-#include "remote-perfect-symbol-filter-test.h"
 
 namespace {
 
 using ::testing::Each;
 using ::testing::Field;
 using ::testing::IsTrue;
+using ::testing::NotNull;
 using ::testing::Pointee;
 using ::testing::Property;
 
@@ -793,96 +792,6 @@ TEST_F(LdRemoteTests, SymbolFilter) {
   EXPECT_EQ(Run(), kReturnValue);
 
   ExpectLog("");
-}
-
-// This reuses one of the modules from the SymbolFilter test, but it only uses
-// the test fixture to acquire the VMO (and the cached page size).  It doesn't
-// do any dynamic linking, it just decodes a module and then unit-tests the
-// generated filter function.
-template <class Elf, class Test>
-void PerfectSymbolFilterTest(Test& test, std::string_view path_prefix) {
-  using size_type = Elf::size_type;
-  using Sym = Elf::Sym;
-  using Module = ld::RemoteLoadModule<Elf>;
-
-  test.LdsvcPathPrefix(path_prefix);
-
-  auto diag = elfldltl::testing::ExpectOkDiagnostics();
-  auto decoded = Module::Decoded::Create(diag, test.GetLibVmo("libsymbol-filter-dep17.so"),
-                                         static_cast<size_type>(Test::kPageSize));
-  ASSERT_TRUE(decoded);
-  ASSERT_TRUE(decoded->HasModule());
-
-  // The original module has all three symbols.
-
-  constexpr elfldltl::SymbolName kFirst = "first";
-  const Sym* first_sym = kFirst.Lookup(decoded->symbol_info());
-  EXPECT_NE(first_sym, nullptr);
-
-  constexpr elfldltl::SymbolName kSecond = "second";
-  const Sym* second_sym = kSecond.Lookup(decoded->symbol_info());
-  EXPECT_NE(second_sym, nullptr);
-
-  constexpr elfldltl::SymbolName kThird = "third";
-  const Sym* third_sym = kThird.Lookup(decoded->symbol_info());
-  EXPECT_NE(third_sym, nullptr);
-
-  // These are distinct symbols.
-  EXPECT_NE(first_sym, second_sym);
-  EXPECT_NE(first_sym, third_sym);
-  EXPECT_NE(second_sym, third_sym);
-
-  // Populate the filter.
-  typename Module::SymbolFilter filter = ld::testing::PerfectSymbolFilterTest<Elf>(diag, decoded);
-  ASSERT_TRUE(filter);
-
-  // Mock up a module object.  It won't be referenced by calls to the filter.
-  Module mod;
-
-  // First symbol is found by the filter.
-  elfldltl::SymbolName name = kFirst;
-  auto first_result = filter(mod, name);
-  ASSERT_TRUE(first_result.is_ok()) << first_result.error_value();
-  EXPECT_EQ(*first_result, first_sym);
-
-  // Second symbol is filtered out: not found.
-  name = kSecond;
-  auto second_result = filter(mod, name);
-  ASSERT_TRUE(second_result.is_ok()) << second_result.error_value();
-  EXPECT_EQ(*second_result, nullptr);
-
-  // Third symbol is found by the filter.
-  name = kThird;
-  auto third_result = filter(mod, name);
-  ASSERT_TRUE(third_result.is_ok()) << third_result.error_value();
-  EXPECT_EQ(*third_result, third_sym);
-
-  // Now install the filter and get the same results via the module.  Nothing
-  // else will be used, so the module stays otherwise default-constructed.
-  mod.set_symbol_filter(std::move(filter));
-
-  name = kFirst;
-  first_result = mod.Lookup(diag, name);
-  ASSERT_TRUE(first_result.is_ok()) << first_result.error_value();
-  EXPECT_EQ(*first_result, first_sym);
-
-  name = kSecond;
-  second_result = mod.Lookup(diag, name);
-  ASSERT_TRUE(second_result.is_ok()) << second_result.error_value();
-  EXPECT_EQ(*second_result, nullptr);
-
-  name = kThird;
-  third_result = mod.Lookup(diag, name);
-  ASSERT_TRUE(third_result.is_ok()) << third_result.error_value();
-  EXPECT_EQ(*third_result, third_sym);
-}
-
-TEST_F(LdRemoteTests, PerfectSymbolFilter) {
-  ASSERT_NO_FATAL_FAILURE(PerfectSymbolFilterTest<elfldltl::Elf<>>(*this, "symbol-filter"));
-}
-
-TEST_F(LdRemoteTests, PerfectSymbolFilterElf32) {
-  ASSERT_NO_FATAL_FAILURE(PerfectSymbolFilterTest<elfldltl::Elf32<>>(*this, "symbol-filter-elf32"));
 }
 
 }  // namespace

@@ -72,7 +72,6 @@ library_headers("headers") {
       "lib/ld/remote-decoded-module.h",
       "lib/ld/remote-dynamic-linker.h",
       "lib/ld/remote-load-module.h",
-      "lib/ld/remote-perfect-symbol-filter.h",
       "lib/ld/remote-zygote.h",
     ]
 

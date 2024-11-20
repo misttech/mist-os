@@ -28,18 +28,6 @@
   udf #0
 #endif
 
-#elif defined(__arm__)
-
-#ifdef IN_PROCESS_TEST
-  b TestStart
-#else
-  // .prologue.fp
-  bl TestStart
-  // Return value in r0 is argument.
-  bl _exit
-  udf #0
-#endif
-
 #elif defined(__riscv)
 
 #ifdef IN_PROCESS_TEST

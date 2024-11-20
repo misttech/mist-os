@@ -303,16 +303,6 @@ template("_test_data") {
       deps = [ ":$manifest_target" ]
       outputs = [ "$host_test_data_dir/$main_target" ]
     }
-
-    # This is used for symbol-filter-elf32.  It provides metadata for putting
-    # these non-Fuchsia binaries in the usual place in a Fuchsia test package.
-    # Each binary target has metadata for its flat name with no subdirectory.
-    # This places them all inside the lib/ subdirectory for this root module;
-    # LdLoadZirconLdsvcTestsBase::GetLibVmo will find them there.
-    _test_prefix_manifest("$main_target.fuchsia-test-data") {
-      prefix = "lib/test/$main_target/lib"
-      deps = invoker.deps
-    }
   }
 }
 
@@ -1547,22 +1537,11 @@ symbol_filter_values = [
   23,
   42,
 ]
-
-# The symbol-filter and symbol-filter-elf32 targets are actually identical, but
-# they will be instantiated in different build environments.  The -elf32
-# version is really only used for one of its dependencies, but this is the
-# simple way to get that packaged in the test under a different name.
-foreach(suffix,
-        [
-          "",
-          "-elf32",
-        ]) {
-  test_executable("symbol-filter$suffix") {
-    sources = [ "symbol-filter.cc" ]
-    deps = []
-    foreach(value, symbol_filter_values) {
-      deps += [ ":symbol-filter-dep$value" ]
-    }
+test_executable("symbol-filter") {
+  sources = [ "symbol-filter.cc" ]
+  deps = []
+  foreach(value, symbol_filter_values) {
+    deps += [ ":symbol-filter-dep$value" ]
   }
 }
 

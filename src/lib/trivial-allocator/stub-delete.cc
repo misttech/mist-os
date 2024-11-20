@@ -5,9 +5,7 @@
 #include <new>
 
 #ifndef STUB_BODY
-#define STUB_BODY \
-  do {            \
-  } while (0)  // Silent no-op
+#define STUB_BODY  // Silent no-op
 #endif
 
 // See the BUILD.gn target "stub-delete" for more commentary.
@@ -25,18 +23,17 @@
 // delete` function to do the actual deletion, so those entry points must be
 // defined even if though they can never be reached.
 
-void operator delete(void* ptr) noexcept { STUB_BODY; }
-void operator delete[](void* ptr) noexcept { STUB_BODY; }
+void operator delete(void* ptr) noexcept { STUB_BODY }
+void operator delete[](void* ptr) noexcept { STUB_BODY }
 
-void operator delete(void* ptr, std::align_val_t alignment) noexcept { STUB_BODY; }
-void operator delete[](void* ptr, std::align_val_t alignment) noexcept { STUB_BODY; }
+void operator delete(void* ptr, std::align_val_t alignment) noexcept { STUB_BODY }
+void operator delete[](void* ptr, std::align_val_t alignment) noexcept { STUB_BODY }
 
-void operator delete(void* ptr, size_t size) noexcept { STUB_BODY; }
-void operator delete[](void* ptr, size_t size) noexcept { STUB_BODY; }
+void operator delete(void* ptr, size_t size) noexcept { STUB_BODY }
+void operator delete[](void* ptr, size_t size) noexcept { STUB_BODY }
 
-void operator delete(void* ptr, size_t size, std::align_val_t al) noexcept { STUB_BODY; }
-
-void operator delete[](void* ptr, size_t size, std::align_val_t al) noexcept { STUB_BODY; }
+void operator delete(void* ptr, size_t size, std::align_val_t al) noexcept { STUB_BODY }
+void operator delete[](void* ptr, size_t size, std::align_val_t al) noexcept { STUB_BODY }
 
 // These are the mangled names of all the functions above.  Because these
 // functions are magical in the language, the compiler insists on making
@@ -51,17 +48,13 @@ void operator delete[](void* ptr, size_t size, std::align_val_t al) noexcept { S
 #endif
 
 HIDDEN(_ZdaPv);
-HIDDEN(_ZdaPvj);
 HIDDEN(_ZdaPvm);
 
 HIDDEN(_ZdlPv);
-HIDDEN(_ZdlPvj);
 HIDDEN(_ZdlPvm);
 
-HIDDEN(_ZdaPvSt11align_val_t);
 HIDDEN(_ZdlPvSt11align_val_t);
+HIDDEN(_ZdaPvSt11align_val_t);
 
-HIDDEN(_ZdaPvjSt11align_val_t);
-HIDDEN(_ZdaPvmSt11align_val_t);
-HIDDEN(_ZdlPvjSt11align_val_t);
 HIDDEN(_ZdlPvmSt11align_val_t);
+HIDDEN(_ZdaPvmSt11align_val_t);

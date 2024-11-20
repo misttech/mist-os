@@ -6,10 +6,10 @@
 
 namespace {
 
-void PanicDelete() { ZX_PANIC("`delete` statement reached at runtime!"); }
+void DummyDelete() { ZX_PANIC("`delete` statement reached at runtime!"); }
 
 }  // namespace
 
-#define STUB_BODY PanicDelete()
+#define STUB_BODY DummyDelete();
 
 #include "stub-delete.cc"  // nogncheck
