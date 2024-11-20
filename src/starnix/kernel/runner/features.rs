@@ -20,6 +20,7 @@ use starnix_modules_input::{
     DEFAULT_TOUCH_DEVICE_ID,
 };
 use starnix_modules_magma::magma_device_init;
+use starnix_modules_nanohub::nanohub_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
@@ -73,6 +74,8 @@ pub struct Features {
     pub rootfs_rw: bool,
 
     pub network_manager: bool,
+
+    pub nanohub: bool,
 }
 
 /// Parses all the featurse in `entries`.
@@ -107,6 +110,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
+            ("nanohub", _) => features.nanohub = true,
             ("network_manager", _) => features.network_manager = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
@@ -259,6 +263,9 @@ pub fn run_container_features(
         if let Err(e) = kernel.network_manager.init(kernel) {
             log_error!("Network manager initialization failed: ({e:?})");
         }
+    }
+    if features.nanohub {
+        nanohub_device_init(locked, system_task);
     }
 
     Ok(())

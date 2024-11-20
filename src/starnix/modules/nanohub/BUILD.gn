@@ -9,13 +9,17 @@ fuchsia_package_with_single_component("sockettunnel") {
   manifest = "meta/sockettunnel.cml"
 }
 
-rustc_library("socket-tunnel") {
-  name = "starnix-modules-socket-tunnel"
+rustc_library("nanohub") {
+  name = "starnix-modules-nanohub"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
 
-  sources = [ "lib.rs" ]
+  sources = [
+    "lib.rs",
+    "nanohub.rs",
+    "socket_tunnel.rs",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_rust",

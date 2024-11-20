@@ -512,6 +512,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/input",
     "//src/starnix/modules/layeredfs",
     "//src/starnix/modules/magma",
+    "//src/starnix/modules/nanohub",
     "//src/starnix/modules/overlayfs",
     "//src/starnix/modules/perfetto-consumer",
     "//src/starnix/modules/touch-power-policy",

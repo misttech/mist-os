@@ -2494,14 +2494,16 @@ assembly_input_bundle("adb_support") {
 # valid build-types: all
 #
 assembly_input_bundle("nanohub_support") {
-  base_packages = [ "//src/starnix/modules/socket-tunnel:sockettunnel" ]
+  base_packages = [ "//src/starnix/modules/nanohub:sockettunnel" ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/starnix/modules/socket-tunnel/meta/sockettunnel.core_shard.cml" ]
+          shards = [
+            "//src/starnix/modules/nanohub/meta/sockettunnel.core_shard.cml",
+          ]
         },
       ]
     },
