@@ -130,6 +130,7 @@ if (!defined(toolchain_variant.name)) {
   toolchain_variant.remove_common_configs = []
   toolchain_variant.remove_shared_configs = []
   toolchain_variant.deps = []
+  toolchain_variant.executable_deps = []
   toolchain_variant.is_pic_default = false
   toolchain_variant.with_shared = true
   toolchain_variant.instrumented = false
@@ -1621,6 +1622,11 @@ declare_args() {
   #       this variant (as well as the automatic `${label}_deps` for
   #       each label in configs).
   #
+  #   `executable_deps`
+  #       [list of labels] Added to the deps of every executable() target
+  #       linked in this variant (as well as `deps`, above, and the automatic
+  #       `${label}_deps` for each label in configs).
+  #
   #   `name` (required if configs is omitted)
   #       [string] Name of the variant as used in
   #       [`select_variant`](#select_variant) elements' `variant` fields.
@@ -2262,6 +2268,7 @@ if (in_default_toolchain) {
         remove_common_configs = []
         remove_shared_configs = []
         deps = []
+        executable_deps = []
         tags = []
         if (variant == false) {
           name = ""
@@ -2833,6 +2840,9 @@ template("variant_target") {
         target_type = target_type
         deps = []
         forward_variables_from(target_invoker, "*")
+        if (target_type == "executable") {
+          deps += toolchain_variant.executable_deps
+        }
         deps += toolchain_variant.deps
         foreach(config,
                 toolchain_variant.configs +
@@ -2840,6 +2850,9 @@ template("variant_target") {
                     toolchain_variant.remove_common_configs) {
           # Expand the label so it always has a `:name` part.
           config = get_label_info(config, "label_no_toolchain")
+          if (target_type == "executable") {
+            deps += [ "${config}_executable_deps" ]
+          }
           deps += [ "${config}_deps" ]
         }
         if (defined(visibility)) {

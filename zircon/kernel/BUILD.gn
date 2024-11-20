@@ -366,6 +366,8 @@ if (is_kernel) {
 
   group("kernel_config_deps") {
   }
+  group("kernel_config_executable_deps") {
+  }
 
   config("headers") {
     include_dirs = [

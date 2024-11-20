@@ -107,6 +107,8 @@ if (toolchain_environment == "kernel.phys" ||
       "//src/lib/trivial-allocator:panic-delete",
     ]
   }
+  group("phys_config_executable_deps") {
+  }
 
   source_set("trampoline-boot") {
     visibility = [

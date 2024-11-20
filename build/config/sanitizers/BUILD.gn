@@ -104,7 +104,7 @@ variant("asan") {
     configs += [ "//zircon/kernel/lib/instrumentation/asan:kasan" ]
   }
 
-  deps = [ ":asan_default_options" ]
+  executable_deps = [ ":asan_default_options" ]
 }
 
 sanitizer_rustflags("asan.rustflags") {
@@ -227,6 +227,7 @@ config("no_sanitizers") {
 # fuzzers.
 variant("rust-asan") {
   rustflags = [ "-Zsanitizer=address" ]
+  executable_deps = [ ":asan_default_options" ]
 }
 
 # TODO(https://fxbug.dev/42120045): Building with this variant alone can still lead to
@@ -244,7 +245,7 @@ variant("lsan") {
     libs = [ "zircon" ]
   }
 
-  deps = [ ":lsan_default_options" ]
+  executable_deps = [ ":lsan_default_options" ]
 }
 
 variant("ubsan") {
@@ -276,7 +277,7 @@ variant("ubsan") {
   # It also includes the ubsan runtime and plumbing for it.
   if (_prebuilt_runtime && toolchain_variant.tags + [ "asan" ] - [ "asan" ] ==
                            toolchain_variant.tags) {
-    deps = [ ":ubsan_default_options" ]
+    executable_deps = [ ":ubsan_default_options" ]
     configs += [
       ":variant-libprefix",
       ":ubsan.rustflags",
@@ -321,6 +322,7 @@ variant("hwasan") {
     ":variant-libprefix",
     ":hwasan.rustflags",
   ]
+  executable_deps = [ ":hwasan_default_options" ]
 }
 
 sanitizer_rustflags("hwasan.rustflags") {

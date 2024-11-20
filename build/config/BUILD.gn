@@ -691,8 +691,10 @@ config("frame_pointers") {
   }
 }
 
+# Implicit dependencies for frame_pointers config
 group("frame_pointers_deps") {
-  # Implicit dependencies for frame_pointers config
+}
+group("frame_pointers_executable_deps") {
 }
 
 config("no_frame_pointers") {

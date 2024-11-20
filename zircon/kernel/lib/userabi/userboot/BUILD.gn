@@ -93,6 +93,8 @@ if (toolchain_environment == "userboot") {
 
   group("userboot_config_deps") {
   }
+  group("userboot_config_executable_deps") {
+  }
 
   # This is the output of target ":gen-vdso-syms-ld", below.
   vdso_syms_ld = "$target_gen_dir/vdso-syms.ld"

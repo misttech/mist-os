@@ -87,6 +87,9 @@ if (current_toolchain == default_toolchain) {
     group("phys32_config_deps") {
       public_deps = [ "//zircon/kernel/phys:phys_config_deps" ]
     }
+    group("phys32_config_executable_deps") {
+      public_deps = [ "//zircon/kernel/phys:phys_config_executable_deps" ]
+    }
 
     # phys32 code is 32-bit (i686) and loaded at a fixed address.
     config("x86-32") {
