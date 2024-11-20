@@ -13,13 +13,13 @@
 
 namespace mtl {
 
-class StdError {
+class StdError : public ToString {
  public:
   virtual ~StdError() = default;
 
   virtual ktl::optional<const StdError*> source() const { return ktl::nullopt; }
 
-  virtual BString to_string() const { return "StdError"; }
+  BString to_string() const override { return "StdError"; }
 };
 
 class Chain {
@@ -54,11 +54,11 @@ class Chain {
   const StdError* next_;
 };
 
-template <typename E = void>
+template <typename E>
 struct ErrorImpl : public StdError {
   E object_;
 
-  explicit ErrorImpl(E err) : object_(std::move(err)) {}
+  explicit ErrorImpl(E err) : object_(ktl::move(err)) {}
 
   BString to_string() const override { return object_.to_string(); }
 
@@ -86,7 +86,7 @@ struct ContextError : public StdError {
 
   ktl::optional<const StdError*> source() const override {
     if constexpr (std::is_same_v<E, Error>) {
-      return error.source();
+      return error.inner_;
     }
     if constexpr (std::is_base_of_v<StdError, E>) {
       return static_cast<const StdError*>(&error);
@@ -148,11 +148,6 @@ class Error : public StdError {
     return Error::construct(ContextError<C, Error>{ktl::move(context), ktl::move(*this)});
   }
 
-  template <typename C>
-  Error ext_context(C ctx) const {
-    return this->context(ctx);
-  }
-
   template <typename C, typename E>
   static Error from_context(C context, E error) {
     return Error::construct(ContextError<C, E>{ktl::move(context), ktl::move(error)});
@@ -203,12 +198,21 @@ class Error : public StdError {
 
 namespace ext {
 
+template <class E>
 class StdError {
  public:
+  StdError(E error) : error_(ktl::move(error)) {}
+
   template <typename C>
-  Error ext_context(C context) const {
-    return Error::from_context(context, *this);
+  Error ext_context(C context) {
+    if constexpr (std::is_same_v<E, Error>) {
+      return ktl::move(error_).context(context);
+    }
+    return Error::from_context(context, ktl::move(error_));
   }
+
+ private:
+  E error_;
 };
 
 }  // namespace ext
@@ -216,20 +220,14 @@ class StdError {
 template <typename E, typename... T>
 class Context : public fit::result<E, T...> {
  public:
-  using Base = fit::result<E, T...>;
-  using Base::Base;  // Inherit constructors
-
-  explicit Context(fit::result<E, T...> result) : fit::result<E, T...>(std::move(result)) {}
+  explicit Context(fit::result<E, T...> result) : fit::result<E, T...>(ktl::move(result)) {}
 
   /// Wrap the error value with additional context.
-  template <typename C>
-  fit::result<Error, T...> context(C context) {
+  template <typename Context>
+  fit::result<Error, T...> context(Context&& context) {
     if (this->is_error()) {
-      auto error = ktl::move(this->error_value());
-      if constexpr (std::is_base_of_v<ext::StdError, std::remove_cvref_t<decltype(error)>>) {
-        return fit::error(error.ext_context(context));
-      }
-      return fit::error(Error::from_context(context, ktl::move(error)));
+      ext::StdError<E> error(ktl::move(this->error_value()));
+      return fit::error(error.ext_context(context));
     }
     if constexpr (sizeof...(T) > 0) {
       return fit::ok(ktl::move(this->value()));
@@ -240,15 +238,12 @@ class Context : public fit::result<E, T...> {
 
   /// Wrap the error value with additional context that is evaluated lazily
   /// only once an error does occur.
-  template <typename C, typename F>
-    requires std::is_convertible_v<std::invoke_result_t<F>, C>
-  fit::result<Error, T...> with_context(F&& context_fn) {
+  template <typename Context, typename ContextFn>
+    requires std::is_convertible_v<std::invoke_result_t<ContextFn>, Context>
+  fit::result<Error, T...> with_context(ContextFn&& context_fn) {
     if (this->is_error()) {
-      auto error = ktl::move(this->error_value());
-      if constexpr (std::is_base_of_v<ext::StdError, std::remove_cvref_t<decltype(error)>>) {
-        return fit::error(error.ext_context(context_fn()));
-      }
-      return fit::error(Error::from_context(context_fn(), ktl::move(error)));
+      ext::StdError<E> error(ktl::move(this->error_value()));
+      return fit::error(error.ext_context(context_fn()));
     }
     if constexpr (sizeof...(T) > 0) {
       return fit::ok(ktl::move(this->value()));

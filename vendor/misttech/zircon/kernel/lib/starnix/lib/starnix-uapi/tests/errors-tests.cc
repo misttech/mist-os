@@ -40,6 +40,20 @@ bool macro_errno_formatting() {
   END_TEST;
 }
 
+bool context_errno_formatting() {
+  BEGIN_TEST;
+
+  auto location = std::source_location::current();
+  auto errno =
+      Errno::with_context(ErrnoCode(ENOENT, STRINGIFY_IMPL(ENOENT)), location, "TEST CONTEXT");
+  auto location_str = starnix_uapi::to_string(location);
+  auto format = mtl::format("errno ENOENT(2) from %.*s, context: TEST CONTEXT",
+                            static_cast<int>(location_str.size()), location_str.data());
+  ASSERT_STREQ(format, errno.to_string());
+
+  END_TEST;
+}
+
 bool macro_errno_with_context_formatting() {
   BEGIN_TEST;
 
@@ -53,20 +67,6 @@ bool macro_errno_with_context_formatting() {
   ASSERT_BYTES_EQ((const uint8_t*)(expected_suffix.data()),
                   (const uint8_t*)(err_str.data() + err_str.size() - expected_suffix.size()),
                   expected_suffix.size());
-
-  END_TEST;
-}
-
-bool context_errno_formatting() {
-  BEGIN_TEST;
-
-  auto location = std::source_location::current();
-  auto errno =
-      Errno::with_context(ErrnoCode(ENOENT, STRINGIFY_IMPL(ENOENT)), location, "TEST CONTEXT");
-  auto location_str = starnix_uapi::to_string(location);
-  auto format = mtl::format("errno ENOENT(2) from %.*s, context: TEST CONTEXT",
-                            static_cast<int>(location_str.size()), location_str.data());
-  ASSERT_STREQ(format, errno.to_string());
 
   END_TEST;
 }
@@ -117,8 +117,8 @@ bool source_context() {
 UNITTEST_START_TESTCASE(starnix_uapi_errors)
 UNITTEST("basic errno formatting", unit_testing::basic_errno_formatting)
 UNITTEST("macro errno formatting", unit_testing::macro_errno_formatting)
-UNITTEST("macro errno with context formatting", unit_testing::macro_errno_with_context_formatting)
 UNITTEST("context errno formatting", unit_testing::context_errno_formatting)
+UNITTEST("macro errno with context formatting", unit_testing::macro_errno_with_context_formatting)
 UNITTEST("with source context", unit_testing::with_source_context)
 UNITTEST("source context", unit_testing::source_context)
 UNITTEST_END_TESTCASE(starnix_uapi_errors, "starnix_uapi_errors", "Tests Errors")

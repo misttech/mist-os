@@ -55,13 +55,13 @@ class ErrnoCode {
   const char* name_ = nullptr;
 };
 
-class Errno : public mtl::ext::StdError {
+class Errno : public mtl::StdError {
  public:
   ErrnoCode code_{0};
 
  private:
   std::source_location location_;
-  ktl::optional<ktl::string_view> context_;
+  ktl::optional<BString> context_;
 
  public:
   // impl Errno
@@ -77,7 +77,7 @@ class Errno : public mtl::ext::StdError {
 
   uint64_t return_value() const { return code_.return_value(); }
 
-  BString to_string() const;
+  BString to_string() const override;
 
   // C++
   uint32_t error_code() const { return code_.error_code(); }
@@ -86,9 +86,8 @@ class Errno : public mtl::ext::StdError {
   bool operator==(const ErrnoCode& other) const { return code_ == other; }
 
  private:
-  Errno(const ErrnoCode& code, std::source_location location,
-        ktl::optional<ktl::string_view> context)
-      : code_(code), location_(location), context_(context) {}
+  Errno(const ErrnoCode& code, std::source_location location, ktl::optional<BString> context)
+      : code_(code), location_(location), context_(std::move(context)) {}
 };
 
 // Special errors indicating a blocking syscall was interrupted, but it can be restarted.
@@ -141,14 +140,14 @@ BString to_string(const std::source_location& location);
 template <typename E, typename... T>
 class SourceContext : public mtl::Context<E, T...> {
  public:
-  using Base = mtl::Context<E, T...>;
-  using Base::Base;  // Inherit constructors
+  // using Base = mtl::Context<E, T...>;
+  // using Base::Base;  // Inherit constructors
 
   explicit SourceContext(fit::result<E, T...> result) : mtl::Context<E, T...>(std::move(result)) {}
 
-  template <typename F>
+  template <typename ContextFn>
   mtl::result<T...> with_source_context(
-      F context_fn, std::source_location caller = std::source_location::current()) {
+      ContextFn&& context_fn, std::source_location caller = std::source_location::current()) {
     return this->template with_context<BString>([&caller, &context_fn]() {
       const BString context = context_fn();
       auto caller_str = to_string(caller);
@@ -157,8 +156,8 @@ class SourceContext : public mtl::Context<E, T...> {
     });
   }
 
-  template <typename C>
-  mtl::result<T...> source_context(C context,
+  template <typename Context>
+  mtl::result<T...> source_context(Context&& context,
                                    std::source_location caller = std::source_location::current()) {
     ktl::string_view context_sv = context;
     auto caller_str = to_string(caller);
@@ -175,6 +174,13 @@ SourceContext<E, T...> make_source_context(fit::result<E, T...> result) {
 }
 
 }  // namespace starnix_uapi
+
+#ifdef ENOTSUP
+#undef ENOTSUP
+#endif
+
+// ENOTSUP is a different error in posix, but has the same value as EOPNOTSUPP in linux.
+#define ENOTSUP EOPNOTSUPP
 
 /// `errno` returns an `Errno` struct tagged with the current file name and line number.
 ///
