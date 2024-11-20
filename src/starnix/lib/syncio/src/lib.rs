@@ -9,7 +9,6 @@ use crate::zxio::{
 use bitflags::bitflags;
 use bstr::BString;
 use fidl::encoding::const_assert_eq;
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use std::ffi::CStr;
 use std::marker::PhantomData;
@@ -616,14 +615,6 @@ impl Zxio {
         Ok(zxio)
     }
 
-    pub fn create_with_on_open(handle: zx::Handle) -> Result<Zxio, zx::Status> {
-        let zxio = Zxio::default();
-        let status =
-            unsafe { zxio::zxio_create_with_on_open(handle.into_raw(), zxio.as_storage_ptr()) };
-        zx::ok(status)?;
-        Ok(zxio)
-    }
-
     pub fn release(self) -> Result<zx::Handle, zx::Status> {
         let mut handle = 0;
         let status = unsafe { zxio::zxio_release(self.as_ptr(), &mut handle) };
@@ -631,22 +622,7 @@ impl Zxio {
         unsafe { Ok(zx::Handle::from_raw(handle)) }
     }
 
-    pub fn open(&self, flags: fio::OpenFlags, path: &str) -> Result<Self, zx::Status> {
-        let zxio = Zxio::default();
-        let status = unsafe {
-            zxio::zxio_open(
-                self.as_ptr(),
-                flags.bits(),
-                path.as_ptr() as *const c_char,
-                path.len(),
-                zxio.as_storage_ptr(),
-            )
-        };
-        zx::ok(status)?;
-        Ok(zxio)
-    }
-
-    pub fn open3(
+    pub fn open(
         &self,
         path: &str,
         flags: fio::Flags,
@@ -1428,22 +1404,16 @@ impl Drop for Zxio {
 enum NodeKind {
     File,
     Directory,
+    Symlink,
     Unknown,
 }
 
-impl NodeKind {
-    fn from(info: &fio::NodeInfoDeprecated) -> NodeKind {
-        match info {
-            fio::NodeInfoDeprecated::File(_) => NodeKind::File,
-            fio::NodeInfoDeprecated::Directory(_) => NodeKind::Directory,
-            _ => NodeKind::Unknown,
-        }
-    }
-
-    fn from2(representation: &fio::Representation) -> NodeKind {
+impl From<fio::Representation> for NodeKind {
+    fn from(representation: fio::Representation) -> Self {
         match representation {
             fio::Representation::File(_) => NodeKind::File,
             fio::Representation::Directory(_) => NodeKind::Directory,
+            fio::Representation::Symlink(_) => NodeKind::Symlink,
             _ => NodeKind::Unknown,
         }
     }
@@ -1461,33 +1431,30 @@ struct DescribedNode {
 /// Open the given path in the given directory.
 ///
 /// The semantics for the flags argument are defined by the
-/// fuchsia.io/Directory.Open message.
+/// fuchsia.io/Directory.Open3 message.
 ///
-/// This function adds OPEN_FLAG_DESCRIBE to the given flags and then blocks
+/// This function adds FLAG_SEND_REPRESENTATION to the given flags and then blocks
 /// until the directory describes the newly opened node.
 ///
-/// Returns the opened Node, along with its NodeInfoDeprecated, or an error.
+/// Returns the opened Node, along with its NodeKind, or an error.
 fn directory_open(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     deadline: zx::MonotonicInstant,
 ) -> Result<DescribedNode, zx::Status> {
-    let flags = flags | fio::OpenFlags::DESCRIBE;
+    let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
     let (client_end, server_end) = zx::Channel::create();
-    directory
-        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end))
-        .map_err(|_| zx::Status::IO)?;
+    directory.open3(path, flags, &Default::default(), server_end).map_err(|_| zx::Status::IO)?;
     let node = fio::NodeSynchronousProxy::new(client_end);
 
     match node.wait_for_event(deadline).map_err(|_| zx::Status::IO)? {
-        fio::NodeEvent::OnOpen_ { s: status, info } => {
-            zx::Status::ok(status)?;
-            Ok(DescribedNode { node, kind: NodeKind::from(&*info.ok_or(zx::Status::IO)?) })
+        fio::NodeEvent::OnOpen_ { .. } => {
+            panic!("Should never happen when sending FLAG_SEND_REPRESENTATION")
         }
         fio::NodeEvent::OnRepresentation { payload } => {
-            Ok(DescribedNode { node, kind: NodeKind::from2(&payload) })
+            Ok(DescribedNode { node, kind: payload.into() })
         }
         fio::NodeEvent::_UnknownEvent { .. } => Err(zx::Status::NOT_SUPPORTED),
     }
@@ -1506,18 +1473,17 @@ pub fn directory_open_vmo(
     vmo_flags: fio::VmoFlags,
     deadline: zx::MonotonicInstant,
 ) -> Result<zx::Vmo, zx::Status> {
-    let mut open_flags = fio::OpenFlags::empty();
-    if vmo_flags.contains(fio::VmoFlags::WRITE) {
-        open_flags |= fio::OpenFlags::RIGHT_WRITABLE;
-    }
+    let mut flags = fio::Flags::empty();
     if vmo_flags.contains(fio::VmoFlags::READ) {
-        open_flags |= fio::OpenFlags::RIGHT_READABLE;
+        flags |= fio::PERM_READABLE;
+    }
+    if vmo_flags.contains(fio::VmoFlags::WRITE) {
+        flags |= fio::PERM_WRITABLE;
     }
     if vmo_flags.contains(fio::VmoFlags::EXECUTE) {
-        open_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        flags |= fio::PERM_EXECUTABLE;
     }
-
-    let description = directory_open(directory, path, open_flags, deadline)?;
+    let description = directory_open(directory, path, flags, deadline)?;
     let file = match description.kind {
         NodeKind::File => fio::FileSynchronousProxy::new(description.node.into_channel()),
         _ => return Err(zx::Status::IO),
@@ -1539,7 +1505,7 @@ pub fn directory_read_file(
     path: &str,
     deadline: zx::MonotonicInstant,
 ) -> Result<Vec<u8>, zx::Status> {
-    let description = directory_open(directory, path, fio::OpenFlags::RIGHT_READABLE, deadline)?;
+    let description = directory_open(directory, path, fio::PERM_READABLE, deadline)?;
     let file = match description.kind {
         NodeKind::File => fio::FileSynchronousProxy::new(description.node.into_channel()),
         _ => return Err(zx::Status::IO),
@@ -1563,7 +1529,7 @@ pub fn directory_read_file(
 ///
 /// A zx::Channel to the opened node is returned (or an error).
 ///
-/// It is an error to supply the OPEN_FLAG_DESCRIBE flag in flags.
+/// It is an error to supply the FLAG_SEND_REPRESENTATION flag in flags.
 ///
 /// This function will "succeed" even if the given path does not exist in the
 /// given directory because this function does not wait for the directory to
@@ -1571,26 +1537,24 @@ pub fn directory_read_file(
 pub fn directory_open_async(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
-    flags: fio::OpenFlags,
-) -> Result<zx::Channel, zx::Status> {
-    if flags.intersects(fio::OpenFlags::DESCRIBE) {
+    flags: fio::Flags,
+) -> Result<fio::DirectorySynchronousProxy, zx::Status> {
+    if flags.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
         return Err(zx::Status::INVALID_ARGS);
     }
 
-    let (client_end, server_end) = zx::Channel::create();
+    let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
     directory
-        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end))
+        .open3(path, flags, &Default::default(), server_end.into_channel())
         .map_err(|_| zx::Status::IO)?;
-    Ok(client_end)
+    Ok(proxy)
 }
 
 /// Open a directory at the given path in the given directory without blocking.
 ///
-/// This function adds the OPEN_FLAG_DIRECTORY flag
-/// to ensure that the open operation completes only
-/// if the given path is actually a directory, which means clients can start
-/// using the returned DirectorySynchronousProxy immediately without waiting
-/// for the server to complete the operation.
+/// This function adds the PROTOCOL_DIRECTORY flag to ensure that the open operation completes only
+/// if the given path is actually a directory, which means clients can start using the returned
+/// DirectorySynchronousProxy immediately without waiting for the server to complete the operation.
 ///
 /// This function will "succeed" even if the given path does not exist in the
 /// given directory or if the path is not a directory because this function
@@ -1599,29 +1563,11 @@ pub fn directory_open_async(
 pub fn directory_open_directory_async(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
 ) -> Result<fio::DirectorySynchronousProxy, zx::Status> {
-    let flags = flags | fio::OpenFlags::DIRECTORY;
-    let client = directory_open_async(directory, path, flags)?;
-    Ok(fio::DirectorySynchronousProxy::new(client))
-}
-
-pub fn directory_clone(
-    directory: &fio::DirectorySynchronousProxy,
-    flags: fio::OpenFlags,
-) -> Result<fio::DirectorySynchronousProxy, zx::Status> {
-    let (client_end, server_end) = zx::Channel::create();
-    directory.clone(flags, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
-    Ok(fio::DirectorySynchronousProxy::new(client_end))
-}
-
-pub fn file_clone(
-    file: &fio::FileSynchronousProxy,
-    flags: fio::OpenFlags,
-) -> Result<fio::FileSynchronousProxy, zx::Status> {
-    let (client_end, server_end) = zx::Channel::create();
-    file.clone(flags, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
-    Ok(fio::FileSynchronousProxy::new(client_end))
+    let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
+    let proxy = directory_open_async(directory, path, flags)?;
+    Ok(proxy)
 }
 
 #[cfg(test)]
@@ -1651,7 +1597,7 @@ mod test {
         let description = directory_open(
             &pkg,
             "bin/syncio_lib_test",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
             zx::MonotonicInstant::INFINITE,
         )?;
         assert!(match description.kind {
@@ -1691,11 +1637,8 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_directory_open_directory_async() -> Result<(), Error> {
         let pkg = open_pkg();
-        let bin = directory_open_directory_async(
-            &pkg,
-            "bin",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
+        let bin =
+            directory_open_directory_async(&pkg, "bin", fio::PERM_READABLE | fio::PERM_EXECUTABLE)?;
         let vmo = directory_open_vmo(
             &bin,
             "syncio_lib_test",
@@ -1758,7 +1701,7 @@ mod test {
 
         // Check all entry inside bin are either "." or a file
         let bin_io = io
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, "bin")
+            .open("bin", fio::PERM_READABLE | fio::PERM_EXECUTABLE, Default::default())
             .expect("open");
         for entry in bin_io.create_dirent_iterator().expect("failed to create iterator") {
             let dirent = entry.expect("dirent");

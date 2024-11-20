@@ -635,7 +635,7 @@ fn create_fs_context(
         // /container will mount the container pkg
         // /container/component will be a tmpfs where component using the starnix kernel will have their
         // package mounted.
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let container_fs = LayeredFs::new_fs(
             kernel,
             create_remotefs_filesystem(

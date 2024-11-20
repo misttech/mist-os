@@ -36,9 +36,9 @@ use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 ///
 /// Open "/pkg" and returns an FsContext rooted in that directory.
 fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+    let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
     let (server, client) = zx::Channel::create();
-    fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
+    fdio::open("/pkg", rights, server).expect("failed to open /pkg");
     RemoteFs::new_fs(
         kernel,
         client,

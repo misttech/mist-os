@@ -28,7 +28,7 @@ impl MountAction {
     ) -> Result<MountAction, Error> {
         let (spec, options) = MountSpec::parse(spec)?;
         assert_eq!(spec.mount_point.as_slice(), b"/");
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
 
         // We only support mounting these file systems at the root.
         // The root file system needs to be creatable without a task because we mount the root
@@ -50,7 +50,7 @@ impl MountAction {
         spec: &str,
     ) -> Result<MountAction, Error> {
         let (spec, options) = MountSpec::parse(spec)?;
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
 
         let fs = match spec.fs_type.as_slice() {
             // The remote_bundle file system is available only via the mounts declaration in CML.

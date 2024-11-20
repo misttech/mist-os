@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
-use fxfs_testing::{close_file_checked, open_dir_checked, open_file_checked, TestFixture};
+use fxfs_testing::TestFixture;
 use std::sync::Arc;
 use syncio::{
     zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, SeekOrigin,
@@ -19,7 +19,7 @@ use vfs::node::Node;
 use vfs::path::Path;
 use vfs::remote::RemoteLike;
 use vfs::symlink::Symlink;
-use vfs::{pseudo_directory, ObjectRequestRef, ToFlags, ToObjectRequest};
+use vfs::{pseudo_directory, ObjectRequest, ObjectRequestRef, ToObjectRequest};
 use zx::{self as zx, HandleBased, Status};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -54,7 +54,7 @@ async fn test_symlink() {
         );
 
         let symlink_zxio =
-            dir_zxio.open(fio::OpenFlags::RIGHT_READABLE, "symlink").expect("open failed");
+            dir_zxio.open("symlink", fio::PERM_READABLE, Default::default()).expect("open failed");
         assert_eq!(symlink_zxio.read_link().expect("read_link failed"), b"target");
     })
     .await;
@@ -66,19 +66,20 @@ async fn test_symlink() {
 async fn test_fsverity_enabled() {
     let fixture = TestFixture::new().await;
     let root = fixture.root();
-    let file = open_file_checked(
+    let file = fuchsia_fs::directory::open_file(
         &root,
-        fio::OpenFlags::CREATE
-            | fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::NOT_DIRECTORY,
         "foo",
+        fio::Flags::FLAG_MAYBE_CREATE
+            | fio::PERM_READABLE
+            | fio::PERM_WRITABLE
+            | fio::Flags::PROTOCOL_FILE,
     )
-    .await;
+    .await
+    .unwrap();
     let data = vec![0xFF; 8192];
     file.write(&data).await.expect("FIDL call failed").expect("write failed");
 
-    close_file_checked(file).await;
+    fuchsia_fs::file::close(file).await.unwrap();
 
     let (dir_client, dir_server) = zx::Channel::create();
     root.clone2(dir_server.into()).expect("clone failed");
@@ -91,12 +92,12 @@ async fn test_fsverity_enabled() {
         };
         let foo_zxio = Arc::new(
             dir_zxio
-                .open3(
+                .open(
                     "foo",
                     fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
-                .expect("open3 failed"),
+                .expect("open failed"),
         );
         assert!(!attrs.fsverity_enabled);
         let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
@@ -143,19 +144,20 @@ async fn test_fsverity_enabled() {
 async fn test_not_fsverity_enabled() {
     let fixture = TestFixture::new().await;
     let root = fixture.root();
-    let file = open_file_checked(
+    let file = fuchsia_fs::directory::open_file(
         &root,
-        fio::OpenFlags::CREATE
-            | fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::NOT_DIRECTORY,
         "foo",
+        fio::Flags::FLAG_MAYBE_CREATE
+            | fio::PERM_READABLE
+            | fio::PERM_WRITABLE
+            | fio::Flags::PROTOCOL_FILE,
     )
-    .await;
+    .await
+    .unwrap();
     let data = vec![0xFF; 8192];
     file.write(&data).await.expect("FIDL call failed").expect("write failed");
 
-    close_file_checked(file).await;
+    fuchsia_fs::file::close(file).await.unwrap();
 
     let (dir_client, dir_server) = zx::Channel::create();
     root.clone2(dir_server.into()).expect("clone failed");
@@ -168,12 +170,12 @@ async fn test_not_fsverity_enabled() {
         };
         let foo_zxio = Arc::new(
             dir_zxio
-                .open3(
+                .open(
                     "foo",
                     fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
-                .expect("open3 failed"),
+                .expect("open failed"),
         );
         assert!(!attrs.fsverity_enabled);
 
@@ -238,6 +240,25 @@ async fn test_read_link_error() {
                 Ok(())
             });
         }
+
+        fn open3(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            path: Path,
+            flags: fio::Flags,
+            object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            if !path.is_empty() {
+                return Err(Status::NOT_DIR);
+            }
+            scope.spawn(vfs::symlink::Connection::create(
+                scope.clone(),
+                self,
+                &flags,
+                object_request,
+            )?);
+            Ok(())
+        }
     }
 
     impl DirectoryEntry for ErrorSymlink {
@@ -256,14 +277,11 @@ async fn test_read_link_error() {
         "error_symlink" => Arc::new(ErrorSymlink),
     };
 
-    let (dir_client, dir_server) = create_endpoints();
+    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        dir_server,
-    );
+    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
+    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {
         let dir_zxio =
@@ -271,7 +289,7 @@ async fn test_read_link_error() {
 
         assert_eq!(
             dir_zxio
-                .open(fio::OpenFlags::RIGHT_READABLE, "error_symlink")
+                .open("error_symlink", fio::PERM_READABLE, Default::default())
                 .expect_err("open succeeded"),
             zx::Status::IO
         );
@@ -286,14 +304,14 @@ async fn test_xattr_dir() {
     let (dir_client, dir_server) = zx::Channel::create();
     fixture
         .root()
-        .open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::CREATE,
-            fio::ModeType::empty(),
+        .open3(
             "foo",
-            dir_server.into(),
+            fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+            dir_server,
         )
         .expect("open failed");
 
@@ -332,14 +350,14 @@ async fn test_xattr_dir_multiple_attributes() {
     let (dir_client, dir_server) = zx::Channel::create();
     fixture
         .root()
-        .open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::CREATE,
-            fio::ModeType::empty(),
+        .open3(
             "foo",
-            dir_server.into(),
+            fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+            dir_server,
         )
         .expect("open failed");
 
@@ -424,13 +442,14 @@ async fn test_xattr_file_large_attribute() {
     let (foo_client, foo_server) = zx::Channel::create();
     fixture
         .root()
-        .open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE,
-            fio::ModeType::empty(),
+        .open3(
             "foo",
-            foo_server.into(),
+            fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::FLAG_MAYBE_CREATE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+            foo_server,
         )
         .expect("open failed");
 
@@ -543,20 +562,17 @@ async fn test_allocate_file() {
     let dir = pseudo_directory! {
         "foo" => AllocateFile::new(Ok(())),
     };
-    let (dir_client, dir_server) = create_endpoints();
+    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        Path::dot(),
-        dir_server,
-    );
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE;
+    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {
         let dir_zxio =
             Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
         let foo_zxio = dir_zxio
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .open("foo", fio::PERM_READABLE | fio::PERM_WRITABLE, Default::default())
             .expect("open failed");
 
         foo_zxio.allocate(0, 10, syncio::AllocateMode::empty()).unwrap();
@@ -571,20 +587,17 @@ async fn test_allocate_file_not_sup() {
     let dir = pseudo_directory! {
         "foo" => AllocateFile::new(Err(Status::NOT_SUPPORTED)),
     };
-    let (dir_client, dir_server) = create_endpoints();
+    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        Path::dot(),
-        dir_server,
-    );
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
+    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {
         let dir_zxio =
             Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
         let foo_zxio = dir_zxio
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .open("foo", fio::PERM_READABLE | fio::PERM_WRITABLE, Default::default())
             .expect("open failed");
 
         assert_matches!(
@@ -627,14 +640,14 @@ async fn test_get_set_attributes_node() {
 
         // Create a file.
         let test_file = dir_zxio
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::FLAG_MAYBE_CREATE
                     | fio::Flags::PROTOCOL_FILE
                     | fio::Flags::PERM_SET_ATTRIBUTES,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         let attr = zxio_node_attributes_t {
             gid: 111,
@@ -669,7 +682,7 @@ async fn test_get_set_attributes_node() {
 }
 
 #[fuchsia::test]
-async fn test_open3() {
+async fn test_open() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -680,23 +693,24 @@ async fn test_open3() {
 
         // Create a test directory.
         let test_dir = dir_zxio
-            .open3(
+            .open(
                 "test_dir",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_DIRECTORY
-                    | fio::RW_STAR_DIR.to_flags(),
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Now create a file in that directory.
         let test_file = test_dir
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Write something to the file.
         const CONTENT: &[u8] = b"hello";
@@ -715,12 +729,12 @@ async fn test_open3() {
             ..Default::default()
         };
         let _test_dir = dir_zxio
-            .open3(
+            .open(
                 "test_dir",
-                fio::RW_STAR_DIR.to_flags(),
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
                 ZxioOpenOptions::new(Some(&mut attr), None),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
         assert_eq!(
@@ -748,8 +762,8 @@ async fn test_open3() {
             ..Default::default()
         };
         let _test_file = test_dir
-            .open3("test_file", fio::Flags::empty(), ZxioOpenOptions::new(Some(&mut attr), None))
-            .expect("open3 failed");
+            .open("test_file", fio::Flags::empty(), ZxioOpenOptions::new(Some(&mut attr), None))
+            .expect("open failed");
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
         assert_eq!(
             attr.abilities,
@@ -769,7 +783,7 @@ async fn test_open3() {
 }
 
 #[fuchsia::test]
-async fn test_open3_symlink() {
+async fn test_open_symlink() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -781,18 +795,18 @@ async fn test_open3_symlink() {
         // Create and open a symlink.
         dir_zxio.create_symlink("symlink", b"target").expect("create_symlink failed");
         let symlink = dir_zxio
-            .open3(
+            .open(
                 "symlink",
                 fio::Flags::PROTOCOL_SYMLINK | fio::Flags::PERM_GET_ATTRIBUTES,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
         assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
 
         // Open should also work without specifying any protocol.
         let symlink = dir_zxio
-            .open3("symlink", fio::Flags::PERM_GET_ATTRIBUTES, ZxioOpenOptions::default())
-            .expect("open3 failed");
+            .open("symlink", fio::Flags::PERM_GET_ATTRIBUTES, ZxioOpenOptions::default())
+            .expect("open failed");
         assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
     })
     .await;
@@ -801,7 +815,7 @@ async fn test_open3_symlink() {
 }
 
 #[fuchsia::test]
-async fn test_open3_file_protocol_flags() {
+async fn test_open_file_protocol_flags() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -811,7 +825,7 @@ async fn test_open3_file_protocol_flags() {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
 
         let test_file = dir_zxio
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_FILE
@@ -820,7 +834,7 @@ async fn test_open3_file_protocol_flags() {
                     | fio::Flags::FILE_APPEND,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Write something to the file.
         const CONTENT: &[u8] = b"hello";
@@ -844,7 +858,7 @@ async fn test_open3_file_protocol_flags() {
 }
 
 #[fuchsia::test]
-async fn test_open3_create_attributes() {
+async fn test_open_create_attributes() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -873,14 +887,15 @@ async fn test_open3_create_attributes() {
         };
 
         let _test_directory = dir_zxio
-            .open3(
+            .open(
                 "test_dir",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_DIRECTORY
-                    | fio::RW_STAR_DIR.to_flags(),
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
                 ZxioOpenOptions::new(Some(&mut attr), Some(create_attr)),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
         assert_eq!(
@@ -902,7 +917,7 @@ async fn test_open3_create_attributes() {
 }
 
 #[fuchsia::test]
-async fn test_open3_rights() {
+async fn test_open_rights() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -913,12 +928,12 @@ async fn test_open3_rights() {
 
         // Create and write to a file.
         let test_file = dir_zxio
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Write something to the file.
         const CONTENT: &[u8] = b"hello";
@@ -926,8 +941,8 @@ async fn test_open3_rights() {
 
         // Check rights
         let test_file = dir_zxio
-            .open3("test_file", fio::Flags::PERM_READ, ZxioOpenOptions::default())
-            .expect("open3 failed");
+            .open("test_file", fio::Flags::PERM_READ, ZxioOpenOptions::default())
+            .expect("open failed");
         let mut buf = [0; 20];
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
@@ -937,29 +952,29 @@ async fn test_open3_rights() {
 
         // Check that no rights are inherited when specifying no permission flags.
         let test_file = dir_zxio
-            .open3("test_file", fio::Flags::empty(), ZxioOpenOptions::default())
-            .expect("open3 failed");
+            .open("test_file", fio::Flags::empty(), ZxioOpenOptions::default())
+            .expect("open failed");
         // Make sure we can't read or write to the file.
         assert_eq!(test_file.read(&mut buf).expect_err("read succeeded"), zx::Status::BAD_HANDLE);
         assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
 
         // Optional rights on directories.
         let test_dir = dir_zxio
-            .open3(
+            .open(
                 ".",
                 fio::Flags::PERM_READ | fio::Flags::PERM_INHERIT_WRITE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Now make sure we can open and write to the test file.
         let test_file = test_dir
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
         // This time we should be able to write to the file.
@@ -971,7 +986,7 @@ async fn test_open3_rights() {
 }
 
 #[fuchsia::test]
-async fn test_open3_node() {
+async fn test_open_node() {
     let fixture = TestFixture::new().await;
 
     let (dir_client, dir_server) = zx::Channel::create();
@@ -984,12 +999,12 @@ async fn test_open3_node() {
 
         // Create a file.
         let test_file = dir_zxio
-            .open3(
+            .open(
                 "test_file",
                 fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
                 ZxioOpenOptions::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Write something to the file.
         const CONTENT: &[u8] = b"hello";
@@ -1033,15 +1048,16 @@ async fn test_open3_node() {
 async fn test_casefold() {
     let fixture = TestFixture::new().await;
     let root = fixture.root();
-    let test_directory = open_dir_checked(
-        root,
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::DIRECTORY
-            | fio::OpenFlags::CREATE,
+    let test_directory = fuchsia_fs::directory::open_directory(
+        &root,
         "test_dir",
+        fio::PERM_READABLE
+            | fio::PERM_WRITABLE
+            | fio::Flags::PROTOCOL_DIRECTORY
+            | fio::Flags::FLAG_MAYBE_CREATE,
     )
-    .await;
+    .await
+    .unwrap();
 
     let (dir_client, dir_server) = zx::Channel::create();
     test_directory.clone2(dir_server.into()).expect("clone failed");
@@ -1076,7 +1092,7 @@ async fn test_casefold() {
         assert_eq!(attributes.casefold, true);
 
         let _file = dir_zxio
-            .open3(
+            .open(
                 "foo",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_FILE
@@ -1084,15 +1100,15 @@ async fn test_casefold() {
                     | fio::Flags::PERM_WRITE,
                 Default::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
 
         let _file = dir_zxio
-            .open3(
+            .open(
                 "FOO",
                 fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
                 Default::default(),
             )
-            .expect("open3 failed");
+            .expect("open failed");
     })
     .await;
 
@@ -1100,7 +1116,7 @@ async fn test_casefold() {
 }
 
 #[fuchsia::test]
-async fn test_open3_selinux_context_attr() {
+async fn test_open_selinux_context_attr() {
     let fixture = TestFixture::new().await;
     let root = fixture.root();
 
@@ -1121,7 +1137,7 @@ async fn test_open3_selinux_context_attr() {
             // Verify that we can still fetch attributes properly at the same time.
             let mut attr: zxio_node_attributes_t = Default::default();
             let _file = dir_zxio
-                .open3(
+                .open(
                     TEST_FILE,
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_FILE
@@ -1150,7 +1166,7 @@ async fn test_open3_selinux_context_attr() {
             let mut attr: zxio_node_attributes_t = Default::default();
             let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
             let file = dir_zxio
-                .open3(
+                .open(
                     TEST_FILE,
                     fio::Flags::PROTOCOL_FILE
                         | fio::Flags::PERM_READ
@@ -1182,7 +1198,7 @@ async fn test_open3_selinux_context_attr() {
             let mut attr: zxio_node_attributes_t = Default::default();
             let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
             let _file = dir_zxio
-                .open3(
+                .open(
                     TEST_FILE,
                     fio::Flags::PROTOCOL_FILE
                         | fio::Flags::PERM_READ
