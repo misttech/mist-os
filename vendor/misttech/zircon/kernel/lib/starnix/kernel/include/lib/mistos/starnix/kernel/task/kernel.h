@@ -5,6 +5,7 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_H_
 
+#include <lib/expando/expando.h>
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/device/registry.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
@@ -42,6 +43,12 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
 
   // The processes and threads running in this kernel, organized by pid_t.
   starnix_sync::RwLock<PidTable> pids_;
+
+  // Subsystem-specific properties that hang off the Kernel object.
+  ///
+  /// Instead of adding yet another property to the Kernel object, consider storing the property
+  /// in an expando if that property is only used by one part of the system, such as a module.
+  expando::Expando expando_;
 
   /// The default namespace for abstract AF_UNIX sockets in this kernel.
   ///

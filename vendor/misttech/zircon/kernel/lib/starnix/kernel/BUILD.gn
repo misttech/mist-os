@@ -73,6 +73,7 @@ zx_library("starnix_core") {
     "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/bootfs",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/elfldltl",
+    "//vendor/misttech/zircon/kernel/lib/starnix/lib/expando",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-syscalls",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:headers",

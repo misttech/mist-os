@@ -20,6 +20,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_registry.h>
 #include <lib/mistos/starnix/kernel/vfs/lookup_context.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix/kernel/vfs/symlink_mode.h>
@@ -1094,7 +1095,18 @@ UserAddress CurrentTask::maximum_valid_address() const {
 
 fit::result<Errno, FileSystemHandle> CurrentTask::create_filesystem(
     const FsStr& fs_type, FileSystemOptions options) const {
-  return fit::error(errno(ENOTDIR));
+  // Please register new file systems via //src/starnix/modules/lib.rs, even if the file
+  // system is implemented inside starnix_core.
+  //
+  // Most file systems should be implemented as modules. The VFS provides various traits that
+  // let starnix_core integrate file systems without needing to depend on the file systems
+  // directly.
+  auto registry = task_->kernel()->expando_.Get<FsRegistry>();
+  auto result = registry->create(*this, fs_type, options);
+  if (result.is_error()) {
+    return fit::error(errno(ENODEV, fs_type));
+  }
+  return result.take_value();
 }
 
 }  // namespace starnix

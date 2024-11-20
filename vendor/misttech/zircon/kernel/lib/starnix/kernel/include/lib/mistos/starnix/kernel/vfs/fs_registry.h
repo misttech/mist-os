@@ -21,10 +21,11 @@ namespace starnix {
 using CreateFs =
     std::function<fit::result<Errno, FileSystemHandle>(const CurrentTask&, FileSystemOptions)>;
 
-class FsRegistry {
+class FsRegistry : public fbl::RefCounted<FsRegistry> {
  private:
   starnix_sync::Mutex<util::BTreeMap<ktl::string_view, CreateFs>> registry_;
 
+ public:
   void register_fs(ktl::string_view fs_type, CreateFs create_fs) {
     auto locked = registry_.Lock();
     auto [_, inserted] = locked->try_emplace(fs_type, ktl::move(create_fs));
