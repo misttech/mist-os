@@ -148,7 +148,15 @@ func (c *tunnelCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface
 	c.listenForInterrupt(ctx, cmd, cleanupSSHConfig)
 	log.Infof("SSH tunnel starting. Press Ctrl+C to exit.")
 	if err = cmd.Wait(); err != nil {
-		log.Infof("Tunnel closed with exit code %d", cmd.ProcessState.ExitCode())
+		code := cmd.ProcessState.ExitCode()
+		log.Infof("Tunnel closed with exit code %d", code)
+		if code == 255 {
+			log.Infof("Failed to forward a port to remote host %s.\n"+
+				"If you see `Error: remote port forwarding failed for listen port $PORT` "+
+				"you can try:\n\n"+
+				"`netstat -tulpne | grep :$PORT` on the remote host to find if a process has already "+
+				"taken the port.", c.remoteHost)
+		}
 	}
 
 	return subcommands.ExitSuccess

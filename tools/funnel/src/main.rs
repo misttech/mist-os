@@ -293,7 +293,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::info!("result from do_ssh: {:?}", do_ssh_res);
     match do_ssh_res {
         Ok(_) => {}
-        e @ Err(ssh::TunnelError::TunnelAlreadyRunning { remote_host: _ }) => {
+        e @ Err(ssh::TunnelError::PortForwardingFailed { remote_host: _ }) => {
             // If this returned an error due to our signal just log and return
             let was_requested = term_requested.lock().unwrap();
             if !*was_requested {
