@@ -908,8 +908,12 @@ if (is_kernel) {
 
   group("rust-cfg-big-zircon-kernel") {
     testonly = true
-    public_deps = [ ":big-kernel.rsp" ]
-    public_configs = [ ":rust-big-kernel.config" ]
+
+    # This logic is specific to the x86 kernel when loaded as a ZBI.
+    if (target_cpu == "x64") {
+      public_deps = [ ":big-kernel.rsp" ]
+      public_configs = [ ":rust-big-kernel.config" ]
+    }
   }
 
   config("rust-big-kernel.config") {

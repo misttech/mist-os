@@ -12,6 +12,7 @@ import("//build/zbi/zbi_input.gni")
 import("//src/bringup/lib/mexec/testing/zbi_test.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")
+import("//zircon/kernel/params.gni")
 import("//zircon/kernel/phys/boot-shim/devicetree.gni")
 import("//zircon/kernel/phys/devicetree_boot_test.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
@@ -631,10 +632,11 @@ if (current_toolchain != default_toolchain) {
       ]
     }
     if (current_cpu != "riscv64") {  # TODO(mcgrathr): kernel not ready
-      deps += [
-        ":physboot-zbi-kernel-core-tests",
-        ":zbi-chain-load-core-tests",
-      ]
+      deps += [ ":zbi-chain-load-core-tests" ]
+    }
+
+    if (!use_elf_kernel) {
+      deps += [ ":physboot-zbi-kernel-core-tests" ]
     }
 
     if (have_devicetree) {
