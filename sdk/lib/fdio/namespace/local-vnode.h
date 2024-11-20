@@ -43,21 +43,14 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
 
   class Intermediate;
 
-  // Initializes a new vnode with a remote node_type, and attaches a reference to it
-  // inside an (optional) parent.
+  // Initializes a new vnode.
   //
   // The parent must outlive the child.
   template <class T, class... Args>
   static fbl::RefPtr<LocalVnode> Create(Intermediate* parent, fbl::String name,
                                         std::in_place_type_t<T> in_place, Args&&... args) {
-    fbl::RefPtr vn = fbl::MakeRefCounted<LocalVnode>(parent, std::move(name), in_place,
-                                                     std::forward<Args>(args)...);
-
-    if (vn->parent_ != nullptr) {
-      vn->parent_->AddEntry(vn);
-    }
-
-    return vn;
+    return fbl::MakeRefCounted<LocalVnode>(parent, std::move(name), in_place,
+                                           std::forward<Args>(args)...);
   }
 
   // Detaches this vnode from its parent. The Vnode's own children are not unlinked.

@@ -583,6 +583,7 @@ zx_status_t fdio_namespace::Bind(
                 }
 
                 vn = std::move(vn_res.value());
+                c.AddEntry(vn);
                 return ZX_OK;
               }
 
@@ -596,6 +597,7 @@ zx_status_t fdio_namespace::Bind(
               // Create a new intermediate node.
               vn = LocalVnode::Create(&c, fbl::String(next_path_segment),
                                       std::in_place_type_t<LocalVnode::Intermediate>());
+              c.AddEntry(vn);
 
               // Keep track of the first node we create. If any subsequent
               // operation fails during bind, we will need to delete all nodes
