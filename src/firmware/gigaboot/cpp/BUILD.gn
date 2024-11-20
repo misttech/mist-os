@@ -26,6 +26,8 @@ source_set("lib") {
     "fastboot.cc",
     "fastboot.h",
     "gbl_dt.cc",
+    "gbl_efi_fastboot_protocol.cc",
+    "gbl_efi_fastboot_protocol.h",
     "gbl_loader.cc",
     "gbl_loader.h",
     "gpt.cc",

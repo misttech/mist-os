@@ -10,6 +10,7 @@
 
 #include "backends.h"
 #include "boot_zbi_items.h"
+#include "gbl_efi_fastboot_protocol.h"
 #include "input.h"
 #include "utils.h"
 
@@ -40,6 +41,21 @@ EFIAPI efi_status ConAndSerialOutputString(struct efi_simple_text_output_protoco
 
 const efi_guid kEfiDtbTableGuid = {
     0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}};
+
+// GUID for GBL variables.
+efi_guid kGblEfiVendorGuid = {
+    0x5a6d92f3, 0xa2d0, 0x4083, {0x91, 0xa1, 0xa5, 0x0f, 0x6c, 0x3d, 0x98, 0x30}};
+
+efi_status InstallGblProtocols() {
+  printf("Installing GBL_EFI_FASTBOOT_PROTOCOL...\n");
+  efi_status res = InstallGblEfiFastbootProtocol();
+  if (res != EFI_SUCCESS) {
+    printf("Failed to install GBL_EFI_FASTBOOT_PROTOCOL: %s\n", EfiStatusToString(res));
+    return res;
+  }
+
+  return EFI_SUCCESS;
+}
 
 }  // namespace
 
@@ -147,6 +163,24 @@ zx::result<> LaunchGbl(bool stop_in_fastboot) {
       gEfiSystemTable->BootServices->InstallConfigurationTable(&kEfiDtbTableGuid, GblFdt().data());
   if (status != EFI_SUCCESS) {
     printf("Failed to load device tree: %s\n", EfiStatusToString(status));
+    return zx::error(static_cast<int>(status));
+  }
+
+  // Installs GBL EFI protocols
+  status = InstallGblProtocols();
+  if (status != EFI_SUCCESS) {
+    return zx::error(static_cast<int>(status));
+  }
+
+  // GBL provides an EFI variable for specifying fuchsia as boot target.
+  wchar_t gbl_os_boot_fuchsia[] = {L"gbl_os_boot_fuchsia"};
+  // Value of the variable doesn't matter. As long as the variable exists, GBL considers fuchsia.
+  // However it must be no more than 1 byte because that is what GBL attempts to read.
+  status = gEfiSystemTable->RuntimeServices->SetVariable(
+      reinterpret_cast<char16_t*>(gbl_os_boot_fuchsia), &kGblEfiVendorGuid,
+      EFI_VARIABLE_BOOTSERVICE_ACCESS, 1, "1");
+  if (status != EFI_SUCCESS) {
+    printf("Failed to set \"gbl_os_boot_fuchsia\" variable: %s\n", EfiStatusToString(status));
     return zx::error(static_cast<int>(status));
   }
 
