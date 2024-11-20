@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::request_metadata::Metadata;
 use crate::error::RoutingError;
-use crate::rights::{Rights, RightsMetadata, RightsWalker};
+use crate::rights::{Rights, RightsWalker};
 use crate::walk_state::WalkStateUnit;
 use async_trait::async_trait;
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -26,8 +27,8 @@ impl<T: CapabilityBound> Routable<T> for RightsRouter<T> {
     ) -> Result<RouterResponse<T>, router_error::RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let RightsRouter { router, rights, moniker } = self;
-        let request_rights =
-            request.metadata.get_rights().ok_or(fsandbox::RouterError::InvalidArgs)?;
+        let request_rights: Rights =
+            request.metadata.get_metadata().ok_or(fsandbox::RouterError::InvalidArgs)?;
         let request_rights = RightsWalker::new(request_rights, moniker.clone());
         let router_rights = RightsWalker::new(*rights, moniker.clone());
         // The rights of the request must be compatible with the
@@ -81,7 +82,7 @@ mod tests {
         let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::RW_STAR_DIR.into());
         let metadata = Dict::new();
-        metadata.set_rights(fio::R_STAR_DIR.into());
+        metadata.set_metadata(Into::<Rights>::into(fio::R_STAR_DIR));
         let capability = proxy
             .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await
@@ -99,7 +100,7 @@ mod tests {
         let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::R_STAR_DIR.into());
         let metadata = Dict::new();
-        metadata.set_rights(fio::RW_STAR_DIR.into());
+        metadata.set_metadata(Into::<Rights>::into(fio::RW_STAR_DIR));
         let error = proxy
             .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await

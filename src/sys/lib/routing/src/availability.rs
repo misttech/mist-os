@@ -4,11 +4,7 @@
 
 use crate::error::AvailabilityRoutingError;
 use cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource};
-use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
-use sandbox::{Capability, Data, Dict, DictKey};
-
-const AVAILABILITY_KEY: &'static str = "availability";
 
 pub fn advance_with_offer(
     moniker: &ExtendedMoniker,
@@ -46,45 +42,6 @@ pub fn advance_with_expose(
         });
     }
     result
-}
-
-/// A type which has accessors for route request `Availability` metadata.
-pub trait AvailabilityMetadata {
-    /// Infallibly assigns `value` to `self`.
-    fn set_availability(&self, value: Availability);
-
-    /// Retrieves the `Availability` metadata from `self`, if present.
-    fn get_availability(&self) -> Option<Availability>;
-}
-
-impl AvailabilityMetadata for Dict {
-    fn set_availability(&self, value: Availability) {
-        let key = DictKey::new(AVAILABILITY_KEY).expect("dict key creation failed unexpectedly");
-        match self.insert(key, Capability::Data(Data::String(value.to_string()))) {
-            // When an entry already exists for a key in a Dict, insert() will
-            // still replace that entry with the new value, even though it
-            // returns an ItemAlreadyExists error. As a result, we can treat
-            // ItemAlreadyExists as a success case.
-            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
-            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
-            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
-        }
-    }
-
-    fn get_availability(&self) -> Option<Availability> {
-        let key = DictKey::new(AVAILABILITY_KEY).expect("dict key creation failed unexpectedly");
-        let capability = self.get(&key).ok()??;
-        match capability {
-            Capability::Data(Data::String(availability)) => match availability.as_str() {
-                "Optional" => Some(Availability::Optional),
-                "Required" => Some(Availability::Required),
-                "SameAsTarget" => Some(Availability::SameAsTarget),
-                "Transitional" => Some(Availability::Transitional),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
 }
 
 impl crate::legacy_router::OfferVisitor for Availability {

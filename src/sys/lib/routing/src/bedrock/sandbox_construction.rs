@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::availability::AvailabilityMetadata;
-use crate::bedrock::request_metadata::METADATA_KEY_TYPE;
+use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
 use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
@@ -27,6 +26,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::warn;
+
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
@@ -625,7 +625,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
             Capability::Data(Data::String(porcelain_type.to_string())),
         )
         .expect("failed to build default use metadata?");
-    metadata.set_availability(*config_use.availability());
+    metadata.set_metadata(*config_use.availability());
     let default_request = Request { metadata, target: component.as_weak().into() };
     match program_input.config().insert_capability(
         &config_use.target_name,
@@ -770,7 +770,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             Capability::Data(Data::String(porcelain_type.to_string())),
         )
         .expect("failed to build default use metadata?");
-    metadata.set_availability(*use_.availability());
+    metadata.set_metadata(*use_.availability());
     let default_request = Request { metadata, target: component.as_weak().into() };
     let router = router
         .with_availability(moniker.clone(), *use_.availability())
@@ -942,7 +942,7 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
             Capability::Data(Data::String(porcelain_type.to_string())),
         )
         .expect("failed to build default offer metadata?");
-    metadata.set_availability(*offer.availability());
+    metadata.set_metadata(*offer.availability());
     // Offered capabilities need to support default requests in the case of offer-to-dictionary.
     // This is a corollary of the fact that program_input_dictionary and
     // component_output_dictionary support default requests, and we need this to cover the case
@@ -1080,7 +1080,7 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
             Capability::Data(Data::String(porcelain_type.to_string())),
         )
         .expect("failed to build default expose metadata?");
-    metadata.set_availability(*expose.availability());
+    metadata.set_metadata(*expose.availability());
     let default_request = Request { metadata, target: component.as_weak().into() };
     match target_dict.insert_capability(
         target_name,
@@ -1125,7 +1125,7 @@ impl<T: CapabilityBound, C: ComponentInstanceInterface + 'static> Routable<T>
             return Ok(RouterResponse::<T>::Debug(data));
         }
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
-        let availability = request.metadata.get_availability().ok_or(RouterError::InvalidArgs)?;
+        let availability = request.metadata.get_metadata().ok_or(RouterError::InvalidArgs)?;
         match availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
                 Err(RoutingError::SourceCapabilityIsVoid {

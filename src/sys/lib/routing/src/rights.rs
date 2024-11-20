@@ -4,12 +4,11 @@
 
 use crate::error::RightsRoutingError;
 use crate::walk_state::WalkStateUnit;
+use fidl_fuchsia_io as fio;
 use moniker::ExtendedMoniker;
-use sandbox::{Capability, Data, Dict, DictKey};
 #[cfg(feature = "serde")]
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use std::fmt;
-use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 /// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
 const LEGACY_READABLE_RIGHTS: fio::Operations = fio::Operations::empty()
@@ -23,8 +22,6 @@ const LEGACY_WRITABLE_RIGHTS: fio::Operations = fio::Operations::empty()
     .union(fio::Operations::WRITE_BYTES)
     .union(fio::Operations::UPDATE_ATTRIBUTES)
     .union(fio::Operations::MODIFY_DIRECTORY);
-
-const RIGHTS_KEY: &'static str = "rights";
 
 /// Performs rights validation for a routing step
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -137,39 +134,7 @@ impl WalkStateUnit for RightsWalker {
         RightsRoutingError::MissingRightsSource { moniker: self.moniker.clone() }
     }
 }
-// A type which has accessors for route request `Rights` metadata.
-pub trait RightsMetadata {
-    /// Infallibly assigns `value` to `self`.
-    fn set_rights(&self, value: Rights);
 
-    /// Retrieves the `Availability` metadata from `self`, if present.
-    fn get_rights(&self) -> Option<Rights>;
-}
-
-impl RightsMetadata for Dict {
-    fn set_rights(&self, value: Rights) {
-        let key = DictKey::new(RIGHTS_KEY).expect("dict key creation failed unexpectedly");
-        match self.insert(key, Capability::Data(Data::Uint64(value.into()))) {
-            // When an entry already exists for a key in a Dict, insert() will
-            // still replace that entry with the new value, even though it
-            // returns an ItemAlreadyExists error. As a result, we can treat
-            // ItemAlreadyExists as a success case.
-            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
-            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
-            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
-        }
-    }
-
-    fn get_rights(&self) -> Option<Rights> {
-        let key = DictKey::new(RIGHTS_KEY).expect("dict key creation failed unexpectedly");
-        let capability = self.get(&key).ok()??;
-        let rights = match capability {
-            Capability::Data(Data::Uint64(rights)) => fio::Operations::from_bits(rights)?,
-            _ => None?,
-        };
-        Some(Rights::from(rights))
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
