@@ -127,6 +127,11 @@ IMAGES_RECOVERY_FASTBOOT = [
     ManifestImage("fuchsia.esp", ["efi"], "blk"),
 ]
 
+# This is the image for running GBL installer.
+IMAGES_GBL_FASTBOOT_INSTALLER = [
+    ManifestImage("gbl-installer.esp", ["efi"], "blk"),
+]
+
 
 def ParseSize(size):
     """Parse a size.
@@ -582,7 +587,9 @@ def Main(args):
         if build_dir == "":
             build_dir = paths.FUCHSIA_BUILD_DIR
 
-        if args.recovery_fastboot:
+        if args.gbl:
+            target_images = IMAGES_GBL_FASTBOOT_INSTALLER
+        elif args.recovery_fastboot:
             target_images = IMAGES_RECOVERY_FASTBOOT
         else:
             target_images = IMAGES_RECOVERY_INSTALLER
@@ -591,37 +598,40 @@ def Main(args):
             return 1
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Set up the ChromeOS reserved partition.
-            reserved_zeroes = os.path.join(temp_dir, "reserved")
-            with open(reserved_zeroes, "wb") as f:
-                sz = Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE
-                f.write(b"\x00" * sz)
+            if not args.gbl:
+                # Set up the ChromeOS reserved partition.
+                reserved_zeroes = os.path.join(temp_dir, "reserved")
+                with open(reserved_zeroes, "wb") as f:
+                    sz = Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE
+                    f.write(b"\x00" * sz)
 
-            reserved_part = Partition(
-                reserved_zeroes,
-                "reserved",
-                "reserved",
-                Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE,
-            )
-            output.AddPartition(reserved_part)
-
-            # Add an abr metadata partition.
-            # A pre-generated abr metadata that can only boots zircon-r.
-            abr_data_file = os.path.join(temp_dir, "abr_data")
-            with open(abr_data_file, "wb") as abr_data:
-                abr_data.write(
-                    (
-                        b"\x00\x41\x42\x30\x02\x01\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\x00"
-                        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x6b\xa3\x22\x12"
-                    ).ljust(
-                        1024 * 1024
-                    )  # Make a 1MB partition.
+                reserved_part = Partition(
+                    reserved_zeroes,
+                    "reserved",
+                    "reserved",
+                    Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE,
                 )
+                output.AddPartition(reserved_part)
 
-            # TODO(b/268532862): Use new GUID once switched to gigaboot++.
-            parts.append(
-                Partition(str(abr_data_file), ABR_META_GPT_GUID, "durable_boot")
-            )
+                # Add an abr metadata partition.
+                # A pre-generated abr metadata that can only boots zircon-r.
+                abr_data_file = os.path.join(temp_dir, "abr_data")
+                with open(abr_data_file, "wb") as abr_data:
+                    abr_data.write(
+                        (
+                            b"\x00\x41\x42\x30\x02\x01\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\x00"
+                            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x6b\xa3\x22\x12"
+                        ).ljust(
+                            1024 * 1024
+                        )  # Make a 1MB partition.
+                    )
+
+                # TODO(b/268532862): Use new GUID once switched to gigaboot++.
+                parts.append(
+                    Partition(
+                        str(abr_data_file), ABR_META_GPT_GUID, "durable_boot"
+                    )
+                )
 
             for p in parts:
                 output.AddPartition(p)
@@ -694,11 +704,18 @@ if __name__ == "__main__":
         default=False,
         help="DEPRECATED. Has no effect.",
     )
-    parser.add_argument(
+    installer_type = parser.add_mutually_exclusive_group()
+    installer_type.add_argument(
         "--recovery-fastboot",
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Create a bootable recovery-eng image with userspace fastboot.",
+    )
+    installer_type.add_argument(
+        "--gbl",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Create a bootable GBL image which always stop in fastboot first.",
     )
     parser.add_argument(
         "host",

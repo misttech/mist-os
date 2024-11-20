@@ -195,20 +195,28 @@ int gigaboot_main(int argc, char** argv) {
 }
 
 // Main routine for booting embedded GBL.
-int gbl_main(int argc, char** argv) {
+int gbl_main(bool is_installer) {
   printf("Preparing to boot Generic Bootloader(GBL)...\n");
+  if (is_installer) {
+    printf("Image is for bootstrap/installer use. Always stops in Fastboot...\n");
+  }
   auto mode = gigaboot::GetCommandlineRebootMode(IsQemu()).value_or(gigaboot::RebootMode::kNormal);
-  if (gigaboot::LaunchGbl(mode == gigaboot::RebootMode::kBootloader || CheckFastbootKey())
-          .is_error()) {
+  bool stop_in_fastboot =
+      is_installer || mode == gigaboot::RebootMode::kBootloader || CheckFastbootKey();
+  if (gigaboot::LaunchGbl(stop_in_fastboot).is_error()) {
     printf("Failed to boot GBL\n");
   }
   return 1;
 }
 
+#ifndef GBL_STOP_IN_FASTBOOT
+#define GBL_STOP_IN_FASTBOOT 0
+#endif
+
 int main(int argc, char** argv) {
   SetSerial();
 #ifdef GIGABOOT_BOOT_GBL
-  return gbl_main(argc, argv);
+  return gbl_main(GBL_STOP_IN_FASTBOOT);
 #else
   return gigaboot_main(argc, argv);
 #endif
