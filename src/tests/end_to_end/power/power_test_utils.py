@@ -619,6 +619,9 @@ def _append_power_data(
             timestamp_ticks = int(
                 (sample.timestamp * TICKS_PER_NS) + starting_ticks
             )
+            assert (
+                timestamp_ticks >= 0
+            ), f"timestamp_ticks must be positive: {timestamp_ticks} {sample.__dict__}"
             merged_trace.write(timestamp_ticks.to_bytes(8, "little"))
             merged_trace.write(category.data)
             merged_trace.write(name.data)
@@ -1034,7 +1037,14 @@ def merge_gonk_data(
     end_gonk: trace_time.TimePoint = lows_gonk[1].gonk_time
     delta_gonk: trace_time.TimeDelta = end_gonk - base_gonk
 
-    def gonk_to_trace_delta(
+    assert (
+        delta_trace.to_nanoseconds() >= 0
+    ), f"delta_trace should be positive: {delta_trace}"
+    assert (
+        delta_gonk.to_nanoseconds() >= 0
+    ), f"delta_gonk should be positive: {delta_gonk}"
+
+    def gonk_time_to_trace_delta(
         sample_time: trace_time.TimePoint,
     ) -> trace_time.TimeDelta:
         sample_delta_gonk = sample_time - base_gonk
@@ -1047,15 +1057,24 @@ def merge_gonk_data(
         )
         return sample_delta_trace
 
+    # Trace timestamp where the first high-to-low transition occurred.
+    base_trace_ns = base_trace.to_epoch_delta().to_nanoseconds()
+
     # Adjust each GonkSample's time using computed clock drift.
     power_samples_for_trace = []
     for s in gonk_samples_filtered:
-        time_offset = gonk_to_trace_delta(s.gonk_time)
+        time_offset = gonk_time_to_trace_delta(s.gonk_time)
         n_rails = len(s.voltages)
         for i in range(n_rails):
+            timestamp = base_trace_ns + time_offset.to_nanoseconds()
+
+            # Skip samples that were adjusted backwards past the beginning of the trace.
+            if timestamp < 0:
+                continue
+
             power_samples_for_trace.append(
                 Sample(
-                    time_offset.to_nanoseconds(),
+                    timestamp,
                     s.currents[i],
                     s.voltages[i],
                     aux_current=None,
@@ -1066,7 +1085,4 @@ def merge_gonk_data(
             )
 
     # Insert gonk samples with the modified timestamp into the existing trace.
-    starting_ticks = int(
-        base_trace.to_epoch_delta().to_nanoseconds() * TICKS_PER_NS
-    )
-    _append_power_data(fxt_path, power_samples_for_trace, starting_ticks)
+    _append_power_data(fxt_path, power_samples_for_trace, starting_ticks=0)
