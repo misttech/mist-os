@@ -14,6 +14,7 @@ use lazy_static::lazy_static;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
+use vfs::ObjectRequestRef;
 use zx::AsHandleRef;
 
 use crate::model::actions::{ActionsManager, DestroyAction};
@@ -115,8 +116,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
     let test = build_realm().await;
 
     lazy_static! {
-        static ref OPEN_FLAGS: fio::OpenFlags =
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
+        static ref OPEN_FLAGS: fio::Flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
     }
 
     // A directory that notifies via the sender whenever it is opened.
@@ -140,8 +140,21 @@ async fn open_requests_go_to_the_same_directory_connection() {
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
             assert_eq!(relative_path.into_string(), "");
+            assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY);
+            self.0.clone().try_send(()).unwrap();
+        }
+
+        fn open3(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            relative_path: vfs::path::Path,
+            flags: fio::Flags,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), zx::Status> {
+            assert_eq!(relative_path.into_string(), "");
             assert_eq!(flags, *OPEN_FLAGS);
             self.0.clone().try_send(()).unwrap();
+            Ok(())
         }
     }
 
@@ -164,8 +177,9 @@ async fn open_requests_go_to_the_same_directory_connection() {
 
         // Make a few open calls.
         for _ in 0..10 {
-            let (_, server_end) = fidl::endpoints::create_endpoints();
-            dir.open(*OPEN_FLAGS, fio::ModeType::empty(), ".", server_end).unwrap();
+            let (_, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+            dir.open3(".", *OPEN_FLAGS, &fio::Options::default(), server_end.into_channel())
+                .unwrap();
         }
     }
     // Drain routing and open requests.

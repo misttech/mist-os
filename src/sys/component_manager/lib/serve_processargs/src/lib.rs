@@ -188,6 +188,7 @@ mod test_util {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
+    use vfs::ObjectRequestRef;
 
     pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Connector::new();
@@ -222,6 +223,20 @@ mod test_util {
                 scope.spawn(async move {
                     self.0.send((relative_path, server_end.into_channel())).await.unwrap();
                 });
+            }
+
+            fn open3(
+                self: Arc<Self>,
+                scope: ExecutionScope,
+                relative_path: Path,
+                _flags: fio::Flags,
+                object_request: ObjectRequestRef<'_>,
+            ) -> Result<(), zx::Status> {
+                let object_request = object_request.take();
+                scope.spawn(async move {
+                    self.0.send((relative_path, object_request.into_channel())).await.unwrap();
+                });
+                Ok(())
             }
 
             fn lazy(&self, path: &Path) -> bool {

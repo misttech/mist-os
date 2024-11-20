@@ -12,9 +12,9 @@ use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenReque
 use crate::directory::entry_container::Directory;
 use crate::directory::test_utils::{run_client, DirentsSameInodeBuilder};
 use crate::execution_scope::ExecutionScope;
-use crate::file;
 use crate::object_request::ObjectRequest;
 use crate::path::Path;
+use crate::{file, ObjectRequestRef};
 
 use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::channel::oneshot;
@@ -189,6 +189,17 @@ async fn lazy_remote() {
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
             self.0.lock().unwrap().take().unwrap().send(()).unwrap();
+        }
+
+        fn open3(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _path: Path,
+            _flags: fio::Flags,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            self.0.lock().unwrap().take().unwrap().send(()).unwrap();
+            Ok(())
         }
 
         fn lazy(&self, _path: &Path) -> bool {

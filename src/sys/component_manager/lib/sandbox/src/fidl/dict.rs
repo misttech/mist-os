@@ -163,8 +163,8 @@ mod tests {
     };
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
-    use vfs::pseudo_directory;
     use vfs::remote::RemoteLike;
+    use vfs::{pseudo_directory, ObjectRequestRef};
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     lazy_static! {
@@ -1060,6 +1060,18 @@ mod tests {
         ) {
             assert_eq!(relative_path.as_ref(), "bar");
             self.0.inc();
+        }
+
+        fn open3(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            relative_path: Path,
+            _flags: fio::Flags,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            assert_eq!(relative_path.as_ref(), "bar");
+            self.0.inc();
+            Ok(())
         }
     }
 

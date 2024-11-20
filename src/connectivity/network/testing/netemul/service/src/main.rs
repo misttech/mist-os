@@ -28,6 +28,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::directory::immutable::simple::Simple as SimpleImmutableDir;
 use vfs::remote::RemoteLike;
+use vfs::ObjectRequestRef;
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_netemul_network as fnetemul_network,
@@ -643,6 +644,35 @@ impl RemoteLike for DevfsDevice {
             return;
         }
         error!("failed to serve device or controller: Bad path {}", path.as_ref());
+    }
+
+    fn open3(
+        self: Arc<Self>,
+        _scope: vfs::execution_scope::ExecutionScope,
+        path: vfs::path::Path,
+        _flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // If we are opening the device directly we get the device protocol.
+        if path.is_dot() || path.is_empty() {
+            self.device.serve_device(object_request.take().into_server_end()).map_err(|e| {
+                error!("failed to serve device on path {}: {}", self.path, e);
+                zx::Status::INTERNAL
+            })?;
+            return Ok(());
+        }
+        // If we are opening "device_controller" then we get fuchsia.device/Controller.
+        if path.as_ref() == "device_controller" {
+            self.device.serve_controller(object_request.take().into_server_end()).map_err(|e| {
+                error!("failed to serve controller on path {}: {}", self.path, e);
+                zx::Status::INTERNAL
+            })?;
+            return Ok(());
+        }
+
+        // Failed to serve device or controller
+        error!("failed to serve device or controller: Bad path {}", path.as_ref());
+        Err(zx::Status::BAD_PATH)
     }
 }
 
