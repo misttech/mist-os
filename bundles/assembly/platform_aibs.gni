@@ -293,6 +293,7 @@ user_platform_aib_names =
       "kernel_page_scanner_aging_fast",
       "kernel_page_table_eviction_never",
       "kernel_page_table_eviction_on_request",
+      "kernel_arm64_event_stream_disable",
 
       # Recovery
       "factory_reset",
