@@ -446,9 +446,7 @@ impl PackageManifest {
         for sp in subpackages {
             let key = sp.merkle;
 
-            if !visited_subpackages.contains(&key) {
-                visited_subpackages.insert(key);
-
+            if visited_subpackages.insert(key) {
                 let package_manifest = Self::try_load_from(&sp.manifest_path).map_err(|_| {
                     PackageManifestError::InvalidSubpackagePath {
                         merkle: sp.merkle,

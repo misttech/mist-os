@@ -224,6 +224,8 @@ impl notify::EventHandler for FastbootFileHandler {
                                             );
                                         }
                                         Ok(device) => {
+                                            // TODO(https://fxbug.dev/379733655): Remove this
+                                            #[allow(clippy::set_contains_or_insert)]
                                             if !self.seen_devices.contains(&device) {
                                                 let _ = self
                                                     .fastboot_file_tx

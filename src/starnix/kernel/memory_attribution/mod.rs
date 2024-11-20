@@ -116,6 +116,8 @@ impl MemoryAttributionManager {
                 for thread_group in pids.get_thread_groups() {
                     let pid = thread_group.leader;
                     new_processes.insert(pid);
+                    // TODO(https://fxbug.dev/379733655): Remove this
+                    #[allow(clippy::set_contains_or_insert)]
                     if !processes.contains(&pid) {
                         let name = get_thread_group_identifier(&thread_group);
                         let mut update = attribution_info_for_thread_group(name, &thread_group);
