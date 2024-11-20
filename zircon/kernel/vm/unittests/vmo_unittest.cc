@@ -105,7 +105,7 @@ static bool vmo_commit_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -1429,7 +1429,7 @@ static bool vmo_clones_of_compressed_pages_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -1519,7 +1519,7 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -2587,7 +2587,7 @@ static bool vmo_attribution_compression_test() {
   BEGIN_TEST;
 
   // Need a compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -3192,7 +3192,7 @@ static bool vmo_lookup_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -3751,7 +3751,7 @@ static bool vmo_supply_compressed_pages_test() {
 
   AutoVmScannerDisable scanner_disable;
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }
@@ -4026,7 +4026,7 @@ static bool vmo_high_priority_reclaim_test() {
   EXPECT_EQ(page, vmo->DebugGetPage(0));
 
   // If we have a compressor, then compressing should also fail.
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   if (compression) {
     auto compressor = compression->AcquireCompressor();
     EXPECT_OK(compressor.get().Arm());
@@ -4326,7 +4326,7 @@ static bool vmo_prefetch_compressed_pages_test() {
   AutoVmScannerDisable scanner_disable;
 
   // Need a working compressor.
-  auto compression = pmm_page_compression();
+  auto compression = Pmm::Node().GetPageCompression();
   if (!compression) {
     END_TEST;
   }

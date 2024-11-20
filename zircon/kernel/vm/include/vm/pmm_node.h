@@ -123,13 +123,14 @@ class PmmNode {
 
   PageQueues* GetPageQueues() { return &page_queues_; }
 
-  // See |pmm_get_page_compression|
+  // Retrieve any page compression instance. If this returns non-null then it's return value will
+  // not change and the result can be cached.
   VmCompression* GetPageCompression() {
     Guard<Mutex> guard{&compression_lock_};
     return page_compression_.get();
   }
 
-  // See |pmm_set_page_compression|.
+  // Set the page compression instance. Returns an error if one has already been set.
   zx_status_t SetPageCompression(fbl::RefPtr<VmCompression> compression);
 
   // Fill all free pages (both non-loaned and loaned) with a pattern and arm the checker.  See

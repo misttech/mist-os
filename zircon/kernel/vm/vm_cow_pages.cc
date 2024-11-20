@@ -88,7 +88,7 @@ uint32_t GetShareCount(T p) {
   if (p->IsPage()) {
     share_count = p->Page()->object.share_count;
   } else if (p->IsReference()) {
-    share_count = pmm_page_compression()->GetMetadata(p->Reference());
+    share_count = Pmm::Node().GetPageCompression()->GetMetadata(p->Reference());
   }
 
   return share_count;
@@ -106,7 +106,7 @@ void SetShareCount(T p, uint32_t count) {
   if (p->IsPage()) {
     p->Page()->object.share_count = count;
   } else if (p->IsReference()) {
-    pmm_page_compression()->SetMetadata(p->Reference(), count);
+    Pmm::Node().GetPageCompression()->SetMetadata(p->Reference(), count);
   }
 }
 
@@ -202,7 +202,7 @@ ktl::optional<vm_page_t*> MaybeDecompressReference(VmCompression* compression,
 }
 
 void FreeReference(VmPageOrMarker::ReferenceValue content) {
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   DEBUG_ASSERT(compression);
   compression->Free(content);
 }
@@ -443,7 +443,7 @@ void VmCowPages::CacheFree(vm_page_t* p) {
 zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
                                               AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(page_or_mark->IsReference());
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   DEBUG_ASSERT(compression);
 
   vm_page_t* p;
@@ -1573,7 +1573,7 @@ void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, boo
       struct {
         BatchPQUpdateBacklink* page_backlink_updater;
         VmCompression* compression;
-      } state = {&page_backlink_updater, pmm_page_compression()};
+      } state = {&page_backlink_updater, Pmm::Node().GetPageCompression()};
       page_list_.ForEveryPageMutable([this, &state](VmPageOrMarkerRef p, uint64_t off) {
         // Hidden VMO hierarchies do not support intervals.
         ASSERT(!p->IsInterval());
@@ -1636,7 +1636,7 @@ void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, boo
       BatchPQUpdateBacklink* page_backlink_updater;
       VmCompression* compression;
     } state = {removed_left, merge_start_offset, &page_remover, &page_backlink_updater,
-               pmm_page_compression()};
+               Pmm::Node().GetPageCompression()};
     child.page_list_.MergeFrom(
         page_list_, merge_start_offset, merge_end_offset,
         [&page_remover](VmPageOrMarker&& p, uint64_t offset) { page_remover.PushContent(&p); },
@@ -5439,7 +5439,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
   }
   AssertHeld(cursor->lock_ref());
 
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
 
   // This loop attempts to take pages from the VMO one page at a time. For each page, it:
   // 1. Allocates a zero page to replace the existing page.
@@ -5580,7 +5580,7 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
     return TakePagesWithParentLocked(offset, len, pages, taken_len, page_request);
   }
 
-  VmCompression* compression = pmm_page_compression();
+  VmCompression* compression = Pmm::Node().GetPageCompression();
   bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
       [&compression, &found_page](VmPageOrMarkerRef p, uint64_t off) {

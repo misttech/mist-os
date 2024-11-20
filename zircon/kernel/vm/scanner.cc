@@ -98,7 +98,7 @@ void scanner_print_stats() {
   printf("[SCAN]: Found %lu locked pages in discardable vmos\n", counts.locked);
   printf("[SCAN]: Found %lu unlocked pages in discardable vmos\n", counts.unlocked);
   pmm_page_queues()->Dump();
-  if (VmCompression* compression = pmm_page_compression()) {
+  if (VmCompression* compression = Pmm::Node().GetPageCompression()) {
     compression->Dump();
   }
 }
@@ -396,7 +396,7 @@ static void scanner_init_func(uint level) {
                                           gBootOptions->page_scanner_accessed_scan_interval_ms));
 
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
-    zx_status_t status = pmm_set_page_compression(ktl::move(compression));
+    zx_status_t status = Pmm::Node().SetPageCompression(ktl::move(compression));
     ASSERT_MSG(status == ZX_OK, "status: %d", status);
     if (gBootOptions->random_debug_compress) {
       pmm_page_queues()->StartDebugCompressor();

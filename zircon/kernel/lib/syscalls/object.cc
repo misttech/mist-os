@@ -919,7 +919,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
 
       zx_info_kmem_stats_compression_t kstats = {};
 
-      VmCompression* compression = pmm_page_compression();
+      VmCompression* compression = Pmm::Node().GetPageCompression();
       if (compression) {
         VmCompression::Stats stats = compression->GetStats();
         kstats.uncompressed_storage_bytes = stats.memory_usage.uncompressed_content_bytes;

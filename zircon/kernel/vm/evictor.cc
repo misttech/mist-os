@@ -334,7 +334,7 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
   ktl::optional<VmCompression::CompressorGuard> maybe_instance;
   VmCompressor* compression_instance = nullptr;
   if (IsCompressionEnabled()) {
-    VmCompression* compression = pmm_page_compression();
+    VmCompression* compression = Pmm::Node().GetPageCompression();
     if (compression) {
       maybe_instance.emplace(compression->AcquireCompressor());
       compression_instance = &maybe_instance->get();

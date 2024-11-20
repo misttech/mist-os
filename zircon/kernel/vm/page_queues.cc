@@ -115,7 +115,7 @@ class PageQueues::LruIsolate {
         // LruAction::None we would not have enqueued any Reclaim pages, so we can just check for
         // EvictOnly.
         if (lru_action_ != LruAction::EvictOnly && !compression) {
-          compression = pmm_page_compression();
+          compression = Pmm::Node().GetPageCompression();
           if (compression) {
             maybe_compressor.emplace(compression->AcquireCompressor());
             compressor = &maybe_compressor->get();
