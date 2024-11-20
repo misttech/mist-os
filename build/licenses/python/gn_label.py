@@ -5,6 +5,7 @@
 """Utilities for working with GnLabel strings."""
 
 import dataclasses
+import logging
 import os
 from pathlib import Path
 from typing import Any, List
@@ -147,6 +148,18 @@ class GnLabel:
         return f"https://cs.opensource.google/fuchsia/fuchsia/+/main:{self.path_str}"
 
     def is_host_target(self) -> bool:
+        # Some host-tools do not have a toolchain.
+        # Add them here to ensure we skip collecting those licenses.
+        extra_host_targets = [
+            "prebuilt/third_party/rust/",
+        ]
+        if any(substring in self.path_str for substring in extra_host_targets):
+            logging.debug(
+                "Target %s is a host-tool even though the toolchain (%s) does not start with 'host_'",
+                self.path_str,
+                self.toolchain.name if self.toolchain else "",
+            )
+            return True
         return bool(self.toolchain and self.toolchain.name.startswith("host_"))
 
     def is_3rd_party(self) -> bool:
