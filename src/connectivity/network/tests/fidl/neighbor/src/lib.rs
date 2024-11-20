@@ -521,15 +521,14 @@ fn incomplete_then_reachable(
 /// Helper function to observe the next solicitation resolution on a
 /// [`FrameMetadata`] stream.
 ///
-/// This function runs a state machine that observes the next neighbor
-/// resolution on the stream. It waits for a neighbor solicitation to be
-/// observed followed by an UDP frame to that destination, asserting that any
-/// following solicitations in between are to the same IP. That allows tests to
-/// be resilient in face of ARP or NDP retransmissions.
+/// This function collects all the router solicitations it sees until it receives
+/// a UDP packet. It then asserts that the UDP packet's destination IP matches
+/// the given `dst_ip`.
 async fn next_solicitation_resolution(
     stream: &mut (impl futures::Stream<Item = Result<FrameMetadata>> + std::marker::Unpin),
-) -> fidl_fuchsia_net::IpAddress {
-    let mut solicitation = None;
+    dst_ip: fidl_fuchsia_net::IpAddress,
+) -> HashSet<fidl_fuchsia_net::IpAddress> {
+    let mut solicitations = HashSet::new();
     loop {
         match stream
             .try_next()
@@ -537,26 +536,13 @@ async fn next_solicitation_resolution(
             .expect("failed to read from metadata stream")
             .expect("metadata stream ended unexpectedly")
         {
-            FrameMetadata::NeighborSolicitation(ip) => match &solicitation {
-                Some(previous) => {
-                    assert_eq!(ip, *previous, "observed solicitation for a different IP address");
-                }
-                None => solicitation = Some(ip),
-            },
-            FrameMetadata::Udp(ip) => match solicitation {
-                Some(solicitation) => {
-                    assert_eq!(
-                        solicitation, ip,
-                        "observed UDP frame to a different address than solicitation"
-                    );
-                    // Once we observe the expected UDP frame, we can break the loop.
-                    break solicitation;
-                }
-                None => panic!(
-                    "observed UDP frame to {} without prior solicitation",
-                    fidl_fuchsia_net_ext::IpAddress::from(ip)
-                ),
-            },
+            FrameMetadata::NeighborSolicitation(ip) => {
+                let _ = solicitations.insert(ip);
+            }
+            FrameMetadata::Udp(ip) => {
+                assert_eq!(ip, dst_ip);
+                return solicitations;
+            }
             FrameMetadata::Other => (),
         }
     }
@@ -652,7 +638,10 @@ async fn neigh_clear_entries<N: Netstack, I: Ip>(name: &str) {
     // observe the neighbor solicitations over the network.
     let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
 
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob_ip);
+    assert_eq!(
+        next_solicitation_resolution(&mut solicit_stream, bob_ip).await,
+        HashSet::from_iter(std::iter::once(bob_ip))
+    );
     assert_entries(&mut iter, incomplete_then_reachable(alice.ep.id(), bob_ip, BOB_MAC)).await;
 
     // Clear entries and verify they go away.
@@ -688,10 +677,33 @@ async fn neigh_clear_entries<N: Netstack, I: Ip>(name: &str) {
         .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
 
-    // Exchange datagrams again and assert that new solicitation requests were
-    // sent.
-    let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob_ip);
+    const MAX_RETRIES: usize = 5;
+    let mut all_solicitations = HashSet::new();
+    for _ in 0..MAX_RETRIES {
+        // Exchange datagrams again and assert that new solicitation requests were
+        // sent.
+        let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
+        let solicitations = next_solicitation_resolution(&mut solicit_stream, bob_ip).await;
+        if solicitations == HashSet::from_iter(std::iter::once(bob_ip)) {
+            return;
+        } else {
+            // We failed the test because Bob's delayed advertisement may have installed
+            // a new neighbor entry at Alice. Since Alice must have a neighbor entry
+            // either way because of the `exchange_dgram`, we need to clear the entries
+            // and go again.
+            all_solicitations.extend(solicitations.into_iter());
+            alice_controller
+                .clear_entries(alice.ep.id(), I::VERSION.into_ext())
+                .await
+                .expect("clear_entries FIDL error")
+                .map_err(zx::Status::from_raw)
+                .expect("clear_entries failed")
+        }
+    }
+    panic!(
+        "maximum retries {} exceeded, all solicitations received: {:?}",
+        MAX_RETRIES, all_solicitations
+    );
 }
 
 #[netstack_test]
@@ -945,7 +957,10 @@ async fn neigh_add_remove_entry<N: Netstack, I: Ip>(name: &str) {
     // Exchange datagrams again and assert that new solicitation requests were
     // sent (ignoring any UDP metadata this time).
     let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
-    assert_eq!(next_solicitation_resolution(&mut meta_stream).await, bob_ip);
+    assert_eq!(
+        next_solicitation_resolution(&mut meta_stream, bob_ip).await,
+        HashSet::from_iter(std::iter::once(bob_ip))
+    );
 }
 
 #[netstack_test]
