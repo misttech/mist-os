@@ -55,13 +55,13 @@ class DisplayEngineInterface {
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
   virtual config_check_result_t CheckConfiguration(
-      cpp20::span<const display_config_t> display_configs,
+      uint64_t display_id, cpp20::span<const layer_t> layers,
       cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
       size_t* out_client_composition_opcodes_actual) = 0;
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual void ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
-                                  const config_stamp_t* banjo_config_stamp) = 0;
+  virtual void ApplyConfiguration(uint64_t display_id, cpp20::span<const layer_t> layers,
+                                  config_stamp_t config_stamp) = 0;
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,

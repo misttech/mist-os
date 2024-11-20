@@ -37,7 +37,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -293,64 +292,60 @@ void DisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 }
 
 config_check_result_t DisplayEngine::CheckConfiguration(
-    cpp20::span<const display_config_t> display_configs,
+    uint64_t display_id, cpp20::span<const layer_t> layers,
     cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
     size_t* out_client_composition_opcodes_actual) {
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = 0;
-  }
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_id) == kDisplayId);
 
-  if (display_configs.size() != 1) {
-    ZX_DEBUG_ASSERT(display_configs.size() == 0);
+  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= layers.size());
+  ZX_DEBUG_ASSERT(!out_client_composition_opcodes_actual ||
+                  *out_client_composition_opcodes_actual == layers.size());
+
+  ZX_DEBUG_ASSERT(layers.size() == 1);
+
+  const layer_t& layer = layers[0];
+  const rect_u_t display_area = {
+      .x = 0,
+      .y = 0,
+      .width = current_display_.scanout_info.geometry.width,
+      .height = current_display_.scanout_info.geometry.height,
+  };
+
+  if (std::memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+    // TODO(costan): Doesn't seem right?
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0].display_id) == kDisplayId);
-
-  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= display_configs[0].layer_count);
-  std::fill(out_client_composition_opcodes.begin(), out_client_composition_opcodes.end(), 0);
-  if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = out_client_composition_opcodes.size();
+  if (std::memcmp(&layer.image_source, &layer.display_destination, sizeof(rect_u_t)) != 0) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+    return CONFIG_CHECK_RESULT_OK;
+  }
+  if (layer.image_metadata.width != layer.image_source.width ||
+      layer.image_metadata.height != layer.image_source.height) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
+    return CONFIG_CHECK_RESULT_OK;
+  }
+  if (layer.alpha_mode != ALPHA_DISABLE) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+    return CONFIG_CHECK_RESULT_OK;
+  }
+  if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+    return CONFIG_CHECK_RESULT_OK;
   }
 
-  bool success;
-  if (display_configs[0].layer_count != 1) {
-    success = display_configs[0].layer_count == 0;
-  } else {
-    const layer_t& layer = display_configs[0].layer_list[0];
-    const rect_u_t display_area = {
-        .x = 0,
-        .y = 0,
-        .width = current_display_.scanout_info.geometry.width,
-        .height = current_display_.scanout_info.geometry.height,
-    };
-    success = layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
-              layer.image_metadata.width == current_display_.scanout_info.geometry.width &&
-              layer.image_metadata.height == current_display_.scanout_info.geometry.height &&
-              memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
-              memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0 &&
-              display_configs[0].cc_flags == 0 && layer.alpha_mode == ALPHA_DISABLE;
-  }
-  if (!success) {
-    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
-      out_client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
-    }
-  }
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
-                                       const config_stamp_t* banjo_config_stamp) {
-  ZX_DEBUG_ASSERT(banjo_config_stamp);
-  display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
-  uint64_t handle = display_configs.empty() || display_configs[0].layer_count == 0
-                        ? INVALID_DISPLAY_ID
-                        : display_configs[0].layer_list[0].image_handle;
+void DisplayEngine::ApplyConfiguration(uint64_t display_id, cpp20::span<const layer_t> layers,
+                                       config_stamp_t config_stamp) {
+  ZX_DEBUG_ASSERT(layers.size() == 1);
+  uint64_t handle = layers[0].image_handle;
 
   {
     fbl::AutoLock al(&flush_lock_);
     latest_fb_ = reinterpret_cast<imported_image_t*>(handle);
-    latest_config_stamp_ = config_stamp;
+    latest_config_stamp_ = display::ToConfigStamp(config_stamp);
   }
 }
 

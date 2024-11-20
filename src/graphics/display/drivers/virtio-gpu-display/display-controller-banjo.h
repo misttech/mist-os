@@ -47,10 +47,10 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
                                                  uint32_t index, uint64_t* out_capture_handle);
   void DisplayEngineReleaseImage(uint64_t banjo_image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
+      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
                                        size_t banjo_display_configs_count,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(

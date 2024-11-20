@@ -30,7 +30,6 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-interface.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-interface.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
@@ -84,11 +83,11 @@ class DisplayEngine final : public DisplayEngineInterface {
       display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) override;
   void ReleaseImage(display::DriverImageId driver_image_id) override;
   config_check_result_t CheckConfiguration(
-      cpp20::span<const display_config_t> display_configs,
+      uint64_t display_id, cpp20::span<const layer_t> layers,
       cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
       size_t* out_client_composition_opcodes_actual) override;
-  void ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
-                          const config_stamp_t* banjo_config_stamp) override;
+  void ApplyConfiguration(uint64_t display_id, cpp20::span<const layer_t> layers,
+                          config_stamp_t config_stamp) override;
   zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId driver_buffer_collection_id) override;

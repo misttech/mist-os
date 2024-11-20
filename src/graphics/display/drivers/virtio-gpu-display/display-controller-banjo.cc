@@ -106,24 +106,105 @@ void DisplayControllerBanjo::DisplayEngineReleaseImage(uint64_t banjo_image_hand
 }
 
 config_check_result_t DisplayControllerBanjo::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual) {
-  cpp20::span<const display_config_t> display_configs(banjo_display_configs,
-                                                      banjo_display_configs_count);
+  cpp20::span<const display_config_t> banjo_display_configs(banjo_display_configs_array,
+                                                            banjo_display_configs_count);
   cpp20::span<client_composition_opcode_t> out_client_composition_opcodes(
       out_client_composition_opcodes_list, out_client_composition_opcodes_size);
+  std::fill(out_client_composition_opcodes.begin(), out_client_composition_opcodes.end(), 0);
 
-  return engine_.CheckConfiguration(display_configs, out_client_composition_opcodes,
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = 0;
+  }
+
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs.size() == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  if (banjo_display_configs.size() > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
+  const display_config& banjo_display_config = banjo_display_configs[0];
+  cpp20::span<const layer_t> banjo_layers(banjo_display_config.layer_list,
+                                          banjo_display_config.layer_count);
+
+  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= banjo_layers.size());
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = banjo_layers.size();
+  }
+
+  // The display coordinator currently uses zero-display configs to blank a
+  // display. We'll remove this eventually.
+  if (banjo_layers.size() == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not currently support multi-layer configurations. This
+  // restriction will be lifted in the near future.
+  if (banjo_layers.size() > 1) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    for (size_t i = 1; i < banjo_layers.size(); ++i) {
+      out_client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+    }
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not currently support color correction.
+  if (banjo_display_config.cc_flags != 0) {
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION;
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  return engine_.CheckConfiguration(banjo_display_config.display_id, banjo_layers,
+                                    out_client_composition_opcodes,
                                     out_client_composition_opcodes_actual);
 }
 
 void DisplayControllerBanjo::DisplayEngineApplyConfiguration(
-    const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
     const config_stamp_t* banjo_config_stamp) {
-  cpp20::span<const display_config_t> display_configs(banjo_display_configs,
-                                                      banjo_display_configs_count);
-  return engine_.ApplyConfiguration(display_configs, banjo_config_stamp);
+  cpp20::span<const display_config_t> banjo_display_configs(banjo_display_configs_array,
+                                                            banjo_display_configs_count);
+
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs.size() == 0) {
+    return;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_configs.size() == 1,
+                      "Display coordinator applied rejected multi-display config");
+
+  const display_config& banjo_display_config = banjo_display_configs[0];
+  cpp20::span<const layer_t> banjo_layers(banjo_display_config.layer_list,
+                                          banjo_display_config.layer_count);
+
+  // The display coordinator currently uses zero-display configs to blank a
+  // display. We'll remove this eventually.
+  if (banjo_layers.size() == 0) {
+    return;
+  }
+
+  // This adapter does not currently support multi-layer configurations. This
+  // restriction will be lifted in the near future.
+  ZX_DEBUG_ASSERT_MSG(banjo_layers.size() == 1,
+                      "Display coordinator applied rejected multi-layer config");
+
+  // This adapter does not currently support color correction.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_config.cc_flags == 0,
+                      "Display coordinator applied rejected color-correction config");
+
+  engine_.ApplyConfiguration(banjo_display_config.display_id, banjo_layers, *banjo_config_stamp);
 }
 
 zx_status_t DisplayControllerBanjo::DisplayEngineSetBufferCollectionConstraints(
