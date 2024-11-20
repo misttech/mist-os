@@ -23,13 +23,6 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
       "//lib",
       "//src/ui/lib/escher",
     ]
-
-    if (is_linux) {
-      testonly = true
-      deps += [
-        "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
-      ]
-    }
   }
 
   vulkan_executable("waterfall_on_scenic") {
@@ -43,13 +36,6 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
       "//lib",
       "//src/ui/lib/escher",
     ]
-
-    if (is_linux) {
-      testonly = true
-      deps += [
-        "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
-      ]
-    }
   }
 
   group("waterfall_base") {

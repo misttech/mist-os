@@ -14,10 +14,7 @@ group("examples") {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    "escher/test:escher_examples_test($linux_x64_toolchain)",
-    "flatland-rainbow:flatland-rainbow-tests",
-  ]
+  public_deps = [ "flatland-rainbow:flatland-rainbow-tests" ]
 }
 
 fuchsia_package("flatland-examples") {

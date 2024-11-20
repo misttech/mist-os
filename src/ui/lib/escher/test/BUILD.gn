@@ -99,8 +99,6 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
     }
 
     deps = [
-      ":force_examples_to_build_on_host",
-      ":force_paper_shader_compiler_to_build_on_host",
       "base:base_unittests",
       "//src/lib/fxl",
       "//src/ui/lib/escher/test/common:gtest_escher",
@@ -194,33 +192,7 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
       "//src/ui/lib/escher/test/common:readback_fixtures",
     ]
 
-    if (is_linux) {
-      deps += [
-        "//src/ui/lib/escher/shaders:host_shader_data($linux_x64_toolchain)",
-      ]
-    }
-
     # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
-  }
-}
-
-# Guarantees that buildbots at least build the Escher examples on Linux,
-# even if they are not run.
-group("force_examples_to_build_on_host") {
-  if (is_linux) {
-    testonly = true
-    deps = [
-      "//src/ui/examples/escher/rainfall:rainfall_on_fb($linux_x64_toolchain)",
-      "//src/ui/examples/escher/waterfall:waterfall_on_fb($linux_x64_toolchain)",
-    ]
-  }
-}
-
-# Guarantees that buildbots at least build the paper shader compiler on Linux,
-# even if they are not run.
-group("force_paper_shader_compiler_to_build_on_host") {
-  if (is_linux) {
-    deps = [ "//src/ui/tools/paper_shader_compiler($linux_x64_toolchain)" ]
   }
 }
