@@ -1057,6 +1057,21 @@ pub enum SlaacConfig<Instant> {
     Temporary(TemporarySlaacConfig<Instant>),
 }
 
+impl<Instant: Copy> SlaacConfig<Instant> {
+    /// The lifetime for which the address is valid.
+    pub fn valid_until(&self) -> Lifetime<Instant> {
+        match self {
+            SlaacConfig::Static { valid_until } => *valid_until,
+            SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                desync_factor: _,
+                creation_time: _,
+                dad_counter: _,
+            }) => Lifetime::Finite(*valid_until),
+        }
+    }
+}
+
 /// The configuration for an IPv6 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Ipv6AddrConfig<Instant> {
@@ -1120,15 +1135,7 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
-                SlaacConfig::Static { valid_until } => *valid_until,
-                SlaacConfig::Temporary(TemporarySlaacConfig {
-                    valid_until,
-                    desync_factor: _,
-                    creation_time: _,
-                    dad_counter: _,
-                }) => Lifetime::Finite(*valid_until),
-            },
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => inner.valid_until(),
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => common.valid_until,
         }
     }

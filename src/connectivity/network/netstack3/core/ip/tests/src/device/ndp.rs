@@ -2063,7 +2063,7 @@ fn assert_slaac_timers_integration<CC, BC, I>(
 ) where
     CC: Ipv6DeviceConfigurationContext<BC>,
     for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext<CC::DeviceId>,
     I: IntoIterator<Item = (InnerSlaacTimerId, BC::Instant)>,
 {
     let want = timers.into_iter().collect::<HashMap<_, _>>();
@@ -2079,7 +2079,7 @@ fn assert_next_slaac_timer_integration<CC, BC>(
 ) where
     CC: Ipv6DeviceConfigurationContext<BC>,
     for<'a> CC::Ipv6DeviceStateCtx<'a>: SlaacContext<BC>,
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext,
+    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId> + SlaacBindingsContext<CC::DeviceId>,
 {
     let got = ip::device::testutil::collect_slaac_timers_integration(core_ctx, device_id)
         .into_iter()
