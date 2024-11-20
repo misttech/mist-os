@@ -645,11 +645,6 @@ impl RegisteredDevices {
         self.0.lock().get(&tag).map(|d| d.topological_path().to_string())
     }
 
-    /// Unregisters and returns the device with the specified tag, if registered.
-    pub fn take(&self, tag: DeviceTag) -> Option<Box<dyn Device>> {
-        self.0.lock().remove(&tag)
-    }
-
     /// Returns a block_connector for the device with the specified tag.  This will wait till the
     /// device is registered.
     pub async fn get_block_connector(
