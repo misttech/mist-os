@@ -4,7 +4,7 @@
 
 use argh::FromArgs;
 use assembly_config_schema::BuildType;
-use assembly_util::{
+use assembly_constants::{
     BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination, BootfsDestination,
     BootfsPackageDestination, PackageDestination,
 };

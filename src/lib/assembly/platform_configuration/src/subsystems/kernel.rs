@@ -9,7 +9,7 @@ use assembly_config_schema::platform_config::kernel_config::{
     MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PagetableEvictionPolicy,
     PlatformKernelConfig, ZeroPageScanCount,
 };
-use assembly_util::{BootfsDestination, FileEntry};
+use assembly_constants::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
 pub(crate) struct KernelSubsystem;
 

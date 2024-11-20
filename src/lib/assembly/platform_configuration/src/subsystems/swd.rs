@@ -8,7 +8,7 @@ use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 use camino::Utf8PathBuf;
 use std::fs::File;
 

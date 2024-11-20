@@ -6,13 +6,13 @@
 //! destination files in this central location. The resulting enums are iterated over in order to
 //! generate scrutiny golden files.
 
-use crate::named_map::Key;
+use assembly_util::NamedMapKey;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 /// A destination path for an input file.
-pub trait Destination: Key + Clone + std::fmt::Display {}
+pub trait Destination: NamedMapKey + Clone + std::fmt::Display {}
 
 /// A mapping between a file source and destination.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -368,12 +368,12 @@ impl std::fmt::Display for BootfsCompiledPackageDestination {
     }
 }
 
-impl Key for BootfsDestination {}
-impl Key for PackageDestination {}
-impl Key for BootfsPackageDestination {}
-impl Key for PackageSetDestination {}
-impl Key for BlobfsCompiledPackageDestination {}
-impl Key for BootfsCompiledPackageDestination {}
+impl NamedMapKey for BootfsDestination {}
+impl NamedMapKey for PackageDestination {}
+impl NamedMapKey for BootfsPackageDestination {}
+impl NamedMapKey for PackageSetDestination {}
+impl NamedMapKey for BlobfsCompiledPackageDestination {}
+impl NamedMapKey for BootfsCompiledPackageDestination {}
 impl Destination for String {}
 impl Destination for BootfsDestination {}
 impl Destination for PackageDestination {}

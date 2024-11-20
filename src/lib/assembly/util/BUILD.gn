@@ -16,13 +16,10 @@ rustc_library("util") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
-    "//third_party/rust_crates:strum",
-    "//third_party/rust_crates:strum_macros",
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
   sources = [
     "src/fast_copy.rs",
-    "src/files.rs",
     "src/insert_unique.rs",
     "src/lib.rs",
     "src/named_map.rs",

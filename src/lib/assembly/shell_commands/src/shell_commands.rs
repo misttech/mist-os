@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Result};
 use assembly_config_schema::assembly_config::ShellCommands;
+use assembly_constants::{BootfsPackageDestination, PackageDestination};
 use assembly_package_utils::PackageInternalPathBuf;
-use assembly_util::{BootfsPackageDestination, PackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, RelativeTo};

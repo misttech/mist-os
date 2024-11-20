@@ -64,6 +64,7 @@ rustc_library("platform_configuration") {
     "//src/lib/assembly/component_manager_config",
     "//src/lib/assembly/config_capabilities",
     "//src/lib/assembly/config_schema",
+    "//src/lib/assembly/constants",
     "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/named_file_map",

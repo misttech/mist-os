@@ -6,11 +6,12 @@ use crate::base_package::BasePackage;
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
+use assembly_constants::BootfsDestination;
 use assembly_images_config::Zbi;
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
 use assembly_tool::Tool;
-use assembly_util::{BootfsDestination, InsertUniqueExt, MapEntry};
+use assembly_util::{InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use std::collections::BTreeMap;
@@ -188,11 +189,11 @@ mod tests {
 
     use crate::base_package::BasePackage;
     use assembly_config_schema::ImageAssemblyConfig;
+    use assembly_constants::BootfsDestination;
     use assembly_images_config::{PostProcessingScript, Zbi, ZbiCompression};
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
-    use assembly_util::BootfsDestination;
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_hash::Hash;
     use regex::Regex;

@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use assembly_config_schema::ImageAssemblyConfig;
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 use assembly_validate_util::{BootfsContents, PkgNamespace};
 use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;

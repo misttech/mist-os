@@ -7,11 +7,11 @@ use anyhow::{ensure, Context};
 use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_constants::{BootfsDestination, FileEntry};
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FilesystemImageMode, FvmVolumeConfig,
     VolumeConfig,
 };
-use assembly_util::{BootfsDestination, FileEntry};
 
 pub(crate) struct StorageSubsystemConfig;
 impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {

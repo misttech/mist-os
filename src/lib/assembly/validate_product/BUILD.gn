@@ -13,8 +13,8 @@ rustc_library("validate_product") {
   with_unit_tests = true
   deps = [
     "//src/lib/assembly/config_schema",
+    "//src/lib/assembly/constants",
     "//src/lib/assembly/structured_config",
-    "//src/lib/assembly/util",
     "//src/lib/assembly/validate_util",
     "//src/lib/versioning/version-history/rust",
     "//src/lib/versioning/version-history/rust/data",

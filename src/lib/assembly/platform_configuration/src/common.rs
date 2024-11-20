@@ -13,10 +13,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
-use assembly_named_file_map::NamedFileMap;
-use assembly_util::{
-    BootfsDestination, CompiledPackageDestination, FileEntry, NamedMap, PackageSetDestination,
+use assembly_constants::{
+    BootfsDestination, CompiledPackageDestination, FileEntry, PackageSetDestination,
 };
+use assembly_named_file_map::NamedFileMap;
+use assembly_util::NamedMap;
 
 /// The platform's base service level.
 ///

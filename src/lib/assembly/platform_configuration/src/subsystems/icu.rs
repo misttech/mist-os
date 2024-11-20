@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 use assembly_config_schema::platform_config::icu_config::ICUConfig;
-use assembly_util::FileEntry;
+use assembly_constants::FileEntry;
 
 const DATA_VERSION: &str = "44";
 const FORMAT: &str = "le";

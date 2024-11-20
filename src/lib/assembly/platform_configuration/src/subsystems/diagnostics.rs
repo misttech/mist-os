@@ -9,7 +9,8 @@ use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueTyp
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType, Severity,
 };
-use assembly_util::{read_config, BootfsPackageDestination, FileEntry, PackageSetDestination};
+use assembly_constants::{BootfsPackageDestination, FileEntry, PackageSetDestination};
+use assembly_util::read_config;
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 

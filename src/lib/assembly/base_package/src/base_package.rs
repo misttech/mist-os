@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use assembly_constants::PackageDestination;
 use assembly_package_list::{PackageList, PackageUrlList, WritablePackageList};
-use assembly_util::PackageDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::collections::BTreeMap;

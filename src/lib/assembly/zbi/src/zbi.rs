@@ -4,8 +4,8 @@
 
 use anyhow::{anyhow, Context, Error, Result};
 use assembly_config_schema::BoardDriverArguments;
+use assembly_constants::BootfsDestination;
 use assembly_tool::Tool;
-use assembly_util::BootfsDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::BTreeMap;
 use std::fs::File;

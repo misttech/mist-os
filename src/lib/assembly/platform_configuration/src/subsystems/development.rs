@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
-use assembly_util::{BootfsDestination, FileEntry};
+use assembly_constants::{BootfsDestination, FileEntry};
 
 pub(crate) struct DevelopmentConfig;
 impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfig {

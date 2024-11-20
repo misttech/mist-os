@@ -8,7 +8,7 @@ use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueTyp
 use assembly_config_schema::platform_config::ui_config::{
     PlatformUiConfig, UnsignedIntegerRangeInclusive,
 };
-use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
+use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct UiSubsystem;
 

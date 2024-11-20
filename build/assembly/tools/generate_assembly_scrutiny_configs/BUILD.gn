@@ -11,7 +11,7 @@ rustc_binary("generate_assembly_scrutiny_configs") {
   sources = [ "src/main.rs" ]
   deps = [
     "//src/lib/assembly/config_schema",
-    "//src/lib/assembly/util",
+    "//src/lib/assembly/constants",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:strum",

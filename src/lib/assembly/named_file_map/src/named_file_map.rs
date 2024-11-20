@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use assembly_util::{
-    BTreeMapDuplicateKeyError, BootfsDestination, Destination, FileEntry, InsertUniqueExt,
-    MapEntry, NamedMap,
-};
+use assembly_constants::{BootfsDestination, Destination, FileEntry};
+use assembly_util::{BTreeMapDuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap};
 use camino::Utf8PathBuf;
 use fuchsia_merkle::Hash;
 use fuchsia_pkg::BlobInfo;

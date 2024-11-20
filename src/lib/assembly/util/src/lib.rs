@@ -6,17 +6,11 @@
 
 //! Utility methods and traits used throughout assembly.
 mod fast_copy;
-mod files;
 mod insert_unique;
 mod named_map;
 mod paths;
 
 pub use fast_copy::fast_copy;
-pub use files::{
-    BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination, BootfsDestination,
-    BootfsPackageDestination, CompiledPackageDestination, Destination, FileEntry,
-    PackageDestination, PackageSetDestination, TestCompiledPackageDestination,
-};
 pub use insert_unique::{
     BTreeMapDuplicateKeyError, DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry,
 };
