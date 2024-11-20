@@ -4,25 +4,36 @@
 
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsStr,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{statfs, CGROUP2_SUPER_MAGIC, CGROUP_SUPER_MAGIC};
 
-use crate::cgroup::CgroupDirectoryNode;
+use crate::cgroup::CgroupRoot;
+use std::sync::Arc;
 
-pub struct CgroupV1Fs;
+pub struct CgroupV1Fs {
+    #[allow(dead_code)]
+    // `root` is not accessed, but is needed to keep the cgroup hierarchy alive.
+    root: Arc<CgroupRoot>,
+}
+
 impl CgroupV1Fs {
     pub fn new_fs(
         _locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Permanent, CgroupV1Fs, options)?;
-        let root = FsNode::new_root(CgroupDirectoryNode::new());
-        fs.set_root_node(root);
+        let root = CgroupRoot::new();
+        let fs = FileSystem::new(
+            current_task.kernel(),
+            CacheMode::Uncached,
+            CgroupV1Fs { root: root.clone() },
+            options,
+        )?;
+        fs.set_root(root.create_node_ops(current_task, &fs));
         Ok(fs)
     }
 }
@@ -40,16 +51,26 @@ impl FileSystemOps for CgroupV1Fs {
     }
 }
 
-pub struct CgroupV2Fs;
+pub struct CgroupV2Fs {
+    #[allow(dead_code)]
+    // `root` is not accessed, but is needed to keep the cgroup hierarchy alive.
+    root: Arc<CgroupRoot>,
+}
+
 impl CgroupV2Fs {
     pub fn new_fs(
         _locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Permanent, CgroupV2Fs, options)?;
-        let root = FsNode::new_root(CgroupDirectoryNode::new());
-        fs.set_root_node(root);
+        let root = CgroupRoot::new();
+        let fs = FileSystem::new(
+            current_task.kernel(),
+            CacheMode::Uncached,
+            CgroupV2Fs { root: root.clone() },
+            options,
+        )?;
+        fs.set_root(root.create_node_ops(current_task, &fs));
         Ok(fs)
     }
 }

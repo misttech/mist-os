@@ -18,6 +18,7 @@ rustc_library("cgroup") {
 
   deps = [
     "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",

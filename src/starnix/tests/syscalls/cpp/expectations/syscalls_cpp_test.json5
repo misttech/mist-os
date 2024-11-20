@@ -84,6 +84,9 @@
 
                 // TODO(https://fxbug.dev/372236700): Fails with new toolchain.
                 "PtraceTest.InterruptAfterListen",
+
+                // TODO(https://fxbug.dev/379958264)
+                "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
             ],
         },
     ],
