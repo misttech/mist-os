@@ -490,9 +490,10 @@ impl FidlProtocol for TracingProtocol {
                 };
                 let output_file = task.output_file.clone();
                 let target_info = task.target_info.clone();
+                let categories = task.config.categories.clone().unwrap_or_default();
                 responder
                     .send(match task.shutdown().await {
-                        Ok(ref result) => Ok((&target_info, &output_file, result)),
+                        Ok(ref result) => Ok((&target_info, &output_file, &categories, result)),
                         Err(e) => Err(e),
                     })
                     .map_err(Into::into)

@@ -565,14 +565,14 @@ pub async fn trace(
                 waiter.wait().await;
             }
             writer.line(format!("Shutting down recording and writing to file."))?;
-            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
         }
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
                 None => target_spec.unwrap_or_else(|| "".to_owned()),
             };
-            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose, opts.no_symbolize).await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
         TraceSubCommand::Symbolize(opts) => {
@@ -673,15 +673,21 @@ async fn stop_tracing(
     output: String,
     mut writer: Writer,
     verbose: bool,
+    skip_symbolization: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let (target, output_file) = match res {
-        Ok((target, output_file, stop_result)) => {
+        Ok((target, output_file, categories, stop_result)) => {
             for stat in stop_result.provider_stats.unwrap_or_default() {
                 for stat_output in stats_to_print(stat, verbose) {
                     writer.line(stat_output)?;
                 }
             }
+
+            if !skip_symbolization && categories.contains(&"kernel:ipc".to_string()) {
+                symbolize_trace_file(output_file.clone(), output_file.clone(), &context)?;
+            }
+
             (target, output_file)
         }
         Err(e) => ffx_bail!("{}", handle_recording_error(context, e, &output).await),
@@ -896,6 +902,7 @@ mod tests {
                 .send(Ok((
                     &ffx::TargetInfo { nodename: Some("foo".to_owned()), ..Default::default() },
                     &if name.is_empty() { "foo".to_owned() } else { name },
+                    &vec!["platypus".to_string(), "beaver".to_string()],
                     &generate_stop_result(),
                 )))
                 .expect("responder err"),
@@ -1206,6 +1213,7 @@ mod tests {
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1250,6 +1258,7 @@ Current tracing status:
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1315,6 +1324,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
                     verbose: false,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1337,6 +1347,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string()),
                     verbose: false,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1365,6 +1376,7 @@ Current tracing status:
                     background: true,
                     verbose: true,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1403,6 +1415,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
                     verbose: true,
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1438,6 +1451,7 @@ Current tracing status:
                     background: true,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1467,6 +1481,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1500,6 +1515,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
@@ -1533,6 +1549,7 @@ Current tracing status:
                     background: false,
                     verbose: false,
                     trigger: vec![],
+                    no_symbolize: false,
                 }),
             },
             writer,
