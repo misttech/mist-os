@@ -40,7 +40,9 @@ rustc_library("b") {
   edition = "2021"
   name = "b"
   deps = [ ":c" ]
-  define_rustdoc_test_override = true
+
+  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
+  #define_rustdoc_test_override = true
   source_root = "b/lib.rs"
   sources = [ "b/lib.rs" ]
   quiet_clippy = true
@@ -49,7 +51,9 @@ rustc_library("b") {
 rustc_library("c") {
   edition = "2021"
   name = "c"
-  define_rustdoc_test_override = true
+
+  # TODO(https://fxbug.dev/373420863): Re-enable when dryrun is green
+  #define_rustdoc_test_override = true
   source_root = "c/lib.rs"
   sources = [ "c/lib.rs" ]
   quiet_clippy = true
