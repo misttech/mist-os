@@ -87,10 +87,15 @@ type EmulatorConfig struct {
 	Memory int `json:"memory"`
 
 	// VirtualDeviceSpec is the name of the virtual device spec to pass to
-	// `ffx emu start --device`. Setting this value will cause ffx emu to be
-	// called directly with the product bundle and virtual device spec instead
-	// of a custom config.
+	// `ffx emu start --device`. This will only be used if UseProductBundle
+	// is set to true. If empty, ffx emu will use the default recommended spec
+	// or the first spec in its device list.
 	VirtualDeviceSpec string `json:"virtual_device"`
+
+	// UseProductBundle specifies whether to call `ffx emu` directly with the
+	// product bundle instead of a custom config. If true, the VirtualDeviceSpec
+	// will be used instead of the CPU and Memory.
+	UseProductBundle bool `json:"use_product_bundle"`
 
 	// KVM specifies whether to enable hardware virtualization acceleration.
 	KVM bool `json:"kvm"`
@@ -439,7 +444,7 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		startArgs := ffxutil.EmuStartArgs{
 			Engine: strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
 		}
-		if t.config.VirtualDeviceSpec != "" {
+		if t.config.UseProductBundle {
 			startArgs.ProductBundle = filepath.Join(cwd, pbPath)
 			startArgs.KernelArgs = ffxConfig.KernelArgs
 			startArgs.Device = t.config.VirtualDeviceSpec
