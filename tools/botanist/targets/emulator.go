@@ -143,7 +143,6 @@ type emulatorCommandBuilder interface {
 	AddSerial()
 	AddTapNetwork(mac string, interfaceName string)
 	AddKernelArg(string)
-	HasFFXSupport() bool
 	BuildFFXConfig() (*qemu.Config, error)
 	BuildInvocation() ([]string, error)
 }
@@ -405,7 +404,7 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 	cmdLine.SetMemory(t.config.Memory)
 
 	var cmd *exec.Cmd
-	if t.builder.HasFFXSupport() && t.UseFFXExperimental(ffxEmuExperimentLevel) {
+	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
 		ffxConfig, err := cmdLine.BuildFFXConfig()
 		if err != nil {
 			return err
@@ -437,7 +436,9 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			ZBI:      t.config.ZBITool,
 			UEFI:     code,
 		}
-		startArgs := ffxutil.EmuStartArgs{}
+		startArgs := ffxutil.EmuStartArgs{
+			Engine: strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
+		}
 		if t.config.VirtualDeviceSpec != "" {
 			startArgs.ProductBundle = filepath.Join(cwd, pbPath)
 			startArgs.KernelArgs = ffxConfig.KernelArgs
@@ -451,11 +452,7 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			startArgs.Config = absFFXConfigFile
 		}
 
-		isQEMU := false // Versus "is AEMU" or "is crosvm"
-		if builder, ok := t.builder.(*qemuCommandBuilder); ok {
-			_, isQEMU = builder.baseQEMUCommandBuilder.(*qemu.QEMUCommandBuilder)
-		}
-		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, isQEMU, tools, startArgs)
+		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, tools, startArgs)
 		if err != nil {
 			return err
 		}
@@ -540,7 +537,7 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 
 // Stop stops the emulator target.
 func (t *emulator) Stop() error {
-	if t.builder.HasFFXSupport() && t.UseFFXExperimental(ffxEmuExperimentLevel) {
+	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
 		return t.ffx.EmuStop(context.Background())
 	}
 	if t.process == nil {

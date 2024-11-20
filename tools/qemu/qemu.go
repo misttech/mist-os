@@ -19,6 +19,8 @@ const (
 
 // Config holds emulator configuration values which can be passed to
 // `ffx emu start` as a file through the --config flag.
+// TODO(ihuh): Move to a less-QEMU specific package since it can be used
+// for any type of emulation engine with `ffx emu start`.
 type Config struct {
 	Args       []string          `json:"args"`
 	Envs       map[string]string `json:"envs"`

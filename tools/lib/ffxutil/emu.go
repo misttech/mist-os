@@ -47,7 +47,11 @@ type File struct {
 }
 
 type EmuStartArgs struct {
-	// If using a custom config, all other fields should be empty.
+	// The emulation engine to run with. The currently supported values are
+	// `aemu`, `qemu`, and `crosvm`. If empty, it will default to `aemu`.
+	Engine string
+
+	// If using a custom config, all other fields below should be empty.
 	Config string
 
 	// TODO(https://fxbug.dev/329144967): Add more fields as necessary
@@ -59,14 +63,14 @@ type EmuStartArgs struct {
 }
 
 // EmuStartConsole returns a command to launch the emulator.
-func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string, qemu bool, tools EmuTools, startArgs EmuStartArgs) (*exec.Cmd, error) {
+func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string, tools EmuTools, startArgs EmuStartArgs) (*exec.Cmd, error) {
 	// If using different tools from the ones in the sdk, they need to be
 	// provided in the sdk.overrides in the ffx config.
 	toolsToOverride := make(map[string]string)
 	if tools.Emulator != "" {
 		expectedName := "aemu_internal"
-		if qemu {
-			expectedName = "qemu_internal"
+		if startArgs.Engine != "" {
+			expectedName = fmt.Sprintf("%s_internal", startArgs.Engine)
 		}
 		toolsToOverride[expectedName] = tools.Emulator
 	}
@@ -111,8 +115,13 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 			args = append(args, "--device", startArgs.Device)
 		}
 	}
-	if qemu {
-		args = append(args, "--engine", "qemu")
+	if startArgs.Engine != "" {
+		// For `ffx emu start`, the `aemu` engine is specified as `femu`.
+		engine := startArgs.Engine
+		if engine == "aemu" {
+			engine = "femu"
+		}
+		args = append(args, "--engine", engine)
 	}
 	dryRunCommand := append(args, "--dry-run")
 	if err := f.Run(ctx, dryRunCommand...); err != nil {
