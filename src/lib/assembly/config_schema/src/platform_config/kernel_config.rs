@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_constants::ZeroPageScanCount;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -129,21 +130,4 @@ pub struct PageScannerConfig {
     /// but removes some timing predictability from system behavior.
     #[serde(default)]
     pub disable_eviction: bool,
-}
-
-/// Options for zero page scanner configuration.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ZeroPageScanCount {
-    /// Default value is 20000. This value was chosen to consume, in the worst
-    /// case, 5% CPU on a lower-end arm device. Individual configurations may wish to tune this higher (or lower) as needed.
-    #[default]
-    Default,
-
-    /// No zero page scanning will occur. This can
-    /// provide additional system predictability for benchmarking or other
-    /// workloads.
-    NoScans,
-
-    PerSecond(u64),
 }

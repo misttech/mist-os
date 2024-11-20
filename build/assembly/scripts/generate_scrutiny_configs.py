@@ -111,6 +111,11 @@ def main() -> int:
         help="Optional list of bootfs packages to merge in",
     )
     parser.add_argument(
+        "--kernel-args-input",
+        type=argparse.FileType("r"),
+        help="Optional list of kernel arguments to merge in",
+    )
+    parser.add_argument(
         "--static-packages-output",
         required=True,
         type=argparse.FileType("w"),
@@ -176,6 +181,8 @@ def main() -> int:
         bootfs_packages.add_optional(args.bootfs_packages_input.readlines())
     if args.bootfs_files_input:
         bootfs_files.add_optional(args.bootfs_files_input.readlines())
+    if args.kernel_args_input:
+        kernel_cmdline.add_optional(args.kernel_args_input.readlines())
 
     with args.static_packages_output as static_packages_output:
         static_packages.write(static_packages_output)

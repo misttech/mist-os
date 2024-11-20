@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_constants::{
-    BootfsDestination, CompiledPackageDestination, FileEntry, PackageSetDestination,
+    BootfsDestination, CompiledPackageDestination, FileEntry, KernelArg, PackageSetDestination,
 };
 use assembly_named_file_map::NamedFileMap;
 use assembly_util::NamedMap;
@@ -248,7 +248,7 @@ pub(crate) trait ConfigurationBuilder {
 
     /// Add a kernel command line arg that should be included in the
     /// assembled platform.
-    fn kernel_arg(&mut self, arg: String);
+    fn kernel_arg(&mut self, arg: KernelArg);
 
     /// Packages compiled by subsystems to include in the assembled product.
     /// Example: the trusted apps package which is configured by the product
@@ -614,8 +614,8 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         self.configuration_capabilities.try_insert_unique(name.to_string(), config)
     }
 
-    fn kernel_arg(&mut self, arg: String) {
-        self.kernel_args.insert(arg);
+    fn kernel_arg(&mut self, arg: KernelArg) {
+        self.kernel_args.insert(arg.to_string());
     }
 
     fn compiled_package(

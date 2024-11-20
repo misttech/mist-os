@@ -7,9 +7,9 @@ use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
     MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PagetableEvictionPolicy,
-    PlatformKernelConfig, ZeroPageScanCount,
+    PlatformKernelConfig,
 };
-use assembly_constants::{BootfsDestination, FileEntry};
+use assembly_constants::{BootfsDestination, FileEntry, KernelArg};
 use camino::Utf8PathBuf;
 pub(crate) struct KernelSubsystem;
 
@@ -78,7 +78,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
 
         if context.board_info.kernel.scheduler_prefer_little_cpus {
-            builder.kernel_arg("kernel.scheduler.prefer-little-cpus=true".to_owned());
+            builder.kernel_arg(KernelArg::SchedulerPreferLittleCpus(true));
         }
 
         if context.board_info.kernel.quiet_early_boot {
@@ -86,7 +86,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 context.build_type == &BuildType::Eng,
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
             );
-            builder.kernel_arg("kernel.phys.verbose=false".to_owned())
+            builder.kernel_arg(KernelArg::PhysVerbose(false))
         }
 
         if let Some(serial) = &context.board_info.kernel.serial {
@@ -94,28 +94,24 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 context.build_type == &BuildType::Eng,
                 "'kernel.serial' can only be enabled in 'eng' builds"
             );
-            let arg = format!("kernel.serial={}", serial);
-            builder.kernel_arg(arg);
+            builder.kernel_arg(KernelArg::Serial(serial.to_string()));
         }
 
         if let Some(oom) = &context.board_info.kernel.oom {
             if oom.evict_at_warning {
-                builder.kernel_arg("kernel.oom.evict-at-warning=true".to_owned());
+                builder.kernel_arg(KernelArg::OomEvictAtWarning(true));
             }
             if oom.evict_continuous {
-                builder.kernel_arg("kernel.oom.evict-continuous=true".to_owned());
+                builder.kernel_arg(KernelArg::OomEvictContinuous(true));
             }
             if let Some(outofmemory_mb) = oom.out_of_memory_mb {
-                let arg = format!("kernel.oom.outofmemory-mb={}", outofmemory_mb);
-                builder.kernel_arg(arg);
+                builder.kernel_arg(KernelArg::OomOutOfMemoryMib(outofmemory_mb));
             }
             if let Some(critical_mb) = oom.critical_mb {
-                let arg = format!("kernel.oom.critical-mb={}", critical_mb);
-                builder.kernel_arg(arg);
+                builder.kernel_arg(KernelArg::OomCriticalMib(critical_mb));
             }
             if let Some(warning_mb) = oom.warning_mb {
-                let arg = format!("kernel.oom.warning-mb={}", warning_mb);
-                builder.kernel_arg(arg);
+                builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
             }
         }
 
@@ -133,7 +129,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 context.build_type == &BuildType::Eng,
                 "'kernel.halt-on-panic' can only be enabled in 'eng' builds"
             );
-            builder.kernel_arg("kernel.halt-on-panic=true".to_owned())
+            builder.kernel_arg(KernelArg::HaltOnPanic(true))
         }
 
         if let Some(page_scanner) = &kernel_config.page_scanner {
@@ -148,31 +144,24 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             }
 
             if page_scanner.disable_at_boot {
-                builder.kernel_arg("kernel.page-scanner.start-at-boot=false".to_owned());
+                builder.kernel_arg(KernelArg::PageScannerStartAtBoot(false));
             }
 
             if page_scanner.disable_eviction {
-                builder.kernel_arg("kernel.page-scanner.enable-eviction=false".to_owned());
+                builder.kernel_arg(KernelArg::PageScannerEnableEviction(false));
             }
 
-            let scan_count: u64 = match page_scanner.zero_page_scans_per_second {
-                ZeroPageScanCount::Default => 20000,
-                ZeroPageScanCount::NoScans => 0,
-                ZeroPageScanCount::PerSecond(x) => x,
-            };
-
-            let arg = format!("kernel.page-scanner.zero-page-scans-per-second={}", scan_count);
-            builder.kernel_arg(arg);
+            builder.kernel_arg(KernelArg::PageScannerZeroPageScanCount(
+                page_scanner.zero_page_scans_per_second.clone(),
+            ));
         }
 
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
-            let kernel_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
-            builder.kernel_arg(kernel_arg);
+            builder.kernel_arg(KernelArg::AslrEntropyBits(aslr_entropy_bits));
         }
 
         if let Some(memory_limit_mb) = kernel_config.memory_limit_mb {
-            let kernel_arg = format!("kernel.memory-limit-mb={}", memory_limit_mb);
-            builder.kernel_arg(kernel_arg);
+            builder.kernel_arg(KernelArg::MemoryLimitMib(memory_limit_mb));
         }
 
         for thread_roles_file in &context.board_info.configuration.thread_roles {
