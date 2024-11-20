@@ -32,7 +32,7 @@ closed protocol Counter {
     /// + request `request` the server end channel to the node.
     strict OpenInNamespace(resource struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
-        flags fuchsia.io.OpenFlags;
+        flags fuchsia.io.Flags;
         request zx.Handle:CHANNEL;
     });
     /// Opens the directory found at `path`.

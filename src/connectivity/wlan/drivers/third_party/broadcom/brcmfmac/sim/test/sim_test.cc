@@ -780,9 +780,9 @@ fidl::ClientEnd<fuchsia_io::Directory> SimTest::CreateDriverSvcClient() {
   // Open the svc directory in the driver's outgoing, and store a client to it.
   auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                    svc_endpoints.server.TakeChannel().release());
+  zx_status_t status = fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
+                                     static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                                     svc_endpoints.server.TakeChannel().release());
   EXPECT_EQ(ZX_OK, status);
   return std::move(svc_endpoints.client);
 }

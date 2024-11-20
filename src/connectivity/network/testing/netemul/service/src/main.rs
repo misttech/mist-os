@@ -2481,7 +2481,7 @@ mod tests {
         let () = counter
             .open_in_namespace(
                 &format!("{}/{}/device_controller", DEVFS_PATH, TEST_DEVICE_NAME),
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::PERM_READABLE,
                 server_end.into_channel(),
             )
             .expect("failed to connect to device through counter");
@@ -2797,7 +2797,7 @@ mod tests {
         let (ethernet, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         let () = counter
-            .open_in_namespace(&path, fio::OpenFlags::RIGHT_READABLE, server_end.into_channel())
+            .open_in_namespace(&path, fio::PERM_READABLE, server_end.into_channel())
             .unwrap_or_else(|e| panic!("failed to connect to {} through counter: {:?}", path, e));
         let (status, buf) =
             ethernet.read_dirents(fio::MAX_BUF).await.expect("calling read dirents");
