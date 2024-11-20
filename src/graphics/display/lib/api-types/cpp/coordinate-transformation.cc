@@ -5,7 +5,6 @@
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <zircon/assert.h>
 
 namespace display {
 

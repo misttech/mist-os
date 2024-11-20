@@ -12,6 +12,13 @@
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/CoordinateTransformation`].
+//
+// Also equivalent to the banjo type
+// [`fuchsia.hardware.display.controller/CoordinateTransformation`].
+//
+// See `::fuchsia_hardware_display_types::wire::CoordinateTransformation` for references.
+//
+// Instances are guaranteed to represent valid enum members.
 class CoordinateTransformation {
  public:
   // True iff `fidl_transformation` is convertible to a valid CoordinateTransformation.

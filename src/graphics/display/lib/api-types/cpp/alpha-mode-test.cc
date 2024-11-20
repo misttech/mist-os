@@ -5,6 +5,7 @@
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <gtest/gtest.h>
 
@@ -12,30 +13,58 @@ namespace display {
 
 namespace {
 
-TEST(AlphaMode, FidlConversion) {
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kDisable),
-            AlphaMode::kDisable);
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied),
-            AlphaMode::kPremultiplied);
-  EXPECT_EQ(ToAlphaMode(fuchsia_hardware_display_types::wire::AlphaMode::kHwMultiply),
-            AlphaMode::kHwMultiply);
+constexpr AlphaMode kPremultiplied2(
+    fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied);
 
-  EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kDisable),
-            fuchsia_hardware_display_types::wire::AlphaMode::kDisable);
-  EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kPremultiplied),
-            fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied);
-  EXPECT_EQ(ToFidlAlphaMode(AlphaMode::kHwMultiply),
-            fuchsia_hardware_display_types::wire::AlphaMode::kHwMultiply);
+TEST(AlphaModeTest, EqualityIsReflexive) {
+  EXPECT_EQ(AlphaMode::kPremultiplied, AlphaMode::kPremultiplied);
+  EXPECT_EQ(kPremultiplied2, kPremultiplied2);
+  EXPECT_EQ(AlphaMode::kDisable, AlphaMode::kDisable);
 }
 
-TEST(AlphaMode, BanjoConversion) {
-  EXPECT_EQ(ToAlphaMode(ALPHA_DISABLE), AlphaMode::kDisable);
-  EXPECT_EQ(ToAlphaMode(ALPHA_PREMULTIPLIED), AlphaMode::kPremultiplied);
-  EXPECT_EQ(ToAlphaMode(ALPHA_HW_MULTIPLY), AlphaMode::kHwMultiply);
+TEST(AlphaModeTest, EqualityIsSymmetric) {
+  EXPECT_EQ(AlphaMode::kPremultiplied, kPremultiplied2);
+  EXPECT_EQ(kPremultiplied2, AlphaMode::kPremultiplied);
+}
 
-  EXPECT_EQ(ToBanjoAlpha(AlphaMode::kDisable), ALPHA_DISABLE);
-  EXPECT_EQ(ToBanjoAlpha(AlphaMode::kPremultiplied), ALPHA_PREMULTIPLIED);
-  EXPECT_EQ(ToBanjoAlpha(AlphaMode::kHwMultiply), ALPHA_HW_MULTIPLY);
+TEST(AlphaModeTest, EqualityForDifferentValues) {
+  EXPECT_NE(AlphaMode::kPremultiplied, AlphaMode::kDisable);
+  EXPECT_NE(AlphaMode::kDisable, AlphaMode::kPremultiplied);
+  EXPECT_NE(kPremultiplied2, AlphaMode::kDisable);
+  EXPECT_NE(AlphaMode::kDisable, kPremultiplied2);
+}
+
+TEST(AlphaModeTest, ToBanjoAlphaMode) {
+  static constexpr coordinate_transformation_t banjo_transformation =
+      AlphaMode::kPremultiplied.ToBanjo();
+  EXPECT_EQ(ALPHA_PREMULTIPLIED, banjo_transformation);
+}
+
+TEST(AlphaModeTest, ToFidlAlphaMode) {
+  static constexpr fuchsia_hardware_display_types::wire::AlphaMode fidl_transformation =
+      AlphaMode::kPremultiplied.ToFidl();
+  EXPECT_EQ(fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied, fidl_transformation);
+}
+
+TEST(AlphaModeTest, ToAlphaModeWithBanjoValue) {
+  static constexpr AlphaMode transformation(ALPHA_PREMULTIPLIED);
+  EXPECT_EQ(AlphaMode::kPremultiplied, transformation);
+}
+
+TEST(AlphaModeTest, ToAlphaModeWithFidlValue) {
+  static constexpr AlphaMode transformation(
+      fuchsia_hardware_display_types::wire::AlphaMode::kPremultiplied);
+  EXPECT_EQ(AlphaMode::kPremultiplied, transformation);
+}
+
+TEST(AlphaModeTest, BanjoConversionRoundtrip) {
+  EXPECT_EQ(AlphaMode::kPremultiplied, AlphaMode(AlphaMode::kPremultiplied.ToBanjo()));
+  EXPECT_EQ(AlphaMode::kDisable, AlphaMode(AlphaMode::kDisable.ToBanjo()));
+}
+
+TEST(AlphaModeTest, FidlConversionRoundtrip) {
+  EXPECT_EQ(AlphaMode::kPremultiplied, AlphaMode(AlphaMode::kPremultiplied.ToFidl()));
+  EXPECT_EQ(AlphaMode::kDisable, AlphaMode(AlphaMode::kDisable.ToFidl()));
 }
 
 }  // namespace

@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 
-#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
