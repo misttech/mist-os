@@ -13,6 +13,7 @@ the block device label (and optionally path) to run on.
 
 import asyncio
 import logging
+import random
 
 import fidl.fuchsia_blackout_test as blackout
 import honeydew.errors
@@ -47,6 +48,8 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         self.destroy_after_test = self.user_params.get(
             "destroy_after_test", False
         )
+        self.seed = self.user_params.get("seed", random.randint(0, 1024 * 1024))
+        _LOGGER.info(f"Blackout: random seed is {self.seed}")
 
         self.create_blackout_component()
 
@@ -72,7 +75,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             self.blackout_proxy.setup(
                 device_label=self.device_label,
                 device_path=self.device_path,
-                seed=1234,
+                seed=self.seed,
             )
         )
         asserts.assert_equal(res.err, None, "Failed to run setup")
@@ -81,7 +84,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             self.blackout_proxy.test(
                 device_label=self.device_label,
                 device_path=self.device_path,
-                seed=1234,
+                seed=self.seed,
                 duration=self.load_generation_duration,
             )
         )
@@ -128,7 +131,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             self.blackout_proxy.verify(
                 device_label=self.device_label,
                 device_path=self.device_path,
-                seed=1234,
+                seed=self.seed,
             )
         )
         asserts.assert_equal(
