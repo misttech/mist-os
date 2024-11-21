@@ -44,7 +44,7 @@ async fn verify_main_process_critical_default_denied() -> Result<(), Error> {
         zx::MonotonicDuration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
     )));
 
-    let moniker = format!("./realm_builder:{}/component_manager", test.root.child_name());
+    let moniker = format!("./realm_builder:{}", test.root.child_name());
 
     let wait_for_cm_exit = Box::pin(async move {
         EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut event_stream).await.unwrap();
@@ -86,7 +86,7 @@ async fn verify_main_process_critical_nonzero_flag_used() -> Result<(), Error> {
         zx::MonotonicDuration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
     )));
 
-    let moniker = format!("./realm_builder:{}/component_manager", test.root.child_name());
+    let moniker = format!("./realm_builder:{}", test.root.child_name());
 
     let wait_for_cm_exit = Box::pin(async move {
         EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut event_stream).await.unwrap();
@@ -121,7 +121,7 @@ async fn verify_main_process_critical_allowed() -> Result<(), Error> {
         .context("failed to wait for exposed dir handle to become readable")?;
 
     // component_manager should be killed too as a result of the critical marking.
-    let moniker = format!("./realm_builder:{}/component_manager", test.root.child_name());
+    let moniker = format!("./realm_builder:{}", test.root.child_name());
 
     EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut event_stream).await.unwrap();
 

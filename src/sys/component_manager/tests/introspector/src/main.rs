@@ -166,7 +166,7 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
                     "fuchsia.component.runner.ComponentRunner",
                 ))
                 .from(&mock_runner)
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();

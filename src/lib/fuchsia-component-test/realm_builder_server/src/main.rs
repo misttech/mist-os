@@ -1277,7 +1277,7 @@ impl RealmNode2 {
                     }
                 }
 
-                if is_parent_ref(target) {
+                if matches!(target, fcdecl::Ref::Parent(_)) {
                     match &capability {
                         ftest::Capability::Protocol(ftest::Protocol { availability, .. })
                         | ftest::Capability::Directory(ftest::Directory { availability, .. })
@@ -1310,6 +1310,9 @@ impl RealmNode2 {
                     let decl =
                         create_expose_decl(capability.clone(), from.clone(), ExposingIn::Realm)?;
                     push_if_not_present(&mut state_guard.decl.exposes, decl);
+                } else if matches!(target, fcdecl::Ref::Self_(_)) {
+                    let decl = create_use_decl(capability.clone(), from.clone())?;
+                    push_if_not_present(&mut state_guard.decl.uses, decl);
                 } else {
                     let decl = create_offer_decl(capability.clone(), from.clone(), target.clone())?;
                     push_if_not_present(&mut state_guard.decl.offers, decl);
@@ -1417,7 +1420,10 @@ async fn add_use_decl_if_needed(
     if let fcdecl::Ref::Child(child) = ref_ {
         if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(&child.name)) {
             let mut decl = child.get_decl().await;
-            push_if_not_present(&mut decl.uses, create_use_decl(capability)?);
+            push_if_not_present(
+                &mut decl.uses,
+                create_use_decl(capability, fcdecl::Ref::Parent(fcdecl::ParentRef {}))?,
+            );
             let () = child.replace_decl(decl).await?;
         }
     }
@@ -1952,7 +1958,11 @@ fn check_and_unwrap_use_availability(
     }
 }
 
-fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, RealmBuilderError> {
+fn create_use_decl(
+    capability: ftest::Capability,
+    source: fcdecl::Ref,
+) -> Result<cm_rust::UseDecl, RealmBuilderError> {
+    let source: cm_rust::UseSource = source.fidl_into_native();
     Ok(match capability {
         ftest::Capability::Protocol(protocol) => {
             // If the capability was renamed in the parent's offer declaration, we want to use the
@@ -1969,7 +1979,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 .map(FidlIntoNative::fidl_into_native)
                 .unwrap_or(cm_rust::DependencyType::Strong);
             cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -1995,7 +2005,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 .map(FidlIntoNative::fidl_into_native)
                 .unwrap_or(cm_rust::DependencyType::Strong);
             cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -2010,6 +2020,9 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             })
         }
         ftest::Capability::Storage(storage) => {
+            if source != cm_rust::UseSource::Parent {
+                unreachable!("storage use source must be parent");
+            }
             // If the capability was renamed in the parent's offer declaration, we want to use the
             // post-rename version of it here.
             let source_name = try_into_target_name(&storage.name, &storage.as_)?;
@@ -2031,7 +2044,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 &service.path,
             )?;
             cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary,
@@ -2047,8 +2060,8 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             let filter = event.filter.as_ref().cloned().map(FidlIntoNative::fidl_into_native);
             let target_path = try_into_capability_path(&event.path)?;
             cm_rust::UseDecl::EventStream(cm_rust::UseEventStreamDecl {
-                source: cm_rust::UseSource::Parent,
-                source_name: source_name,
+                source,
+                source_name,
                 target_path,
                 filter,
                 scope: event.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
@@ -2063,7 +2076,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             let source_dictionary = parse_relative_path(runner.from_dictionary)?;
 
             cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
-                source: cm_rust::UseSource::Parent,
+                source,
                 source_name,
                 source_dictionary,
             })
@@ -2087,13 +2100,6 @@ fn contains_child(realm: &RealmNodeState, ref_: &fcdecl::Ref) -> bool {
             .chain(realm.mutable_children.keys())
             .any(|name| child.name.as_str() == name.as_str()),
         _ => true,
-    }
-}
-
-fn is_parent_ref(ref_: &fcdecl::Ref) -> bool {
-    match ref_ {
-        fcdecl::Ref::Parent(_) => true,
-        _ => false,
     }
 }
 

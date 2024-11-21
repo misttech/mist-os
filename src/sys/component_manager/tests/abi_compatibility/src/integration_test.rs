@@ -219,16 +219,6 @@ async fn create_realm(
         .with_nested_component_manager("#meta/abi_compat_component_manager.cm")
         .await
         .unwrap();
-    cm_builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
-                .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                .from(Ref::child("component_manager"))
-                .to(Ref::parent()),
-        )
-        .await
-        .unwrap();
 
     let instance = cm_builder.build().await.unwrap();
     instance.start_component_tree().await.unwrap();

@@ -3,6 +3,7 @@
     maintain_utc_clock: false,
     use_builtin_process_launcher: false,
     num_threads: 2,
+    log_destination: "syslog",
     security_policy: {
         job_policy: {
             main_process_critical: [
@@ -13,7 +14,6 @@
     namespace_capabilities: [
         {
             protocol: [
-                "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.tracing.provider.Registry",

@@ -41,7 +41,7 @@ async fn component_manager_namespace() {
             Route::new()
                 .capability(Capability::protocol_by_name("fidl.examples.routing.echo.Echo"))
                 .from(&echo_server)
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();

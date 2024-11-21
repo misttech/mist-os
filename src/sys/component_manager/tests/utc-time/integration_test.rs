@@ -90,11 +90,9 @@ async fn builtin_time_service_and_clock_routed() {
     component_manager_realm
         .add_route(
             Route::new()
-                .capability(
-                    Capability::directory("boot").path("/boot").rights(fio::Operations::all()),
-                )
+                .capability(Capability::directory("boot").path("/boot").rights(fio::R_STAR_DIR))
                 .from(&mock_boot)
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();

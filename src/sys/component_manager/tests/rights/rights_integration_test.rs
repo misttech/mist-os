@@ -43,7 +43,7 @@ async fn run_test(url: &str, expected_result: &str) {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                .from(Ref::child("component_manager"))
+                .from(Ref::self_())
                 .to(Ref::parent()),
         )
         .await
@@ -208,17 +208,6 @@ async fn route_directories_from_component_manager_namespace() {
 
     let (cm_builder, _task) =
         builder.with_nested_component_manager(COMPONENT_MANAGER_URL).await.unwrap();
-
-    cm_builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
-                .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                .from(Ref::child("component_manager"))
-                .to(Ref::parent()),
-        )
-        .await
-        .unwrap();
 
     let instance = cm_builder.build().await.unwrap();
 

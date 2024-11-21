@@ -9,7 +9,4 @@
             "/pkg/data/mock_runner_cm_config",
         ],
     },
-    use: [
-        { protocol: "fuchsia.component.runner.ComponentRunner" },
-    ],
 }

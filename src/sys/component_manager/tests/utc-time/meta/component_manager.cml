@@ -27,11 +27,6 @@
                 "fuchsia.process.Launcher",
             ],
         },
-        {
-            directory: "boot",
-            rights: [ "r*" ],
-            path: "/boot",
-        },
     ],
     expose: [
         {

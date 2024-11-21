@@ -32,16 +32,7 @@ fn main() {
         )
         .await
         .unwrap();
-        builder
-            .build_in_nested_component_manager_with_passthrough_offers(
-                "#meta/component_manager.cm",
-                vec![
-                    "fuchsia.kernel.VmexResource".parse().unwrap(),
-                    "fuchsia.pkg.PackageResolver".parse().unwrap(),
-                ],
-            )
-            .await
-            .unwrap()
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
     });
     let realm_proxy = realm
         .root

@@ -2,11 +2,10 @@
     debug: false,
     maintain_utc_clock: false,
     use_builtin_process_launcher: false,
+    log_destination: "syslog",
     namespace_capabilities: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.boot.WriteOnlyLog",
                 "fidl.test.components.Trigger",
                 "fuchsia.process.Launcher",
             ],

@@ -50,7 +50,6 @@ async fn build_reboot_on_terminate_realm(
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.SystemController"))
-                .capability(Capability::protocol_by_name("fuchsia.boot.WriteOnlyLog"))
                 .capability(Capability::protocol_by_name("fidl.test.components.Trigger"))
                 .from(Ref::parent())
                 .to(&realm),
@@ -69,8 +68,15 @@ async fn build_reboot_on_terminate_realm(
         .await
         .unwrap();
 
-    let (component_manager_realm, nested_component_manager_task) =
-        builder.with_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+    let (component_manager_realm, nested_component_manager_task) = builder
+        .with_nested_component_manager_etc(
+            "#meta/component_manager.cm",
+            // This does not originate from the parent (see logic below), so skip passthrough, which
+            // would generate a `use from parent`.
+            &["fidl.test.components.Trigger"],
+        )
+        .await
+        .unwrap();
 
     // Define a mock component that serves the `/boot` directory to component manager
     let trigger = component_manager_realm
@@ -86,16 +92,7 @@ async fn build_reboot_on_terminate_realm(
             Route::new()
                 .capability(Capability::protocol_by_name("fidl.test.components.Trigger"))
                 .from(&trigger)
-                .to(Ref::child("component_manager")),
-        )
-        .await
-        .unwrap();
-    component_manager_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.boot.WriteOnlyLog"))
-                .from(Ref::parent())
-                .to(Ref::child("component_manager")),
+                .to(Ref::self_()),
         )
         .await
         .unwrap();
