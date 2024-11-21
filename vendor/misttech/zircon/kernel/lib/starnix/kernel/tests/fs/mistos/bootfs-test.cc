@@ -10,14 +10,15 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/util/testing/unittest.h>
 #include <lib/unittest/unittest.h>
 
 #include <object/handle.h>
 
 namespace unit_testing {
+namespace {
 
-using namespace starnix;
-using namespace starnix_uapi;
+using starnix::VecOutputBuffer;
 
 bool test_bootfs() {
   BEGIN_TEST;
@@ -28,7 +29,7 @@ bool test_bootfs() {
     auto file = (*current_task).open_file("A.txt", OpenFlags(OpenFlagsEnum::RDONLY));
     ASSERT_TRUE(file.is_ok(), "failed to open_file");
 
-    auto read_buffer = VecOutputBuffer::New(128);
+    auto read_buffer = VecOutputBuffer::New(256);
     auto read_result = file->read(*current_task, &read_buffer);
     ASSERT_TRUE(read_result.is_ok());
 
@@ -36,21 +37,25 @@ bool test_bootfs() {
         "Four score and seven years ago our fathers brought forth on this "
         "continent, a new nation, conceived in Liberty, and dedicated to the "
         "proposition that all men are created equal.";
-    ASSERT_BYTES_EQ((const uint8_t*)content, read_buffer.data(), sizeof(content));
+    auto data_span = read_buffer.data();
+    ASSERT_EQ(strlen(content), read_result.value());
+    ASSERT_BYTES_EQ((const uint8_t*)content, data_span.data(), read_result.value());
   }
 
   {
     auto file = (*current_task).open_file("/nested/B.txt", OpenFlags(OpenFlagsEnum::RDONLY));
     ASSERT_TRUE(file.is_ok(), "failed to open_file");
 
-    auto read_buffer = VecOutputBuffer::New(128);
+    auto read_buffer = VecOutputBuffer::New(256);
     auto read_result = file->read(*current_task, &read_buffer);
     ASSERT_TRUE(read_result.is_ok());
 
     const char* content =
         "Now we are engaged in a great civil war, testing whether that nation, "
         "or any nation so conceived and so dedicated, can long endure.";
-    ASSERT_BYTES_EQ((const uint8_t*)content, read_buffer.data(), sizeof(content));
+    auto data_span = read_buffer.data();
+    ASSERT_EQ(strlen(content), read_result.value());
+    ASSERT_BYTES_EQ((const uint8_t*)content, data_span.data(), read_result.value());
   }
 
   {
@@ -62,12 +67,15 @@ bool test_bootfs() {
     ASSERT_TRUE(read_result.is_ok());
 
     const char* content = "We are met on a great battle-field of that war.";
-    ASSERT_BYTES_EQ((const uint8_t*)content, read_buffer.data(), sizeof(content));
+    auto data_span = read_buffer.data();
+    ASSERT_EQ(strlen(content), read_result.value());
+    ASSERT_BYTES_EQ((const uint8_t*)content, data_span.data(), read_result.value());
   }
 
   END_TEST;
 }
 
+}  // namespace
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_fs_bootfs)

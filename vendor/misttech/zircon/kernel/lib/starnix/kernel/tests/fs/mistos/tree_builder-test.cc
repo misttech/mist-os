@@ -3,7 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/mistos/starnix/kernel/fs/mistos/tree_builder.h>
+#include "../fs/mistos/tree_builder.h"
+
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -17,8 +18,12 @@
 #include <object/handle.h>
 
 namespace unit_testing {
+namespace {
 
-using namespace starnix;
+using starnix::FsNodeOps;
+using starnix::MemoryFileNode;
+using starnix::TmpFs;
+using starnix::TreeBuilder;
 
 bool two_files() {
   BEGIN_TEST;
@@ -95,6 +100,7 @@ bool overlapping_paths() {
   END_TEST;
 }
 
+}  // namespace
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_fs_treebuilder)

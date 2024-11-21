@@ -16,6 +16,7 @@ zx_library("starnix_core") {
     "device/mem.cc",
     "execution/executor.cc",
     "fs/mistos/bootfs.cc",
+    "fs/mistos/simple_directory.cc",
     "fs/mistos/syslog.cc",
     "fs/mistos/tree_builder.cc",
     "fs/sysfs/fs.cc",
@@ -62,7 +63,6 @@ zx_library("starnix_core") {
     "vfs/namespace.cc",
     "vfs/namespace_node.cc",
     "vfs/path.cc",
-    "vfs/simple_directory.cc",
     "vfs/syscalls.cc",
     "vfs/xattr.cc",
   ]

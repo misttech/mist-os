@@ -5,14 +5,12 @@
 #include "lib/mistos/starnix/kernel/fs/mistos/bootfs.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/fs/mistos/tree_builder.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/memory_file.h>
-#include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
 #include <lib/mistos/util/status.h>
 #include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/error-stdio.h>
@@ -27,7 +25,11 @@
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_object.h>
 
-#define LOCAL_TRACE 0
+#include "../kernel_priv.h"
+#include "simple_directory.h"
+#include "tree_builder.h"
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 

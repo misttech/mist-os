@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/vfs/simple_directory.h"
+#include "simple_directory.h"
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
