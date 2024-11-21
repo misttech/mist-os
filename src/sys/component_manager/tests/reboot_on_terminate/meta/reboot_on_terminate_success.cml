@@ -9,6 +9,7 @@
     ],
     program: {
         binary: "bin/reboot_on_terminate_success_bin",
+        lifecycle: { stop_event: "notify" },
     },
     children: [
         {
@@ -29,6 +30,17 @@
     use: [
         {
             protocol: [ "fidl.test.components.Trigger" ],
+        },
+
+        // Force CM to stop this component before `#shutdown_shim`, otherwise CM's
+        // `fuchsia.hardware.power.statecontrol.Admin` connection (served by `#shutdown_shim`) will
+        // close during the reboot attempt causing CM to panic before it sends the
+        // `fuchsia.process.lifecycle.Lifecycle.Stop` message to this component (which we are using
+        // as the signal that `on_terminate: "reboot"` is working).
+        {
+            protocol: "placeholder",
+            from: "#shutdown_shim",
+            availability: "transitional",
         },
     ],
     offer: [
