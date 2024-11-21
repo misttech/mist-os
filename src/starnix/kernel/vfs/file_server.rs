@@ -765,18 +765,16 @@ mod tests {
 
             assert_eq!(
                 root_zxio
-                    .open("foo", fio::PERM_READABLE | fio::PERM_WRITABLE, Default::default())
+                    .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
                     .expect_err("open"),
                 zx::Status::NOT_FOUND
             );
             let foo_zxio = root_zxio
                 .open(
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::CREATE,
                     "foo",
-                    fio::PERM_READABLE
-                        | fio::PERM_WRITABLE
-                        | fio::Flags::FLAG_MAYBE_CREATE
-                        | fio::Flags::PROTOCOL_FILE,
-                    Default::default(),
                 )
                 .expect("zxio_open");
             assert_directory_content(&root_zxio, &[b".", b"foo"]);
@@ -814,12 +812,11 @@ mod tests {
             assert_eq!(
                 root_zxio
                     .open(
-                        "bar/baz",
-                        fio::Flags::PROTOCOL_DIRECTORY
-                            | fio::Flags::FLAG_MAYBE_CREATE
-                            | fio::PERM_READABLE
-                            | fio::PERM_WRITABLE,
-                        Default::default(),
+                        fio::OpenFlags::DIRECTORY
+                            | fio::OpenFlags::CREATE
+                            | fio::OpenFlags::RIGHT_READABLE
+                            | fio::OpenFlags::RIGHT_WRITABLE,
+                        "bar/baz"
                     )
                     .expect_err("open"),
                 zx::Status::NOT_FOUND
@@ -827,22 +824,20 @@ mod tests {
 
             let bar_zxio = root_zxio
                 .open(
+                    fio::OpenFlags::DIRECTORY
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE,
                     "bar",
-                    fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::FLAG_MAYBE_CREATE
-                        | fio::PERM_READABLE
-                        | fio::PERM_WRITABLE,
-                    Default::default(),
                 )
                 .expect("open");
             let baz_zxio = root_zxio
                 .open(
+                    fio::OpenFlags::DIRECTORY
+                        | fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE,
                     "bar/baz",
-                    fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::FLAG_MAYBE_CREATE
-                        | fio::PERM_READABLE
-                        | fio::PERM_WRITABLE,
-                    Default::default(),
                 )
                 .expect("open");
             assert_directory_content(&root_zxio, &[b".", b"foo", b"bar"]);
@@ -879,7 +874,7 @@ mod tests {
             assert_directory_content(&root_zxio, &[b"."]);
             assert_eq!(
                 root_zxio
-                    .open(
+                    .open3(
                         "foo",
                         fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
                         ZxioOpenOptions::default()
@@ -888,7 +883,7 @@ mod tests {
                 zx::Status::NOT_FOUND
             );
             root_zxio
-                .open(
+                .open3(
                     "foo",
                     fio::Flags::PROTOCOL_FILE
                         | fio::Flags::PERM_READ
@@ -901,7 +896,7 @@ mod tests {
 
             assert_eq!(
                 root_zxio
-                    .open(
+                    .open3(
                         "bar/baz",
                         fio::Flags::PROTOCOL_DIRECTORY
                             | fio::Flags::PERM_READ
@@ -913,7 +908,7 @@ mod tests {
                 zx::Status::NOT_FOUND
             );
             let bar_zxio = root_zxio
-                .open(
+                .open3(
                     "bar",
                     fio::Flags::PROTOCOL_DIRECTORY
                         | fio::Flags::PERM_READ
@@ -923,7 +918,7 @@ mod tests {
                 )
                 .expect("open3 failed");
             root_zxio
-                .open(
+                .open3(
                     "bar/baz",
                     fio::Flags::PROTOCOL_DIRECTORY
                         | fio::Flags::PERM_READ

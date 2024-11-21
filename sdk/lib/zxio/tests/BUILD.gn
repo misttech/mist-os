@@ -84,7 +84,6 @@ rustc_test("zxio_rust_test") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-fs",
     "//src/starnix/lib/syncio",
     "//src/storage/fxfs/platform:fxfs-testing",
     "//src/storage/lib/fsverity-merkle",
