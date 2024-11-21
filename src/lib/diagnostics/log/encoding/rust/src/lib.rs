@@ -9,6 +9,7 @@
 use bitfield::bitfield;
 use std::borrow::{Borrow, Cow};
 use tracing::{Level, Metadata};
+use zerocopy::{FromBytes, IntoBytes, KnownLayout};
 
 pub use fidl_fuchsia_diagnostics::Severity;
 
@@ -286,6 +287,7 @@ bitfield! {
     ///
     /// [Record headers]: https://fuchsia.dev/fuchsia-src/development/tracing/trace-format#record_header
     /// [Argument headers]: https://fuchsia.dev/fuchsia-src/development/tracing/trace-format#argument_header
+    #[derive(IntoBytes, FromBytes, KnownLayout)]
     pub struct Header(u64);
     impl Debug;
 
@@ -436,19 +438,16 @@ impl FromSeverity for log::LevelFilter {
 mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
-    use crate::parse::try_parse_record;
     use std::fmt::Debug;
     use std::io::Cursor;
 
     fn parse_argument(bytes: &[u8]) -> (&[u8], Argument<'static>) {
-        let (remaining, decoded_from_full) =
-            nom::error::dbg_dmp(&crate::parse::parse_argument, "roundtrip")(bytes).unwrap();
+        let (decoded_from_full, remaining) = crate::parse::parse_argument(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())
     }
 
     fn parse_record(bytes: &[u8]) -> (&[u8], Record<'static>) {
-        let (remaining, decoded_from_full) =
-            nom::error::dbg_dmp(&crate::parse::try_parse_record, "roundtrip")(bytes).unwrap();
+        let (decoded_from_full, remaining) = crate::parse::parse_record(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())
     }
 
@@ -609,6 +608,6 @@ mod tests {
         encoder.buf.put_u64_le(header.0).unwrap();
         encoder.buf.put_i64_le(zx::BootInstant::get().into_nanos()).unwrap();
         encoder.write_argument(Argument::other("msg", "test message one")).unwrap();
-        assert!(try_parse_record(encoder.buf.get_ref()).is_err());
+        assert!(crate::parse::parse_record(encoder.buf.get_ref()).is_err());
     }
 }
