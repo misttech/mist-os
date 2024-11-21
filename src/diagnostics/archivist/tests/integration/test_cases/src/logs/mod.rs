@@ -9,6 +9,7 @@ mod crash;
 mod interest;
 mod lifecycle;
 mod lifecycle_stop;
+mod log_stream;
 mod selectors;
 mod sorting;
 mod utils;

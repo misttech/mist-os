@@ -17,6 +17,8 @@ mod constants;
 pub mod encode;
 pub mod parse;
 
+pub use constants::*;
+
 /// A raw severity.
 pub type RawSeverity = u8;
 
@@ -126,10 +128,9 @@ impl<'a> Argument<'a> {
         Argument::Line(value)
     }
 
-    // We keep this private for the places where we know we don't need to interpret as a known
-    // field.
     #[inline]
-    pub(crate) fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
+    /// Creates a new key-value argument.
+    pub fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
         Argument::Other { name: name.into(), value: value.into() }
     }
 
@@ -275,9 +276,6 @@ impl From<bool> for Value<'static> {
     }
 }
 
-/// The tracing format supports many types of records, we're sneaking in as a log message.
-pub const TRACING_FORMAT_LOG_RECORD_TYPE: u8 = 9;
-
 bitfield! {
     /// A header in the tracing format. Expected to precede every Record and Argument.
     ///
@@ -312,7 +310,7 @@ bitfield! {
 
 impl Header {
     /// Sets the length of the item the header refers to. Panics if not 8-byte aligned.
-    fn set_len(&mut self, new_len: usize) {
+    pub fn set_len(&mut self, new_len: usize) {
         assert_eq!(new_len % 8, 0, "encoded message must be 8-byte aligned");
         self.set_size_words((new_len / 8) as u16 + u16::from(new_len % 8 > 0))
     }

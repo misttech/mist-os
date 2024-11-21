@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 type RawSeverity = u8;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StoredMessage {
     bytes: Box<[u8]>,
     severity: Severity,

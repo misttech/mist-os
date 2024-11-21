@@ -129,6 +129,7 @@ rustc_library("lib") {
     "src/logs/serial.rs",
     "src/logs/servers/log.rs",
     "src/logs/servers/log_settings.rs",
+    "src/logs/servers/log_stream.rs",
     "src/logs/servers/mod.rs",
     "src/logs/shared_buffer.rs",
     "src/logs/socket.rs",
@@ -142,7 +143,6 @@ rustc_library("lib") {
     "src/testing.rs",
     "src/utils.rs",
   ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 archivist_optimized_binary("bin") {

@@ -854,8 +854,22 @@ pub struct WriteSlot {
     range: std::ops::Range<usize>,
 }
 
+/// Wrapper for a vector that allows us to implement necessary traits.
 #[derive(Debug)]
-struct ResizableBuffer(Vec<u8>);
+pub struct ResizableBuffer(Vec<u8>);
+
+impl From<Vec<u8>> for ResizableBuffer {
+    fn from(buf: Vec<u8>) -> Self {
+        Self(buf)
+    }
+}
+
+impl ResizableBuffer {
+    /// Return the inner vector.
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+}
 
 impl MutableBuffer for Cursor<ResizableBuffer> {
     fn capacity(&self) -> usize {

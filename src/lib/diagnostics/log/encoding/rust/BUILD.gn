@@ -40,6 +40,7 @@ rustc_library("rust") {
     "//src/diagnostics/archivist/tests/integration/realm_factory/puppet:*",
     "//src/diagnostics/validator/logs/*",
     "//src/lib/diagnostics/log/*",
+    "//src/starnix/kernel/*",
   ]
 
   test_deps = [

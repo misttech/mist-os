@@ -57,6 +57,9 @@ pub struct Archivist {
     /// The server handling fuchsia.logger.Log
     log_server: Arc<LogServer>,
 
+    /// The server handling fuchsia.diagnostics.LogStream
+    log_stream_server: Arc<LogStreamServer>,
+
     /// The server handling fuchsia.inspect.InspectSink
     _inspect_sink_server: Arc<InspectSinkServer>,
 
@@ -126,6 +129,8 @@ impl Archivist {
 
         let log_server =
             Arc::new(LogServer::new(Arc::clone(&logs_repo), servers_scope.new_child()));
+        let log_stream_server =
+            Arc::new(LogStreamServer::new(Arc::clone(&logs_repo), servers_scope.new_child()));
 
         // Initialize the external event providers containing incoming diagnostics directories and
         // log sink connections.
@@ -176,6 +181,7 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
+            log_stream_server,
             event_router,
             _inspect_sink_server: inspect_sink_server,
             stop_recv,
@@ -279,6 +285,7 @@ impl Archivist {
             logs_repository,
             accessor_server: _accessor_server,
             log_server: _log_server,
+            log_stream_server: _log_stream_server,
             _inspect_sink_server,
             general_scope,
             incoming_events_scope,
@@ -354,6 +361,13 @@ impl Archivist {
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.logger.Log connection");
             log_server.spawn(stream);
+        });
+
+        // Server fuchsia.logger.LogStream
+        let log_stream_server = Arc::clone(&self.log_stream_server);
+        svc_dir.add_fidl_service(move |stream| {
+            debug!("fuchsia.logger.LogStream connection");
+            log_stream_server.spawn(stream);
         });
 
         // Server fuchsia.diagnostics.LogSettings

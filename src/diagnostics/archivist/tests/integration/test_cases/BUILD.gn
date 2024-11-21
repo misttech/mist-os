@@ -51,6 +51,7 @@ rustc_test("bin") {
     "src/logs/interest.rs",
     "src/logs/lifecycle.rs",
     "src/logs/lifecycle_stop.rs",
+    "src/logs/log_stream.rs",
     "src/logs/mod.rs",
     "src/logs/selectors.rs",
     "src/logs/sorting.rs",
@@ -63,6 +64,8 @@ rustc_test("bin") {
   if (current_build_target_api_level == "PLATFORM" ||
       current_build_target_api_level == "HEAD") {
     sources += [ "src/inspect/escrow.rs" ]
+
+    deps += [ "//src/lib/diagnostics/log/encoding/rust" ]
   }
 
   inputs = [

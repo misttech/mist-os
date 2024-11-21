@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use crate::identity::ComponentIdentity;
+use crate::logs::container::{CursorItem, LogsArtifactsContainer};
 use derivative::Derivative;
-use fidl_fuchsia_diagnostics::Selector;
+use diagnostics_data::{Data, Logs};
+use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
@@ -156,36 +158,77 @@ impl<I: Ord + Unpin> Stream for Multiplexer<I> {
     }
 }
 
-/// A handle to a running multiplexer. Can be used to add new sub-streams to the multiplexer.
-pub struct MultiplexerHandle<I> {
-    sender: UnboundedSender<IncomingStream<PinStream<I>>>,
-    id: usize,
-    pub trace_id: ftrace::Id,
-}
-
-impl<I> MultiplexerHandle<I> {
-    /// Send a new substream to the multiplexer. Returns `true` if it is still listening.
-    pub fn send(&self, identity: Arc<ComponentIdentity>, stream: PinStream<I>) -> bool {
-        self.sender.unbounded_send(IncomingStream::Next { identity, stream }).is_ok()
-    }
-
-    pub fn multiplexer_id(&self) -> usize {
-        self.id
-    }
-
-    pub fn parent_trace_id(&self) -> ftrace::Id {
-        self.trace_id
-    }
-
+pub trait MultiplexerHandleAction {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool;
     /// Notify the multiplexer that no new sub-streams will be arriving.
-    pub fn close(&self) {
-        self.sender.unbounded_send(IncomingStream::Done).ok();
-    }
+    fn close(&self);
+    fn multiplexer_id(&self) -> usize;
 }
 
 enum IncomingStream<S> {
     Next { identity: Arc<ComponentIdentity>, stream: S },
     Done,
+}
+
+pub struct MultiplexerHandle<I> {
+    id: usize,
+    trace_id: ftrace::Id,
+    sender: UnboundedSender<IncomingStream<PinStream<I>>>,
+}
+
+impl<I> MultiplexerHandle<I> {
+    fn send(&self, identity: Arc<ComponentIdentity>, stream: PinStream<I>) -> bool {
+        self.sender.unbounded_send(IncomingStream::Next { identity, stream }).is_ok()
+    }
+}
+
+impl MultiplexerHandleAction for MultiplexerHandle<Arc<Data<Logs>>> {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool {
+        let stream = container.cursor(mode, self.trace_id);
+        self.send(Arc::clone(&container.identity), stream)
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
+}
+
+impl MultiplexerHandleAction for MultiplexerHandle<CursorItem> {
+    fn send_cursor_from(&self, mode: StreamMode, container: &Arc<LogsArtifactsContainer>) -> bool {
+        let stream = container.cursor_raw(mode);
+        self.send(Arc::clone(&container.identity), stream)
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
+}
+
+#[cfg(test)]
+impl MultiplexerHandleAction for MultiplexerHandle<i32> {
+    fn send_cursor_from(
+        &self,
+        _mode: StreamMode,
+        _container: &Arc<LogsArtifactsContainer>,
+    ) -> bool {
+        unreachable!("Not used in the tests");
+    }
+
+    fn multiplexer_id(&self) -> usize {
+        self.id
+    }
+
+    fn close(&self) {
+        self.sender.unbounded_send(IncomingStream::Done).ok();
+    }
 }
 
 /// A `SubStream` wraps an inner stream and keeps its latest value cached inline for comparison

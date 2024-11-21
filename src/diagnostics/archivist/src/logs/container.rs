@@ -91,11 +91,25 @@ struct ContainerState {
     is_initializing: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct CursorItem {
     pub rolled_out: u64,
     pub message: Arc<StoredMessage>,
     pub identity: Arc<ComponentIdentity>,
+}
+
+impl Eq for CursorItem {}
+
+impl Ord for CursorItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.message.timestamp().cmp(&other.message.timestamp())
+    }
+}
+
+impl PartialOrd for CursorItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.message.timestamp().cmp(&other.message.timestamp()))
+    }
 }
 
 impl LogsArtifactsContainer {
@@ -164,6 +178,20 @@ impl LogsArtifactsContainer {
                 })
             })
             .filter_map(future::ready)
+    }
+
+    /// Returns a stream of this component's log messages. These are the raw messages in FXT format.
+    ///
+    /// # Rolled out logs
+    ///
+    /// When messages are evicted from our internal buffers before a client can read them, they
+    /// are counted as rolled out messages which gets appended to the metadata of the next message.
+    /// If there is no next message, there is no way to know how many messages were rolled out.
+    pub fn cursor_raw(&self, mode: StreamMode) -> PinStream<CursorItem> {
+        let Some(buffer_cursor) = self.buffer.cursor(mode) else {
+            return Box::pin(futures::stream::empty());
+        };
+        Box::pin(self.create_raw_cursor(buffer_cursor))
     }
 
     /// Returns a stream of this component's log messages.

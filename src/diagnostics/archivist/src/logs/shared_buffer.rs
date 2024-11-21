@@ -6,7 +6,7 @@ use crate::identity::ComponentIdentity;
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use derivative::Derivative;
-use diagnostics_log_encoding::{Header, TRACING_FORMAT_LOG_RECORD_TYPE};
+use diagnostics_log_encoding::{Header, FXT_HEADER_SIZE, TRACING_FORMAT_LOG_RECORD_TYPE};
 use fidl_fuchsia_diagnostics::StreamMode;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_async as fasync;
@@ -25,10 +25,6 @@ use zx::AsHandleRef as _;
 // The buffer needs to be big enough for at least 1 message which is MAX_DATAGRAM_LEN_BYTES (32768)
 // bytes, but we allow up to 65536 bytes.
 const MIN_BUFFER_SIZE: usize = (MAX_DATAGRAM_LEN_BYTES * 2) as usize;
-
-// Every message in the shared buffer contains an 8 byte header consisting of a 32 bit container ID,
-// followed by a the least significant 32 bits of the per-container message ID.
-const FXT_HEADER_SIZE: usize = 8;
 
 pub type OnInactive = Box<dyn Fn(Arc<ComponentIdentity>) + Send + Sync>;
 
@@ -400,6 +396,9 @@ impl Inner {
             let msg_id = container.msg_ids.end;
             container.msg_ids.end += 1;
 
+            // Every message in the shared buffer contains an 8 byte header consisting of a 32 bit
+            // container ID, followed by a the least significant 32 bits of the per-container
+            // message ID.
             let (container_msg_id, _) = u64::mut_from_prefix(dest).unwrap();
             *container_msg_id = (socket.container_id.0 as u64) << 32 | (msg_id & 0xffff_ffff);
 

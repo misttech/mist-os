@@ -5,9 +5,9 @@
 use crate::events::router::EventConsumer;
 use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
-use crate::logs::container::LogsArtifactsContainer;
+use crate::logs::container::{CursorItem, LogsArtifactsContainer};
 use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
-use crate::logs::multiplex::{Multiplexer, MultiplexerHandle};
+use crate::logs::multiplex::{Multiplexer, MultiplexerHandleAction};
 use crate::logs::shared_buffer::SharedBuffer;
 use crate::logs::stats::LogStreamStats;
 use crate::severity_filter::KlogSeverityFilter;
@@ -171,6 +171,22 @@ impl LogsRepository {
         });
     }
 
+    pub fn logs_cursor_raw(
+        &self,
+        mode: StreamMode,
+        parent_trace_id: ftrace::Id,
+    ) -> impl Stream<Item = CursorItem> + Send {
+        let mut repo = self.mutable_state.lock();
+        let substreams = repo.logs_data_store.iter().map(|(identity, c)| {
+            let cursor = c.cursor_raw(mode);
+            (Arc::clone(identity), cursor)
+        });
+        let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id, None, substreams);
+        repo.logs_multiplexers.add(mode, Box::new(mpx_handle));
+        merged.set_on_drop_id_sender(repo.logs_multiplexers.cleanup_sender());
+        merged
+    }
+
     pub fn logs_cursor(
         &self,
         mode: StreamMode,
@@ -183,7 +199,7 @@ impl LogsRepository {
             (Arc::clone(identity), cursor)
         });
         let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id, selectors, substreams);
-        repo.logs_multiplexers.add(mode, mpx_handle);
+        repo.logs_multiplexers.add(mode, Box::new(mpx_handle));
         merged.set_on_drop_id_sender(repo.logs_multiplexers.cleanup_sender());
         merged
     }
@@ -428,7 +444,7 @@ impl LogsRepositoryState {
     }
 }
 
-type LiveIteratorsMap = HashMap<usize, (StreamMode, MultiplexerHandle<Arc<LogsData>>)>;
+type LiveIteratorsMap = HashMap<usize, (StreamMode, Box<dyn MultiplexerHandleAction + Send>)>;
 
 /// Ensures that BatchIterators get access to logs from newly started components.
 pub struct MultiplexerBroker {
@@ -459,7 +475,7 @@ impl MultiplexerBroker {
 
     /// A new BatchIterator has been created and must be notified when future log containers are
     /// created.
-    fn add(&mut self, mode: StreamMode, recipient: MultiplexerHandle<Arc<LogsData>>) {
+    fn add(&mut self, mode: StreamMode, recipient: Box<dyn MultiplexerHandleAction + Send>) {
         match mode {
             // snapshot streams only want to know about what's currently available
             StreamMode::Snapshot => recipient.close(),
@@ -472,12 +488,9 @@ impl MultiplexerBroker {
     /// Notify existing BatchIterators of a new logs container so they can include its messages
     /// in their results.
     pub fn send(&mut self, container: &Arc<LogsArtifactsContainer>) {
-        self.live_iterators.lock().retain(|_, (mode, recipient)| {
-            recipient.send(
-                Arc::clone(&container.identity),
-                container.cursor(*mode, recipient.parent_trace_id()),
-            )
-        });
+        self.live_iterators
+            .lock()
+            .retain(|_, (mode, recipient)| recipient.send_cursor_from(*mode, container));
     }
 
     /// Notify all multiplexers to terminate their streams once sub streams have terminated.

@@ -107,6 +107,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol_by_name("fuchsia.diagnostics.FeedbackArchiveAccessor"))
             .capability(Capability::protocol_by_name("fuchsia.diagnostics.LoWPANArchiveAccessor"))
             .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
+            .capability(Capability::protocol::<fdiagnostics::LogStreamMarker>())
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
@@ -204,10 +205,8 @@ impl ArchivistRealmFactory {
                 test_realm
                     .add_route(
                         Route::new()
-                            .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                             .capability(Capability::protocol::<flogger::LogSinkMarker>())
                             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
-                            .capability(Capability::protocol::<flogger::LogMarker>())
                             .from(&archivist)
                             .to(&puppet),
                     )
