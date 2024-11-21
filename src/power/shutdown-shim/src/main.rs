@@ -14,8 +14,7 @@ async fn main() {
         std::process::exit(1);
     };
     let (svc, server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let Ok(()) = fdio::open_deprecated("/svc", fio::OpenFlags::RIGHT_READABLE, server.into())
-    else {
+    let Ok(()) = fdio::open("/svc", fio::PERM_READABLE, server.into()) else {
         eprintln!("[shutdown-shim]: could not obtain namespace");
         std::process::exit(1);
     };
