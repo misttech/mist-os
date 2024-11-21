@@ -48,14 +48,16 @@ class GptDevicePartitioner {
 
   // Find and initialize a GPT based device.
   //
-  // If block_controller is provided, then that device is used directly.  Otherwise, query fshost
-  // for the system GPT, and use that.
-  //
-  // If the system GPT was not formatted correctly, attempts to format it by calling
-  // fshost.Admin.InitGpt.  This won't be done on directly provided `block_controller` instances.
+  // If block_controller is provided, then search is skipped, and block_controller is used
+  // directly. If it is not provided, we search for a device with a valid GPT,
+  // with an entry for an FVM. If multiple devices with valid GPT containing
+  // FVM entries are found, an error is returned.
   static zx::result<InitializeGptResult> InitializeGpt(
       const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_controller);
+
+  // Returns block info for a specified block device.
+  const fuchsia_hardware_block::wire::BlockInfo& GetBlockInfo() const { return block_info_; }
 
   GptDevice* GetGpt() const { return gpt_.get(); }
 
@@ -115,8 +117,8 @@ class GptDevicePartitioner {
   };
 
   // Find all block devices which could contain a GPT.
-  // TODO(https://fxbug.dev/339491886): Remove this and migrate users to interact with the
-  // fuchsia.paver.Paver (or fuchsia.fshost.Admin directly) to connect to and interact with the GPT.
+  // TODO(https://fxbug.dev/339491886): Re-initializing the GPT might be better managed by
+  // storage-host or fshost.  Then we can eliminate this direct dependency on devfs.
   static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
 
  private:
@@ -127,19 +129,16 @@ class GptDevicePartitioner {
       fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device);
 
   GptDevicePartitioner(BlockDevices devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
-                       uint64_t block_count, uint32_t block_size, std::unique_ptr<GptDevice> gpt)
+                       std::unique_ptr<GptDevice> gpt,
+                       fuchsia_hardware_block::wire::BlockInfo block_info)
       : devices_(std::move(devices)),
-        block_count_(block_count),
-        block_size_(block_size),
         svc_root_(component::MaybeClone(svc_root)),
-        gpt_(std::move(gpt)) {
-    // gpt_ is only set for the legacy Devfs configuration.
-    ZX_DEBUG_ASSERT(devices_.IsStorageHost() ^ gpt_ != nullptr);
-  }
+        gpt_(std::move(gpt)),
+        block_info_(block_info) {}
 
   // Detects if the system has storage-host.
   // If not, the below Legacy methods will substitute their matching method.
-  bool StorageHostDetected() const { return devices_.IsStorageHost(); }
+  bool StorageHostDetected() const;
 
   // Returns a file descriptor to a partition which can be paved, if one exists.
   // TODO(https://fxbug.dev/339491886): Remove once products are using storage-host.
@@ -150,12 +149,9 @@ class GptDevicePartitioner {
   zx::result<> ResetPartitionTablesLegacy(std::span<const PartitionInitSpec> partitions) const;
 
   const paver::BlockDevices devices_;
-  const uint64_t block_count_;
-  const uint64_t block_size_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
-  // When storage-host is disabled, this can be used to read from the GPT device.
-  // TODO(https://fxbug.dev/339491886): Remove once products are using storage-host.
   mutable std::unique_ptr<GptDevice> gpt_;
+  fuchsia_hardware_block::wire::BlockInfo block_info_;
 };
 
 // TODO(69527): Remove this and migrate usages to |utf16_to_utf8|

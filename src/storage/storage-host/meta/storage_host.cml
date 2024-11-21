@@ -20,20 +20,22 @@
             ],
         },
         {
-            service: [ "fuchsia.storagehost.PartitionService" ],
+            directory: "partitions",
+            rights: [ "rw*" ],
+            path: "/partitions",
         },
     ],
     expose: [
+        {
+            directory: [ "partitions" ],
+            from: "self",
+        },
         {
             protocol: [
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.storagehost.PartitionsAdmin",
                 "fuchsia.storagehost.PartitionsManager",
             ],
-            from: "self",
-        },
-        {
-            service: [ "fuchsia.storagehost.PartitionService" ],
             from: "self",
         },
     ],

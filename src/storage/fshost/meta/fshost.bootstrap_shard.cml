@@ -120,10 +120,12 @@
             from: "#fshost",
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
-            ],
+            directory: [ "partitions" ],
+            from: "#fshost",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.fshost.Admin" ],
             from: "#fshost",
         },
         {

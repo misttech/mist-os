@@ -50,7 +50,6 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/lib/ramdevice_client/rust",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/minfs/bin:minfs-component",
-    "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/lib/cm_rust",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
@@ -230,12 +229,6 @@ template("fshost_integration_test_package") {
     if (data_filesystem_format == "fxfs") {
       deps += [ "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust" ]
     }
-    if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
-      deps += [
-        "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
-        "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
-      ]
-    }
   }
 
   _migration_component_target = "${target_name}_migration"
@@ -265,7 +258,6 @@ template("fshost_integration_test_package") {
       "//src/lib/fuchsia-fs",
       "//src/storage/lib/block_client/rust",
       "//src/storage/lib/fs_management/rust:fs_management",
-      "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
     ]
   }
 

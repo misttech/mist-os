@@ -48,7 +48,7 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
 
   void set_dispatcher(async_dispatcher_t* dispatcher) { dispatcher_ = dispatcher; }
   void set_devfs_root(fbl::unique_fd devfs_root) {
-    devices_ = *BlockDevices::CreateDevfs(std::move(devfs_root));
+    devices_ = *BlockDevices::Create(std::move(devfs_root));
   }
   void set_svc_root(fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
     svc_root_ = std::move(svc_root);
@@ -61,7 +61,8 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
         svc_root_(std::move(svc_root)),
         context_(std::make_shared<Context>()) {}
 
-  static zx::result<std::unique_ptr<Paver>> Create(fbl::unique_fd devfs_root = {});
+  static zx::result<std::unique_ptr<Paver>> Create(fbl::unique_fd devfs_root = {},
+                                                   fbl::unique_fd partitions_root = {});
 
   void LifecycleStopCallback(fit::callback<void(zx_status_t status)> cb);
 

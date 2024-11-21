@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -74,15 +73,6 @@ struct DeviceAndController {
 zx::result<DeviceAndController> GetNewConnections(
     fidl::UnownedClientEnd<fuchsia_device::Controller> controller);
 
-struct PartitionDescription {
-  std::string name;
-  uuid::Uuid type;
-  uint64_t start;
-  uint64_t length;
-  // Instance is last since it is often elided.  If unset, a generated instance is used.
-  std::optional<uuid::Uuid> instance;
-};
-
 class BlockDevice {
  public:
   static void Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,
@@ -96,11 +86,6 @@ class BlockDevice {
 
   static void CreateFromVmo(const fbl::unique_fd& devfs_root, const uint8_t* guid, zx::vmo vmo,
                             uint32_t block_size, std::unique_ptr<BlockDevice>* device);
-
-  static void CreateWithGpt(const fbl::unique_fd& devfs_root, uint64_t block_count,
-                            uint32_t block_size,
-                            const std::vector<PartitionDescription>& init_partitions,
-                            std::unique_ptr<BlockDevice>* device);
 
   ~BlockDevice() { ramdisk_destroy(client_); }
 
@@ -220,26 +205,42 @@ class FakePartitionClient : public paver::PartitionClient {
   size_t partition_size_;
 };
 
-class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
+template <typename T>
+class FakeSvc {
  public:
-  explicit FakeBootArgs(std::string slot_suffix = "-a");
+  explicit FakeSvc(async_dispatcher_t* dispatcher, T args)
+      : dispatcher_(dispatcher), vfs_(dispatcher), fake_boot_args_(std::move(args)) {
+    root_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
+    root_dir_->AddEntry(
+        fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>,
+        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_boot::Arguments> request) {
+          fidl::BindServer(dispatcher_, std::move(request), &fake_boot_args_);
+          return ZX_OK;
+        }));
 
-  void GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) override;
-  void GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) override;
-  void GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& completer) override;
-  void GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) override;
-  void Collect(CollectRequestView request, CollectCompleter::Sync& completer) override;
+    auto svc_remote = fidl::CreateEndpoints(&svc_local_);
+    ASSERT_OK(svc_remote.status_value());
 
-  void SetAstroSysConfigAbrWearLeveling(bool value) { astro_sysconfig_abr_wear_leveling_ = value; }
-  void AddStringArgs(std::string key, std::string value) {
-    string_args_[std::move(key)] = std::move(value);
+    vfs_.ServeDirectory(root_dir_, std::move(*svc_remote));
   }
 
- private:
-  fidl::ServerBindingGroup<fuchsia_boot::Arguments> bindings_;
+  void ForwardServiceTo(const char* name, fidl::ClientEnd<fuchsia_io::Directory> svc) {
+    root_dir_->AddEntry(
+        name, fbl::MakeRefCounted<fs::Service>([name, svc = std::move(svc)](zx::channel request) {
+          return fdio_service_connect_at(svc.channel().get(), fbl::StringPrintf("%s", name).data(),
+                                         request.release());
+        }));
+  }
 
-  bool astro_sysconfig_abr_wear_leveling_ = false;
-  std::unordered_map<std::string, std::string> string_args_;
+  T& fake_boot_args() { return fake_boot_args_; }
+  fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  fbl::RefPtr<fs::PseudoDir> root_dir_;
+  fs::SynchronousVfs vfs_;
+  T fake_boot_args_;
+  fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
 
 #endif  // SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_

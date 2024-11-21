@@ -21,6 +21,7 @@
 #include <fbl/ref_ptr.h>
 #include <zxtest/zxtest.h>
 
+#include "src/lib/files/scoped_temp_dir.h"
 #include "src/storage/lib/block_server/fake_server.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
@@ -30,19 +31,21 @@ namespace {
 
 using driver_integration_test::IsolatedDevmgr;
 
-/// Mocks the PartitionService exported by storage-host.
+/// Mocks the `partitions` directory exported by storage-host.
 class FakeStorageHost {
  public:
   FakeStorageHost(async_dispatcher_t* dispatcher, std::vector<block_server::FakeServer> servers)
       : vfs_(dispatcher),
         root_dir_(fbl::MakeRefCounted<fs::PseudoDir>()),
         servers_(std::move(servers)) {
-    auto service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-    ASSERT_OK(root_dir_->AddEntry("fuchsia.storagehost.PartitionService", service_dir));
     for (unsigned i = 0; i < servers_.size(); ++i) {
       auto partition_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-      EXPECT_OK(service_dir->AddEntry("part-" + std::to_string(i), partition_dir));
-      EXPECT_OK(partition_dir->AddEntry(
+      EXPECT_OK(root_dir_->AddEntry("part-" + std::to_string(i), partition_dir));
+      auto svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+      EXPECT_OK(partition_dir->AddEntry("svc", svc_dir));
+      auto service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+      EXPECT_OK(svc_dir->AddEntry("fuchsia.storagehost.PartitionService", service_dir));
+      EXPECT_OK(service_dir->AddEntry(
           "volume", fbl::MakeRefCounted<fs::Service>([this, i](zx::channel channel) {
             fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> request(std::move(channel));
             this->servers_[i].Serve(std::move(request));
@@ -53,16 +56,24 @@ class FakeStorageHost {
     // Bind to the local namespace at Path()
     auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_EQ(vfs_.ServeDirectory(root_dir_, std::move(server)), ZX_OK);
-    svc_root_ = std::move(client);
+    fdio_ns_t* ns;
+    EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
+    EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, Path().c_str(), client.TakeChannel().release()));
   }
 
-  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root() { return svc_root_.borrow(); }
+  fbl::unique_fd OpenPartitionsDir() {
+    int fd = ::open((Path().c_str()), O_RDONLY | O_DIRECTORY);
+    EXPECT_GE(fd, 0);
+    return fbl::unique_fd(fd);
+  }
 
  private:
+  std::string Path() { return temp_dir_.path() + "/partitions"; }
+
   fs::SynchronousVfs vfs_;
   fbl::RefPtr<fs::PseudoDir> root_dir_;
   std::vector<block_server::FakeServer> servers_;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
+  files::ScopedTempDir temp_dir_;
 };
 
 TEST(BlockDevicesTests, TestPartitionsDir) {
@@ -92,7 +103,8 @@ TEST(BlockDevicesTests, TestPartitionsDir) {
   IsolatedDevmgr devmgr;
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
 
-  zx::result devices = paver::BlockDevices::CreateStorageHost(storage_host.svc_root());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate(),
+                                                   storage_host.OpenPartitionsDir());
   ASSERT_OK(devices);
 
   {

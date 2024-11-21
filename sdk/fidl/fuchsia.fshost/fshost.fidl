@@ -8,7 +8,6 @@ using zx;
 using fuchsia.fxfs;
 using fuchsia.hardware.block;
 using fuchsia.io;
-using fuchsia.storagehost;
 
 type MountOptions = resource table {
     1: read_only bool;
@@ -80,20 +79,4 @@ closed protocol Admin {
     /// Wipes the data volume which will get reinitialised upon next boot.  This is not
     /// cryptographically secure; the caller should take care to reset hardware keys.
     strict ShredDataVolume() -> () error zx.Status;
-
-    /// Returns whether fshost is configured to use storage-host.
-    // TODO(https://fxbug.dev/339491886): Remove once storage-host is always enabled.
-    strict StorageHostEnabled() -> (struct {
-        enabled bool;
-    });
-};
-
-/// Special functionality that is only intended to be used in recovery and device bringup.  All
-/// methods require fuchsia.fshost.Netboot to be set, unless otherwise indicated.
-@discoverable
-closed protocol Recovery {
-    /// Wipes and re-initializes the system partition table.  This is a destructive operation!
-    strict InitSystemPartitionTable(struct {
-        partitions vector<fuchsia.storagehost.PartitionInfo>:fuchsia.storagehost.MAX_PARTITIONS;
-    }) -> () error zx.Status;
 };

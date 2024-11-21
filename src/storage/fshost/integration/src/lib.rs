@@ -68,11 +68,6 @@ impl TestFixtureBuilder {
         self.disk.as_mut().unwrap().builder()
     }
 
-    pub fn with_uninitialized_disk(mut self) -> Self {
-        self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::uninitialized()));
-        self
-    }
-
     pub fn with_disk_from_vmo(mut self, vmo: zx::Vmo) -> Self {
         self.disk = Some(disk_builder::Disk::Prebuilt(vmo));
         self

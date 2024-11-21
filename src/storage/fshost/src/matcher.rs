@@ -11,9 +11,8 @@ use crate::device::{Device, DeviceTag};
 use crate::environment::Environment;
 use anyhow::{bail, Context, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_block::Flag as BlockFlag;
 use fs_management::format::DiskFormat;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
 
 #[async_trait]
@@ -34,6 +33,8 @@ pub trait Matcher: Send {
 
 pub struct Matchers {
     matchers: Vec<Box<dyn Matcher>>,
+
+    matched: BTreeMap<String, usize>,
 }
 
 impl Matchers {
@@ -42,11 +43,6 @@ impl Matchers {
     pub fn new(config: &fshost_config::Config) -> Self {
         let mut matchers = Vec::<Box<dyn Matcher>>::new();
 
-        // NB: Order is important here!
-        // Generally speaking, we want to have more specific matchers first, and more general
-        // matchers later.  For example, the GptMatcher needs to come after most others because it
-        // will bind to *any* non-removable device, but will only bind once.  It will in turn
-        // publish more devices, which will be matched by our other matchers.
         if config.bootpart {
             matchers.push(Box::new(BootpartMatcher::new()));
         }
@@ -56,9 +52,6 @@ impl Matchers {
         if config.fxfs_blob {
             if !config.netboot {
                 matchers.push(Box::new(FxblobMatcher::new(config.ramdisk_image)));
-            }
-            if config.ramdisk_image || config.netboot {
-                matchers.push(Box::new(FxblobOnRecoveryMatcher::new()));
             }
         } else {
             let fvm_matcher = if config.storage_host {
@@ -79,39 +72,48 @@ impl Matchers {
             // Add another matcher for the non-ramdisk version of fvm.
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Fvm,
+                false,
                 FVM_DRIVER_PATH,
                 false,
             )));
         }
 
         if config.gpt {
-            matchers.push(Box::new(GptMatcher::new(
-                if config.storage_host {
-                    GptType::StorageHost
-                } else {
-                    GptType::Driver(GPT_DRIVER_PATH)
-                },
-                config.netboot,
-            )));
+            if config.storage_host {
+                matchers.push(Box::new(StorageHostMatcher::new()));
+            } else {
+                matchers.push(Box::new(PartitionMapMatcher::new(
+                    DiskFormat::Gpt,
+                    false,
+                    GPT_DRIVER_PATH,
+                    false,
+                )));
+            }
         }
 
         if config.gpt_all {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Gpt,
-                GPT_DRIVER_PATH,
                 true,
+                GPT_DRIVER_PATH,
+                false,
             )));
         }
 
         if config.mbr {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Mbr,
-                MBR_DRIVER_PATH,
                 true,
-            )));
+                MBR_DRIVER_PATH,
+                false,
+            )))
         }
 
-        Matchers { matchers }
+        if (config.ramdisk_image || config.netboot) && config.fxfs_blob {
+            matchers.push(Box::new(FxblobOnRecoveryMatcher::new()));
+        }
+
+        Matchers { matchers, matched: BTreeMap::new() }
     }
 
     /// Using the set of matchers we created, figure out if this block device matches any of our
@@ -134,9 +136,10 @@ impl Matchers {
             }
         }
 
-        for (_, m) in self.matchers.iter_mut().enumerate() {
+        for (index, m) in self.matchers.iter_mut().enumerate() {
             if m.match_device(device.as_mut()).await {
                 let mut tag = m.process_device(device.as_mut(), env).await?;
+                self.matched.insert(device.topological_path().to_string(), index);
                 // Tag the first Ramdisk device so that it's retained; the ramdisk will be detached
                 // if it's dropped.
                 if device.is_fshost_ramdisk() {
@@ -145,7 +148,6 @@ impl Matchers {
                 }
                 if let Some(tag) = tag {
                     env.registered_devices().register_device(tag, device);
-                    tracing::info!("Registering device {tag:?}");
                 }
                 return Ok(true);
             }
@@ -166,7 +168,10 @@ impl BootpartMatcher {
 #[async_trait]
 impl Matcher for BootpartMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
-        device.get_block_info().await.map_or(false, |info| info.flags.contains(BlockFlag::BOOTPART))
+        device
+            .get_block_info()
+            .await
+            .map_or(false, |info| info.flags.contains(fidl_fuchsia_hardware_block::Flag::BOOTPART))
     }
 
     async fn process_device(
@@ -401,64 +406,6 @@ impl Matcher for FvmMatcher {
     }
 }
 
-enum GptType {
-    StorageHost,
-    Driver(&'static str),
-}
-
-/// Matches the system GPT partition, which is expected to be on a non-removable disk.
-struct GptMatcher {
-    gpt_type: GptType,
-    allow_malformed: bool,
-    device_path: Option<String>,
-}
-
-impl GptMatcher {
-    fn new(gpt_type: GptType, allow_malformed: bool) -> Self {
-        Self { gpt_type, allow_malformed, device_path: None }
-    }
-}
-
-#[async_trait]
-impl Matcher for GptMatcher {
-    async fn match_device(&self, device: &mut dyn Device) -> bool {
-        if self.device_path.is_some() {
-            return false;
-        }
-        if device.is_fshost_ramdisk() {
-            return false;
-        }
-        let removable = match device.get_block_info().await {
-            Ok(info) => info.flags.contains(BlockFlag::REMOVABLE),
-            Err(err) => {
-                tracing::warn!(?err, "Failed to query block info");
-                false
-            }
-        };
-        if self.allow_malformed {
-            // Match the first device which is non-removable, regardless of its format.
-            // If the device is uninitialized or is malformed, we'll still bind to it later, but it'll
-            // have no partitions until it is formatted by fshost.Recovery/ResetSystemPartitionTables.
-            !removable
-        } else {
-            !removable && device.content_format().await.ok() == Some(DiskFormat::Gpt)
-        }
-    }
-
-    async fn process_device(
-        &mut self,
-        device: &mut dyn Device,
-        env: &mut dyn Environment,
-    ) -> Result<Option<DeviceTag>, Error> {
-        match self.gpt_type {
-            GptType::Driver(driver_path) => env.attach_driver(device, driver_path).await?,
-            GptType::StorageHost => env.launch_storage_host(device).await?,
-        };
-        self.device_path = Some(device.topological_path().to_string());
-        Ok(Some(DeviceTag::SystemPartitionTable))
-    }
-}
-
 // Matches partition maps. Matching is done using content sniffing.
 struct PartitionMapMatcher {
     // The content format expected.
@@ -470,13 +417,27 @@ struct PartitionMapMatcher {
     // When matched, this driver is attached to the device.
     driver_path: &'static str,
 
+    // If true, only match devices that are on the fshost ramdisk.
+    match_ramdisk: bool,
+
     // The topological paths of all devices matched so far.
     device_paths: Vec<String>,
 }
 
 impl PartitionMapMatcher {
-    fn new(content_format: DiskFormat, driver_path: &'static str, allow_multiple: bool) -> Self {
-        Self { content_format, allow_multiple, driver_path, device_paths: Vec::new() }
+    fn new(
+        content_format: DiskFormat,
+        allow_multiple: bool,
+        driver_path: &'static str,
+        match_ramdisk: bool,
+    ) -> Self {
+        Self {
+            content_format,
+            allow_multiple,
+            driver_path,
+            match_ramdisk,
+            device_paths: Vec::new(),
+        }
     }
 }
 
@@ -484,6 +445,9 @@ impl PartitionMapMatcher {
 impl Matcher for PartitionMapMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
         if !self.allow_multiple && !self.device_paths.is_empty() {
+            return false;
+        }
+        if self.match_ramdisk && !device.is_fshost_ramdisk() {
             return false;
         }
         device.content_format().await.ok() == Some(self.content_format)
@@ -496,6 +460,35 @@ impl Matcher for PartitionMapMatcher {
     ) -> Result<Option<DeviceTag>, Error> {
         env.attach_driver(device, self.driver_path).await?;
         self.device_paths.push(device.topological_path().to_string());
+        Ok(None)
+    }
+}
+
+// Matches a single GPT-formatted block device and binds the storage-host component to it.
+// The field the topological path of the matched device.
+struct StorageHostMatcher(Option<String>);
+
+impl StorageHostMatcher {
+    pub fn new() -> Self {
+        Self(None)
+    }
+}
+
+#[async_trait]
+impl Matcher for StorageHostMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if self.0.is_some() {
+            return false;
+        }
+        device.content_format().await.ok() == Some(DiskFormat::Gpt)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<Option<DeviceTag>, Error> {
+        env.launch_storage_host(device).await?;
         Ok(None)
     }
 }
@@ -781,12 +774,6 @@ mod tests {
             Ok(())
         }
 
-        fn partition_manager_exposed_dir(
-            &mut self,
-        ) -> Result<fidl_fuchsia_io::DirectoryProxy, Error> {
-            unreachable!()
-        }
-
         async fn bind_and_enumerate_fvm(
             &mut self,
             _device: &mut dyn Device,
@@ -917,14 +904,10 @@ mod tests {
         let mock_device = MockDevice::new().set_block_flags(Flag::BOOTPART);
 
         // Check no match when disabled in config.
-        assert!(!Matchers::new(&fshost_config::Config {
-            bootpart: false,
-            gpt: false,
-            ..default_config()
-        },)
-        .match_device(Box::new(mock_device.clone()), &mut MockEnv::new())
-        .await
-        .expect("match_device failed"));
+        assert!(!Matchers::new(&fshost_config::Config { bootpart: false, ..default_config() },)
+            .match_device(Box::new(mock_device.clone()), &mut MockEnv::new())
+            .await
+            .expect("match_device failed"));
 
         assert!(Matchers::new(&default_config())
             .match_device(
@@ -1002,7 +985,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             ramdisk_image: true,
             data_filesystem_format: "minfs".to_string(),
-            gpt: false,
             ..default_config()
         });
         let fvm_device = MockDevice::new()
@@ -1038,7 +1020,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             ramdisk_image: true,
             data_filesystem_format: "fxfs".to_string(),
-            gpt: false,
             ..default_config()
         });
 
@@ -1064,7 +1045,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             ramdisk_image: true,
             data_filesystem_format: "fxfs".to_string(),
-            gpt: false,
             ..default_config()
         });
 
@@ -1148,7 +1128,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiple_fvm_partitions_no_label() {
-        let mut matchers = Matchers::new(&fshost_config::Config { gpt: false, ..default_config() });
+        let mut matchers = Matchers::new(&default_config());
 
         assert!(matchers
             .match_device(
@@ -1193,14 +1173,6 @@ mod tests {
             ..default_config()
         });
 
-        assert!(matchers
-            .match_device(
-                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
-                &mut MockEnv::new().expect_attach_driver(GPT_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
         // FVM shouldn't match...
         assert!(!matchers
             .match_device(
@@ -1229,7 +1201,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
-            gpt: false,
             ..default_config()
         });
 
@@ -1283,7 +1254,6 @@ mod tests {
                 storage_host: true,
                 fvm: true,
                 data_filesystem_format: "minfs".to_string(),
-                gpt: false,
                 ..default_config()
             })
         };
@@ -1346,7 +1316,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
-            gpt: false,
             ..default_config()
         });
 
@@ -1405,7 +1374,6 @@ mod tests {
         let mut matchers = Matchers::new(&fshost_config::Config {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
-            gpt: false,
             ..default_config()
         });
 
@@ -1435,19 +1403,19 @@ mod tests {
         let mut matchers =
             Matchers::new(&fshost_config::Config { storage_host: true, ..default_config() });
 
-        assert!(matchers
+        // A non-GPT device should fail.
+        assert!(!matchers
             .match_device(
-                Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
-                &mut MockEnv::new().expect_launch_storage_host()
+                Box::new(MockDevice::new().set_content_format(DiskFormat::Fxfs)),
+                &mut MockEnv::new()
             )
             .await
             .expect("match_device failed"));
 
-        // Any future devices shouldn't bind.
-        assert!(!matchers
+        assert!(matchers
             .match_device(
                 Box::new(MockDevice::new().set_content_format(DiskFormat::Gpt)),
-                &mut MockEnv::new()
+                &mut MockEnv::new().expect_launch_storage_host()
             )
             .await
             .expect("match_device failed"));

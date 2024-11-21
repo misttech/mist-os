@@ -20,7 +20,7 @@ use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
+use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
@@ -37,10 +37,7 @@ pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
-use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
-    fuchsia_inspect as finspect,
-};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_inspect as finspect};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -59,10 +56,6 @@ pub trait Environment: Send + Sync {
 
     /// Binds an instance of storage-host to the given device.
     async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error>;
-
-    /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
-    /// before the manager is bound and it will get routed once bound.
-    fn partition_manager_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error>;
 
     /// Binds the fvm driver and returns a list of the names of the child partitions.
     async fn bind_and_enumerate_fvm(
@@ -410,6 +403,12 @@ impl FshostEnvironment {
         self.data.exposed_dir(self.container.maybe_fs())
     }
 
+    /// Returns a proxy for the exposed dir of the GPT.  This must be called before
+    /// the GPT is mounted and it will get routed once bound.
+    pub fn gpt_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.gpt.exposed_dir(None)
+    }
+
     /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
     /// called before "/data" is mounted and it will get routed once the data partition is
     /// mounted and the crypt service becomes available. Fails for single volume filesystems.
@@ -736,11 +735,7 @@ impl Environment for FshostEnvironment {
     }
 
     async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        if self.gpt.is_serving() {
-            // If we want to support multiple GPT devices, we'll need to change Environment to
-            // separate the system GPT and other GPTs.
-            bail!("GPT already bound");
-        }
+        let queue = self.gpt.queue().ok_or_else(|| anyhow!("GPT already bound"))?;
         let filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
             device.block_connector()?,
             Box::new(fs_management::Gpt::dynamic_child()),
@@ -748,28 +743,23 @@ impl Environment for FshostEnvironment {
         .serve_multi_volume()
         .await
         .context("Failed to start GPT")?;
-        let queue = self.gpt.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir();
         for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone2(server.into_channel().into())?;
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
             &exposed_dir,
-            fstoragehost::PartitionServiceMarker::SERVICE_NAME,
-            fuchsia_fs::PERM_READABLE,
+            "partitions",
+            fio::Flags::PERM_CONNECT | fio::Flags::PERM_ENUMERATE | fio::Flags::PERM_TRAVERSE,
         )
-        .await
-        .context("Failed to open partitions dir")?;
+        .await?;
+        const PARTITION_SERVICE_SUFFIX: &str = "/svc/fuchsia.storagehost.PartitionService";
         self.watcher
-            .add_source(Box::new(DirSource::new(partitions_dir)))
+            .add_source(Box::new(DirSource::with_suffix(partitions_dir, PARTITION_SERVICE_SUFFIX)))
             .await
             .context("Failed to watch gpt partitions dir")?;
         self.gpt = Filesystem::ServingGpt(filesystem);
         Ok(())
-    }
-
-    fn partition_manager_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.gpt.exposed_dir(None)
     }
 
     async fn bind_and_enumerate_fvm(
@@ -1078,12 +1068,10 @@ impl Environment for FshostEnvironment {
         });
         if let Some(container) = self.container.take() {
             container.into_fs().shutdown().await.unwrap_or_else(|error| {
-                tracing::error!(?error, "failed to shut down container");
+                tracing::error!(?error, "failed to shut down fxfs");
             })
         }
-        self.gpt.shutdown(None).await.unwrap_or_else(|error| {
-            tracing::error!(?error, "failed to shut down gpt");
-        });
+        self.gpt = Filesystem::Queue(FilesystemQueue::default());
         Ok(())
     }
 

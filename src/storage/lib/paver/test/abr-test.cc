@@ -45,7 +45,7 @@ TEST(AstroAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::AstroPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -62,7 +62,7 @@ TEST(SherlockAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::SherlockPartitionerFactory().New(
@@ -79,7 +79,7 @@ TEST(KolaAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::KolaPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -96,7 +96,7 @@ TEST(LuisAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::LuisPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -113,7 +113,7 @@ TEST(X64AbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::X64PartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -125,7 +125,6 @@ class CurrentSlotUuidTest : public PaverTest {
  protected:
   static constexpr int kBlockSize = 512;
   static constexpr int kDiskBlocks = 1024;
-  static constexpr uuid::Uuid kEmptyGuid;
   static constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
   static constexpr uint8_t kZirconType[GPT_GUID_LEN] = GPT_ZIRCON_ABR_TYPE_GUID;
   static constexpr uint8_t kTestUuid[GPT_GUID_LEN] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
@@ -133,42 +132,63 @@ class CurrentSlotUuidTest : public PaverTest {
                                                       0xcc, 0xdd, 0xee, 0xff};
   void SetUp() override {
     PaverTest::SetUp();
+    args_.disable_block_watcher = true;
 
-    IsolatedDevmgr::Args args = DevmgrArgs();
-    ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
+    ASSERT_OK(IsolatedDevmgr::Create(&args_, &devmgr_));
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
+                  .status_value());
+    ASSERT_NO_FATAL_FAILURE(
+        BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, kDiskBlocks, kBlockSize, &disk_));
+  }
+
+  zx::result<std::unique_ptr<gpt::GptDevice>> CreateGptDevice() {
+    zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
+    if (new_connection.is_error()) {
+      return new_connection.take_error();
+    }
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
+        std::move(new_connection->device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(
+        std::move(volume), std::move(new_connection->controller));
+    if (remote_device.is_error()) {
+      return remote_device.take_error();
+    }
+    return gpt::GptDevice::Create(std::move(remote_device.value()),
+                                  /*blocksize=*/disk_->block_size(),
+                                  /*blocks=*/disk_->block_count());
+  }
+
+  void CreatePartitionOnDisk(const char* name, const uint8_t* type_guid = kZirconType) {
+    zx::result gpt_result = CreateGptDevice();
+    ASSERT_OK(gpt_result);
+    std::unique_ptr<gpt::GptDevice> gpt = std::move(gpt_result.value());
+    ASSERT_OK(gpt->Sync());
+    static uint64_t partition_offset = 2 + gpt->EntryArrayBlockCount();
+    ASSERT_OK(gpt->AddPartition(name, type_guid, kTestUuid, partition_offset, 10, 0));
+    partition_offset += 10;  // Adjust partition offset for the next invocation of this method.
+    ASSERT_OK(gpt->Sync());
+
+    fidl::WireResult result =
+        fidl::WireCall(disk_->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
+    ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+    ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
+
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(),
+                                   "sys/platform/ram-disk/ramctl/ramdisk-0/block/part-000/block")
                   .status_value());
   }
 
-  virtual IsolatedDevmgr::Args DevmgrArgs() {
-    IsolatedDevmgr::Args args;
-    // storage-host publishes devices synchronously so it's easier to test with.
-    args.enable_storage_host = true;
-    return args;
-  }
+  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.RealmExposedDir(); }
 
-  zx::result<paver::BlockDevices> CreateBlockDevices() {
-    if (DevmgrArgs().enable_storage_host) {
-      return paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir().borrow());
-    }
-    return paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
-  }
-
-  void CreateGptDevice(const std::vector<PartitionDescription>& partitions) {
-    ASSERT_NO_FATAL_FAILURE(BlockDevice::CreateWithGpt(devmgr_.devfs_root(), kDiskBlocks,
-                                                       kBlockSize, partitions, &disk_));
-  }
-
+  IsolatedDevmgr::Args args_;
   IsolatedDevmgr devmgr_;
   std::unique_ptr<BlockDevice> disk_;
 };
 
 TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"zircon-a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon-a"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
@@ -176,11 +196,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"zircon_a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon_a"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
@@ -188,11 +206,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"ZiRcOn-A", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZiRcOn-A"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
@@ -200,11 +216,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconB) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"zircon_b", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon_b"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
@@ -212,11 +226,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconB) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconR) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"ZIRCON_R", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZIRCON-R"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
@@ -224,11 +236,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconR) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestInvalid) {
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"ZERCON_R", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
-  }));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZERCON-R"));
 
-  zx::result devices = CreateBlockDevices();
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
   auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_TRUE(result.is_error());
@@ -259,50 +269,24 @@ TEST(CurrentSlotTest, TestInvalid) {
   ASSERT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
-class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
- public:
-  void GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) override {
-    std::vector<fidl::StringView> response = {
-        fidl::StringView(),
-        fidl::StringView(),
-        fidl::StringView::FromExternal("_a"),
-    };
-    completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(response));
-  }
-
-  // Not implemented.
-  void GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) override {}
-  void GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& completer) override {}
-  void GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) override {}
-  void Collect(CollectRequestView request, CollectCompleter::Sync& completer) override {}
-};
-
 class KolaAbrClientTest : public CurrentSlotUuidTest {
  protected:
   static constexpr uint8_t kFvmType[GPT_GUID_LEN] = GPT_FVM_TYPE_GUID;
   static constexpr uint8_t kVbMetaType[GPT_GUID_LEN] = GPT_VBMETA_ABR_TYPE_GUID;
   static constexpr uint8_t kBootloaderType[GPT_GUID_LEN] = GPT_BOOTLOADER_ABR_TYPE_GUID;
 
-  IsolatedDevmgr::Args DevmgrArgs() override {
-    IsolatedDevmgr::Args args;
-    args.board_name = "kola";
-    args.fake_boot_args = std::make_unique<FakeBootArgs>();
-    args.disable_block_watcher = false;
-    return args;
-  }
-
   void SetUp() override {
+    args_.board_name = "kola";
+    args_.boot_arg = "_a";
     CurrentSlotUuidTest::SetUp();
 
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-        PartitionDescription{"boot_a", uuid::Uuid(kZirconType), 0x22, 0x1},
-        PartitionDescription{"boot_b", uuid::Uuid(kBootloaderType), 0x23, 0x1},
-        PartitionDescription{"super", uuid::Uuid(kFvmType), 0x24, 0x1},
-        PartitionDescription{"vbmeta_a", uuid::Uuid(kVbMetaType), 0x25, 0x1},
-        PartitionDescription{"vbmeta_b", uuid::Uuid(kBootloaderType), 0x26, 0x1},
-    }));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("boot_a", kZirconType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("boot_b", kBootloaderType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("super", kFvmType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("vbmeta_a", kVbMetaType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("vbmeta_b", kBootloaderType));
 
-    zx::result devices = CreateBlockDevices();
+    zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
     ASSERT_OK(devices);
     std::shared_ptr<paver::Context> context;
     zx::result partitioner = paver::KolaPartitionerFactory().New(
@@ -314,27 +298,9 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
     abr_client_ = std::move(*abr_client);
   }
 
-  // TODO(https://fxbug.dev/371060853): Remove this; use fshost APIs.
-  zx::result<std::unique_ptr<gpt::GptDevice>> OpenGptDevice() {
-    zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
-    if (new_connection.is_error()) {
-      return new_connection.take_error();
-    }
-    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
-        std::move(new_connection->device));
-    zx::result remote_device = block_client::RemoteBlockDevice::Create(
-        std::move(volume), std::move(new_connection->controller));
-    if (remote_device.is_error()) {
-      return remote_device.take_error();
-    }
-    return gpt::GptDevice::Create(std::move(remote_device.value()),
-                                  /*blocksize=*/disk_->block_size(),
-                                  /*blocks=*/disk_->block_count());
-  }
-
   zx::result<KolaGptEntryAttributes> CheckPartitionState(uint32_t index, std::string_view name,
                                                          const uint8_t* type_guid) {
-    zx::result gpt_result = OpenGptDevice();
+    zx::result gpt_result = CreateGptDevice();
     if (gpt_result.is_error()) {
       return gpt_result.take_error();
     }

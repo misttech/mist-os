@@ -431,19 +431,17 @@ WriteFirmwareResult CreateWriteFirmwareResult(std::variant<zx_status_t, bool>* v
 
 }  // namespace
 
-zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root) {
-  zx::result devices = BlockDevices::CreateDevfs(std::move(devfs_root));
+zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root,
+                                                 fbl::unique_fd partitions_root) {
+  zx::result devices = BlockDevices::Create(std::move(devfs_root), std::move(partitions_root));
   if (devices.is_error()) {
     return devices.take_error();
   }
-  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  if (zx_status_t status =
-          fdio_open3("/svc", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
-                     server.TakeChannel().release());
-      status != ZX_OK) {
-    return zx::error(status);
+  zx::result svc_root = component::Connect<fuchsia_io::Directory>("/svc");
+  if (svc_root.is_error()) {
+    return {};
   }
-  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(client)));
+  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(*svc_root)));
 }
 
 void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter::Sync& _completer) {
@@ -693,13 +691,13 @@ void BootManager::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                        fidl::ServerEnd<fuchsia_paver::BootManager> server) {
   zx::result supports_abr = abr::SupportsVerifiedBoot(devices, svc_root);
   if (supports_abr.is_error()) {
-    ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
-    fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
-    return;
+      ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
+      fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
+      return;
   } else if (!*supports_abr) {
-    LOG("System doesn't support verified boot; not creating BootManager\n");
-    fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
-    return;
+      LOG("System doesn't support verified boot; not creating BootManager\n");
+      fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
+      return;
   }
 
   zx::result partitioner =

@@ -657,13 +657,10 @@ impl RegisteredDevices {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum DeviceTag {
     /// The fshost ramdisk device.
     Ramdisk,
-
-    /// The block device containing the partition table in which the Fuchsia system resides.
-    SystemPartitionTable,
 
     /// The Fxblob device that isn't the ramdisk.
     FxblobOnRecovery,

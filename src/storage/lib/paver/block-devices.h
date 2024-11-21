@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.storagehost/cpp/markers.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
@@ -64,17 +63,14 @@ class ServiceBasedVolumeConnector : public VolumeConnector {
 
 // An abstraction for accessing block devices, either via devfs or the partitions directory
 // exposed by storage-host.
+// The partitions directory will be preferred (i.e. on systems which use storage-host).
 class BlockDevices {
  public:
-  // Creates an instance that searches for devices in Devfs.
-  // `devfs_root` can be injected for testing.  If unspecified, the devfs root will be connected to
-  // /dev.
-  static zx::result<BlockDevices> CreateDevfs(fbl::unique_fd devfs_root = {});
-
-  // Creates an instance that searches for devices in the partitions directory of storage-host.
-  // `service_root` should contain the `fuchsia.storagehost.PartitionService` service.
-  static zx::result<BlockDevices> CreateStorageHost(
-      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
+  // `devfs_root` and `partitions_root` can be injected for testing.  If unspecified, the devfs root
+  // will be connected to /dev, and the partitions root will be connected to /partitions (if
+  // available).
+  static zx::result<BlockDevices> Create(fbl::unique_fd devfs_root = {},
+                                         fbl::unique_fd partitions_root = {});
 
   // Creates an empty BlockDevices instance which never yields any partitions.  Useful for tests
   // which need a valid instance but don't actually use it.
@@ -93,7 +89,7 @@ class BlockDevices {
 
   const fbl::unique_fd& devfs_root() const { return devfs_root_; }
 
-  bool IsStorageHost() const;
+  bool HasPartitionsDirectory() const;
 
   // Returns a connector for every partition that matches the filter.  A channel connected to the
   // fuchsia.hardware.block.partition.Partition service of the block device is provided to `filter`.

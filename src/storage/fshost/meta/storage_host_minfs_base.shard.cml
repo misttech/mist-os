@@ -43,12 +43,8 @@
             path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
         },
         {
-            protocol: "fuchsia.storagehost.PartitionsManager",
-            path: "/gpt/fuchsia.storagehost.PartitionsManager",
-        },
-        {
-            service: "fuchsia.storagehost.PartitionService",
-            path: "/gpt/fuchsia.storagehost.PartitionService",
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
+            path: "/gpt/fuchsia.storagehost.PartitionsAdmin",
         },
     ],
     use: [
@@ -104,12 +100,7 @@
             availability: "same_as_target",
         },
         {
-            service: "fuchsia.storagehost.PartitionService",
-            from: "self",
-            availability: "same_as_target",
-        },
-        {
-            protocol: "fuchsia.storagehost.PartitionsManager",
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
             from: "self",
             availability: "same_as_target",
         },

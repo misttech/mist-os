@@ -6,13 +6,11 @@ use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
 use block_client::{
-    AsBlockProxy, BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId,
-    WriteOptions,
+    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
 };
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 
-use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt as _;
 use std::collections::BTreeMap;
@@ -20,6 +18,10 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use zx::AsHandleRef as _;
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_storagehost as fstoragehost,
+    fuchsia_async as fasync,
+};
 
 /// A single partition in a GPT device.
 pub struct GptPartition {
@@ -200,7 +202,6 @@ impl Inner {
                         .checked_add(info.num_blocks)
                         .ok_or_else(|| anyhow!("Overflow in partition range"))?,
             ));
-            // TODO(https://fxbug.dev/376745136): propagate block flags from parent to children
             let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
             self.partitions_dir.add_entry(
                 &format!("part-{}", index),
@@ -234,11 +235,11 @@ impl std::fmt::Debug for GptManager {
 
 impl GptManager {
     pub async fn new(
-        block: impl AsBlockProxy,
+        block: fblock::BlockProxy,
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
         tracing::info!("Binding to GPT");
-        let client = Arc::new(RemoteBlockClient::new(block).await?);
+        let client = Arc::new(RemoteBlockClient::new(&block).await?);
         let block_size = client.block_size();
         let block_count = client.block_count();
         let gpt = gpt::Gpt::open(client).await.context("Failed to load GPT")?;
@@ -258,14 +259,6 @@ impl GptManager {
         this.inner.lock().await.bind_partitions(&this).await?;
         tracing::info!("Starting all partitions OK!");
         Ok(this)
-    }
-
-    pub fn block_size(&self) -> u32 {
-        self.block_size
-    }
-
-    pub fn block_count(&self) -> u64 {
-        self.block_count
     }
 
     pub async fn create_transaction(self: &Arc<Self>) -> Result<zx::EventPair, zx::Status> {
@@ -349,7 +342,7 @@ impl GptManager {
 
     pub async fn reset_partition_table(
         self: &Arc<Self>,
-        partitions: Vec<gpt::PartitionInfo>,
+        partitions: Vec<fstoragehost::PartitionInfo>,
     ) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().await;
         if inner.pending_transaction.is_some() {
@@ -358,9 +351,21 @@ impl GptManager {
 
         tracing::info!("Resetting gpt.  Expect data loss!!!");
         let mut transaction = inner.gpt.create_transaction().unwrap();
-        transaction.partitions = partitions;
-        inner.gpt.commit_transaction(transaction).await?;
 
+        fn convert_partition_info(info: fstoragehost::PartitionInfo) -> gpt::PartitionInfo {
+            gpt::PartitionInfo {
+                label: info.name,
+                type_guid: gpt::Guid::from_bytes(info.type_guid.value),
+                instance_guid: gpt::Guid::from_bytes(info.instance_guid.value),
+                start_block: info.start_block,
+                num_blocks: info.num_blocks,
+                flags: info.flags,
+            }
+        }
+        transaction.partitions =
+            partitions.into_iter().map(convert_partition_info).collect::<Vec<_>>();
+
+        inner.gpt.commit_transaction(transaction).await?;
         tracing::info!("Rebinding partitions...");
         if let Err(err) = inner.bind_partitions(&self).await {
             tracing::error!(?err, "Failed to rebind partitions");
@@ -401,8 +406,9 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::ObjectRequest;
     use {
-        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
-        fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
+        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
+        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
+        fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
     };
 
     async fn setup(
@@ -569,9 +575,11 @@ mod tests {
                 &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
-        let block =
-            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
-                .expect("Failed to open block service");
+        let block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &proxy,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open block service");
         let client = RemoteBlockClient::new(block).await.expect("Failed to create block client");
 
         assert_eq!(client.block_count(), 1);
@@ -755,9 +763,11 @@ mod tests {
                 &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
-        let block =
-            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
-                .expect("Failed to open block service");
+        let block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &proxy,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open block service");
         let client = RemoteBlockClient::new(block).await.expect("Failed to create block client");
 
         let buffer = vec![0; BLOCK_SIZE as usize];
@@ -836,12 +846,12 @@ mod tests {
             .unwrap();
         let part_0_proxy = connect_to_named_protocol_at_dir_root::<fstoragehost::PartitionMarker>(
             &part_0_dir,
-            "partition",
+            "svc/fuchsia.storagehost.PartitionService/partition",
         )
         .expect("Failed to open Partition service");
         let part_1_proxy = connect_to_named_protocol_at_dir_root::<fstoragehost::PartitionMarker>(
             &part_1_dir,
-            "partition",
+            "svc/fuchsia.storagehost.PartitionService/partition",
         )
         .expect("Failed to open Partition service");
 
@@ -869,17 +879,21 @@ mod tests {
         runner.commit_transaction(transaction).await.expect("Failed to commit transaction");
 
         // Ensure the changes have propagated to the correct partitions.
-        let part_0_block =
-            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&part_0_dir, "volume")
-                .expect("Failed to open Volume service");
+        let part_0_block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &part_0_dir,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open Volume service");
         let (status, guid) = part_0_block.get_type_guid().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(guid.unwrap().value, [0xffu8; 16]);
         // TODO(https://fxbug.dev/371060853): Check flags after they can be read through the
         // Partition protocol
-        let part_1_block =
-            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&part_1_dir, "volume")
-                .expect("Failed to open Volume service");
+        let part_1_block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &part_1_dir,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open Volume service");
         let (status, guid) = part_1_block.get_type_guid().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(guid.unwrap().value, PART_TYPE_GUID);
@@ -925,27 +939,27 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
-        let nil_entry = PartitionInfo {
-            label: "".to_string(),
-            type_guid: Guid::from_bytes([0u8; 16]),
-            instance_guid: Guid::from_bytes([0u8; 16]),
+        let nil_entry = fstoragehost::PartitionInfo {
+            name: "".to_string(),
+            type_guid: fpartition::Guid { value: [0u8; 16] },
+            instance_guid: fpartition::Guid { value: [0u8; 16] },
             start_block: 0,
             num_blocks: 0,
             flags: 0,
         };
         let mut new_partitions = vec![nil_entry; 128];
-        new_partitions[0] = PartitionInfo {
-            label: PART_3_NAME.to_string(),
-            type_guid: Guid::from_bytes(PART_TYPE_GUID),
-            instance_guid: Guid::from_bytes([1u8; 16]),
+        new_partitions[0] = fstoragehost::PartitionInfo {
+            name: PART_3_NAME.to_string(),
+            type_guid: fpartition::Guid { value: PART_TYPE_GUID },
+            instance_guid: fpartition::Guid { value: [1u8; 16] },
             start_block: 64,
             num_blocks: 2,
             flags: 0,
         };
-        new_partitions[2] = PartitionInfo {
-            label: PART_4_NAME.to_string(),
-            type_guid: Guid::from_bytes(PART_TYPE_GUID),
-            instance_guid: Guid::from_bytes([2u8; 16]),
+        new_partitions[2] = fstoragehost::PartitionInfo {
+            name: PART_4_NAME.to_string(),
+            type_guid: fpartition::Guid { value: PART_TYPE_GUID },
+            instance_guid: fpartition::Guid { value: [2u8; 16] },
             start_block: 66,
             num_blocks: 4,
             flags: 0,
@@ -970,9 +984,11 @@ mod tests {
                 &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
-        let block =
-            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
-                .expect("Failed to open block service");
+        let block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &proxy,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open block service");
         let (status, name) = block.get_name().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(name.unwrap(), PART_3_NAME);
@@ -986,10 +1002,10 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
-        let nil_entry = PartitionInfo {
-            label: "".to_string(),
-            type_guid: Guid::from_bytes([0u8; 16]),
-            instance_guid: Guid::from_bytes([0u8; 16]),
+        let nil_entry = fstoragehost::PartitionInfo {
+            name: "".to_string(),
+            type_guid: fpartition::Guid { value: [0u8; 16] },
+            instance_guid: fpartition::Guid { value: [0u8; 16] },
             start_block: 0,
             num_blocks: 0,
             flags: 0,
@@ -1010,18 +1026,18 @@ mod tests {
             .await
             .expect("load should succeed");
         let new_partitions = vec![
-            PartitionInfo {
-                label: "a".to_string(),
-                type_guid: Guid::from_bytes([1u8; 16]),
-                instance_guid: Guid::from_bytes([1u8; 16]),
+            fstoragehost::PartitionInfo {
+                name: "a".to_string(),
+                type_guid: fpartition::Guid { value: [1u8; 16] },
+                instance_guid: fpartition::Guid { value: [1u8; 16] },
                 start_block: 4,
                 num_blocks: 2,
                 flags: 0,
             },
-            PartitionInfo {
-                label: "b".to_string(),
-                type_guid: Guid::from_bytes([2u8; 16]),
-                instance_guid: Guid::from_bytes([2u8; 16]),
+            fstoragehost::PartitionInfo {
+                name: "b".to_string(),
+                type_guid: fpartition::Guid { value: [2u8; 16] },
+                instance_guid: fpartition::Guid { value: [2u8; 16] },
                 start_block: 6,
                 num_blocks: 200,
                 flags: 0,
@@ -1041,10 +1057,10 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
-        let new_partitions = vec![PartitionInfo {
-            label: "a".to_string(),
-            type_guid: Guid::from_bytes([1u8; 16]),
-            instance_guid: Guid::from_bytes([1u8; 16]),
+        let new_partitions = vec![fstoragehost::PartitionInfo {
+            name: "a".to_string(),
+            type_guid: fpartition::Guid { value: [1u8; 16] },
+            instance_guid: fpartition::Guid { value: [1u8; 16] },
             start_block: 1,
             num_blocks: 2,
             flags: 0,
@@ -1064,18 +1080,18 @@ mod tests {
             .await
             .expect("load should succeed");
         let new_partitions = vec![
-            PartitionInfo {
-                label: "a".to_string(),
-                type_guid: Guid::from_bytes([1u8; 16]),
-                instance_guid: Guid::from_bytes([1u8; 16]),
+            fstoragehost::PartitionInfo {
+                name: "a".to_string(),
+                type_guid: fpartition::Guid { value: [1u8; 16] },
+                instance_guid: fpartition::Guid { value: [1u8; 16] },
                 start_block: 32,
                 num_blocks: 2,
                 flags: 0,
             },
-            PartitionInfo {
-                label: "b".to_string(),
-                type_guid: Guid::from_bytes([2u8; 16]),
-                instance_guid: Guid::from_bytes([2u8; 16]),
+            fstoragehost::PartitionInfo {
+                name: "b".to_string(),
+                type_guid: fpartition::Guid { value: [2u8; 16] },
+                instance_guid: fpartition::Guid { value: [2u8; 16] },
                 start_block: 33,
                 num_blocks: 1,
                 flags: 0,

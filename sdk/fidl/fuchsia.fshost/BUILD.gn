@@ -10,7 +10,6 @@ fidl("fuchsia.fshost") {
     "//sdk/fidl/fuchsia.hardware.block",
     "//sdk/fidl/fuchsia.io",
     "//src/storage/fxfs/fidl/fuchsia.fxfs",
-    "//src/storage/storage-host/fidl/fuchsia.storagehost",
     "//zircon/vdso/zx",
   ]
   enable_hlcpp = true

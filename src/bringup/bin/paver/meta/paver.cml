@@ -27,14 +27,16 @@
             path: "/dev",
         },
         {
+            directory: "partitions",
+            rights: [ "r*" ],
+            path: "/partitions",
+            availability: "optional",
+        },
+        {
             protocol: [
                 // Services from bootsvc
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
-
-                // Storage services
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
 
                 // Builtin service
                 "fuchsia.process.Launcher",
@@ -45,9 +47,6 @@
                 // Paver queries system state transition
                 "fuchsia.system.state.SystemStateTransition",
             ],
-        },
-        {
-            service: [ "fuchsia.storagehost.PartitionService" ],
         },
     ],
     expose: [

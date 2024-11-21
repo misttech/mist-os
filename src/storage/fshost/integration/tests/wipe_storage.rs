@@ -7,7 +7,7 @@
 
 use block_client::{BlockClient, MutableBufferSlice, RemoteBlockClient};
 use device_watcher::recursive_wait;
-use fidl::endpoints::{create_proxy, Proxy as _, ServiceMarker as _};
+use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::PartitionMarker;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
@@ -67,15 +67,7 @@ async fn write_blob() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
     if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
         let ramdisk_dir =
             fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
@@ -135,15 +127,7 @@ async fn write_blob_no_existing_data_partition() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
     if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
         let ramdisk_dir =
             fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
@@ -207,15 +191,7 @@ async fn blobfs_formatted() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
     if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
         let ramdisk_dir =
             fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
@@ -269,15 +245,7 @@ async fn data_unformatted() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
     if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
         let ramdisk_dir =
             fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
@@ -377,15 +345,7 @@ async fn handles_corrupt_fvm() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
     if cfg!(feature = "storage-host") {
-        recursive_wait(
-            &fixture.dir(
-                fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
-                fio::PERM_READABLE,
-            ),
-            "part-0",
-        )
-        .await
-        .unwrap();
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
         let ramdisk_dir =
             fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");

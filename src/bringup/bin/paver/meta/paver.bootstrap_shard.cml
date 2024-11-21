@@ -33,6 +33,12 @@
             to: "#paver",
         },
         {
+            directory: "partitions",
+            from: "#fshost",
+            to: "#paver",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.system.state.SystemStateTransition" ],
             from: "#shutdown_shim",
             to: "#paver",
@@ -48,19 +54,6 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
-            to: "#paver",
-        },
-        {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
-            ],
-            from: "#fshost",
-            to: "#paver",
-        },
-        {
-            service: [ "fuchsia.storagehost.PartitionService" ],
-            from: "#fshost",
             to: "#paver",
         },
     ],

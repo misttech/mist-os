@@ -286,8 +286,6 @@ enum FxfsType {
 
 pub struct DiskBuilder {
     size: u64,
-    // Overrides all other options.  The disk will be unformatted.
-    uninitialized: bool,
     blob_hash: Option<Hash>,
     data_volume_size: u64,
     data_spec: DataSpec,
@@ -304,14 +302,9 @@ pub struct DiskBuilder {
 }
 
 impl DiskBuilder {
-    pub fn uninitialized() -> DiskBuilder {
-        Self { uninitialized: true, ..Self::new() }
-    }
-
     pub fn new() -> DiskBuilder {
         DiskBuilder {
             size: DEFAULT_DISK_SIZE,
-            uninitialized: false,
             blob_hash: None,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
@@ -527,10 +520,6 @@ impl DiskBuilder {
 
     pub async fn build(mut self) -> zx::Vmo {
         let vmo = zx::Vmo::create(self.size).unwrap();
-
-        if self.uninitialized {
-            return vmo;
-        }
 
         // Initialize the VMO with GPT headers and an *empty* FVM partition.
         if self.gpt {
