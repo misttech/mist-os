@@ -21,6 +21,7 @@ syscall_tests = [
   "aspace_test",
   "bpf_test",
   "capabilities_test",
+  "cgroup_freezer_test",
   "cgroup_test",
   "custom_artifact_test",
   "epoll_test",
