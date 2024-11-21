@@ -258,7 +258,7 @@ impl Inner {
             return;
         }
 
-        let header = Header(u64::read_from_bytes(&msg[..std::mem::size_of::<Header>()]).unwrap());
+        let header = Header::read_from_bytes(&msg[..std::mem::size_of::<Header>()]).unwrap();
 
         // NOTE: Some tests send messages that are bigger than the header indicates.  We ignore the
         // tail of any such messages.
@@ -382,12 +382,10 @@ impl Inner {
                 container.stats.increment_invalid(amount_read);
                 continue;
             }
-            let header = Header(
-                u64::read_from_bytes(
-                    &dest[FXT_HEADER_SIZE..FXT_HEADER_SIZE + std::mem::size_of::<Header>()],
-                )
-                .unwrap(),
-            );
+            let header = Header::read_from_bytes(
+                &dest[FXT_HEADER_SIZE..FXT_HEADER_SIZE + std::mem::size_of::<Header>()],
+            )
+            .unwrap();
             let msg_len = header.size_words() as usize * 8;
             if header.raw_type() != TRACING_FORMAT_LOG_RECORD_TYPE || msg_len != amount_read {
                 debug!("bad type or size ({}, {}, {})", header.raw_type(), msg_len, amount_read);
