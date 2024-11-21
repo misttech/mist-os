@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_package.gni")
 import("//build/cpp/verify_public_symbols.gni")
+import("//build/dist/generated_resource.gni")
 import("//build/dist/renamed_binary.gni")
 import("//build/toolchain/ifs_extract.gni")
 
@@ -21,20 +22,15 @@ import("//build/toolchain/ifs_extract.gni")
 # }
 # ```
 #
-# Parameters
-#
-#    sources (list)
-#      Source files for the Trusted Application.
-#
-#    deps (optional)
-#      Dependencies of the Trusted Application.
+#  See loadable_module() for parameters.
 template("fuchsia_ta_package") {
   main_target = target_name
-  module_target = "_${target_name}_module"
-  ifs_target = "_${target_name}_ifs"
-  verify_public_symbols_target = "_${target_name}_verify_public_symbols"
-  ta_name_resource_target = "_${target_name}_resource"
-  ta_props_resource_target = "_${target_name}_props_resource"
+  module_target = "_fuchsia_ta_package.${target_name}.loadable_module"
+  ifs_target = "_fuchsia_ta_package.${target_name}.ifs"
+  verify_public_symbols_target =
+      "_fuchsia_ta_package.${target_name}.verify_public_symbols"
+  ta_name_resource_target = "_fuchsia_ta_package.${target_name}.name_resource"
+  ta_props_resource_target = "_fuchsia_ta_package.${target_name}.props_resource"
 
   forward_variables_from(invoker, [ "props_file" ])
   if (!defined(props_file)) {
@@ -64,6 +60,7 @@ template("fuchsia_ta_package") {
   # (especially during 'bring-up').
   ifs_file = "$target_out_dir/$main_target.ifs"
   ifs_extract(ifs_target) {
+    forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":*" ]
     outputs = [ ifs_file ]
     deps = [ ":$module_target" ]
@@ -72,6 +69,7 @@ template("fuchsia_ta_package") {
   # This does a diff of the public symbols against those defined in
   # //src/tee/ta/abi.ifs.
   verify_public_symbols(verify_public_symbols_target) {
+    forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":*" ]
     library_name = main_target
     current = ifs_file
@@ -94,10 +92,10 @@ template("fuchsia_ta_package") {
   #    and use that
   # *) An external index could provide the TA name along with other data, such as its
   #    UUID.
-  resource(ta_name_resource_target) {
-    ta_name_file = "${target_gen_dir}/${main_target}"
-    write_file(ta_name_file, main_target)
-    sources = [ ta_name_file ]
+  generated_resource(ta_name_resource_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    visibility = [ ":*" ]
+    contents = main_target
     outputs = [ "data/ta_name" ]
   }
 
@@ -105,12 +103,18 @@ template("fuchsia_ta_package") {
   # Property set of internal core APIs.
   # TODO(b/366486931): Build-time validation for this TA properties file.
   resource(ta_props_resource_target) {
-    sources = [ "${props_file}" ]
+    forward_variables_from(invoker, [ "testonly" ])
+    visibility = [ ":*" ]
+    sources = [ props_file ]
     outputs = [ "data/ta_properties" ]
   }
 
   fuchsia_package(main_target) {
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
     deps = [
       ":${module_target}",
       ":${ta_name_resource_target}",
