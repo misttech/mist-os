@@ -21,11 +21,14 @@ build_api_module("ctf_artifacts") {
   ]
 
   metadata = {
+    # Used by the //:ctf_artifacts_path build API module
     ctf_artifacts_path =
         [ rebase_path("$root_out_dir/ctf_artifacts.json", root_build_dir) ]
   }
 }
 
+# A file that contains the path to the ctf_artifacts manifest, used
+# by infra scripts to locate the latter.
 build_api_module("ctf_artifacts_path") {
   testonly = true
   data_keys = [ "ctf_artifacts_path" ]
