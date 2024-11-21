@@ -176,24 +176,7 @@ struct ProcessTreeRecord {
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | type | koid | name;
     if (type == Type::kJob) {
-      if (ver < 57) {
-        // The component information if the current job is the root job of an ELF component.
-        // Deprecated in version 57 in favor of |components|.
-        std::optional<ComponentInfo> component = std::nullopt;
-        if (!components.empty()) {
-          component = components[0];
-        }
-        components.clear();
-
-        ser | component;
-
-        if (component) {
-          components = {*component};
-        }
-      } else {
-        ser | components;
-      }
-      ser | children;
+      ser | components | children;
     }
   }
 };
@@ -313,24 +296,7 @@ struct ProcessRecord {
   std::vector<ThreadRecord> threads;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | process_koid | process_name | threads;
-    if (ver < 57) {
-      // The component information if the process is running in a component.
-      // Deprecated in version 57 in favor of |components|.
-      std::optional<ComponentInfo> component = std::nullopt;
-      if (!components.empty()) {
-        component = components[0];
-      }
-      components.clear();
-
-      ser | component;
-
-      if (component) {
-        components = {*component};
-      }
-    } else {
-      ser | components;
-    }
+    ser | process_koid | process_name | threads | components;
   }
 };
 
@@ -469,26 +435,8 @@ struct AddressRegion {
   bool shared = false;  // Linux only.
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    if (ver < 60) {
-      // Previous to v60 the MMU flags were sent as a uint32_t bitfield.
-      uint32_t mmu_flags = 0;
-      if (read) {
-        mmu_flags = mmu_flags | (1u << 0);
-      } else if (write) {
-        mmu_flags = mmu_flags | (1u << 1);
-      } else if (execute) {
-        mmu_flags = mmu_flags | (1u << 2);
-      }
-
-      ser | name | base | size | depth | mmu_flags | vmo_koid | vmo_offset | committed_pages;
-
-      read = !!(mmu_flags & (1u << 0));
-      write = !!(mmu_flags & (1u << 1));
-      execute = !!(mmu_flags & (1u << 2));
-    } else {
-      ser | name | base | size | depth | vmo_koid | vmo_offset | committed_pages | read | write |
-          execute | shared;
-    }
+    ser | name | base | size | depth | vmo_koid | vmo_offset | committed_pages | read | write |
+        execute | shared;
   }
 };
 

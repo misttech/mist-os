@@ -59,10 +59,10 @@ constexpr uint32_t kCurrentProtocolVersion = 66;
 //   - INITIAL_VERSION_FOR_API_LEVEL_CURRENT = kCurrentProtocolVersion
 //   - CURRENT_SUPPORTED_API_LEVEL = NEXT_STABLE_API_LEVEL
 
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 58
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 60
-#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 63
-#define CURRENT_SUPPORTED_API_LEVEL 22
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 60
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 63
+#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 66
+#define CURRENT_SUPPORTED_API_LEVEL 26
 
 constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_2;
 
@@ -240,12 +240,7 @@ struct StatusReply {
   // All the installed filters.
   std::vector<Filter> filters;
 
-  void Serialize(Serializer& ser, uint32_t ver) {
-    ser | processes | limbo;
-    if (ver >= 59) {
-      ser | breakpoints | filters;
-    }
-  }
+  void Serialize(Serializer& ser, uint32_t ver) { ser | processes | limbo | breakpoints | filters; }
 };
 
 struct KillRequest {
