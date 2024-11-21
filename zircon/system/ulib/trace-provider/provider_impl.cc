@@ -149,6 +149,9 @@ void TraceProvider::SetGetKnownCategoriesCallback(GetKnownCategoriesCallback cal
 EXPORT trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service_h,
                                                          async_dispatcher_t* dispatcher,
                                                          const char* name) {
+  std::string provider_name =
+      name == nullptr ? trace::internal::GetProcessName().value_or("") : name;
+
   const fidl::ClientEnd<fuchsia_tracing_provider::Registry> to_service{zx::channel{to_service_h}};
 
   ZX_DEBUG_ASSERT(to_service.is_valid());
@@ -166,7 +169,7 @@ EXPORT trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service_
   const fidl::Status result =
       fidl::WireCall(to_service)
           ->RegisterProvider(std::move(endpoints->client), trace::internal::GetPid(),
-                             fidl::StringView::FromExternal(name));
+                             fidl::StringView::FromExternal(provider_name));
   if (!result.ok()) {
     // On products where trace_manager is not included, it is expected that we fail to register a
     // provider with ZX_ERR_PEER_CLOSED
@@ -179,26 +182,22 @@ EXPORT trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service_
   // Note: |to_service| can be closed now. Let it close as a consequence
   // of going out of scope.
 
-  return new trace::internal::TraceProviderImpl(name, dispatcher, std::move(endpoints->server));
+  return new trace::internal::TraceProviderImpl(std::move(provider_name), dispatcher,
+                                                std::move(endpoints->server));
 }
 
 EXPORT trace_provider_t* trace_provider_create(zx_handle_t to_service,
                                                async_dispatcher_t* dispatcher) {
-  auto self = zx::process::self();
-  char name[ZX_MAX_NAME_LEN];
-  auto status = self->get_property(ZX_PROP_NAME, name, sizeof(name));
-  if (status != ZX_OK) {
-    fprintf(stderr, "TraceProvider: error getting process name: status=%d(%s)\n", status,
-            zx_status_get_string(status));
-    name[0] = '\0';
-  }
-  return trace_provider_create_with_name(to_service, dispatcher, name);
+  return trace_provider_create_with_name(to_service, dispatcher, nullptr);
 }
 
 EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_service_h,
                                                              async_dispatcher_t* dispatcher,
                                                              const char* name,
                                                              bool* out_already_started) {
+  std::string provider_name =
+      name == nullptr ? trace::internal::GetProcessName().value_or("") : name;
+
   const fidl::ClientEnd<fuchsia_tracing_provider::Registry> to_service{zx::channel{to_service_h}};
 
   ZX_DEBUG_ASSERT(to_service.is_valid());
@@ -216,7 +215,7 @@ EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_serv
   const fidl::WireResult result =
       fidl::WireCall(to_service)
           ->RegisterProviderSynchronously(std::move(endpoints->client), trace::internal::GetPid(),
-                                          fidl::StringView::FromExternal(name));
+                                          fidl::StringView::FromExternal(provider_name));
   if (!result.ok()) {
     // On products where trace_manager is not included, it is expected that we fail to register a
     // provider with ZX_ERR_PEER_CLOSED
@@ -238,7 +237,8 @@ EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_serv
   if (out_already_started) {
     *out_already_started = response.started;
   }
-  return new trace::internal::TraceProviderImpl(name, dispatcher, std::move(endpoints->server));
+  return new trace::internal::TraceProviderImpl(std::move(provider_name), dispatcher,
+                                                std::move(endpoints->server));
 }
 
 EXPORT void trace_provider_destroy(trace_provider_t* provider) {

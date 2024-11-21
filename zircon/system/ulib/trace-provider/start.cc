@@ -13,21 +13,21 @@
 #include <memory>
 #include <thread>
 
+#include "utils.h"
+
 namespace {
 
 bool CreateProvider(async_dispatcher_t* dispatcher,
                     std::unique_ptr<trace::TraceProviderWithFdio>* out_provider,
                     bool* out_manager_is_tracing_already) {
-  // Get the current process's name.  This is based on what
-  // trace_provider_create_with_fdio() does.
-  zx::unowned<zx::process> process = zx::process::self();
-  char process_name[ZX_MAX_NAME_LEN];
-  if (process->get_property(ZX_PROP_NAME, process_name, sizeof(process_name)) != ZX_OK) {
+  // Try to get a name for the trace.
+  zx::result trace_name = trace::internal::GetProcessName();
+  if (trace_name.is_error()) {
     return false;
   }
 
-  return trace::TraceProviderWithFdio::CreateSynchronously(dispatcher, process_name, out_provider,
-                                                           out_manager_is_tracing_already);
+  return trace::TraceProviderWithFdio::CreateSynchronously(
+      dispatcher, trace_name->c_str(), out_provider, out_manager_is_tracing_already);
 }
 
 // Implements a thread that runs a TraceProvider.  It signals |completion|

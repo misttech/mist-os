@@ -4,7 +4,10 @@
 
 #include "utils.h"
 
+#include <lib/zx/process.h>
+#include <stdio.h>
 #include <zircon/process.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 
 namespace trace {
@@ -19,6 +22,18 @@ zx_koid_t GetPid() {
     return ZX_KOID_INVALID;
   }
   return info.koid;
+}
+
+zx::result<std::string> GetProcessName() {
+  auto self = zx::process::self();
+  char name[ZX_MAX_NAME_LEN];
+  auto status = self->get_property(ZX_PROP_NAME, name, sizeof(name));
+  if (status != ZX_OK) {
+    fprintf(stderr, "TraceProvider: error getting process name: status=%d(%s)\n", status,
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok(name);
 }
 
 }  // namespace internal

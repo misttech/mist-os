@@ -96,7 +96,8 @@ typedef struct trace_provider trace_provider_t;
 // and must be single-threaded.
 //
 // |name| is the name of the trace provider and is used for diagnostic
-// purposes. The maximum supported length is 100 characters.
+// purposes. The maximum supported length is 100 characters. If NULL is passed,
+// the process name is used.
 //
 // Returns the trace provider, or null if creation failed.
 //
@@ -118,7 +119,7 @@ trace_provider_t* trace_provider_create(zx_handle_t to_service, async_dispatcher
 // On return, if !NULL, |*out_already_started| is true if the trace manager has
 // already started tracing, which is a hint to the provider to wait for the
 // Start() message before continuing if it wishes to not drop trace records
-// before Start() is received.
+// before Start() is received. If |name| is NULL, the process name is used.
 trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_service,
                                                       async_dispatcher_t* dispatcher,
                                                       const char* name, bool* out_already_started);
