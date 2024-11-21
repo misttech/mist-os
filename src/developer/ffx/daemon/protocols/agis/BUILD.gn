@@ -13,13 +13,14 @@ if (is_host) {
     deps = [
       "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis_rust",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+      "//src/developer/ffx/lib/netext:lib",
       "//src/developer/ffx/lib/protocols:lib",
       "//src/developer/ffx/lib/tasks:lib",
       "//src/lib/fidl/rust/fidl",
       "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:async-net",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:tokio",
       "//third_party/rust_crates:tracing",
     ]
 

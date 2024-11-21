@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use async_net::unix::UnixStream;
 use async_trait::async_trait;
+use netext::TokioAsyncReadExt;
 use protocols::prelude::*;
 use std::path::Path;
+use tokio::net::UnixStream;
 use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_gpu_agis as agis};
 
 #[ffx_protocol]
@@ -67,9 +68,9 @@ impl FidlProtocol for ListenerProtocol {
 
                     // Split sockets for bi-directional communication.
                     let (read_half_ffx, mut write_half_ffx) =
-                        futures::AsyncReadExt::split(ffx_socket);
+                        futures::AsyncReadExt::split(ffx_socket.into_futures_stream());
                     let (read_half_unix, mut write_half_unix) =
-                        futures::AsyncReadExt::split(unix_stream);
+                        futures::AsyncReadExt::split(unix_stream.into_futures_stream());
 
                     let unix_reader = futures::io::BufReader::with_capacity(
                         65536, /* buf size */

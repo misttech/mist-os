@@ -488,7 +488,6 @@ async fn init_daemon_proxy(
 mod test {
     use super::*;
     use async_lock::Mutex;
-    use async_net::unix::UnixListener;
     use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_developer_ffx::{
         DaemonMarker, DaemonRequest, DaemonRequestStream, TargetCollectionMarker,
@@ -497,7 +496,9 @@ mod test {
     };
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, StreamExt, TryStreamExt};
+    use netext::{TokioAsyncReadExt, UnixListenerStream};
     use std::path::PathBuf;
+    use tokio::net::UnixListener;
 
     /// Retry a future until it succeeds or retries run out.
     async fn retry_with_backoff<E, F>(
@@ -615,12 +616,12 @@ mod test {
 
         let listen_task = Task::local(async move {
             // let (sock, _addr) = listener.accept().await.unwrap();
-            let mut stream = listener.incoming();
+            let mut stream = UnixListenerStream(listener);
             while let Some(sock) = stream.try_next().await.unwrap_or(None) {
                 fuchsia_async::Timer::new(Duration::from_secs(sleep_secs)).await;
                 let node_clone = Arc::clone(&daemon);
                 link_tasks1.lock().await.push(Task::local(async move {
-                    let (mut rx, mut tx) = sock.split();
+                    let (mut rx, mut tx) = sock.into_multithreaded_futures_stream().split();
                     ascendd::run_stream(node_clone, &mut rx, &mut tx)
                         .map(|r| eprintln!("link error: {:?}", r))
                         .await;

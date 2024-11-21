@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use async_net::TcpListener;
 use async_trait::async_trait;
 use ffx_config::ConfigLevel;
 use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
 use futures::future::join;
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
+use netext::{TcpListenerStream, TokioAsyncReadExt};
 use protocols::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use {::rcs as rcs_lib, fidl_fuchsia_developer_ffx as ffx};
 
 const REVERSE_BACKLOG: u16 = 128;
@@ -47,7 +48,7 @@ impl Forward {
         listener: TcpListener,
         tasks: Arc<tasks::TaskManager>,
     ) {
-        let mut incoming = listener.incoming();
+        let mut incoming = TcpListenerStream(listener);
         while let Some(conn) = incoming.next().await {
             let conn = match conn {
                 Ok(conn) => conn,
@@ -94,13 +95,13 @@ impl Forward {
     }
 
     fn establish_tcp_forward(
-        conn: async_net::TcpStream,
+        conn: tokio::net::TcpStream,
         socket: fuchsia_async::Socket,
         keep_alive: rcs::port_forward::SocketKeepAliveToken,
         tasks: Arc<tasks::TaskManager>,
     ) {
-        let (mut socket_read, mut socket_write) = socket.split();
-        let (mut conn_read, mut conn_write) = conn.split();
+        let (mut socket_read, mut socket_write) = socket.into_futures_stream().split();
+        let (mut conn_read, mut conn_write) = conn.into_futures_stream().split();
 
         let write_read = async move {
             let mut buf = [0; 4096];
@@ -227,7 +228,7 @@ impl FidlProtocol for Forward {
                             addr,
                             host_address
                         );
-                        let tcp_stream = match async_net::TcpStream::connect(&host_address).await {
+                        let tcp_stream = match tokio::net::TcpStream::connect(&host_address).await {
                             Ok(stream) => stream,
                             Err(e) => {
                                 tracing::error!("Could not connect to {:?}: {:?}", host_address, e);

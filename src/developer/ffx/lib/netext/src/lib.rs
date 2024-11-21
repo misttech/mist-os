@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context as _, Result};
+use futures::Stream;
 use itertools::Itertools;
 use nix::ifaddrs::{getifaddrs, InterfaceAddress};
 use nix::net::if_::InterfaceFlags;
@@ -13,7 +14,9 @@ use std::ffi::CString;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Poll;
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
+use tokio::net::{TcpListener, TcpStream, UnixListener, UnixStream};
 
 pub trait IsLocalAddr {
     /// is_local_addr returns true if the address is not globally routable.
@@ -81,9 +84,102 @@ pub trait TokioAsyncReadExt: tokio::io::AsyncRead + tokio::io::AsyncWrite + Size
     fn into_futures_stream(self) -> TokioAsyncWrapper<Self> {
         TokioAsyncWrapper(Rc::new(RefCell::new(self)))
     }
+
+    fn into_multithreaded_futures_stream(self) -> MultithreadedTokioAsyncWrapper<Self>
+    where
+        Self: Send,
+    {
+        MultithreadedTokioAsyncWrapper(Arc::new(Mutex::new(self)))
+    }
 }
 
 impl<T> TokioAsyncReadExt for T where T: tokio::io::AsyncRead + tokio::io::AsyncWrite {}
+
+pub struct MultithreadedTokioAsyncWrapper<T: ?Sized>(Arc<Mutex<T>>);
+
+impl<T> Clone for MultithreadedTokioAsyncWrapper<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> futures::io::AsyncRead for MultithreadedTokioAsyncWrapper<T>
+where
+    T: tokio::io::AsyncRead + Unpin + ?Sized,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<futures::io::Result<usize>> {
+        let mut inner = self.0.lock().unwrap();
+        let mut buf = tokio::io::ReadBuf::new(buf);
+        tokio::io::AsyncRead::poll_read(Pin::new(&mut *inner), cx, &mut buf)
+            .map_ok(|_| buf.filled().len())
+    }
+}
+
+impl<T> futures::io::AsyncWrite for MultithreadedTokioAsyncWrapper<T>
+where
+    T: tokio::io::AsyncWrite + Unpin + ?Sized,
+{
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<futures::io::Result<usize>> {
+        let mut inner = self.0.lock().unwrap();
+        tokio::io::AsyncWrite::poll_write(Pin::new(&mut *inner), cx, buf)
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<futures::io::Result<()>> {
+        let mut inner = self.0.lock().unwrap();
+        tokio::io::AsyncWrite::poll_flush(Pin::new(&mut *inner), cx)
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<futures::io::Result<()>> {
+        let mut inner = self.0.lock().unwrap();
+        tokio::io::AsyncWrite::poll_shutdown(Pin::new(&mut *inner), cx)
+    }
+}
+
+pub struct UnixListenerStream(pub UnixListener);
+
+impl Stream for UnixListenerStream {
+    type Item = Result<UnixStream, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let listener = &mut this.0;
+
+        match listener.poll_accept(cx) {
+            Poll::Ready(value) => Poll::Ready(Some(value.map(|(stream, _)| stream))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+pub struct TcpListenerStream(pub TcpListener);
+
+impl Stream for TcpListenerStream {
+    type Item = Result<TcpStream, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let listener = &mut this.0;
+
+        match listener.poll_accept(cx) {
+            Poll::Ready(value) => Poll::Ready(Some(value.map(|(stream, _)| stream))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
 
 impl IsLocalAddr for IpAddr {
     fn is_local_addr(&self) -> bool {
