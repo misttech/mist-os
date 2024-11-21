@@ -50,7 +50,7 @@ The following are some key concepts related to categories:
 
 When you use an event, make sure to include the relevant library in your code:
 
-* {C}
+* {C }
 
   Note: The header file is defined in
   [//zircon/system/ulib/trace/include/lib/trace/internal/event_common.h](/zircon/system/ulib/trace/include/lib/trace/internal/event_common.h).
@@ -96,7 +96,7 @@ Note: The trace scope is not used in Perfetto.
 At the minimum, an instant trace has both a name and a category to differentiate
 it:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD);
@@ -118,7 +118,7 @@ You can also make an instant event that includes additional arguments:
 
 Note: For more information on arguments, see [Arguments](#arguments).
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, {{ '<var>argument_1</var>' }}, {{ '<var>argument_1_value</var>' }}, {{ '<var>argument_2</var>' }}, "{{ '<var>argument_2_string</var>' }}");
@@ -158,7 +158,7 @@ it:
 
 Note: Duration events must **begin** and **end** as last in, first out.
 
-* {C}
+* {C }
 
   ```c
   TRACE_DURATION_BEGIN("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}");
@@ -185,7 +185,7 @@ Note: Duration events must **begin** and **end** as last in, first out.
 Alternatively, you can define a duration event and automatically close it when
 it goes out of scope using RAII (Resource acquisition is initialization) as follows::
 
-* {C}
+* {C }
 
   ```c
   {
@@ -246,7 +246,7 @@ event:
 Note: Counter `id`s must be unique for a given process, category, and name
 combination.
 
-* {C}
+* {C }
 
   ```c
   trace_counter_id_t counter_id = 555;
@@ -287,7 +287,7 @@ handoff occurs. Each flow event may also attach arguments. A flow begin
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   trace_flow_id_t flow_id = 555;
@@ -345,7 +345,7 @@ annotate the asynchronous operation with additional information. The arguments
 that you provide to matching async begin, async instant, and async end events
 are combined together in the trace; you do not need to repeat them.
 
-* {C}
+* {C }
 
   ```c
   trace_async_id_t async_id = 555;
@@ -399,7 +399,7 @@ A null argument is just a name a no data.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "SomeNullArg", TA_NULL());
@@ -423,7 +423,7 @@ A numeric type is any `int` or `float` data type.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   // Standard int types
@@ -445,6 +445,7 @@ For example:
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "Someint64", -234516543631231);
   // Doubles
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "Somedouble", 3.1415);
+  ```
 
 * {Rust}
 
@@ -464,7 +465,7 @@ A string type is any `string` data type.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "ping", "pong");
@@ -490,7 +491,7 @@ to the wrong data type.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "somepointer", &i, "someotherpointer", &i, TA_POINTER(0xABCD));
@@ -516,7 +517,7 @@ them from regular `u64` data types.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "somekoid", TA_KOID(0x0012));
@@ -541,7 +542,7 @@ A boolean displays as either `true` or `false`.
 
 For example:
 
-* {C}
+* {C }
 
   ```c
   TRACE_INSTANT("{{ '<var>trace_category</var>' }}", "{{ '<var>trace_name</var>' }}", TRACE_SCOPE_THREAD, "somebool", TA_BOOL(true));
