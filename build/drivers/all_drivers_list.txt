@@ -125,7 +125,6 @@
 //src/devices/bus/drivers/platform/test:test-child-1-driver
 //src/devices/bus/drivers/platform/test:test-child-2-driver
 //src/devices/bus/drivers/platform/test:test-child-3-driver
-//src/devices/bus/drivers/platform/test:test-clock-driver
 //src/devices/bus/drivers/platform/test:test-composite-node-spec-driver
 //src/devices/bus/drivers/platform/test:test-gpio-driver
 //src/devices/bus/drivers/platform/test:test-parent-driver

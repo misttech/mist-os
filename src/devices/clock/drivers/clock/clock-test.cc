@@ -5,7 +5,6 @@
 #include "clock.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <lib/async-default/include/lib/async/default.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>

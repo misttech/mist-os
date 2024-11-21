@@ -59,7 +59,6 @@ TEST(PbusTest, Enumeration) {
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3")
                 .status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/clock/test-clock/clock-1").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/spi/test-spi/spi/spi-0-0").status_value());
   // TODO(316176095): Figure out why this driver binds but never starts.
   // EXPECT_EQ(RecursiveWaitForFile(dirfd,
@@ -75,7 +74,6 @@ TEST(PbusTest, Enumeration) {
   EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-2/child-4", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/clock/test-clock/clock-1", &st, 0), 0);
   // TODO(316176095): Figure out why this driver binds but never starts.
   // EXPECT_EQ(
   //    fstatat(dirfd,

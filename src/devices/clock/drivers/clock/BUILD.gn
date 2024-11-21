@@ -33,7 +33,6 @@ source_set("common") {
     "//zircon/system/ulib/zx",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/component/outgoing/cpp",
@@ -67,7 +66,6 @@ test("clock-test-bin") {
   sources = [ "clock-test.cc" ]
   deps = [
     ":common",
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",

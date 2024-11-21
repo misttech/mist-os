@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
