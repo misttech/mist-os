@@ -92,6 +92,10 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
                                                    const FsNode& parent, FileMode mode,
                                                    DeviceType dev, FsCred owner);
 
+// Creates a new tmpfs filesystem with default options
+fit::result<Errno, FileSystemHandle> tmp_fs(const CurrentTask& current_task,
+                                            FileSystemOptions options);
+
 }  // namespace starnix
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
