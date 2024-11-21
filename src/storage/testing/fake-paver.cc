@@ -23,13 +23,6 @@ void FakePaver::FindDataSink(FindDataSinkRequestView request,
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(request->data_sink.TakeChannel()), this);
 }
 
-void FakePaver::FindDynamicDataSink(FindDynamicDataSinkRequestView request,
-                                    FindDynamicDataSinkCompleter::Sync& _completer) {
-  fidl::BindServer(
-      dispatcher_,
-      fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(request->data_sink.TakeChannel()), this);
-}
-
 void FakePaver::UseBlockDevice(UseBlockDeviceRequestView request,
                                UseBlockDeviceCompleter::Sync& _completer) {
   auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
