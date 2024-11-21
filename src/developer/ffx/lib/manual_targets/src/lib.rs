@@ -32,8 +32,8 @@ pub trait ManualTargets: Sync {
             .await
             .unwrap_or_else(|_| Value::default())
             .as_object()
-            .unwrap_or(&Map::new())
-            .clone()
+            .cloned()
+            .unwrap_or_default()
     }
 
     async fn add(&self, target: String, expiry: Option<u64>) -> Result<()> {

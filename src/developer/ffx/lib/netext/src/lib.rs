@@ -323,7 +323,7 @@ fn ifaddr_to_socketaddr(ifaddr: InterfaceAddress) -> Option<std::net::SocketAddr
 /// scope_id_to_name attempts to convert a scope_id to an interface name, otherwise it returns the
 /// scopeid formatted as a string.
 pub fn scope_id_to_name(scope_id: u32) -> String {
-    scope_id_to_name_checked(scope_id).unwrap_or(format!("{scope_id}"))
+    scope_id_to_name_checked(scope_id).unwrap_or_else(|_| scope_id.to_string())
 }
 
 fn scope_id_to_name_checked(scope_id: u32) -> Result<String> {

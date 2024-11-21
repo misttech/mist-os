@@ -155,8 +155,8 @@ impl MockPeer {
             .service_mgr
             .read()
             .get_service_ids_for_registration_handle(&registration_handle)
-            .unwrap_or(&HashSet::new())
-            .clone();
+            .cloned()
+            .unwrap_or_default();
         let closed_fut = {
             let peer_id = self.id.clone();
             let reg_handle_clone = registration_handle.clone();

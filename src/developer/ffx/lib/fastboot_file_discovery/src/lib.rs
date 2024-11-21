@@ -85,10 +85,10 @@ impl FromStr for FastbootEntry {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (connection_type_addr, port_str) = s
             .rsplit_once(':')
-            .ok_or(ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
+            .ok_or_else(|| ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
         let (connection_type, addr) = connection_type_addr
             .rsplit_once(':')
-            .ok_or(ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
+            .ok_or_else(|| ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
 
         let port = port_str.parse::<u16>()?;
         let mode = connection_type.parse::<FastbootMode>()?;

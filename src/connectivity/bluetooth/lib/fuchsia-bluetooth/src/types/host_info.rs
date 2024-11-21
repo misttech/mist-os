@@ -95,6 +95,7 @@ impl fmt::Display for HostInfo {
         writeln!(fmt, "\taddresses:\t{}", addresses_to_custom_string(&self.addresses, "\n\t\t\t"))?;
         writeln!(fmt, "\tactive:\t{}", self.active)?;
         writeln!(fmt, "\ttechnology:\t{:?}", self.technology)?;
+        #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717320)
         writeln!(
             fmt,
             "\tlocal name:\t{}",

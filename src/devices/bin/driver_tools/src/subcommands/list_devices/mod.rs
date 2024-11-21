@@ -102,6 +102,7 @@ impl DevicePrinter for Device {
         if let Some(ref offer_list) = self.0.offer_list {
             println!("{} Offers", offer_list.len());
             for i in 0..offer_list.len() {
+                #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379716593)
                 if let fdecl::Offer::Service(service) = &offer_list[i] {
                     println!(
                         "Service: {}",

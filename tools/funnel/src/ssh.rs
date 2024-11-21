@@ -134,8 +134,9 @@ fn build_ssh_args<W: Write>(
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
     addrs.sort_by(|a, b| b.cmp(a));
 
-    let target_ip =
-        addrs.first().ok_or(TunnelError::NoAddressesError { target: target.nodename.clone() })?;
+    let target_ip = addrs
+        .first()
+        .ok_or_else(|| TunnelError::NoAddressesError { target: target.nodename.clone() })?;
 
     if addrs.len() > 1 {
         tracing::warn!(

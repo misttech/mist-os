@@ -2017,7 +2017,7 @@ impl FuseMutableState {
         let is_async = operation.is_async();
         if header.error < 0 {
             log_trace!("Fuse: {operation:?} -> {header:?}");
-            let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
+            let code = i16::try_from(-header.error).unwrap_or_else(|_| EINVAL.error_code() as i16);
             let errno = errno_from_code!(code);
             let response = operation.handle_error(&mut self.operations_state, errno);
             if is_async {

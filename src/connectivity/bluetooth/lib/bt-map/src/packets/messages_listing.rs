@@ -640,7 +640,7 @@ impl MessagesListing {
         let version_attr = &attributes
             .iter()
             .find(|a| a.name.local_name == VERSION_ATTR)
-            .ok_or(Error::MissingData(VERSION_ATTR.to_string()))?
+            .ok_or_else(|| Error::MissingData(VERSION_ATTR.to_string()))?
             .value;
         str::parse(version_attr.as_str())
     }

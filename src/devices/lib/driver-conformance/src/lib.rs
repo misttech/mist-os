@@ -211,6 +211,7 @@ async fn get_driver_and_devices(
         }
     }
 
+    #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379716593)
     match (driver_info, device_list) {
         (Some(driver), Some(devices)) => {
             println!(

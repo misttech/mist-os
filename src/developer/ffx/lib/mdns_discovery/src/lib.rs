@@ -56,6 +56,7 @@ impl CachedTarget {
 
 impl Hash for CachedTarget {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
         self.target.nodename.as_ref().unwrap_or(&"<unknown>".to_string()).hash(state);
     }
 }
@@ -690,8 +691,8 @@ async fn recv_loop(
                 tracing::trace!(
                     "unable to parse message received on {} from {}: {:?}",
                     sock.local_addr()
-                        .map(|s| format!("{}", s))
-                        .unwrap_or(format!("fd:{}", sock.as_raw_fd())),
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|_| format!("fd:{}", sock.as_raw_fd())),
                     addr,
                     e
                 );
@@ -711,6 +712,7 @@ async fn recv_loop(
         }
 
         if let Some(mdns_protocol) = mdns_protocol.upgrade() {
+            #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
             if let Some((t, ttl)) = make_target(addr, msg) {
                 tracing::trace!(
                     "packet from {} ({}) on {}",

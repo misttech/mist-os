@@ -329,6 +329,7 @@ enum RasterBuilderInner {
 impl RasterBuilder {
     /// Add a path to the raster with optional transform.
     pub fn add(&mut self, path: &Path, transform: Option<&Transform2D<f32>>) -> &mut Self {
+        #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717231)
         self.add_with_transform(path, transform.unwrap_or(&Transform2D::identity()))
     }
     /// Add a path to the raster with transform.

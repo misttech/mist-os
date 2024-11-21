@@ -283,6 +283,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
 
 fn ir_files_list(env_ctx: &EnvironmentContext) -> Option<Vec<String>> {
     let mut ir_files = Vec::new();
+    #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
     let build_dir = env_ctx.build_dir().unwrap_or(&std::path::Path::new(""));
     let all_fidl_json_path = build_dir.join("all_fidl_json.txt");
     match std::fs::read_to_string(all_fidl_json_path) {

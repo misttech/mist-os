@@ -297,7 +297,7 @@ impl<'a> FakeQueue<'a> {
             // If a specific next descriptor was supplied by the chain then use it, otherwise
             // calculate the actual next index we will insert.
             let next_desc = if has_next {
-                desc.next.unwrap_or(ring_index.wrapping_add(1) % self.queue_size)
+                desc.next.unwrap_or_else(|| ring_index.wrapping_add(1) % self.queue_size)
             } else {
                 0
             };

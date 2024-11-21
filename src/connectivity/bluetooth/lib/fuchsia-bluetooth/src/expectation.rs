@@ -157,7 +157,7 @@ where
                 t.into_iter().enumerate().filter_map(|(i, el)| falsify_elem(&self, i, &el, doc)),
                 doc,
             )
-            .or(Some(doc.text("<empty>")))
+            .or_else(|| Some(doc.text("<empty>")))
         }
     }
 }
@@ -223,7 +223,7 @@ where
                 iter.clone().enumerate().filter_map(|(i, el)| falsify_elem(&self.0, i, &el, doc)),
                 doc,
             )
-            .or(Some(doc.text("<empty>")))
+            .or_else(|| Some(doc.text("<empty>")))
         }
     }
 }

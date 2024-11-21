@@ -136,8 +136,12 @@ impl Display for ShowDetail {
             ShowDetail::All => write!(f, "ShowDetail::All is a metavalue")?,
             ShowDetail::Cmd { program, args, env } => {
                 writeln!(f, "Command:")?;
-                writeln!(f, "\tProgram: {}", program.as_ref().unwrap_or(&String::from("")))?;
-                writeln!(f, "\tArguments: {}", args.as_ref().unwrap_or(&vec![]).join(" "))?;
+                writeln!(f, "\tProgram: {}", program.as_ref().map_or("", String::as_str))?;
+                writeln!(
+                    f,
+                    "\tArguments: {}",
+                    args.as_ref().map_or_else(|| "".to_owned(), |args| args.join(" "))
+                )?;
                 writeln!(f, "\tEnvironment:")?;
                 if let Some(env_map) = env {
                     for (k, v) in env_map {

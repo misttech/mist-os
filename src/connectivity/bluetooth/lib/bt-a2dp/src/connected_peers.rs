@@ -80,7 +80,7 @@ impl DiscoveredPeers {
     ) {
         self.stats
             .entry(id)
-            .or_insert({
+            .or_insert_with(|| {
                 let mut new_stats = PeerStats::new(id);
                 let _ = new_stats.iattach(&self.inspect_node, inspect::unique_name("peer_"));
                 new_stats

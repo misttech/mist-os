@@ -13,7 +13,7 @@ pub struct FeatureSet(Vec<Feature>);
 
 impl FeatureSet {
     /// Create an empty FeatureSet.
-    pub fn empty() -> FeatureSet {
+    pub const fn empty() -> FeatureSet {
         FeatureSet(Vec::new())
     }
 
