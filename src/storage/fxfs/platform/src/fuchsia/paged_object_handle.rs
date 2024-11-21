@@ -6,7 +6,7 @@ use crate::fuchsia::pager::{
     MarkDirtyRange, Pager, PagerBacked, PagerVmoStatsOptions, VmoDirtyRange,
 };
 use crate::fuchsia::volume::FxVolume;
-use anyhow::{ensure, Context, Error};
+use anyhow::{anyhow, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::MAX_FILE_SIZE;
@@ -872,8 +872,10 @@ impl PagedObjectHandle {
     }
 
     /// Pre-allocate a region of this file on-disk.
-    #[cfg(test)]
     pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
+        if range.start == range.end {
+            return Err(anyhow!(FxfsError::InvalidArgs));
+        }
         // Flushing relies on the allocated ranges to determine flush batching, so we grab the same
         // lock as flushing to make sure they are mutually exclusive.
         let store = self.store();
