@@ -1866,6 +1866,7 @@ async fn test_omaha_client_policy_config_inspect() {
                 "startup_delay": 61u64,
                 "retry_delay": 5 * 60u64,
                 "allow_reboot_when_idle": false,
+                "fuzz_percentage_range": 25u64,
             }
         }
     );
