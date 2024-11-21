@@ -238,6 +238,25 @@ async fn test_read_link_error() {
                 Ok(())
             });
         }
+
+        fn open3(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            path: Path,
+            flags: fio::Flags,
+            object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            if !path.is_empty() {
+                return Err(Status::NOT_DIR);
+            }
+            scope.spawn(vfs::symlink::Connection::create(
+                scope.clone(),
+                self,
+                &flags,
+                object_request,
+            )?);
+            Ok(())
+        }
     }
 
     impl DirectoryEntry for ErrorSymlink {
