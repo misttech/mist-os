@@ -724,7 +724,6 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
 
  protected:
   friend class VmAspace;
-  friend void vm_init_preheap_vmars();
   friend lazy_init::Access;
 
   // constructor for use in creating the kernel aspace singleton

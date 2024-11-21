@@ -1997,9 +1997,9 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   END_TEST;
 }
 
-// Test to make sure all the vm kernel regions (code, rodata, data, bss, etc.) is correctly mapped
-// in vm and has the correct arch_mmu_flags. This test also check that all gaps are contained within
-// a VMAR.
+// Test to make sure all the vm kernel regions (code, rodata, data, bss, etc.) are correctly mapped
+// in vm and have the correct arch_mmu_flags. This test also check that all gaps are contained
+// within a VMAR.
 static bool vm_kernel_region_test() {
   BEGIN_TEST;
 

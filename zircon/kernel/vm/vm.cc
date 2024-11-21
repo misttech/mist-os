@@ -48,6 +48,7 @@ paddr_t kernel_base_phys;
 // construct an array of kernel program segment descriptors for use here
 // and elsewhere
 namespace {
+
 const ktl::array _kernel_regions = {
     kernel_region{
         .name = "kernel_code",
@@ -74,72 +75,25 @@ const ktl::array _kernel_regions = {
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
     },
 };
+
+// The VMAR containing the kernel's load image and the physmap, respectively.
+fbl::RefPtr<VmAddressRegion> kernel_image_vmar, physmap_vmar;
+
 }  // namespace
+
 const ktl::span<const kernel_region> kernel_regions{_kernel_regions};
 
-namespace {
+void vm_init_preheap() {}
 
-// Declare storage for vmars that make up the statically known initial kernel regions. These are
-// used to roughly sketch out and reserve portions of the kernel's aspace before we have the heap.
-lazy_init::LazyInit<VmAddressRegion> kernel_physmap_vmar;
-lazy_init::LazyInit<VmAddressRegion> kernel_image_vmar;
-
-}  // namespace
-
-// Initializes the statically known initial kernel region vmars. It needs to be global so that
-// VmAddressRegion can friend it.
-void vm_init_preheap_vmars() {
-  fbl::RefPtr<VmAddressRegion> root_vmar = VmAspace::kernel_aspace()->RootVmar();
-
-  // For VMARs that we are just reserving we request full RWX permissions. This will get refined
-  // later in the proper vm_init.
-  constexpr uint32_t kKernelVmarFlags = VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_CAN_RWX_FLAGS;
-
-  // Hold the vmar in a temporary refptr until we can activate it. Activating it will cause the
-  // address space to acquire a refptr allowing us to then safely drop our ref without triggering
-  // the object to get destroyed.
-  fbl::RefPtr<VmAddressRegion> vmar =
-      fbl::AdoptRef<VmAddressRegion>(&kernel_physmap_vmar.Initialize(
-          *root_vmar, PHYSMAP_BASE, PHYSMAP_SIZE, kKernelVmarFlags, "physmap vmar"));
-  {
-    Guard<CriticalMutex> guard(kernel_physmap_vmar->lock());
-    kernel_physmap_vmar->Activate();
-  }
-
-  // |kernel_image_size| is the size in bytes of the region of memory occupied by the kernel
-  // program's various segments (code, rodata, data, bss, etc.), inclusive of any gaps between
-  // them.
-  const size_t kernel_image_size = get_kernel_size();
-  const uintptr_t kernel_vaddr = reinterpret_cast<uintptr_t>(__executable_start);
-  // Create a VMAR that covers the address space occupied by the kernel program segments (code,
-  // rodata, data, bss ,etc.). By creating this VMAR, we are effectively marking these addresses as
-  // off limits to the VM. That way, the VM won't inadvertently use them for something else. This is
-  // consistent with the initial mapping in start.S where the whole kernel region mapping was
-  // written into the page table.
-  //
-  // Note: Even though there might be usable gaps in between the segments, we're covering the whole
-  // regions. The thinking is that it's both simpler and safer to not use the address space that
-  // exists between kernel program segments.
-  vmar = fbl::AdoptRef<VmAddressRegion>(&kernel_image_vmar.Initialize(
-      *root_vmar, kernel_vaddr, kernel_image_size, kKernelVmarFlags, "kernel region vmar"));
-  {
-    Guard<CriticalMutex> guard(kernel_image_vmar->lock());
-    kernel_image_vmar->Activate();
-  }
-}
-
-void vm_init_preheap() {
+// Global so that it can be friended by VmAddressRegion.
+void vm_init() {
   LTRACE_ENTRY;
 
-  // allow the vmm a shot at initializing some of its data structures
-  VmAspace::KernelAspaceInitPreHeap();
-
-  vm_init_preheap_vmars();
-
-  zx_status_t status;
+  // Initialize VMM data structures.
+  VmAspace::KernelAspaceInit();
 
   // grab a page and mark it as the zero page
-  status = pmm_alloc_page(0, &zero_page, &zero_page_paddr);
+  zx_status_t status = pmm_alloc_page(0, &zero_page, &zero_page_paddr);
   DEBUG_ASSERT(status == ZX_OK);
 
   // consider the zero page a wired page part of the kernel.
@@ -149,19 +103,21 @@ void vm_init_preheap() {
   DEBUG_ASSERT(ptr);
 
   arch_zero_page(ptr);
-}
 
-void vm_init() {
-  LTRACE_ENTRY;
+  fbl::RefPtr<VmAddressRegion> root_vmar = VmAspace::kernel_aspace()->RootVmar();
 
-  // Protect the regions of the physmap that are not backed by normal memory.
-  //
-  // See the comments for |phsymap_protect_non_arena_regions| for why we're doing this.
-  //
-  physmap_protect_non_arena_regions();
+  // Full RWX permissions, to be refined by individual kernel regions.
+  constexpr uint32_t kKernelVmarFlags =
+      VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_CAN_RWX_FLAGS;
 
-  // Mark the physmap no-execute.
-  physmap_protect_arena_regions_noexecute();
+  // |kernel_image_size| is the size in bytes of the region of memory occupied by the kernel
+  // program's various segments (code, rodata, data, bss, etc.), inclusive of any gaps between
+  // them.
+  const size_t kernel_image_size = get_kernel_size();
+  const uintptr_t kernel_vaddr = reinterpret_cast<uintptr_t>(__executable_start);
+  status = root_vmar->CreateSubVmar(kernel_vaddr - root_vmar->base(), kernel_image_size, 0,
+                                    kKernelVmarFlags, "kernel region vmar", &kernel_image_vmar);
+  ASSERT(status == ZX_OK);
 
   // Finish reserving the sections in the kernel_region
   for (const auto& region : kernel_regions) {
@@ -174,8 +130,8 @@ void vm_init() {
     dprintf(ALWAYS,
             "VM: reserving kernel region [%#" PRIxPTR ", %#" PRIxPTR ") flags %#x name '%s'\n",
             region.base, region.base + region.size, region.arch_mmu_flags, region.name);
-    zx_status_t status = kernel_image_vmar->ReserveSpace(region.name, region.base, region.size,
-                                                         region.arch_mmu_flags);
+    status = kernel_image_vmar->ReserveSpace(region.name, region.base, region.size,
+                                             region.arch_mmu_flags);
     ASSERT(status == ZX_OK);
 
 #if __has_feature(address_sanitizer)
@@ -183,10 +139,20 @@ void vm_init() {
 #endif  // __has_feature(address_sanitizer)
   }
 
-  // Finishing reserving the physmap
-  zx_status_t status = kernel_physmap_vmar->ReserveSpace(
-      "physmap", PHYSMAP_BASE, PHYSMAP_SIZE, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
+  constexpr uint32_t kPhysmapVmarFlags = VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC |
+                                         VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE;
+  status = root_vmar->CreateSubVmar(PHYSMAP_BASE - root_vmar->base(), PHYSMAP_SIZE, 0,
+                                    kPhysmapVmarFlags, "physmap", &physmap_vmar);
   ASSERT(status == ZX_OK);
+
+  // Protect the regions of the physmap that are not backed by normal memory.
+  //
+  // See the comments for |phsymap_protect_non_arena_regions| for why we're doing this.
+  //
+  physmap_protect_non_arena_regions();
+
+  // Mark the physmap no-execute.
+  physmap_protect_arena_regions_noexecute();
 
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
 }
