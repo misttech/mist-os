@@ -234,8 +234,15 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
   VmObject::AttributionCounts counts = ownership == VmoOwnership::kIoBuffer
                                            ? vmo->GetAttributedMemoryInReferenceOwner()
                                            : vmo->GetAttributedMemory();
+  const vm::FractionalBytes total_scaled_bytes = counts.total_scaled_bytes();
   entry.committed_bytes = counts.uncompressed_bytes;
-  entry.populated_bytes = counts.compressed_bytes + counts.uncompressed_bytes;
+  entry.populated_bytes = counts.total_bytes();
+  entry.committed_private_bytes = counts.private_uncompressed_bytes;
+  entry.populated_private_bytes = counts.total_private_bytes();
+  entry.committed_scaled_bytes = counts.scaled_uncompressed_bytes.integral;
+  entry.populated_scaled_bytes = total_scaled_bytes.integral;
+  entry.committed_fractional_scaled_bytes = counts.scaled_uncompressed_bytes.fractional.raw_value();
+  entry.populated_fractional_scaled_bytes = total_scaled_bytes.fractional.raw_value();
   entry.cache_policy = vmo->GetMappingCachePolicy();
   switch (ownership) {
     case VmoOwnership::kHandle:

@@ -152,6 +152,26 @@ inline zx_info_vmo_v2_t VmoInfoToVersion(const zx_info_vmo_t& vmo) {
   return vmo_v2;
 }
 
+template <>
+inline zx_info_vmo_v3_t VmoInfoToVersion(const zx_info_vmo_t& vmo) {
+  zx_info_vmo_v3_t vmo_v3 = {};
+  vmo_v3.koid = vmo.koid;
+  memcpy(vmo_v3.name, vmo.name, sizeof(vmo.name));
+  vmo_v3.size_bytes = vmo.size_bytes;
+  vmo_v3.parent_koid = vmo.parent_koid;
+  vmo_v3.num_children = vmo.num_children;
+  vmo_v3.num_mappings = vmo.num_mappings;
+  vmo_v3.share_count = vmo.share_count;
+  vmo_v3.flags = vmo.flags;
+  vmo_v3.committed_bytes = vmo.committed_bytes;
+  vmo_v3.handle_rights = vmo.handle_rights;
+  vmo_v3.cache_policy = vmo.cache_policy;
+  vmo_v3.metadata_bytes = vmo.metadata_bytes;
+  vmo_v3.committed_change_events = vmo.committed_change_events;
+  vmo_v3.populated_bytes = vmo.populated_bytes;
+  return vmo_v3;
+}
+
 // Specialize the VmoInfoWriter to work for any T that is a subset of zx_info_vmo_t. This is
 // currently true for v1 and v2 (v2 being the current version). Being a subset the full
 // zx_info_vmo_t can just be casted and copied.
@@ -183,6 +203,7 @@ template <>
 inline zx_info_maps_t MapsInfoToVersion(const zx_info_maps_t& maps) {
   return maps;
 }
+
 template <>
 inline zx_info_maps_v1_t MapsInfoToVersion(const zx_info_maps_t& maps) {
   zx_info_maps_v1_t maps_v1 = {};
@@ -194,8 +215,24 @@ inline zx_info_maps_v1_t MapsInfoToVersion(const zx_info_maps_t& maps) {
   maps_v1.u.mapping.mmu_flags = maps.u.mapping.mmu_flags;
   maps_v1.u.mapping.vmo_koid = maps.u.mapping.vmo_koid;
   maps_v1.u.mapping.vmo_offset = maps.u.mapping.vmo_offset;
-  maps_v1.u.mapping.committed_pages = maps.u.mapping.committed_pages;
+  maps_v1.u.mapping.committed_pages = maps.u.mapping.committed_bytes >> PAGE_SIZE_SHIFT;
   return maps_v1;
+}
+
+template <>
+inline zx_info_maps_v2_t MapsInfoToVersion(const zx_info_maps_t& maps) {
+  zx_info_maps_v2_t maps_v2 = {};
+  memcpy(maps_v2.name, maps.name, sizeof(maps.name));
+  maps_v2.base = maps.base;
+  maps_v2.size = maps.size;
+  maps_v2.depth = maps.depth;
+  maps_v2.type = maps.type;
+  maps_v2.u.mapping.mmu_flags = maps.u.mapping.mmu_flags;
+  maps_v2.u.mapping.vmo_koid = maps.u.mapping.vmo_koid;
+  maps_v2.u.mapping.vmo_offset = maps.u.mapping.vmo_offset;
+  maps_v2.u.mapping.committed_pages = maps.u.mapping.committed_bytes >> PAGE_SIZE_SHIFT;
+  maps_v2.u.mapping.populated_pages = maps.u.mapping.populated_bytes >> PAGE_SIZE_SHIFT;
+  return maps_v2;
 }
 
 template <typename T>
@@ -467,24 +504,34 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
+    case ZX_INFO_TASK_STATS_V1:
     case ZX_INFO_TASK_STATS: {
-      // TODO(https://fxbug.dev/42105279): Handle forward/backward compatibility issues
-      // with changes to the struct.
-
       // Grab a reference to the dispatcher. Only supports processes for
       // now, but could support jobs or threads in the future.
       fbl::RefPtr<ProcessDispatcher> process;
       auto error =
           up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &process);
-      if (error != ZX_OK)
+      if (error != ZX_OK) {
         return error;
+      }
 
       // Build the info structure.
       zx_info_task_stats_t info = {};
 
       auto err = process->GetStats(&info);
-      if (err != ZX_OK)
+      if (err != ZX_OK) {
         return err;
+      }
+
+      if (topic == ZX_INFO_TASK_STATS_V1) {
+        zx_info_task_stats_v1 info_v1 = {
+            .mem_mapped_bytes = info.mem_mapped_bytes,
+            .mem_private_bytes = info.mem_private_bytes,
+            .mem_shared_bytes = info.mem_shared_bytes,
+            .mem_scaled_shared_bytes = info.mem_scaled_shared_bytes,
+        };
+        return single_record_result(_buffer, buffer_size, _actual, _avail, info_v1);
+      }
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
@@ -546,12 +593,14 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return status;
     }
     case ZX_INFO_PROCESS_MAPS_V1:
+    case ZX_INFO_PROCESS_MAPS_V2:
     case ZX_INFO_PROCESS_MAPS: {
       fbl::RefPtr<ProcessDispatcher> process;
       zx_status_t status =
           up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &process);
-      if (status != ZX_OK)
+      if (status != ZX_OK) {
         return status;
+      }
 
       size_t count = 0;
       size_t avail = 0;
@@ -561,11 +610,17 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
             _buffer.reinterpret<zx_info_maps_v1_t>()};
         count = buffer_size / sizeof(zx_info_maps_v1_t);
         status = process->GetAspaceMaps(writer, count, &count, &avail);
+      } else if (topic == ZX_INFO_PROCESS_MAPS_V2) {
+        SubsetVmarMapsInfoWriter<zx_info_maps_v2_t> writer{
+            _buffer.reinterpret<zx_info_maps_v2_t>()};
+        count = buffer_size / sizeof(zx_info_maps_v2_t);
+        status = process->GetAspaceMaps(writer, count, &count, &avail);
       } else {
         SubsetVmarMapsInfoWriter<zx_info_maps_t> writer{_buffer.reinterpret<zx_info_maps_t>()};
         count = buffer_size / sizeof(zx_info_maps_t);
         status = process->GetAspaceMaps(writer, count, &count, &avail);
       }
+
       if (_actual) {
         zx_status_t copy_status = _actual.copy_to_user(count);
         if (copy_status != ZX_OK)
@@ -580,12 +635,14 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
     }
     case ZX_INFO_PROCESS_VMOS_V1:
     case ZX_INFO_PROCESS_VMOS_V2:
+    case ZX_INFO_PROCESS_VMOS_V3:
     case ZX_INFO_PROCESS_VMOS: {
       fbl::RefPtr<ProcessDispatcher> process;
       zx_status_t status =
           up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &process);
-      if (status != ZX_OK)
+      if (status != ZX_OK) {
         return status;
+      }
 
       size_t count = 0;
       size_t avail = 0;
@@ -597,6 +654,10 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       } else if (topic == ZX_INFO_PROCESS_VMOS_V2) {
         SubsetVmoInfoWriter<zx_info_vmo_v2_t> writer{_buffer.reinterpret<zx_info_vmo_v2_t>()};
         count = buffer_size / sizeof(zx_info_vmo_v2_t);
+        status = process->GetVmos(writer, count, &count, &avail);
+      } else if (topic == ZX_INFO_PROCESS_VMOS_V3) {
+        SubsetVmoInfoWriter<zx_info_vmo_v3_t> writer{_buffer.reinterpret<zx_info_vmo_v3_t>()};
+        count = buffer_size / sizeof(zx_info_vmo_v3_t);
         status = process->GetVmos(writer, count, &count, &avail);
       } else {
         SubsetVmoInfoWriter<zx_info_vmo_t> writer{_buffer.reinterpret<zx_info_vmo_t>()};
@@ -618,6 +679,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
     }
     case ZX_INFO_VMO_V1:
     case ZX_INFO_VMO_V2:
+    case ZX_INFO_VMO_V3:
     case ZX_INFO_VMO: {
       // lookup the dispatcher from handle
       fbl::RefPtr<VmObjectDispatcher> vmo;
@@ -633,6 +695,10 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       } else if (topic == ZX_INFO_VMO_V2) {
         zx_info_vmo_v2_t versioned_vmo = VmoInfoToVersion<zx_info_vmo_v2_t>(entry);
         // The V2 layout is a subset of V3
+        return single_record_result(_buffer, buffer_size, _actual, _avail, versioned_vmo);
+      } else if (topic == ZX_INFO_VMO_V3) {
+        zx_info_vmo_v3_t versioned_vmo = VmoInfoToVersion<zx_info_vmo_v3_t>(entry);
+        // The V3 layout is a subset of V4
         return single_record_result(_buffer, buffer_size, _actual, _avail, versioned_vmo);
       } else {
         return single_record_result(_buffer, buffer_size, _actual, _avail, entry);

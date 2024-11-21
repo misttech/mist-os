@@ -1073,14 +1073,20 @@ class MapBuilder final
     entry->depth = depth + FirstNodeDepth;
     entry->type = ZX_INFO_MAPS_TYPE_MAPPING;
     zx_info_maps_mapping_t* u = &entry->u.mapping;
-    u->mmu_flags = arch_mmu_flags_to_vm_flags(region_mmu_flags), u->vmo_koid = vmo->user_id();
+    u->mmu_flags = arch_mmu_flags_to_vm_flags(region_mmu_flags);
+    u->vmo_koid = vmo->user_id();
+    u->vmo_offset = region_object_offset;
     const VmObject::AttributionCounts counts =
         vmo->GetAttributedMemoryInRange(region_object_offset, region_size);
-    const size_t committed_pages = counts.uncompressed_bytes / PAGE_SIZE;
-    const size_t compressed_pages = counts.compressed_bytes / PAGE_SIZE;
-    u->committed_pages = committed_pages;
-    u->populated_pages = committed_pages + compressed_pages;
-    u->vmo_offset = region_object_offset;
+    const vm::FractionalBytes total_scaled_bytes = counts.total_scaled_bytes();
+    u->committed_bytes = counts.uncompressed_bytes;
+    u->populated_bytes = counts.total_bytes();
+    u->committed_private_bytes = counts.private_uncompressed_bytes;
+    u->populated_private_bytes = counts.total_private_bytes();
+    u->committed_scaled_bytes = counts.scaled_uncompressed_bytes.integral;
+    u->populated_scaled_bytes = total_scaled_bytes.integral;
+    u->committed_fractional_scaled_bytes = counts.scaled_uncompressed_bytes.fractional.raw_value();
+    u->populated_fractional_scaled_bytes = total_scaled_bytes.fractional.raw_value();
   }
 
  protected:

@@ -216,6 +216,7 @@ impl From<zx::TaskStatsInfo> for MemoryUsage {
             mem_private_bytes,
             mem_shared_bytes,
             mem_scaled_shared_bytes: _,
+            mem_fractional_scaled_shared_bytes: _,
         } = info;
         Self { private_bytes: mem_private_bytes, shared_bytes: mem_shared_bytes }
     }

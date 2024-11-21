@@ -176,9 +176,8 @@ ErrOr<OneStackUsage> GetUsageForStackPointer(const std::vector<debug_ipc::Addres
   OneStackUsage result;
   result.total = region_or->size;
   result.used = stack_base - stack_pointer;
-  result.committed = region_or->committed_pages * page_size;
-  uint64_t used_pages = (result.used + page_size - 1) / page_size;
-  result.wasted = (region_or->committed_pages - used_pages) * page_size;
+  result.committed = region_or->committed_bytes;
+  result.wasted = result.committed - result.used;
 
   return result;
 }

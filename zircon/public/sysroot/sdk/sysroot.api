@@ -186,7 +186,7 @@
   "include/zircon/syscalls/iob.h": "222f568a237fabcdf20a3ae891ae19a8",
   "include/zircon/syscalls/iommu.h": "a6cc36174b0b1d5c34877f05d047bbc3",
   "include/zircon/syscalls/log.h": "1f6619faeaf65dd53f73cca4c107b4d2",
-  "include/zircon/syscalls/object.h": "1df0b0a0d3dabdebcb9af2341cc05cdf",
+  "include/zircon/syscalls/object.h": "08a72e0d250ddafd79d32c2028cc3daa",
   "include/zircon/syscalls/pci.h": "499fd335372c6d103779f18dfb35d971",
   "include/zircon/syscalls/policy.h": "1c5bc1d4a3a90fe3f26645ebced5c1c3",
   "include/zircon/syscalls/port.h": "45ec2e0484c8b96245f91cf57d69bd15",

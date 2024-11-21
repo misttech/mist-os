@@ -331,7 +331,7 @@ class ProcessDumper : public DumperBase {
 
   fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneDefault(
       zxdump::SegmentDisposition segment, const zx_info_maps_t& mapping, const zx_info_vmo_t& vmo) {
-    if (mapping.u.mapping.committed_pages == 0 &&   // No private RAM here,
+    if (mapping.u.mapping.committed_bytes == 0 &&   // No private RAM here,
         vmo.parent_koid == ZX_KOID_INVALID &&       // and none shared,
         !(vmo.flags & ZX_INFO_VMO_PAGER_BACKED)) {  // and no backing store.
       // Since it's not pager-backed, there isn't data hidden in backing

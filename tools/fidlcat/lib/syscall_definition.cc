@@ -531,8 +531,29 @@ class ZxInfoMapsMapping : public Class<zx_info_maps_mapping_t> {
   static zx_vm_option_t mmu_flags(const zx_info_maps_mapping_t* from) { return from->mmu_flags; }
   static zx_koid_t vmo_koid(const zx_info_maps_mapping_t* from) { return from->vmo_koid; }
   static uint64_t vmo_offset(const zx_info_maps_mapping_t* from) { return from->vmo_offset; }
-  static size_t committed_pages(const zx_info_maps_mapping_t* from) {
-    return from->committed_pages;
+  static size_t committed_bytes(const zx_info_maps_mapping_t* from) {
+    return from->committed_bytes;
+  }
+  static size_t populated_bytes(const zx_info_maps_mapping_t* from) {
+    return from->populated_bytes;
+  }
+  static size_t committed_private_bytes(const zx_info_maps_mapping_t* from) {
+    return from->committed_private_bytes;
+  }
+  static size_t populated_private_bytes(const zx_info_maps_mapping_t* from) {
+    return from->populated_private_bytes;
+  }
+  static size_t committed_scaled_bytes(const zx_info_maps_mapping_t* from) {
+    return from->committed_scaled_bytes;
+  }
+  static size_t populated_scaled_bytes(const zx_info_maps_mapping_t* from) {
+    return from->populated_scaled_bytes;
+  }
+  static size_t committed_fractional_scaled_bytes(const zx_info_maps_mapping_t* from) {
+    return from->committed_fractional_scaled_bytes;
+  }
+  static size_t populated_fractional_scaled_bytes(const zx_info_maps_mapping_t* from) {
+    return from->populated_fractional_scaled_bytes;
   }
 
  private:
@@ -544,7 +565,23 @@ class ZxInfoMapsMapping : public Class<zx_info_maps_mapping_t> {
     AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, uint64_t>>(
         "vmo_offset", SyscallType::kUint64, vmo_offset));
     AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
-        "committed_pages", SyscallType::kSize, committed_pages));
+        "committed_bytes", SyscallType::kSize, committed_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "populated_bytes", SyscallType::kSize, populated_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "committed_private_bytes", SyscallType::kSize, committed_private_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "populated_private_bytes", SyscallType::kSize, populated_private_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "committed_scaled_bytes", SyscallType::kSize, committed_scaled_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "populated_scaled_bytes", SyscallType::kSize, populated_scaled_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "committed_fractional_scaled_bytes", SyscallType::kSize,
+        committed_fractional_scaled_bytes));
+    AddField(std::make_unique<ClassField<zx_info_maps_mapping_t, size_t>>(
+        "populated_fractional_scaled_bytes", SyscallType::kSize,
+        populated_fractional_scaled_bytes));
   }
   ZxInfoMapsMapping(const ZxInfoMapsMapping&) = delete;
   ZxInfoMapsMapping& operator=(const ZxInfoMapsMapping&) = delete;
@@ -759,6 +796,9 @@ class ZxInfoTaskStats : public Class<zx_info_task_stats_t> {
   static size_t mem_scaled_shared_bytes(const zx_info_task_stats_t* from) {
     return from->mem_scaled_shared_bytes;
   }
+  static size_t mem_fractional_scaled_shared_bytes(const zx_info_task_stats_t* from) {
+    return from->mem_fractional_scaled_shared_bytes;
+  }
 
  private:
   ZxInfoTaskStats() : Class("zx_info_task_stats_t") {
@@ -770,6 +810,9 @@ class ZxInfoTaskStats : public Class<zx_info_task_stats_t> {
         "mem_shared_bytes", SyscallType::kSize, mem_shared_bytes));
     AddField(std::make_unique<ClassField<zx_info_task_stats_t, size_t>>(
         "mem_scaled_shared_bytes", SyscallType::kSize, mem_scaled_shared_bytes));
+    AddField(std::make_unique<ClassField<zx_info_task_stats_t, size_t>>(
+        "mem_fractional_scaled_shared_bytes", SyscallType::kSize,
+        mem_fractional_scaled_shared_bytes));
   }
   ZxInfoTaskStats(const ZxInfoTaskStats&) = delete;
   ZxInfoTaskStats& operator=(const ZxInfoTaskStats&) = delete;
@@ -959,6 +1002,22 @@ class ZxInfoVmo : public Class<zx_info_vmo_t> {
   static uint64_t metadata_bytes(const zx_info_vmo_t* from) { return from->metadata_bytes; }
   static uint64_t committed_change_events(const zx_info_vmo_t* from) {
     return from->committed_change_events;
+  }
+  static uint64_t populated_bytes(const zx_info_vmo_t* from) { return from->populated_bytes; }
+  static uint64_t committed_private_bytes(const zx_info_vmo_t* from) {
+    return from->committed_private_bytes;
+  }
+  static uint64_t committed_scaled_bytes(const zx_info_vmo_t* from) {
+    return from->committed_scaled_bytes;
+  }
+  static uint64_t populated_scaled_bytes(const zx_info_vmo_t* from) {
+    return from->populated_scaled_bytes;
+  }
+  static uint64_t committed_fractional_scaled_bytes(const zx_info_vmo_t* from) {
+    return from->committed_fractional_scaled_bytes;
+  }
+  static uint64_t populated_fractional_scaled_bytes(const zx_info_vmo_t* from) {
+    return from->populated_fractional_scaled_bytes;
   }
 
  private:

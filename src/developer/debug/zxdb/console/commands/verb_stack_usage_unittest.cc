@@ -63,8 +63,8 @@ TEST_F(VerbStackUsage, GetThreadStackUsage) {
   stack_region.size = kStackSize;
   stack_region.depth = 1;
   stack_region.vmo_koid = 45678;
-  constexpr uint64_t kCommittedPages = 3;
-  stack_region.committed_pages = kCommittedPages;
+  const uint64_t kCommittedBytes = 3 * kPageSize;
+  stack_region.committed_bytes = kCommittedBytes;
 
   // Unused region.
   debug_ipc::AddressRegion& other_region2 = aspace.emplace_back();
@@ -79,8 +79,8 @@ TEST_F(VerbStackUsage, GetThreadStackUsage) {
   unsafe_region.size = kUnsafeStackSize;
   unsafe_region.depth = 1;
   unsafe_region.vmo_koid = 64291;
-  constexpr uint64_t kUnsafeCommittedPages = 5;
-  unsafe_region.committed_pages = kUnsafeCommittedPages;
+  const uint64_t kUnsafeCommittedBytes = 5 * kPageSize;
+  unsafe_region.committed_bytes = kUnsafeCommittedBytes;
 
   // Good query.
   ThreadStackUsage usage =
@@ -88,14 +88,14 @@ TEST_F(VerbStackUsage, GetThreadStackUsage) {
   ASSERT_TRUE(usage.safe_stack.ok());
   EXPECT_EQ(usage.safe_stack.value().total, kStackSize);
   EXPECT_EQ(usage.safe_stack.value().used, kUsedBytes);
-  EXPECT_EQ(usage.safe_stack.value().committed, kCommittedPages * kPageSize);
-  EXPECT_EQ(usage.safe_stack.value().wasted, (kCommittedPages - 1) * kPageSize);
+  EXPECT_EQ(usage.safe_stack.value().committed, kCommittedBytes);
+  EXPECT_EQ(usage.safe_stack.value().wasted, kCommittedBytes - kUsedBytes);
 
   ASSERT_TRUE(usage.unsafe_stack.ok());
   EXPECT_EQ(usage.unsafe_stack.value().total, kUnsafeStackSize);
   EXPECT_EQ(usage.unsafe_stack.value().used, kUnsafeUsedBytes);
-  EXPECT_EQ(usage.unsafe_stack.value().committed, kUnsafeCommittedPages * kPageSize);
-  EXPECT_EQ(usage.unsafe_stack.value().wasted, (kUnsafeCommittedPages - 1) * kPageSize);
+  EXPECT_EQ(usage.unsafe_stack.value().committed, kUnsafeCommittedBytes);
+  EXPECT_EQ(usage.unsafe_stack.value().wasted, kUnsafeCommittedBytes - kUnsafeUsedBytes);
 }
 
 }  // namespace zxdb

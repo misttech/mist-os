@@ -85,11 +85,26 @@ static inline bool PollVmoNumChildren(const zx::vmo& vmo, size_t expected_num_ch
   });
 }
 
+// TODO(https://fxbug.dev/338300808): While in the transition phase for RFC-0254 the additional
+// attribution fields from the ZX_INFO_VMO query are not used, and we are in 'legacy attribution'
+// mode. This helper method validates that we are still using legacy attribution and can be removed
+// once legacy attribution is removed and the tests are updated to validate the new attribution
+// model.
+static inline void ValidateLegacyVmoAttribution(const zx_info_vmo_t& info) {
+  EXPECT_EQ(info.committed_fractional_scaled_bytes, UINT64_MAX);
+  EXPECT_EQ(info.populated_fractional_scaled_bytes, UINT64_MAX);
+  EXPECT_EQ(info.committed_private_bytes, 0);
+  EXPECT_EQ(info.populated_private_bytes, 0);
+  EXPECT_EQ(info.committed_scaled_bytes, 0);
+  EXPECT_EQ(info.populated_scaled_bytes, 0);
+}
+
 static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
   zx_info_vmo_t info;
   if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
     return UINT64_MAX;
   }
+  ValidateLegacyVmoAttribution(info);
   return info.populated_bytes;
 }
 
@@ -98,6 +113,7 @@ static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
 // Returns true on success, false on error.
 static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_populated_bytes) {
   return PollVmoInfoUntil(vmo, [&](const zx_info_vmo_t& info) {
+    ValidateLegacyVmoAttribution(info);
     if (info.populated_bytes == expected_populated_bytes) {
       return true;
     }

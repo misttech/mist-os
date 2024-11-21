@@ -40,6 +40,12 @@ pub struct VmoInfo {
     pub metadata_bytes: u64,
     pub committed_change_events: u64,
     pub populated_bytes: u64,
+    pub committed_private_bytes: u64,
+    pub populated_private_bytes: u64,
+    pub committed_scaled_bytes: u64,
+    pub populated_scaled_bytes: u64,
+    pub committed_fractional_scaled_bytes: u64,
+    pub populated_fractional_scaled_bytes: u64,
 }
 
 impl Default for VmoInfo {
@@ -65,6 +71,12 @@ impl From<sys::zx_info_vmo_t> for VmoInfo {
             metadata_bytes: info.metadata_bytes,
             committed_change_events: info.committed_change_events,
             populated_bytes: info.populated_bytes,
+            committed_private_bytes: info.committed_private_bytes,
+            populated_private_bytes: info.populated_private_bytes,
+            committed_scaled_bytes: info.committed_scaled_bytes,
+            populated_scaled_bytes: info.populated_scaled_bytes,
+            committed_fractional_scaled_bytes: info.committed_fractional_scaled_bytes,
+            populated_fractional_scaled_bytes: info.populated_fractional_scaled_bytes,
         }
     }
 }

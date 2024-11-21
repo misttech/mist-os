@@ -710,6 +710,7 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
 
   // Update the scaled bytes with the final total, after doing computations above in fixed-point.
   stats->mem_scaled_shared_bytes = scaled_shared_bytes.integral;
+  stats->mem_fractional_scaled_shared_bytes = usage.scaled_shared_bytes.fractional.raw_value();
 
   return ZX_OK;
 }

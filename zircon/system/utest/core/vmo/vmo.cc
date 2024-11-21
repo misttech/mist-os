@@ -2238,6 +2238,57 @@ TEST(VmoTestCase, V1Info) {
   EXPECT_EQ(v1info.cache_policy, info.cache_policy);
 }
 
+TEST(VmoTestCase, V2Info) {
+  zx::vmo vmo;
+  EXPECT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  // Check that the old info can be queried and makes sense
+  zx_info_vmo_v2_t v2info;
+  zx_info_vmo_t info;
+  EXPECT_OK(vmo.get_info(ZX_INFO_VMO_V2, &v2info, sizeof(v2info), nullptr, nullptr));
+  EXPECT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+
+  // Check a subset of the fields that we expect to be stable and non-racy between the two different
+  // get_info invocations.
+  EXPECT_EQ(v2info.koid, info.koid);
+  EXPECT_EQ(v2info.size_bytes, info.size_bytes);
+  EXPECT_EQ(v2info.parent_koid, info.parent_koid);
+  EXPECT_EQ(v2info.num_children, info.num_children);
+  EXPECT_EQ(v2info.num_mappings, info.num_mappings);
+  EXPECT_EQ(v2info.share_count, info.share_count);
+  EXPECT_EQ(v2info.flags, info.flags);
+  EXPECT_EQ(v2info.handle_rights, info.handle_rights);
+  EXPECT_EQ(v2info.cache_policy, info.cache_policy);
+  EXPECT_EQ(v2info.metadata_bytes, info.metadata_bytes);
+  EXPECT_EQ(v2info.committed_change_events, info.committed_change_events);
+}
+
+TEST(VmoTestCase, V3Info) {
+  zx::vmo vmo;
+  EXPECT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  // Check that the old info can be queried and makes sense
+  zx_info_vmo_v3_t v3info;
+  zx_info_vmo_t info;
+  EXPECT_OK(vmo.get_info(ZX_INFO_VMO_V3, &v3info, sizeof(v3info), nullptr, nullptr));
+  EXPECT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+
+  // Check a subset of the fields that we expect to be stable and non-racy between the two different
+  // get_info invocations.
+  EXPECT_EQ(v3info.koid, info.koid);
+  EXPECT_EQ(v3info.size_bytes, info.size_bytes);
+  EXPECT_EQ(v3info.parent_koid, info.parent_koid);
+  EXPECT_EQ(v3info.num_children, info.num_children);
+  EXPECT_EQ(v3info.num_mappings, info.num_mappings);
+  EXPECT_EQ(v3info.share_count, info.share_count);
+  EXPECT_EQ(v3info.flags, info.flags);
+  EXPECT_EQ(v3info.handle_rights, info.handle_rights);
+  EXPECT_EQ(v3info.cache_policy, info.cache_policy);
+  EXPECT_EQ(v3info.metadata_bytes, info.metadata_bytes);
+  EXPECT_EQ(v3info.committed_change_events, info.committed_change_events);
+  EXPECT_EQ(v3info.populated_bytes, info.populated_bytes);
+}
+
 TEST(VmoTestCase, Discardable) {
   // Create a discardable VMO.
   zx::vmo vmo;

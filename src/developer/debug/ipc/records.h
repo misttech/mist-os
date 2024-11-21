@@ -426,7 +426,7 @@ struct AddressRegion {
   uint64_t depth = 0;
   uint64_t vmo_koid = 0;  // Fuchsia only.
   uint64_t vmo_offset = 0;
-  uint64_t committed_pages = 0;
+  uint64_t committed_bytes = 0;
 
   // MMU flags.
   bool read = false;
@@ -435,7 +435,7 @@ struct AddressRegion {
   bool shared = false;  // Linux only.
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | name | base | size | depth | vmo_koid | vmo_offset | committed_pages | read | write |
+    ser | name | base | size | depth | vmo_koid | vmo_offset | committed_bytes | read | write |
         execute | shared;
   }
 };

@@ -110,7 +110,7 @@ async fn mmap_anonymous() {
             find_mapping_in_range(&process, |map, info| {
                 // Within the restricted aspace.
                 if map.base >= base && map.base + map.size <= base + len {
-                    if info.populated_pages == 4200 {  // See mmap_anonymous_then_sleep.c for size.
+                    if info.populated_bytes == (4200 * zx::system_get_page_size()) as usize {  // See mmap_anonymous_then_sleep.c for size.
                         return true;
                     }
                 }

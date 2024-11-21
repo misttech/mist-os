@@ -1277,7 +1277,7 @@ OBJECT_GET_INFO_VMO_DISPLAY_TEST(
     "zx_object_get_info("
     "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
     "topic: \x1B[32mzx.object_info_topic\x1B[0m = \x1B[34mZX_INFO_VMO\x1B[0m, "
-    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m128\x1B[0m)\n"
+    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m176\x1B[0m)\n"
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m\n"
     "    info: \x1B[32mzx_info_vmo_t\x1B[0m = {\n"
@@ -1455,11 +1455,13 @@ OBJECT_GET_INFO_JOB_PROCESSES_DISPLAY_TEST(
   constexpr size_t kMemPrivateBytes = 16000;                                               \
   constexpr size_t kMemSharedBytes = 20000;                                                \
   constexpr size_t kMemScaledSharedBytes = 5000;                                           \
+  constexpr size_t kMemFractionalScaledSharedBytes = 4000;                                 \
   zx_info_task_stats_t buffer;                                                             \
   buffer.mem_mapped_bytes = kMemMappedBytes;                                               \
   buffer.mem_private_bytes = kMemPrivateBytes;                                             \
   buffer.mem_shared_bytes = kMemSharedBytes;                                               \
   buffer.mem_scaled_shared_bytes = kMemScaledSharedBytes;                                  \
+  buffer.mem_fractional_scaled_shared_bytes = kMemFractionalScaledSharedBytes;             \
   auto value =                                                                             \
       ZxObjectGetInfo(result, #result, kHandle, ZX_INFO_TASK_STATS,                        \
                       reinterpret_cast<void*>(&buffer), sizeof(buffer), nullptr, nullptr); \
@@ -1481,7 +1483,7 @@ OBJECT_GET_INFO_TASK_STATS_DISPLAY_TEST(
     "zx_object_get_info("
     "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
     "topic: \x1B[32mzx.object_info_topic\x1B[0m = \x1B[34mZX_INFO_TASK_STATS\x1B[0m, "
-    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m32\x1B[0m)\n"
+    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m40\x1B[0m)\n"
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m\n"
     "    info: \x1B[32mzx_info_task_stats_t\x1B[0m = {\n"
@@ -1489,6 +1491,7 @@ OBJECT_GET_INFO_TASK_STATS_DISPLAY_TEST(
     "      mem_private_bytes: \x1B[32msize\x1B[0m = \x1B[34m16000\x1B[0m\n"
     "      mem_shared_bytes: \x1B[32msize\x1B[0m = \x1B[34m20000\x1B[0m\n"
     "      mem_scaled_shared_bytes: \x1B[32msize\x1B[0m = \x1B[34m5000\x1B[0m\n"
+    "      mem_fractional_scaled_shared_bytes: \x1B[32msize\x1B[0m = \x1B[34m4000\x1B[0m\n"
     "    }\n")
 
 #define OBJECT_GET_INFO_PROCESS_MAPS_DISPLAY_TEST_CONTENT(result, expected)                       \
@@ -1504,7 +1507,7 @@ OBJECT_GET_INFO_TASK_STATS_DISPLAY_TEST(
       .u = {.mapping = {.mmu_flags = ZX_VM_ALIGN_2KB | ZX_VM_PERM_READ | ZX_VM_PERM_EXECUTE,      \
                         .vmo_koid = 5555,                                                         \
                         .vmo_offset = 2048,                                                       \
-                        .committed_pages = 1}}};                                                  \
+                        .committed_bytes = 4096}}};                                               \
   buffer[2] = {                                                                                   \
       .name = "map3", .base = 0x40000, .size = 2048, .depth = 2, .type = ZX_INFO_MAPS_TYPE_VMAR}; \
   size_t actual = buffer.size();                                                                  \
@@ -1530,7 +1533,7 @@ OBJECT_GET_INFO_PROCESS_MAPS_DISPLAY_TEST(
     "zx_object_get_info("
     "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
     "topic: \x1B[32mzx.object_info_topic\x1B[0m = \x1B[34mZX_INFO_PROCESS_MAPS\x1B[0m, "
-    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m312\x1B[0m)\n"
+    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m456\x1B[0m)\n"
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m ("
     "actual: \x1B[32msize\x1B[0m = \x1B[34m3\x1B[0m/\x1B[34m10\x1B[0m)\n"
@@ -1553,7 +1556,14 @@ OBJECT_GET_INFO_PROCESS_MAPS_DISPLAY_TEST(
     "\x1B[31mZX_VM_ALIGN_2KB | ZX_VM_PERM_READ | ZX_VM_PERM_EXECUTE\x1B[0m\n"
     "          vmo_koid: \x1B[32mzx.koid\x1B[0m = \x1B[31m5555\x1B[0m\n"
     "          vmo_offset: \x1B[32muint64\x1B[0m = \x1B[34m2048\x1B[0m\n"
-    "          committed_pages: \x1B[32msize\x1B[0m = \x1B[34m1\x1B[0m\n"
+    "          committed_bytes: \x1B[32msize\x1B[0m = \x1B[34m4096\x1B[0m\n"
+    "          populated_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          committed_private_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          populated_private_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          committed_scaled_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          populated_scaled_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          committed_fractional_scaled_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "          populated_fractional_scaled_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
     "        }\n"
     "      }\n"
     "      {\n"
@@ -1612,7 +1622,7 @@ OBJECT_GET_INFO_PROCESS_VMOS_DISPLAY_TEST(
     "zx_object_get_info("
     "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
     "topic: \x1B[32mzx.object_info_topic\x1B[0m = \x1B[34mZX_INFO_PROCESS_VMOS\x1B[0m, "
-    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m256\x1B[0m)\n"
+    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m352\x1B[0m)\n"
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m ("
     "actual: \x1B[32msize\x1B[0m = \x1B[34m2\x1B[0m/\x1B[34m2\x1B[0m)\n"

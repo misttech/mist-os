@@ -30,16 +30,35 @@ TEST(TaskGetInfoTest, InfoStatsUnstartedSucceeds) {
   ASSERT_OK(process.get_info(ZX_INFO_TASK_STATS, &info, sizeof(info), nullptr, nullptr));
 }
 
-TEST(TaskGetInfoTest, InfoStatsSmokeTest) {
+// TODO(https://fxbug.dev/338300808): While in the transition phase for RFC-0254 we are in 'legacy
+// attribution', and this is indicated by the fractional value being UINT64_MAX. This test can be
+// removed once the legacy attribution is removed and the rest of the tests are updated for the
+// new attribution model.
+TEST(TaskGetInfoTest, FractionalScaledSharedBytesSentinel) {
   zx_info_task_stats_t info;
   ASSERT_OK(
       zx::process::self()->get_info(ZX_INFO_TASK_STATS, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.mem_fractional_scaled_shared_bytes, UINT64_MAX);
+}
+
+template <typename InfoT>
+static void TestProcessGetInfoStatsSmokeTest(const uint32_t topic) {
+  InfoT info;
+  ASSERT_OK(zx::process::self()->get_info(topic, &info, sizeof(info), nullptr, nullptr));
 
   EXPECT_GT(info.mem_private_bytes, 0u);
   EXPECT_GE(info.mem_shared_bytes, 0u);
   EXPECT_GE(info.mem_mapped_bytes, info.mem_private_bytes + info.mem_shared_bytes);
   EXPECT_GE(info.mem_scaled_shared_bytes, 0u);
   EXPECT_GE(info.mem_shared_bytes, info.mem_scaled_shared_bytes);
+}
+
+TEST(TaskGetInfoTest, InfoStatsSmokeTest) {
+  TestProcessGetInfoStatsSmokeTest<zx_info_task_stats_t>(ZX_INFO_TASK_STATS);
+}
+
+TEST(TaskGetInfoTest, InfoStatsSmokeTestV1) {
+  TestProcessGetInfoStatsSmokeTest<zx_info_task_stats_v1_t>(ZX_INFO_TASK_STATS_V1);
 }
 
 constexpr auto handle_provider = []() -> const zx::process& {
