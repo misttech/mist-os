@@ -13,12 +13,11 @@ use fuchsia_component::server as fserver;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::{join, FutureExt, StreamExt, TryStreamExt};
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use thiserror::Error;
 use tracing::*;
 use url::Url;
@@ -33,24 +32,25 @@ mod builtin;
 mod resolver;
 mod runner;
 
-lazy_static! {
-    pub static ref BINDER_EXPOSE_DECL: cm_rust::ExposeDecl =
-        cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-            source: cm_rust::ExposeSource::Framework,
-            source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            #[cfg(fuchsia_api_level_at_least = "25")]
-            source_dictionary: Default::default(),
-            target: cm_rust::ExposeTarget::Parent,
-            target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            // TODO(https://fxbug.dev/42058594): Support optional exposes.
-            availability: cm_rust::Availability::Required,
-        },);
+static BINDER_EXPOSE_DECL: LazyLock<cm_rust::ExposeDecl> = LazyLock::new(|| {
+    cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+        source: cm_rust::ExposeSource::Framework,
+        source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
+        #[cfg(fuchsia_api_level_at_least = "25")]
+        source_dictionary: Default::default(),
+        target: cm_rust::ExposeTarget::Parent,
+        target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
+        // TODO(https://fxbug.dev/42058594): Support optional exposes.
+        availability: cm_rust::Availability::Required,
+    })
+});
 
-    static ref PROTOCOLS_ROUTED_TO_ALL: [cm_types::Name; 2] = [
+static PROTOCOLS_ROUTED_TO_ALL: LazyLock<[cm_types::Name; 2]> = LazyLock::new(|| {
+    [
         cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
         cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
-    ];
-}
+    ]
+});
 
 #[fuchsia::main]
 async fn main() {
