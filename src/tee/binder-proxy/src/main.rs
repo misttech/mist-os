@@ -4,6 +4,7 @@
 
 mod binder_proxy;
 mod bound_virtio_socket;
+mod convert;
 mod microfuchsia_control;
 mod ta_rpc_session;
 mod trusted_app;

@@ -155,8 +155,14 @@ int BinderProxyHostTool(const fxl::CommandLine& command_line) {
 
   auto ta_binder = android::checked_interface_cast<ITrustedApp>(ta_root_object);
 
-  auto result = ta_binder->openSession();
+  android::sp<android::system::microfuchsia::trusted_app::ITrustedAppSession> session_binder;
+  android::system::microfuchsia::trusted_app::OpResult op_result;
+  auto result = ta_binder->openSession({}, &op_result, &session_binder);
   FX_LOGS(INFO) << "openSession result: " << result;
+
+  op_result = {};
+  result = session_binder->invokeCommand(0, {}, &op_result);
+  FX_LOGS(INFO) << "invokeCommand result: " << result;
 
   return EXIT_SUCCESS;
 }

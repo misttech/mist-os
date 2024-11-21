@@ -5,12 +5,9 @@
  */
 package android.system.microfuchsia.trusted_app;
 
-import android.system.microfuchsia.trusted_app.ITrustedAppSession;
 import android.system.microfuchsia.trusted_app.OpResult;
 import android.system.microfuchsia.trusted_app.ParameterSet;
 
-/** {@hide} */
-// Connection to a with a TA
-interface ITrustedApp {
-  ITrustedAppSession openSession(in ParameterSet params, out OpResult result);
+interface ITrustedAppSession {
+  OpResult invokeCommand(int commandID, in ParameterSet params);
 }
