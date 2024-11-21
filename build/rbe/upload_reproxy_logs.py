@@ -146,10 +146,13 @@ def bq_table_insert(table: str, data: str) -> int:
     # The 'bq' CLI tool comes with gcloud SDK.
     # Unfortunately, piping the data through stdin doesn't work
     # because bq expects an interactive session, so we use a temp file.
+    project, _, _ = table.partition(":")
     with tempfile.NamedTemporaryFile() as f:
         f.write(data.encode())
         f.flush()
-        return subprocess.call(["bq", "insert", table, f.name])
+        return subprocess.call(
+            ["bq", f"--project_id={project}", "insert", table, f.name]
+        )
 
 
 def bq_upload_remote_action_logs(
