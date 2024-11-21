@@ -12,6 +12,16 @@ if (board_is_emu) {
     device_name = "${virtual_device_name_prefix}-${device_name}"
   }
 
+  # Certain variants require more memory.
+  need_more_memory =
+      is_asan || is_coverage || is_profile || target_cpu == "riscv64"
+  if (need_more_memory) {
+    recommended_memory = 8192
+  } else if (is_coverage && target_cpu == "x64") {
+    # The max amount of memory supported on arm64 in infra is 8GB so only use this larger memory for x64.
+    recommended_memory = 16384
+  }
+
   # Add the recommended configuration first. This is the default
   # used unless a specific device is requested.
   virtual_device_specification("virtual_device_specification_recommended") {
@@ -19,6 +29,12 @@ if (board_is_emu) {
     name = "${device_name}-recommended"
     description = "Recommended configuration for running this product"
     output = "$root_build_dir/virtual_device_recommended.json"
+    if (need_more_memory) {
+      memory = {
+        quantity = recommended_memory
+        units = "megabytes"
+      }
+    }
     cpu = {
       arch = target_cpu
       count = 4
@@ -32,7 +48,11 @@ if (board_is_emu) {
     description = "Minimum configuration for running this product"
     output = "$root_build_dir/virtual_device_min.json"
     memory = {
-      quantity = 2048
+      if (need_more_memory) {
+        quantity = recommended_memory
+      } else {
+        quantity = 2048
+      }
       units = "megabytes"
     }
     cpu = {
@@ -50,28 +70,8 @@ if (board_is_emu) {
   virtual_device_specification("virtual_device_specification_large") {
     testonly = true
     name = "${device_name}-large"
-    description =
-        "Larger configuration for running this product with extra memory"
-    output = "$root_build_dir/virtual_device_large.json"
-    memory = {
-      # The max amount of memory supported on arm64 in infra is 8GB. If a larger
-      # memory size is needed for a specific use case, either use the xlarge
-      # configuration or create a new device spec.
-      quantity = 8192
-      units = "megabytes"
-    }
-    cpu = {
-      arch = target_cpu
-      count = 4
-    }
-  }
-
-  # Add an X-Large configuration
-  virtual_device_specification("virtual_device_specification_xlarge") {
-    testonly = true
-    name = "${device_name}-xlarge"
     description = "Larger configuration for running this product with extra storage and memory"
-    output = "$root_build_dir/virtual_device_xlarge.json"
+    output = "$root_build_dir/virtual_device_large.json"
     storage = {
       quantity = 10
       units = "gigabytes"
