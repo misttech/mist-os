@@ -6,13 +6,15 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("zx") {
   sources = [
-    "debuglog.cc",
+    #"debuglog.cc",
     "event.cc",
-    "job.cc",
+
+    #"job.cc",
     "object.cc",
-    "process.cc",
-    "resource.cc",
-    "thread.cc",
+
+    #"process.cc",
+    #"resource.cc",
+    #"thread.cc",
     "vmar.cc",
     "vmo.cc",
   ]
@@ -23,7 +25,6 @@ zx_library("zx") {
   ]
 
   deps = [
-    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/debuglog",
     "//zircon/kernel/vm",
   ]

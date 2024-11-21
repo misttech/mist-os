@@ -9,6 +9,7 @@ zx_library("util") {
     "bstring.cc",
     "cprng.cc",
     "split_string.cc",
+    "system.cc",
     "third_party/icu/icu_utf.cc",
     "trim.cc",
     "try_from.cc",

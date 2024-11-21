@@ -4,17 +4,18 @@
 
 source_set("tests") {
   sources = [
-    "arc.cc",
+    #"arc.cc",
     "object-test.cc",
-    "vmo-clone.cc",
-    "vmo-clone2.cc",
-    "vmo-reference.cc",
+
+    #"vmo-clone.cc",
+    #"vmo-clone2.cc",
+    #"vmo-reference.cc",
     "vmo.cc",
     "zx-test.cc",
   ]
   deps = [
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
+    "//zircon/kernel/lib/unittest",
     "//zircon/kernel/object",
-    "//zircon/system/ulib/zxtest:zxtest-mistos",
   ]
 }

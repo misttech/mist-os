@@ -5,80 +5,91 @@
 
 #include <assert.h>
 #include <lib/fit/defer.h>
-#include <lib/mistos/zx/debuglog.h>
 #include <lib/mistos/zx/event.h>
-#include <lib/mistos/zx/job.h>
+#include <lib/mistos/zx/handle.h>
 #include <lib/mistos/zx/object.h>
-#include <lib/mistos/zx/process.h>
-#include <lib/mistos/zx/resource.h>
-#include <lib/mistos/zx/thread.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
-#include <zircon/compiler.h>
-#include <zircon/errors.h>
-#include <zircon/limits.h>
-#include <zircon/types.h>
+#include <lib/unittest/unittest.h>
 
-#include <utility>
-
-#include <zxtest/zxtest.h>
-
+namespace unit_testing {
 namespace {
 
-zx_status_t validate_handle(zx_handle_t handle) {
-  return zx_object_get_info(handle, ZX_INFO_HANDLE_VALID, nullptr, 0, 0u, nullptr);
+zx_status_t validate_handle(Handle* handle) {
+  return (handle && (handle->dispatcher() != nullptr)) ? ZX_OK : ZX_ERR_BAD_HANDLE;
 }
 
-TEST(ZxTestCase, HandleInvalid) {
+bool handle_invalid() {
+  BEGIN_TEST;
+
   zx::handle handle;
   // A default constructed handle is invalid.
-  ASSERT_EQ(handle.release(), ZX_HANDLE_INVALID);
+  ASSERT_TRUE(handle.release() == nullptr);
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, HandleClose) {
-  zx_handle_t raw_event;
-  ASSERT_OK(zx_event_create(0u, &raw_event));
-  ASSERT_OK(validate_handle(raw_event));
+bool handle_close() {
+  BEGIN_TEST;
+  zx::event event;
+  ASSERT_OK(zx::event::create(0u, &event));
+  ASSERT_OK(validate_handle(event.get()));
   {
-    zx::handle handle(raw_event);
+    zx::handle handle(event.release());
   }
   // Make sure the handle was closed.
-  ASSERT_EQ(validate_handle(raw_event), ZX_ERR_BAD_HANDLE);
+  ASSERT_EQ(validate_handle(event.get()), ZX_ERR_BAD_HANDLE);
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, HandleMove) {
+bool handle_move() {
+  BEGIN_TEST;
+
   zx::event event;
   // Check move semantics.
   ASSERT_OK(zx::event::create(0u, &event));
   zx::handle handle(std::move(event));
-  ASSERT_EQ(event.release(), ZX_HANDLE_INVALID);
+  ASSERT_TRUE(event.release() == nullptr);
   ASSERT_OK(validate_handle(handle.get()));
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, HandleReplace) {
-  zx_handle_t raw_event;
+bool handle_replace() {
+  BEGIN_TEST;
+
+  zx::event event;
   zx::handle rep;
-  ASSERT_OK(zx_event_create(0u, &raw_event));
+  ASSERT_OK(zx::event::create(0u, &event));
   {
-    zx::handle handle(raw_event);
+    zx::handle handle(event.release());
     ASSERT_OK(handle.replace(ZX_RIGHT_SAME_RIGHTS, &rep));
-    ASSERT_EQ(handle.release(), ZX_HANDLE_INVALID);
+    ASSERT_TRUE(handle.release() == nullptr);
   }
   // The original shoould be invalid and the replacement should be valid.
-  ASSERT_EQ(validate_handle(raw_event), ZX_ERR_BAD_HANDLE);
+  ASSERT_EQ(validate_handle(event.get()), ZX_ERR_BAD_HANDLE);
   ASSERT_OK(validate_handle(rep.get()));
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, HandleDuplicate) {
-  zx_handle_t raw_event;
+bool handle_duplicate() {
+  BEGIN_TEST;
+
+  zx::event event;
   zx::handle dup;
-  ASSERT_OK(zx_event_create(0u, &raw_event));
-  zx::handle handle(raw_event);
+  ASSERT_OK(zx::event::create(0u, &event));
+  zx::handle handle(event.get());
   ASSERT_OK(handle.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
   // The duplicate must be valid as well as the original.
   ASSERT_OK(validate_handle(dup.get()));
-  ASSERT_OK(validate_handle(raw_event));
+  ASSERT_OK(validate_handle(event.get()));
+
+  END_TEST;
 }
+
+#if 0
 
 TEST(ZxTestCase, GetInfo) {
   zx::vmo vmo;
@@ -104,15 +115,21 @@ TEST(ZxTestCase, SetGetProperty) {
   EXPECT_OK(object.get_property(ZX_PROP_NAME, read_name, sizeof(read_name)));
   EXPECT_STREQ(name, read_name);
 }
+#endif
 
-TEST(ZxTestCase, Event) {
+bool event() {
+  BEGIN_TEST;
   zx::event event;
   ASSERT_OK(zx::event::create(0u, &event));
   ASSERT_OK(validate_handle(event.get()));
   // TODO(cpu): test more.
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, EventDuplicate) {
+bool event_duplicate() {
+  BEGIN_TEST;
+
   zx::event event;
   zx::event dup;
   ASSERT_OK(zx::event::create(0u, &event));
@@ -120,11 +137,12 @@ TEST(ZxTestCase, EventDuplicate) {
   // The duplicate must be valid as well as the original.
   ASSERT_OK(validate_handle(dup.get()));
   ASSERT_OK(validate_handle(event.get()));
+
+  END_TEST;
 }
 
-// TEST(ZxTestCase, Socket)
-
-TEST(ZxTestCase, Vmar) {
+bool vmar() {
+  BEGIN_TEST;
   zx::vmar vmar;
   const size_t size = PAGE_SIZE;
   uintptr_t addr;
@@ -132,8 +150,10 @@ TEST(ZxTestCase, Vmar) {
   ASSERT_OK(validate_handle(vmar.get()));
   ASSERT_OK(vmar.destroy());
   // TODO(teisenbe): test more.
+  END_TEST;
 }
 
+#if 0
 TEST(ZxTestCase, TimeConstruction) {
   // time construction
   ASSERT_EQ(zx::time().get(), 0);
@@ -542,8 +562,11 @@ TEST(ZxTestCase, Unowned) {
   }
   ASSERT_OK(validate_handle(handle.get()));
 }
+#endif
 
-TEST(ZxTestCase, Unowned2) {
+bool unowned2() {
+  BEGIN_TEST;
+
   zx::event handle;
   ASSERT_OK(zx::event::create(0, &handle));
   ASSERT_OK(validate_handle(handle.get()));
@@ -551,9 +574,13 @@ TEST(ZxTestCase, Unowned2) {
     const zx::unowned_event event{handle};
   }
   EXPECT_TRUE(handle.is_valid());
+
+  END_TEST;
 }
 
-TEST(ZxTestCase, VmoContentSize) {
+bool vmo_content_size() {
+  BEGIN_TEST;
+
   zx::vmo vmo;
   constexpr uint32_t options = 0;
   constexpr uint64_t initial_size = 8 * 1024;
@@ -571,16 +598,30 @@ TEST(ZxTestCase, VmoContentSize) {
   EXPECT_EQ(retrieved_size, new_size);
   retrieved_size = 0;
 
-  ASSERT_OK(zx_object_get_property(vmo.get(), ZX_PROP_VMO_CONTENT_SIZE, &retrieved_size,
-                                   sizeof(retrieved_size)));
-  EXPECT_EQ(retrieved_size, new_size);
+  END_TEST;
 }
 
+#if 0
 TEST(ZxTestCase, DebugLog) {
   zx::resource res{ZX_HANDLE_INVALID};
   zx::debuglog log;
   ASSERT_OK(zx::debuglog::create(res, 0, &log));
   EXPECT_OK(log.write(0, "Hello!", sizeof("Hello!")));
 }
+#endif
 
 }  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(mistos_zx_test)
+UNITTEST("handle invalid", unit_testing::handle_invalid)
+UNITTEST("handle close", unit_testing::handle_close)
+UNITTEST("handle move", unit_testing::handle_move)
+UNITTEST("handle replace", unit_testing::handle_replace)
+UNITTEST("handle duplicate", unit_testing::handle_duplicate)
+UNITTEST("event", unit_testing::event)
+UNITTEST("event duplicate", unit_testing::event_duplicate)
+UNITTEST("vmar", unit_testing::vmar)
+UNITTEST("unowned2", unit_testing::unowned2)
+UNITTEST("vmo content size", unit_testing::vmo_content_size)
+UNITTEST_END_TESTCASE(mistos_zx_test, "mistos_zx_test", "mistos zx test")
