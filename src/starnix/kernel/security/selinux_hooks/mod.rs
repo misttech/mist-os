@@ -221,6 +221,57 @@ macro_rules! todo_check_permission {
     }};
 }
 
+/// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
+/// `current_task` under the specified `parent` node.
+/// Policy-defined labeling rules, including transitions, are taken into account.
+///
+/// If no policy has yet been applied to the `parent`s [`create:vfs::FileSystem`] then no SID
+/// is returned.
+fn compute_new_fs_node_sid(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    new_node_class: FileClass,
+) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
+    let fs = parent.fs();
+    let label = match &*fs.security_state.state.0.lock() {
+        FileSystemLabelState::Unlabeled { .. } => {
+            return Ok(None);
+        }
+        FileSystemLabelState::Labeled { label } => label.clone(),
+    };
+
+    // Determine the SID with which the new `FsNode` would be labeled.
+    match label.scheme {
+        // TODO: How should creation of new files under "genfscon" be handled?
+        FileSystemLabelingScheme::GenFsCon => {
+            track_stub!(TODO("https://fxbug.dev/377915469"), "New file in genfscon fs");
+            Ok(Some((label.sid, label)))
+        }
+        FileSystemLabelingScheme::Mountpoint { sid } => Ok(Some((sid, label))),
+        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
+            if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid {
+                return Ok(Some((fscreate_sid, label)));
+            }
+
+            let current_task_sid = current_task.security_state.lock().current_sid;
+            if fs_use_type == FsUseType::Task {
+                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
+                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
+                Ok(Some((current_task_sid, label)))
+            } else {
+                let parent_sid = fs_node_effective_sid(parent);
+                let sid = security_server
+                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
+                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
+                    // for compute_new_file_sid to have failed?
+                    .map_err(|_| errno!(EPERM))?;
+                Ok(Some((sid, label)))
+            }
+        }
+    }
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file.
 pub(super) fn fs_node_init_on_create(
     security_server: &SecurityServer,
@@ -235,56 +286,36 @@ pub(super) fn fs_node_init_on_create(
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
-    // If the creating task's "fscreate" attribute is set then it overrides the normal process
-    // for labeling new files.
-    if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid.clone() {
-        set_cached_sid(new_node, fscreate_sid);
-        return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
-    }
-
-    let fs = new_node.fs();
-    let label = match &*fs.security_state.state.0.lock() {
-        FileSystemLabelState::Unlabeled { .. } => {
-            return Ok(None);
-        }
-        FileSystemLabelState::Labeled { label } => label.clone(),
-    };
-
-    // Compute both the SID to store on the in-memory node and the xattr to persist on-disk
-    // (or None if this circumstance is such that there's no xattr to persist).
-    let (sid, xattr) = match label.scheme {
-        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
-            let current_task_sid = current_task.security_state.lock().current_sid;
-            if fs_use_type == FsUseType::Task {
-                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
-                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
-                (current_task_sid, None)
-            } else {
-                let parent_sid = fs_node_effective_sid(parent);
-                let sid = security_server
-                    .compute_new_file_sid(
-                        current_task_sid,
-                        parent_sid,
-                        file_class_from_file_mode(new_node.info().mode)?,
-                    )
-                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
-                    // for compute_new_file_sid to have failed?
-                    .map_err(|_| errno!(EPERM))?;
+    // Determine the SID with which to label the `new_node` with, dependent on the file
+    // class, etc. This will only fail if the filesystem containing the nodes does not yet
+    // have labeling information resolved.
+    let new_node_class = file_class_from_file_mode(new_node.info().mode)?;
+    if let Some((sid, label)) =
+        compute_new_fs_node_sid(security_server, current_task, parent, new_node_class)?
+    {
+        // If the labeling scheme is "fs_use_xattr" then also construct an xattr value
+        // for the caller to apply to `new_node`.
+        let (sid, xattr) = match label.scheme {
+            FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
                 let xattr = (fs_use_type == FsUseType::Xattr)
                     .then(|| make_fs_node_security_xattr(security_server, sid))
                     .transpose()?;
                 (sid, xattr)
             }
-        }
-        FileSystemLabelingScheme::Mountpoint { .. } | FileSystemLabelingScheme::GenFsCon => {
-            // The label in this case is decided in the `fs_node_init_with_dentry` hook.
-            return Ok(None);
-        }
-    };
+            FileSystemLabelingScheme::Mountpoint { .. } => (sid, None),
+            FileSystemLabelingScheme::GenFsCon => {
+                // Defer labeling to `fs_node_init_with_dentry()`, so that the path of the new
+                // node can be taken into account.
+                return Ok(None);
+            }
+        };
 
-    set_cached_sid(new_node, sid);
+        set_cached_sid(new_node, sid);
 
-    Ok(xattr)
+        Ok(xattr)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
