@@ -35,7 +35,7 @@ mod fidl_pipe;
 mod resolve;
 mod target_connector;
 
-pub use connection::ConnectionError;
+pub use connection::{Connection, ConnectionError};
 pub use discovery::desc::{Description, FastbootInterface};
 pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::{create_overnet_socket, FidlPipe};

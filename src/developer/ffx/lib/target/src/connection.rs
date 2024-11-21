@@ -182,6 +182,15 @@ impl Connection {
             Ok(client)
         }))
     }
+
+    pub fn fake(fidl_pipe: FidlPipe) -> Self {
+        Self {
+            overnet: None,
+            fdomain: async_lock::Mutex::new(None),
+            fidl_pipe,
+            rcs_info: async_lock::Mutex::new(None),
+        }
+    }
 }
 
 #[derive(Debug)]

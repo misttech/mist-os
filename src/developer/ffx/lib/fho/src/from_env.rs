@@ -920,6 +920,19 @@ impl TryFromEnv for EnvironmentContext {
     }
 }
 
+// Returns a DirectConnector only if we have a direct connection. Returns None for
+// a daemon connection.
+#[async_trait(?Send)]
+impl TryFromEnv for Option<Rc<dyn DirectConnector>> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(if let FhoConnectionBehavior::DirectConnector(dc) = &env.behavior {
+            Some(dc.clone())
+        } else {
+            None
+        })
+    }
+}
+
 #[async_trait(?Send)]
 impl<T> TryFromEnv for PhantomData<T> {
     async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
@@ -929,10 +942,9 @@ impl<T> TryFromEnv for PhantomData<T> {
 
 #[cfg(test)]
 mod tests {
-    use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
+    use crate::connector::MockDirectConnector;
     use ffx_command::Error;
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-    use futures::future::LocalBoxFuture;
 
     use super::*;
 
@@ -957,32 +969,12 @@ mod tests {
             .expect_err("Inner AlwaysError should error after second await");
     }
 
-    mockall::mock! {
-        TestConnector {}
-
-        impl DirectConnector for TestConnector {
-           fn connect(&self) -> LocalBoxFuture<'_, Result<()>>;
-           fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>>;
-           fn rcs_proxy_fdomain(&self) -> LocalBoxFuture<'_, Result<FRemoteControlProxy>>;
-           fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
-           fn device_address(&self) -> LocalBoxFuture<'_, Option<std::net::SocketAddr>>;
-           fn target_spec(&self) -> Option<String>;
-           fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>>;
-        }
-    }
-
-    impl std::fmt::Debug for MockTestConnector {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-            f.debug_struct("MockTestConnector").finish()
-        }
-    }
-
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_reconnect_and_rcs_eventual_success() {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
         let mut seq = mockall::Sequence::new();
@@ -1032,7 +1024,7 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
         let mut seq = mockall::Sequence::new();
@@ -1057,7 +1049,7 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let mut tool_env =
             crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        let mut mock_connector = MockTestConnector::new();
+        let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_connect().times(1).returning(|| {
             Box::pin(async {
                 Err(crate::Error::Unexpected(anyhow::anyhow!("we're doomed!").into()))

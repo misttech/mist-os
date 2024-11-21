@@ -205,6 +205,11 @@ impl FidlPipe {
     pub fn host_ssh_address(&self) -> Option<HostAddr> {
         self.host_ssh_address.clone()
     }
+
+    pub fn fake(device_address: Option<SocketAddr>) -> Self {
+        let (_error_sender, error_queue) = async_channel::unbounded();
+        Self { task: None, error_queue, compat: None, device_address, host_ssh_address: None }
+    }
 }
 
 impl Drop for FidlPipe {

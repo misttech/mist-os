@@ -11,6 +11,7 @@ use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Resolution, TargetConnector};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::future::LocalBoxFuture;
+use mockall::automock;
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,7 +19,8 @@ use std::sync::Arc;
 /// An object used for connecting to a Fuchsia Device. This represents the entire underlying
 /// connection to a fuchsia device. If this object is dropped, then all FIDL protocols will be
 /// closed with `PEER_CLOSED` errors as a result.
-pub trait DirectConnector: Debug {
+#[automock]
+pub trait DirectConnector {
     // A note on the shape of this trait: the object must _not_ be sized in order for it to be used as
     // a trait object, due to the bounds around object safety in rust. Furthermore, a safe trait object
     // cannot return `impl Trait` of some kind, so using `impl Future` and making this a trait object
@@ -54,6 +56,9 @@ pub trait DirectConnector: Debug {
 
     /// Returns the spec of the target to which we are connecting/connected.
     fn target_spec(&self) -> Option<String>;
+
+    /// Returns the `Connection` (connecting if it is not yet connected)
+    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<async_lock::Mutex<Option<Connection>>>>>;
 }
 
 pub trait TryFromEnvContext: Sized + Debug {
@@ -218,6 +223,13 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
 
     fn target_spec(&self) -> Option<String> {
         self.target_spec.clone()
+    }
+
+    fn connection(&self) -> LocalBoxFuture<'_, Result<Arc<Mutex<Option<Connection>>>>> {
+        Box::pin(async {
+            self.maybe_connect().await?;
+            Ok(self.connection.clone())
+        })
     }
 }
 
