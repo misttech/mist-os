@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_package.gni")
+import("//build/cpp/verify_public_symbols.gni")
 import("//build/dist/renamed_binary.gni")
 import("//build/toolchain/ifs_extract.gni")
 
@@ -31,6 +32,7 @@ template("fuchsia_ta_package") {
   main_target = target_name
   module_target = "_${target_name}_module"
   ifs_target = "_${target_name}_ifs"
+  verify_public_symbols_target = "_${target_name}_verify_public_symbols"
   ta_name_resource_target = "_${target_name}_resource"
   ta_props_resource_target = "_${target_name}_props_resource"
 
@@ -57,13 +59,31 @@ template("fuchsia_ta_package") {
 
   # An .ifs file describing the symbols defined and needed by the TA. This file
   # is of use in build-time verification that a TA's expected public symbols
-  # are indeed defined (TODO(joshuaseaton) for its consumption to that effect),
-  # as well as of diagnostic value in seeing what subset of the TEE internal
-  # API is being used by a particular TA (especially during 'bring-up').
+  # are indeed defined (see next target), as well as of diagnostic value in
+  # seeing what subset of the TEE internal API is being used by a particular TA
+  # (especially during 'bring-up').
+  ifs_file = "$target_out_dir/$main_target.ifs"
   ifs_extract(ifs_target) {
     visibility = [ ":*" ]
-    outputs = [ "$target_out_dir/$main_target.ifs" ]
+    outputs = [ ifs_file ]
     deps = [ ":$module_target" ]
+  }
+
+  # This does a diff of the public symbols against those defined in
+  # //src/tee/ta/abi.ifs.
+  verify_public_symbols(verify_public_symbols_target) {
+    visibility = [ ":*" ]
+    library_name = main_target
+    current = ifs_file
+    reference = "//src/tee/ta/abi.ifs"
+
+    # TODO(https://fxbug.dev/375092974): Consider defensively filtering for only `TA_*` namespaced
+    # symbols once --include is a valid llvm-ifs flag.
+
+    # TODO(joshuaseaton): Remove once loadable_modules() are no longer linked with
+    # `-Wl,-soname=...`
+    ifs_args = [ "--soname=reference-ta" ]
+    deps = [ ":${ifs_target}" ]
   }
 
   # This adds a file to the package containing the name of the TA at a
@@ -101,6 +121,6 @@ template("fuchsia_ta_package") {
     # Not a really a dependency of the package itself, but we need somewhere to
     # include this into the build graph and other package-related GN code
     # unfortunately expects target_name to expand to a package target.
-    data_deps = [ ":${ifs_target}" ]
+    data_deps = [ ":${verify_public_symbols_target}" ]
   }
 }
