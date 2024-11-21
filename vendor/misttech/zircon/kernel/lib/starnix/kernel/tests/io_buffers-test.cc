@@ -270,13 +270,15 @@ bool test_vec_output_buffer() {
   ASSERT_EQ(5u, output_buffer.bytes_written());
   ASSERT_EQ(5u, output_buffer.available());
 
-  ASSERT_BYTES_EQ((const uint8_t*)"hello", output_buffer.data(), 5);
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("hello"), output_buffer.data().data(),
+                  output_buffer.data().size());
 
   ASSERT_EQ(5u, output_buffer.write_all(ktl::span<uint8_t>{(uint8_t*)"world", 5}).value_or(0),
             "write");
   ASSERT_EQ(10u, output_buffer.bytes_written());
   ASSERT_EQ(0u, output_buffer.available());
-  ASSERT_BYTES_EQ((const uint8_t*)"helloworld", output_buffer.data(), 10);
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("helloworld"), output_buffer.data().data(),
+                  output_buffer.data().size());
   ASSERT_TRUE(output_buffer.write_all(ktl::span<uint8_t>{(uint8_t*)"foo", 3}).is_error());
 
   END_TEST;
@@ -285,11 +287,11 @@ bool test_vec_output_buffer() {
 bool test_vec_write_buffer() {
   BEGIN_TEST;
 
-  ktl::span<const uint8_t> data{reinterpret_cast<const uint8_t*>("helloworld"), 10};
-  auto input_buffer = VecInputBuffer::New(data);
+  auto input_buffer = VecInputBuffer::New({reinterpret_cast<const uint8_t*>("helloworld"), 10});
   auto output_buffer = VecOutputBuffer::New(20);
   ASSERT_EQ(10u, output_buffer.write_buffer(input_buffer).value(), "write_buffer");
-  ASSERT_BYTES_EQ(data.data(), output_buffer.data(), data.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>("helloworld"), output_buffer.data().data(),
+                  output_buffer.data().size());
 
   END_TEST;
 }

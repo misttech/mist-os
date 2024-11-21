@@ -85,7 +85,7 @@ bool test_write_read() {
   auto read = read_result.value();
   ASSERT_EQ(test_bytes.size(), read);
 
-  ASSERT_BYTES_EQ(test_bytes.data(), read_buffer.data(), test_bytes.size());
+  ASSERT_BYTES_EQ(test_bytes.data(), read_buffer.data().data(), test_bytes.size());
 
   END_TEST;
 }
