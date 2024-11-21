@@ -327,24 +327,10 @@ fn may_create(
     new_file_mode: FileMode, // Only used to determine the file class.
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let (current_sid, fscreate_sid) = {
-        let attrs = &current_task.security_state.lock();
-        (attrs.current_sid, attrs.fscreate_sid)
-    };
 
-    let file_sid = if let Some(sid) = fscreate_sid {
-        sid
-    } else {
-        track_stub!(TODO("https://fxbug.dev/375381156"), "Use new file's SID in may_create checks");
-        return Ok(());
-    };
-
+    let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
-    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
-        FileSystemLabelState::Labeled { label } => Ok(label.sid),
-        _ => error!(EPERM),
-    }?;
-    let new_file_type = file_class_from_file_mode(new_file_mode)?;
+
     todo_check_permission!(
         TODO("https://fxbug.dev/374910392", "Check search permission."),
         &permission_check,
@@ -359,17 +345,32 @@ fn may_create(
         parent_sid,
         DirPermission::AddName
     )?;
+
+    let new_file_type = file_class_from_file_mode(new_file_mode)?;
+    let new_file_sid = compute_new_fs_node_sid(
+        security_server,
+        current_task,
+        parent,
+        file_class_from_file_mode(new_file_mode)?,
+    )?
+    .map(|(sid, _)| sid)
+    .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check create permission."),
         &permission_check,
         current_sid,
-        file_sid,
+        new_file_sid,
         CommonFilePermission::Create.for_class(new_file_type)
     )?;
+
+    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
+        FileSystemLabelState::Labeled { label } => Ok(label.sid),
+        _ => error!(EPERM),
+    }?;
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check associate permission."),
         &permission_check,
-        file_sid,
+        new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate
     )?;
