@@ -7,6 +7,7 @@
 
 use fuchsia_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::cmp::min;
+use std::collections::btree_map::Entry as BTreeMapEntry;
 use std::collections::hash_map::Entry as HashMapEntry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
@@ -427,7 +428,28 @@ impl PersistentObjects {
     // returns Error::AccessDenied if `handle` was not opened with
     // DATA_ACCESS_WRITE_META.
     fn rename(&self, handle: ObjectHandle, new_id: &[u8]) -> TeeResult {
-        unimplemented!();
+        let (mut by_handle, mut by_id) = self.lock_for_handle_and_id_writes();
+        match by_handle.entry(handle) {
+            HashMapEntry::Occupied(handle_entry) => {
+                let state = handle_entry.get().lock();
+                if !state.flags.contains(HandleFlags::DATA_ACCESS_WRITE_META) {
+                    return Err(Error::AccessDenied);
+                }
+                let new_id = Vec::from(new_id);
+                match by_id.entry(new_id.clone()) {
+                    BTreeMapEntry::Occupied(_) => return Err(Error::AccessConflict),
+                    BTreeMapEntry::Vacant(id_entry) => {
+                        let _ = id_entry.insert(state.object.clone());
+                    }
+                };
+                let mut obj = state.object.lock();
+                let removed = by_id.remove(&obj.id);
+                debug_assert!(removed.is_some());
+                obj.id = new_id;
+                Ok(())
+            }
+            HashMapEntry::Vacant(_) => panic!("{handle:?} is not a valid handle"),
+        }
     }
 
     // Given a handle, passes the associated object view into a provided

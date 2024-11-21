@@ -17,6 +17,7 @@
                 "regression6005",
                 "regression6006",
                 "regression6007",
+                "regression6008",
                 "regression6009",
                 "regression6014",
                 "regression6015",
@@ -79,14 +80,6 @@
                 "regression6012",
                 "regression6013",
                 "regression6020",
-            ],
-        },
-        {
-            type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/360942417): This test does not clean up its state when
-                // TEE_RenameObject() does not successfully return.
-                "regression6008",
             ],
         },
     ],
