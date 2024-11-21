@@ -30,9 +30,9 @@ namespace storage::volume_image {
 namespace {
 
 std::string ToSizeString(uint64_t bytes) {
-  constexpr int kByteToMegabyte = 1 << 20;
-  std::string size_str = std::to_string(static_cast<double>(bytes) / kByteToMegabyte);
-  return size_str.append(" [MB]");
+  constexpr int kByteToMebibyte = 1 << 20;
+  std::string size_str = std::to_string(static_cast<double>(bytes) / kByteToMebibyte);
+  return size_str.append(" [MiB]");
 }
 
 }  // namespace
