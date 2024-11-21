@@ -7,10 +7,9 @@ use ftest_manager::{CaseStatus, SuiteStatus};
 use fuchsia_component::client;
 use futures::prelude::*;
 use pretty_assertions::assert_eq;
-use test_diagnostics::collect_string_from_socket;
 use test_manager_test_lib::{
-    collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
-    TestRunEventPayload,
+    collect_string_from_socket_helper, collect_suite_events, default_run_option,
+    GroupRunEventByTestCase, RunEvent, TestBuilder, TestRunEventPayload,
 };
 
 async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usize) {
@@ -26,7 +25,8 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     let suite_instance =
         builder.add_suite(TEST_URL, options).await.expect("Cannot create suite instance");
     let (run_events_result, suite_events_result) =
-        futures::future::join(builder.run(), collect_suite_events(suite_instance)).await;
+        futures::future::join(builder.run_with_option(true), collect_suite_events(suite_instance))
+            .await;
 
     let suite_events = suite_events_result.unwrap().0;
     let expected_events = vec![
@@ -46,8 +46,10 @@ async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usi
     let test_run_events = stream::iter(run_events_result.unwrap());
     let num_vmos = test_run_events
         .then(|run_event| async move {
-            let TestRunEventPayload::DebugData { socket, .. } = run_event.payload;
-            let content = collect_string_from_socket(socket).await.expect("cannot read socket");
+            let TestRunEventPayload::DebugData { filename, socket } = run_event.payload;
+            let content = collect_string_from_socket_helper(socket, true)
+                .await
+                .unwrap_or_else(|e| panic!("cannot read socket for {}: {:?}", &filename, e));
             content.len() == vmo_size && content.chars().all(|c| c == 'a')
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))

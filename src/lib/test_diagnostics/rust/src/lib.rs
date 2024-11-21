@@ -18,6 +18,7 @@ use std::sync::Arc;
 pub use crate::diagnostics::LogStream;
 
 mod diagnostics;
+pub mod zstd_compress;
 
 thread_local! {
     static BUFFER: RefCell<Vec<u8>> = RefCell::new(vec![0; 1024*1024*2]);

@@ -895,10 +895,15 @@ mod test {
             socket: s1.into(),
             ..Default::default()
         }];
-        s2.write(&[1, 2, 3, 4, 5]).unwrap();
+        let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
+        let bytes = compressor.compress(&[1, 2, 3, 4, 5]).unwrap();
+        s2.write(bytes.as_slice()).unwrap();
         while let Some(request) = stream.try_next().await.unwrap() {
             match request {
-                ftest_manager::DebugDataIteratorRequest::GetNext { responder } => {
+                ftest_manager::DebugDataIteratorRequest::GetNext { .. } => {
+                    panic!("Not Implemented");
+                }
+                ftest_manager::DebugDataIteratorRequest::GetNextCompressed { responder } => {
                     responder.send(debug_data.drain(..).collect()).unwrap();
                 }
             }
