@@ -92,7 +92,7 @@ impl From<Errno> for zx_status::Status {
 pub struct ErrnoCode(u32);
 
 impl ErrnoCode {
-    pub fn from_return_value(retval: u64) -> Self {
+    pub const fn from_return_value(retval: u64) -> Self {
         let retval = retval as i64;
         if retval >= 0 {
             // Collapse all success codes to 0. This is the only value in the u32 range which
@@ -102,15 +102,15 @@ impl ErrnoCode {
         Self(-retval as u32)
     }
 
-    pub fn from_error_code(code: i16) -> Self {
+    pub const fn from_error_code(code: i16) -> Self {
         Self(code as u32)
     }
 
-    pub fn return_value(&self) -> u64 {
+    pub const fn return_value(&self) -> u64 {
         -(self.0 as i32) as u64
     }
 
-    pub fn error_code(&self) -> u32 {
+    pub const fn error_code(&self) -> u32 {
         self.0
     }
 }
