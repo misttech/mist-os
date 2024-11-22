@@ -1406,10 +1406,6 @@ TYPED_TEST(DlTests, StartupModulesBasic) {
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if constexpr (!TestFixture::kSupportsStartupModules) {
-    GTEST_SKIP() << "test requires startup module support";
-  }
-
   // Make sure foo-v1, foo-v2 are linked in with this test by making direct
   // calls to their unique symbols.
   EXPECT_EQ(foo_v1_StartupModulesBasic(), kReturnValueFromFooV1);
@@ -1452,10 +1448,6 @@ TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
   const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
   const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromFooV1 = 2;
-
-  if constexpr (!TestFixture::kSupportsStartupModules) {
-    GTEST_SKIP() << "test requires startup module support";
-  }
 
   // Make sure has-foo-v1 is linked in with this test by making a direct call to
   // its unique symbol.

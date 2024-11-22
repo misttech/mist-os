@@ -163,6 +163,11 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr void set_global() { abi_module_.symbols_visible = true; }
   constexpr bool is_local() const { return !is_global(); }
 
+  // TODO(https://374155891): Implement RTLD_NODELETE
+  // Whether this module can be unloaded. This is false if the module was loaded
+  // at startup or loaded by dlopen() with the RTLD_NODELETE flag.
+  constexpr void set_no_delete() { can_unload_ = false; }
+
  private:
   // A RuntimeModule can only be created with Module::Create...).
   RuntimeModule() = default;
@@ -172,6 +177,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   Soname name_;
   AbiModule abi_module_;
   size_type static_tls_bias_ = 0;
+  bool can_unload_ = true;
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
 };

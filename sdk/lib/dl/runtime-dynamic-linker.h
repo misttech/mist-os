@@ -46,10 +46,29 @@ class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
 
-  // Not copyable, not movable
-  RuntimeDynamicLinker() = default;
-  RuntimeDynamicLinker(const RuntimeDynamicLinker&) = delete;
-  RuntimeDynamicLinker(RuntimeDynamicLinker&&) = delete;
+  static std::unique_ptr<RuntimeDynamicLinker> Create(
+      const std::vector<AbiModule>& loaded_abi_modules, fbl::AllocChecker& linker_ac) {
+    std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
+    if (dynamic_linker) [[likely]] {
+      // TODO(caslyn): put this logic into a function.
+      // Populate a RuntimeModule data structures and add it to the modules_ list for
+      // each AbiModule loaded with the program.
+      for (const AbiModule& abi_module : loaded_abi_modules) {
+        fbl::AllocChecker module_ac;
+        std::unique_ptr<RuntimeModule> module =
+            RuntimeModule::Create(module_ac, Soname{abi_module.link_map.name.get()});
+        if (!module_ac.check()) [[unlikely]] {
+          return nullptr;
+        }
+        module->module() = abi_module;
+        module->set_no_delete();
+        // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
+        // startup modules.
+        dynamic_linker->modules_.push_back(std::move(module));
+      }
+    }
+    return dynamic_linker;
+  }
 
   constexpr const ModuleList& modules() const { return modules_; }
 
@@ -61,9 +80,8 @@ class RuntimeDynamicLinker {
   // case and include it as an example for the fit::error{Error} description.
 
   // Open `file` with the given `mode`, returning a pointer to the loaded module
-  // for the file. The `retrieve_file` argument is passed on to SessionModule.Load
-  // and is called as a
-  // `fit::result<std::optional<Error>, File>(Diagnostics&, std::string_view)`
+  // for the file. The `retrieve_file` argument is to the LinkingSession and
+  // is called as a `fit::result<std::optional<Error>, File>(Diagnostics&, std::string_view)`
   // with the following semantics:
   //   - fit::error{std::nullopt} is a not found error
   //   - fit::error{Error} is an error type that can be passed to
@@ -137,6 +155,9 @@ class RuntimeDynamicLinker {
   }
 
  private:
+  // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
+  RuntimeDynamicLinker() = default;
+
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
   RuntimeModule* FindModule(Soname name);

@@ -99,6 +99,10 @@ AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
   module.link_map.ld = dyn.data();
   module.soname = module.symbols.soname();
 
+  // All test abi modules that are loaded at startup will have global symbol
+  // visibility.
+  module.symbols_visible = true;
+
   return module;
 }
 
