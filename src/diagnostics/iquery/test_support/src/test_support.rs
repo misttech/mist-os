@@ -362,9 +362,6 @@ impl MockDir {
                 fio::DirectoryRequest::Open { flags, mode: _, path, object, .. } => {
                     self.clone().open(flags, &path, object);
                 }
-                fio::DirectoryRequest::Clone { flags, object, .. } => {
-                    self.clone().open(flags | fio::OpenFlags::DIRECTORY, ".", object);
-                }
                 fio::DirectoryRequest::Rewind { responder, .. } => {
                     self.at_end.store(false, Ordering::Relaxed);
                     responder.send(Status::OK.into_raw()).unwrap();
