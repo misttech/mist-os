@@ -50,8 +50,11 @@ zx::result<GptPartitionMetadata> QueryGptPartitionMetadata(
   GptPartitionMetadata metadata;
 
   fidl::WireResult result = fidl::WireCall<Partition>(volume)->GetMetadata();
-  if (!result.ok() || result->is_error()) {
+  if (!result.ok()) {
     return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    return result->take_error();
   }
   if (!result.value()->has_name() || !result.value()->has_type_guid() ||
       !result.value()->has_instance_guid()) {
@@ -395,7 +398,9 @@ zx::result<std::unique_ptr<BlockPartitionClient>> GptDevicePartitioner::FindPart
         fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>(chan.borrow());
     zx::result metadata = QueryGptPartitionMetadata(client);
     if (metadata.is_error()) {
-      ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      if (metadata.status_value() != ZX_ERR_NOT_SUPPORTED) {
+        ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      }
       return false;
     }
     return filter(*metadata);
