@@ -1317,15 +1317,7 @@ fn enable_ipv6_device_with_config<
         }
     }
 
-    // As per RFC 4861 section 6.3.7,
-    //
-    //    A host sends Router Solicitations to the all-routers multicast
-    //    address.
-    //
-    // If we are operating as a router, we do not solicit routers.
-    if !config.ip_config.unicast_forwarding_enabled {
-        RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
-    }
+    RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
 }
 
 fn disable_ipv6_device_with_config<

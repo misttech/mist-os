@@ -9,7 +9,6 @@ use core::num::{NonZeroU16, NonZeroU8};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{AnyDevice, DeviceIdContext, DeviceIdentifier};
 
-use crate::internal::device::router_solicitation::RsHandler;
 use crate::internal::device::slaac::SlaacConfigurationUpdate;
 use crate::internal::device::state::{IpDeviceFlags, Ipv4DeviceConfiguration};
 use crate::internal::device::{
@@ -327,7 +326,6 @@ where
                     unicast_forwarding_enabled_updates,
                     |next| {
                         if next {
-                            RsHandler::stop_router_solicitation(core_ctx, bindings_ctx, device_id);
                             device::join_ip_multicast_with_config(
                                 core_ctx,
                                 bindings_ctx,
@@ -343,7 +341,6 @@ where
                                 Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
                                 config,
                             );
-                            RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
                         }
                     },
                 ),
