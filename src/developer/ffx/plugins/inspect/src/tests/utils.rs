@@ -97,11 +97,11 @@ pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> Arch
 }
 
 pub fn make_inspects_for_lifecycle() -> Vec<InspectData> {
-    let fake_filename = "fake-filename";
+    let fake_name = "fake-name";
     vec![
-        make_inspect("test/moniker1", 1, 20, fake_filename),
-        make_inspect("test/moniker1", 2, 30, fake_filename),
-        make_inspect("test/moniker3", 3, 3, fake_filename),
+        make_inspect("test/moniker1", 1, 20, fake_name),
+        make_inspect("test/moniker1", 2, 30, fake_name),
+        make_inspect("test/moniker3", 3, 3, fake_name),
     ]
 }
 
@@ -224,10 +224,10 @@ fn handle_remote_control_connect(
 }
 
 pub fn make_inspect_with_length(moniker: &str, timestamp: i64, len: usize) -> InspectData {
-    make_inspect(moniker, timestamp, len, "fake-filename")
+    make_inspect(moniker, timestamp, len, "fake-name")
 }
 
-pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, file_name: &str) -> InspectData {
+pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, tree_name: &str) -> InspectData {
     let long_string = std::iter::repeat("a").take(len).collect::<String>();
     let hierarchy = DiagnosticsHierarchy::new(
         String::from("name"),
@@ -240,17 +240,17 @@ pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, file_name: &str) 
         Timestamp::from_nanos(timestamp),
     )
     .with_hierarchy(hierarchy)
-    .with_name(InspectHandleName::filename(file_name))
+    .with_name(InspectHandleName::name(tree_name))
     .build()
 }
 
 pub fn make_inspects() -> Vec<InspectData> {
-    let fake_filename = "fake-filename";
+    let fake_name = "fake-name";
     vec![
-        make_inspect("test/moniker1", 1, 20, fake_filename),
-        make_inspect("test/moniker2", 2, 10, fake_filename),
-        make_inspect("test/moniker3", 3, 30, fake_filename),
-        make_inspect("test/moniker1", 20, 3, fake_filename),
+        make_inspect("test/moniker1", 1, 20, fake_name),
+        make_inspect("test/moniker2", 2, 10, fake_name),
+        make_inspect("test/moniker3", 3, 30, fake_name),
+        make_inspect("test/moniker1", 20, 3, fake_name),
     ]
 }
 
@@ -280,7 +280,7 @@ pub fn get_v1_json_dump() -> serde_json::Value {
             {
                 "data_source":"Inspect",
                 "metadata":{
-                    "filename":"fuchsia.inspect.Tree",
+                    "name":"fuchsia.inspect.Tree",
                     "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager",
                     "timestamp":0
                 },
@@ -313,7 +313,7 @@ pub fn get_v1_single_value_json() -> serde_json::Value {
             {
                 "data_source":"Inspect",
                 "metadata":{
-                    "filename":"fuchsia.inspect.Tree",
+                    "name":"fuchsia.inspect.Tree",
                     "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager",
                     "timestamp":0
                 },
