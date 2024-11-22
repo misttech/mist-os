@@ -81,6 +81,14 @@ _COMPOSITE_POLICY_PATHS = (
         ),
         "range_transition_policy.pp",
     ),
+    (
+        (
+            "base_policy.conf",
+            "new_file/minimal_policy.conf",
+            "new_file/allow_fork.conf",
+        ),
+        "allow_fork.pp",
+    ),
 )
 
 

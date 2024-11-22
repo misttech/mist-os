@@ -27,6 +27,7 @@ rustc_library("selinux") {
     "src/sync.rs",
   ]
   inputs = [
+    "testdata/composite_policies/compiled/allow_fork.pp",
     "testdata/composite_policies/compiled/class_defaults_policy.pp",
     "testdata/composite_policies/compiled/minimal_policy.pp",
     "testdata/composite_policies/compiled/range_transition_policy.pp",

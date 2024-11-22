@@ -48,14 +48,14 @@ impl<Q: Query> QueryMut for Q {
 
 /// An interface for emptying caches that store [`Query`] input/output pairs. This interface
 /// requires implementers to update state via interior mutability.
-trait Reset {
+pub(super) trait Reset {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&self) -> bool;
 }
 
 /// An interface for emptying caches that store [`Query`] input/output pairs.
-trait ResetMut {
+pub(super) trait ResetMut {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&mut self) -> bool;

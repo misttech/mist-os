@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
+use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut, Reset};
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
@@ -206,6 +206,10 @@ impl SecurityServer {
             state.active_policy = Some(ActivePolicy { parsed, binary, sid_table });
             state.policy_change_count += 1;
         });
+
+        // TODO: https://fxbug.dev/367585803 - move this cache-resetting into the
+        // closure passed to self.with_state_and_update_status.
+        self.avc_manager.reset();
 
         Ok(())
     }
@@ -587,6 +591,10 @@ mod tests {
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
+    const MINIMAL_BINARY_POLICY: &[u8] =
+        include_bytes!("../testdata/composite_policies/compiled/minimal_policy.pp");
+    const ALLOW_FORK_BINARY_POLICY: &[u8] =
+        include_bytes!("../testdata/composite_policies/compiled/allow_fork.pp");
 
     fn security_server_with_tests_policy() -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
@@ -931,6 +939,37 @@ mod tests {
 
         // User copied from source, high security level from target, role and type as default.
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
+    }
+
+    #[test]
+    fn permissions_are_fresh_after_different_policy_load() {
+        let minimal_bytes = MINIMAL_BINARY_POLICY.to_vec();
+        let allow_fork_bytes = ALLOW_FORK_BINARY_POLICY.to_vec();
+        let context = b"source_u:object_r:source_t:s0:c0";
+
+        let security_server = SecurityServer::new();
+        security_server.set_enforcing(true);
+
+        let permission_check = security_server.as_permission_check();
+
+        // Load the minimal policy and get a SID for the context.
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(minimal_bytes.clone()).map_err(|e| format!("{:?}", e))
+        );
+        let sid = security_server.security_context_to_sid(context.into()).unwrap();
+
+        // The minimal policy does not grant fork allowance.
+        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+
+        // Load a policy that does grant fork allowance.
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(allow_fork_bytes).map_err(|e| format!("{:?}", e))
+        );
+
+        // The now-loaded "allow_fork" policy allows the context represented by `sid` to fork.
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
     }
 
     #[test]
