@@ -310,8 +310,14 @@ zx::result<> sampler::ThreadSamplerDispatcher::SampleThreadImpl(zx_koid_t pid, z
     }
   }
 
+  // Up until this point, interrupts are enabled so that we can handle faults when doing usercopies.
+  // However, once we want to write, we aren't using a concurrent writing algorithm. We need to
+  // ensure we don't get interrupted or context switched while we are writing. Otherwise, we could
+  // SetPendingWrite, get context switched out, and then have another thread attempt to
+  // SetPendingWrite which would assert.
+  InterruptDisableGuard irqd;
   internal::PerCpuState& cpu_state = GetPerCpuState(arch_curr_cpu_num());
-  bool enabled = cpu_state.SetPendingWrite();
+  const bool enabled = cpu_state.SetPendingWrite();
   if (!enabled) {
     // Even though we didn't successfully write a sample, we return a success result -- we should
     // still try to sample the thread as it may later be scheduled on a different cpu.

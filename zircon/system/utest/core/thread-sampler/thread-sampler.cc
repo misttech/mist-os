@@ -472,4 +472,62 @@ TEST(ThreadSampler, NonRunningThread) {
   ASSERT_GE(*record_count, size_t{10});
 }
 
+TEST(ThreadSampler, HighFrequency) {
+  // Start the thread sampler a large number of threads at a high frequency to stress the sampler.
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
+  // We use a larger buffer size than the other tests. We need enough buffer room that the buffers
+  // don't immediately fill up and sampling stops.
+  size_t buffer_size = 1000 * ZX_PAGE_SIZE;
+  zx_sampler_config_t config{
+      .period = zx::usec(50).get(),
+      .buffer_size = buffer_size,
+  };
+  zx::iob sampler;
+
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
+
+  zx_status_t create_res =
+      zx_sampler_create(debug_resource.get(), 0, &config, sampler.reset_and_get_address());
+  if constexpr (!sampler_enabled) {
+    ASSERT_EQ(create_res, ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  ASSERT_OK(create_res);
+
+  std::vector<zx::event> events;
+  std::vector<std::thread> threads;
+  for (size_t i = 0; i < 100; i++) {
+    zx::event& event = events.emplace_back();
+    ASSERT_EQ(zx::event::create(0, &event), ZX_OK);
+
+    // Create a thread
+    std::thread& sample_thread = threads.emplace_back(TestFn, event.borrow());
+    zx_handle_t native_handle = native_thread_get_zx_handle(sample_thread.native_handle());
+
+    ASSERT_OK(event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr));
+    ASSERT_OK(zx_sampler_attach(sampler.get(), native_handle));
+  }
+
+  ASSERT_OK(zx_sampler_start(sampler.get()));
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_OK(zx_sampler_stop(sampler.get()));
+
+  for (auto& event : events) {
+    ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_1));
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  zx::result<size_t> record_count = CountRecords(sampler, buffer_size);
+  ASSERT_OK(record_count.status_value());
+  ASSERT_GE(*record_count, 10);
+}
+
 }  // namespace
