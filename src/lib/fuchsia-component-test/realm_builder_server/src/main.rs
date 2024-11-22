@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
+use cm_rust::{CapabilityTypeName, FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
 use cm_types::{LongName, RelativePath};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_inspect::InspectSinkMarker;
@@ -32,6 +32,9 @@ mod builtin;
 mod resolver;
 mod runner;
 
+#[cfg(fuchsia_api_level_at_least = "25")]
+const DIAGNOSTICS_DICT_NAME: &str = "diagnostics";
+
 static BINDER_EXPOSE_DECL: LazyLock<cm_rust::ExposeDecl> = LazyLock::new(|| {
     cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
         source: cm_rust::ExposeSource::Framework,
@@ -45,12 +48,41 @@ static BINDER_EXPOSE_DECL: LazyLock<cm_rust::ExposeDecl> = LazyLock::new(|| {
     })
 });
 
-static PROTOCOLS_ROUTED_TO_ALL: LazyLock<[cm_types::Name; 2]> = LazyLock::new(|| {
-    [
-        cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
-        cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
-    ]
-});
+#[cfg(fuchsia_api_level_at_least = "25")]
+static CAPABILITIES_ROUTED_TO_ALL: LazyLock<[(CapabilityTypeName, cm_types::Name); 3]> =
+    LazyLock::new(|| {
+        [
+            (
+                CapabilityTypeName::Dictionary,
+                cm_types::Name::from_str(DIAGNOSTICS_DICT_NAME).unwrap(),
+            ),
+            // TODO(https://fxbug.dev/345827642): remove the explicit routing of LogSink and InspectSink.
+            // Components should instead use these protocols from the diagnostics dictionary.
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+        ]
+    });
+
+#[cfg(fuchsia_api_level_less_than = "25")]
+static CAPABILITIES_ROUTED_TO_ALL: LazyLock<[(CapabilityTypeName, cm_types::Name); 2]> =
+    LazyLock::new(|| {
+        [
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(LogSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+            (
+                CapabilityTypeName::Protocol,
+                cm_types::Name::from_str(InspectSinkMarker::PROTOCOL_NAME).unwrap(),
+            ),
+        ]
+    });
 
 #[fuchsia::main]
 async fn main() {
@@ -940,9 +972,9 @@ impl RealmNodeState {
     /// Protocols are matched via their `target_name`.
     fn route_common_protocols_from_parent(&mut self) {
         for child in &self.decl.children {
-            for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
+            for (type_name, capability_name) in &*CAPABILITIES_ROUTED_TO_ALL {
                 if self.decl.offers.iter().any(|offer| {
-                    offer.target_name() == protocol
+                    offer.target_name() == capability_name
                         && match offer.target() {
                             cm_rust::OfferTarget::Child(child_ref) => child_ref.name == child.name,
                             cm_rust::OfferTarget::Collection(_) => true,
@@ -951,20 +983,43 @@ impl RealmNodeState {
                 }) {
                     continue;
                 }
-
-                self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone(),
-                        collection: None,
-                    }),
-                    source_name: protocol.clone(),
+                let decl = match type_name {
+                    CapabilityTypeName::Protocol => {
+                        cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                            source: cm_rust::OfferSource::Parent,
+                            target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: child.name.clone(),
+                                collection: None,
+                            }),
+                            source_name: capability_name.clone(),
+                            #[cfg(fuchsia_api_level_at_least = "25")]
+                            source_dictionary: Default::default(),
+                            target_name: capability_name.clone(),
+                            dependency_type: cm_rust::DependencyType::Strong,
+                            availability: cm_rust::Availability::Required,
+                        })
+                    }
                     #[cfg(fuchsia_api_level_at_least = "25")]
-                    source_dictionary: Default::default(),
-                    target_name: protocol.clone(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Required,
-                }));
+                    CapabilityTypeName::Dictionary => {
+                        cm_rust::OfferDecl::Dictionary(cm_rust::OfferDictionaryDecl {
+                            source: cm_rust::OfferSource::Parent,
+                            target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: child.name.clone(),
+                                collection: None,
+                            }),
+                            source_name: capability_name.clone(),
+                            source_dictionary: Default::default(),
+                            target_name: capability_name.clone(),
+                            dependency_type: cm_rust::DependencyType::Strong,
+                            availability: cm_rust::Availability::Required,
+                        })
+                    }
+                    _ => {
+                        unreachable!("we don't route other kinds of capabilities to all components")
+                    }
+                };
+
+                self.decl.offers.push(decl);
             }
         }
     }
@@ -2413,23 +2468,39 @@ mod tests {
         }
 
         fn add_recursive_automatic_decls(&mut self) {
-            let create_offer_decl = |child_name: &str, protocol: cm_types::Name| {
-                OfferBuilder::protocol()
-                    .name(protocol.as_str())
-                    .source(cm_rust::OfferSource::Parent)
-                    .target_static_child(child_name)
-                    .build()
-            };
+            let create_offer_decl =
+                |kind: CapabilityTypeName, child_name: &str, name: cm_types::Name| match kind {
+                    CapabilityTypeName::Protocol => OfferBuilder::protocol()
+                        .name(name.as_str())
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child(child_name)
+                        .build(),
+                    #[cfg(fuchsia_api_level_at_least = "25")]
+                    CapabilityTypeName::Dictionary => OfferBuilder::dictionary()
+                        .name(name.as_str())
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child(child_name)
+                        .build(),
+                    _ => unreachable!("we only call this with protocols and dictionaries"),
+                };
 
             for child in &self.decl.children {
-                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(child.name.as_ref(), protocol.clone()));
+                for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(
+                        *kind,
+                        child.name.as_ref(),
+                        capability.clone(),
+                    ));
                 }
             }
 
             for (child_name, _, _) in &self.children {
-                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
-                    self.decl.offers.push(create_offer_decl(child_name.as_ref(), protocol.clone()));
+                for (kind, capability) in &*CAPABILITIES_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(
+                        *kind,
+                        child_name.as_ref(),
+                        capability.clone(),
+                    ));
                 }
             }
 
@@ -2703,6 +2774,12 @@ mod tests {
         let mut expected_output_tree = ComponentTree {
             decl: ComponentDeclBuilder::new()
                 .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("a"),
+                )
+                .offer(
                     OfferBuilder::protocol()
                         .name(LogSinkMarker::PROTOCOL_NAME)
                         .source(cm_rust::OfferSource::Parent)
@@ -2713,6 +2790,12 @@ mod tests {
                         .name(InspectSinkMarker::PROTOCOL_NAME)
                         .source(cm_rust::OfferSource::Parent)
                         .target_static_child("a"),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::protocol()
@@ -2734,6 +2817,12 @@ mod tests {
                 ComponentTree {
                     decl: ComponentDeclBuilder::new()
                         .offer(
+                            OfferBuilder::dictionary()
+                                .name(DIAGNOSTICS_DICT_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_static"),
+                        )
+                        .offer(
                             OfferBuilder::protocol()
                                 .name(LogSinkMarker::PROTOCOL_NAME)
                                 .source(cm_rust::OfferSource::Parent)
@@ -2744,6 +2833,12 @@ mod tests {
                                 .name(InspectSinkMarker::PROTOCOL_NAME)
                                 .source(cm_rust::OfferSource::Parent)
                                 .target_static_child("b_child_static"),
+                        )
+                        .offer(
+                            OfferBuilder::dictionary()
+                                .name(DIAGNOSTICS_DICT_NAME)
+                                .source(cm_rust::OfferSource::Parent)
+                                .target_static_child("b_child_dynamic"),
                         )
                         .offer(
                             OfferBuilder::protocol()
@@ -3205,6 +3300,12 @@ mod tests {
 
         let mut expected_tree = ComponentTree {
             decl: ComponentDeclBuilder::new_empty_component()
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name(DIAGNOSTICS_DICT_NAME)
+                        .source(cm_rust::OfferSource::Parent)
+                        .target_static_child("realm_with_child"),
+                )
                 .offer(
                     OfferBuilder::protocol()
                         .name(LogSinkMarker::PROTOCOL_NAME)
