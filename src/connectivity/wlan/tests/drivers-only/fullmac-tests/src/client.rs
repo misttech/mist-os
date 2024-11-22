@@ -1086,9 +1086,10 @@ async fn test_signal_report() {
         let expected_snr_db = 30 + i;
         fullmac_driver
             .ifc_proxy
-            .signal_report(&fidl_fullmac::WlanFullmacSignalReportIndication {
-                rssi_dbm: expected_rssi_dbm,
-                snr_db: expected_snr_db,
+            .signal_report(&fidl_fullmac::WlanFullmacImplIfcSignalReportRequest {
+                rssi_dbm: Some(expected_rssi_dbm),
+                snr_db: Some(expected_snr_db),
+                ..Default::default()
             })
             .await
             .expect("Could not send SignalReport");

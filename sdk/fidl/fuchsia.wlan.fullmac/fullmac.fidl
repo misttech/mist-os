@@ -116,11 +116,6 @@ type WlanFullmacEapolConfirm = struct {
     dst_addr ieee80211.MacAddr;
 };
 
-type WlanFullmacSignalReportIndication = struct {
-    rssi_dbm int8;
-    snr_db int8;
-};
-
 type WlanFullmacEapolIndication = struct {
     src_addr ieee80211.MacAddr;
     dst_addr ieee80211.MacAddr;
@@ -483,8 +478,9 @@ closed protocol WlanFullmacImplIfc {
     }) -> ();
 
     // MLME extensions
-    strict SignalReport(struct {
-        ind WlanFullmacSignalReportIndication;
+    strict SignalReport(table {
+        1: rssi_dbm int8;
+        2: snr_db int8;
     }) -> ();
     strict EapolInd(struct {
         ind WlanFullmacEapolIndication;

@@ -1759,10 +1759,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let signal_report_ind =
-            fidl_fullmac::WlanFullmacSignalReportIndication { rssi_dbm: 1, snr_db: 2 };
+        let signal_report_req = fidl_fullmac::WlanFullmacImplIfcSignalReportRequest {
+            rssi_dbm: Some(1),
+            snr_db: Some(2),
+            ..Default::default()
+        };
         assert_variant!(
-            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.signal_report(&signal_report_ind)),
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.signal_report(&signal_report_req)),
             Poll::Ready(Ok(()))
         );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);

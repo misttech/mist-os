@@ -147,7 +147,7 @@ class DataFrameTest : public SimTest {
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
-  void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
+  void OnSignalReport(const fuchsia_wlan_fullmac::WlanFullmacImplIfcSignalReportRequest* req);
   void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
 
  protected:
@@ -258,7 +258,8 @@ void DataFrameInterface::EapolConf(EapolConfRequestView request,
 }
 void DataFrameInterface::SignalReport(SignalReportRequestView request,
                                       SignalReportCompleter::Sync& completer) {
-  test_->OnSignalReport(&request->ind);
+  auto signal_report = fidl::ToNatural(*request);
+  test_->OnSignalReport(&signal_report);
   completer.Reply();
 }
 void DataFrameInterface::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
@@ -333,7 +334,7 @@ void DataFrameTest::OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndicati
 }
 
 void DataFrameTest::OnSignalReport(
-    const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind) {
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcSignalReportRequest* req) {
   if (!testing_driver_triggered_deauth_) {
     // This function is only used for driver initiated deauth testing now.
     return;

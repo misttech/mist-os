@@ -144,7 +144,7 @@ class ConnectTest : public SimTest {
   void OnDisassocConf(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthIndRequest* ind);
-  void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
+  void OnSignalReport(const fuchsia_wlan_fullmac::WlanFullmacImplIfcSignalReportRequest* req);
 
  protected:
   struct ConnectContext {
@@ -274,7 +274,8 @@ void ConnectInterface::DisassocInd(DisassocIndRequestView request,
 }
 void ConnectInterface::SignalReport(SignalReportRequestView request,
                                     SignalReportCompleter::Sync& completer) {
-  test_->OnSignalReport(&request->ind);
+  auto signal_report = fidl::ToNatural(*request);
+  test_->OnSignalReport(&signal_report);
   completer.Reply();
 }
 
@@ -414,10 +415,13 @@ void ConnectTest::OnDisassocInd(
   }
 }
 
-void ConnectTest::OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind) {
+void ConnectTest::OnSignalReport(
+    const fuchsia_wlan_fullmac::WlanFullmacImplIfcSignalReportRequest* req) {
   context_.signal_ind_count++;
-  context_.signal_ind_rssi = ind->rssi_dbm;
-  context_.signal_ind_snr = ind->snr_db;
+  ASSERT_TRUE(req->rssi_dbm().has_value());
+  context_.signal_ind_rssi = req->rssi_dbm().value();
+  ASSERT_TRUE(req->snr_db().has_value());
+  context_.signal_ind_snr = req->snr_db().value();
 }
 
 void ConnectTest::StartConnect() {

@@ -465,11 +465,16 @@ pub fn convert_channel_switch_info(
 ) -> fidl_internal::ChannelSwitchInfo {
     fidl_internal::ChannelSwitchInfo { new_channel: info.new_channel }
 }
-pub fn convert_signal_report_indication(
-    ind: fidl_fullmac::WlanFullmacSignalReportIndication,
-) -> fidl_internal::SignalReportIndication {
-    fidl_internal::SignalReportIndication { rssi_dbm: ind.rssi_dbm, snr_db: ind.snr_db }
+
+pub fn convert_signal_report(
+    req: fidl_fullmac::WlanFullmacImplIfcSignalReportRequest,
+) -> Result<fidl_internal::SignalReportIndication> {
+    Ok(fidl_internal::SignalReportIndication {
+        rssi_dbm: req.rssi_dbm.context("missing rssi_dbm")?,
+        snr_db: req.snr_db.context("missing snr_db")?,
+    })
 }
+
 pub fn convert_eapol_indication(
     ind: fidl_fullmac::WlanFullmacEapolIndication,
 ) -> fidl_mlme::EapolIndication {

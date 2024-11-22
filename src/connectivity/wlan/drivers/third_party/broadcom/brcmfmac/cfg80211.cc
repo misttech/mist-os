@@ -2627,11 +2627,8 @@ static void cfg80211_signal_ind(net_device* ndev) {
 
   // Send signal report indication only if client is in connected state
   if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state)) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind = {};
     int8_t rssi, snr;
     if (brcmf_get_rssi_snr(ndev, &rssi, &snr) == ZX_OK) {
-      signal_ind.rssi_dbm = rssi;
-      signal_ind.snr_db = snr;
       // Store the value in ndev (dumped out when link goes down)
       ndev->last_known_rssi_dbm = rssi;
       ndev->last_known_snr_db = snr;
@@ -2640,7 +2637,12 @@ static void cfg80211_signal_ind(net_device* ndev) {
         BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
         return;
       }
-      auto result = ndev->if_proto.buffer(*arena)->SignalReport(signal_ind);
+      const auto signal_report =
+          fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcSignalReportRequest::Builder(*arena)
+              .rssi_dbm(rssi)
+              .snr_db(snr)
+              .Build();
+      const auto result = ndev->if_proto.buffer(*arena)->SignalReport(signal_report);
       if (!result.ok()) {
         BRCMF_ERR("Failed to send signal report result.status: %s", result.status_string());
         return;

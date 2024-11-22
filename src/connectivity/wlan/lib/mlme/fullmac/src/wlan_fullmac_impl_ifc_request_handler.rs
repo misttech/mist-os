@@ -121,10 +121,10 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_channel_switch_info(ind),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::SignalReport { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::SignalReport { payload, responder } => {
             responder.send().context("Failed to respond to SignalReport")?;
             driver_event_sink.0.send(FullmacDriverEvent::SignalReport {
-                ind: fullmac_to_mlme::convert_signal_report_indication(ind),
+                ind: fullmac_to_mlme::convert_signal_report(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::EapolInd { ind, responder } => {
