@@ -447,7 +447,8 @@ impl MountRecord {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(locked, ".".into())?;
+        let mut current_node =
+            system_task.lookup_path_from_root(locked, ".".into()).context("looking up '.'")?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -456,28 +457,29 @@ impl MountRecord {
         let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
 
         for sub_dir in Path::new(path).components() {
-            let sub_dir = sub_dir.as_os_str().as_bytes();
-
+            let sub_dir_bytes = sub_dir.as_os_str().as_bytes();
             current_node = match current_node.create_node(
                 locked,
                 system_task,
-                sub_dir.into(),
+                sub_dir_bytes.into(),
                 mode!(IFDIR, 0o755),
                 DeviceType::NONE,
             ) {
                 Ok(node) => node,
-                Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(locked, system_task, &mut context, sub_dir.into())?
-                }
+                Err(errno) if errno == EEXIST || errno == ENOTDIR => current_node
+                    .lookup_child(locked, system_task, &mut context, sub_dir_bytes.into())
+                    .with_context(|| format!("looking up {sub_dir:?}"))?,
                 Err(e) => bail!(e),
             };
         }
 
-        let (status, rights) = directory.get_flags(zx::MonotonicInstant::INFINITE)?;
-        zx::Status::ok(status)?;
+        let (status, rights) = directory
+            .get_flags(zx::MonotonicInstant::INFINITE)
+            .context("getting directory flags")?;
+        zx::Status::ok(status).context("getting directory flags (status)")?;
 
         let (client_end, server_end) = zx::Channel::create();
-        directory.clone2(ServerEnd::new(server_end))?;
+        directory.clone2(ServerEnd::new(server_end)).context("cloning directory")?;
 
         // If a filesystem security label argument was provided then apply it to all files via
         // mountpoint-labeling, with a "context=..." mount option.
@@ -492,14 +494,16 @@ impl MountRecord {
             client_end,
             FileSystemOptions { source: path.into(), params, ..Default::default() },
             rights,
-        )?;
+        )
+        .context("making remote fs")?;
 
-        security::file_system_resolve_security(locked, system_task, &fs)?;
+        security::file_system_resolve_security(locked, system_task, &fs)
+            .context("resolving security")?;
 
         // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
         // up some flags.
         let flags = MountFlags::NOSUID | MountFlags::NODEV | MountFlags::RELATIME;
-        current_node.mount(WhatToMount::Fs(fs), flags)?;
+        current_node.mount(WhatToMount::Fs(fs), flags).context("mounting fs")?;
         self.mounts.push(current_node);
 
         Ok(())
