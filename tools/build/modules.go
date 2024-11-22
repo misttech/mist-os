@@ -37,6 +37,7 @@ type Modules struct {
 	packageRepositories      []PackageRepo
 	platforms                []DimensionSet
 	prebuiltBinarySets       []PrebuiltBinarySet
+	prebuiltVersionsLocation PrebuiltVersionsLocation
 	productBundles           []ProductBundle
 	productSizeCheckerOutput []ProductSizeCheckerOutput
 	sdkArchives              []SDKArchive
@@ -71,6 +72,7 @@ func NewModules(buildDir string) (*Modules, error) {
 		"package-repositories":        &m.packageRepositories,
 		"platforms":                   &m.platforms,
 		"prebuilt_binaries":           &m.prebuiltBinarySets,
+		"prebuilt_versions_location":  &m.prebuiltVersionsLocation,
 		"product_bundles":             &m.productBundles,
 		"product_size_checker_output": &m.productSizeCheckerOutput,
 		"rust_target_mapping":         &m.clippyTargets,
@@ -161,6 +163,14 @@ func (m Modules) Platforms() []DimensionSet {
 // registered in the build.
 func (m Modules) PrebuiltBinarySets() []PrebuiltBinarySet {
 	return m.prebuiltBinarySets
+}
+
+func (m Modules) PrebuiltVersionsLocation() PrebuiltVersionsLocation {
+	return m.prebuiltVersionsLocation
+}
+
+func (m Modules) PrebuiltVersions() ([]PrebuiltVersion, error) {
+	return LoadPrebuiltVersions(filepath.Join(m.BuildDir(), m.PrebuiltVersionsLocation().Location))
 }
 
 func (m Modules) ProductSizeCheckerOutput() []ProductSizeCheckerOutput {

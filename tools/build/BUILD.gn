@@ -45,6 +45,8 @@ go_library("build") {
     "package_manifest_test.go",
     "package_repositories.go",
     "prebuilt_binaries.go",
+    "prebuilt_versions.go",
+    "prebuilt_versions_test.go",
     "product_bundles.go",
     "product_size_checker_output.go",
     "sdk_archives.go",
