@@ -40,6 +40,7 @@
         },
     ],
     use: [
+        { protocol: "fuchsia.kernel.VmexResource" },
         {
             directory: "boot-kernel",
             rights: [ "r*" ],
@@ -49,16 +50,19 @@
             directory: "dev-hrtimer",
             rights: [ "r*" ],
             path: "/dev/class/hrtimer",
+            availability: "optional",
         },
         {
             directory: "dev-gpu",
             rights: [ "r*" ],
             path: "/dev/class/gpu",
+            availability: "optional",
         },
         {
             directory: "dev-adb",
             rights: [ "r*" ],
             path: "/dev/class/adb",
+            availability: "optional",
         },
         {
             directory: "container_config",
@@ -69,17 +73,10 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.recovery.FactoryReset",
-            ],
-            from: "parent",
-        },
-        {
-            protocol: [
                 "fuchsia.buildinfo.Provider",
+                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
@@ -101,6 +98,7 @@
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.recovery.FactoryReset",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.starnix.runner.Manager",
                 "fuchsia.sysinfo.SysInfo",
