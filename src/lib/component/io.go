@@ -398,11 +398,6 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 	return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotFound}, dirState)
 }
 
-func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols io.ConnectionProtocols, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/348698584): Remove.
-	return CloseWithEpitaph(channel, zx.ErrNotSupported)
-}
-
 func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
 	if path == dot {
 		return dirState.addConnection(flags, channel)

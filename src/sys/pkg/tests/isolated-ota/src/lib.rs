@@ -556,10 +556,6 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
                     object.close_with_epitaph(zx::Status::IO)?;
                 }
             }
-            fio::DirectoryRequest::Open2 { path, protocols, object_request, control_handle: _ } => {
-                let _ = object_request;
-                todo!("https://fxbug.dev/293947862: path={} protocols={:?}", path, protocols);
-            }
             fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
                 vfs::ObjectRequest::new3(flags, &options, object).handle(|request| {
                     if path == "." {

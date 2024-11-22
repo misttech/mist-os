@@ -15,8 +15,6 @@ use crate::protocols::ToFlags as _;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-#[cfg(any(fuchsia_api_level_less_than = "23", fuchsia_api_level_at_least = "PLATFORM"))]
-use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
@@ -166,19 +164,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
-            }
-            #[cfg(any(
-                fuchsia_api_level_less_than = "23",
-                fuchsia_api_level_at_least = "PLATFORM"
-            ))]
-            fio::DirectoryRequest::Open2 {
-                path: _,
-                protocols: _,
-                object_request,
-                control_handle: _,
-            } => {
-                trace::duration!(c"storage", c"Directory::Open2");
-                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 trace::duration!(c"storage", c"Directory::AdvisoryLock");

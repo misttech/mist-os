@@ -102,29 +102,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.io/ConnectionProtocols.connector",
-        "ordinal": "1",
-        "type": "fuchsia.io/ConnectorFlags"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.io/ConnectionProtocols.node",
-        "ordinal": "2",
-        "type": "fuchsia.io/NodeOptions"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.io/ConnectionProtocols",
-        "strictness": "flexible"
-    },
-    {
-        "kind": "bits",
-        "name": "fuchsia.io/ConnectorFlags",
-        "strictness": "flexible",
-        "type": "uint64"
-    },
-    {
         "kind": "table",
         "name": "fuchsia.io/ConnectorInfo"
     },
@@ -243,14 +220,6 @@
         "ordinal": "3193127272456937152",
         "direction": "one_way",
         "request": "fuchsia.io/DirectoryOpenRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.Open2",
-        "strictness": "strict",
-        "ordinal": "3439711884268033238",
-        "direction": "one_way",
-        "request": "fuchsia.io/DirectoryOpen2Request"
     },
     {
         "kind": "protocol/member",
@@ -425,29 +394,6 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen2Request.object_request",
-        "ordinal": "3",
-        "type": "zx/Handle:CHANNEL"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen2Request.path",
-        "ordinal": "1",
-        "type": "string:4095"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen2Request.protocols",
-        "ordinal": "2",
-        "type": "fuchsia.io/ConnectionProtocols"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/DirectoryOpen2Request",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.io/DirectoryOpen3Request.flags",
         "ordinal": "2",
         "type": "fuchsia.io/Flags"
@@ -503,16 +449,6 @@
         "kind": "struct",
         "name": "fuchsia.io/DirectoryOpenRequest",
         "resourceness": "resource"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/DirectoryProtocolOptions.optional_rights",
-        "ordinal": "1",
-        "type": "fuchsia.io/Operations"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/DirectoryProtocolOptions"
     },
     {
         "kind": "struct/member",
@@ -936,22 +872,6 @@
         "kind": "struct",
         "name": "fuchsia.io/FileObject",
         "resourceness": "resource"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/FileProtocolFlags.APPEND",
-        "value": "1"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/FileProtocolFlags.TRUNCATE",
-        "value": "2"
-    },
-    {
-        "kind": "bits",
-        "name": "fuchsia.io/FileProtocolFlags",
-        "strictness": "flexible",
-        "type": "uint64"
     },
     {
         "kind": "struct/member",
@@ -1706,17 +1626,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "bits/member",
-        "name": "fuchsia.io/NodeFlags.GET_REPRESENTATION",
-        "value": "1"
-    },
-    {
-        "kind": "bits",
-        "name": "fuchsia.io/NodeFlags",
-        "strictness": "flexible",
-        "type": "uint64"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.io/NodeGetAttrResponse.attributes",
         "ordinal": "2",
@@ -1800,34 +1709,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeOptions.flags",
-        "ordinal": "1",
-        "type": "fuchsia.io/NodeFlags"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeOptions.mode",
-        "ordinal": "3",
-        "type": "fuchsia.io/OpenMode"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeOptions.protocols",
-        "ordinal": "2",
-        "type": "fuchsia.io/NodeProtocols"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeOptions.rights",
-        "ordinal": "4",
-        "type": "fuchsia.io/Operations"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/NodeOptions"
-    },
-    {
         "kind": "bits/member",
         "name": "fuchsia.io/NodeProtocolKinds.CONNECTOR",
         "value": "1"
@@ -1847,22 +1728,6 @@
         "name": "fuchsia.io/NodeProtocolKinds",
         "strictness": "flexible",
         "type": "uint64"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeProtocols.directory",
-        "ordinal": "1",
-        "type": "fuchsia.io/DirectoryProtocolOptions"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/NodeProtocols.file",
-        "ordinal": "2",
-        "type": "fuchsia.io/FileProtocolFlags"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/NodeProtocols"
     },
     {
         "kind": "struct/member",
@@ -2016,27 +1881,6 @@
     {
         "kind": "bits",
         "name": "fuchsia.io/OpenFlags",
-        "strictness": "strict",
-        "type": "uint32"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.ALWAYS_CREATE",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.MAYBE_CREATE",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.OPEN_EXISTING",
-        "value": "1"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.io/OpenMode",
         "strictness": "strict",
         "type": "uint32"
     },

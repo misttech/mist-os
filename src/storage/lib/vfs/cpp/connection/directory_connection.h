@@ -90,12 +90,6 @@ class DirectoryConnection final : public Connection,
   void Link(LinkRequestView request, LinkCompleter::Sync& completer) final;
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
-#if FUCHSIA_API_LEVEL_LESS_THAN(23) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
-  void Open2(fuchsia_io::wire::DirectoryOpen2Request* request,
-             Open2Completer::Sync& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void CreateSymlink(fuchsia_io::wire::DirectoryCreateSymlinkRequest* request,
                      CreateSymlinkCompleter::Sync& completer) final {
