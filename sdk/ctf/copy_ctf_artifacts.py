@@ -56,6 +56,7 @@ def main() -> int:
         stripped = path.removeprefix(args.path_prefix_to_strip + "/")
         dest = os.path.join(output_directory, stripped)
         shutil.copyfile(path, dest)
+        shutil.copymode(path, dest)  # Preserve executable bits
         copied_files.append(CopiedFile(path, dest))
         output_artifacts.append(stripped)
 
