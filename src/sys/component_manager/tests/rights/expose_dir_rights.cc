@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/svc/outgoing.h>
@@ -12,6 +12,8 @@
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_dir.h"
 
+namespace fio = fuchsia_io;
+
 int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
@@ -20,39 +22,29 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "Failed to create memfs: %s\n", result.status_string());
     return -1;
   }
-  auto& [memfs, root] = result.value();
-
-  auto [memfs_dir, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-  if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(server));
-      status != ZX_OK) {
-    fprintf(stderr, "Failed to server memfs directory: %s\n", zx_status_get_string(status));
-    return -1;
-  }
+  auto [memfs, root] = std::move(result).value();
 
   svc::Outgoing outgoing(loop.dispatcher());
 
-  using fuchsia_io::wire::OpenFlags;
-
-  std::pair<fbl::String, OpenFlags> dirs[] = {
-      {"read_only", OpenFlags::kRightReadable},
-      {"read_write", OpenFlags::kRightReadable | OpenFlags::kRightWritable},
-      {"read_exec", OpenFlags::kRightReadable | OpenFlags::kRightExecutable},
-      {"read_only_after_scoped", OpenFlags::kRightReadable | OpenFlags::kRightWritable},
+  std::pair<fbl::String, fio::Flags> dirs[] = {
+      {"read_only", fio::kPermReadable},
+      {"read_write", fio::kPermReadable | fio::kPermWritable},
+      {"read_exec", fio::kPermReadable | fio::kPermExecutable},
+      {"read_only_after_scoped", fio::kPermReadable | fio::kPermWritable},
   };
 
-  for (const auto& [name, rights] : dirs) {
-    auto [client, node_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    fidl::ServerEnd<fuchsia_io::Node> server(node_server.TakeChannel());
-    if (fidl::Status result = fidl::WireCall(memfs_dir)->Clone(rights, std::move(server));
-        !result.ok()) {
-      fprintf(stderr, "Failed to clone memfs dir: %s\n", result.FormatDescription().c_str());
+  for (const auto& [name, flags] : dirs) {
+    auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
+    zx_status_t status = memfs->Serve(root, server.TakeChannel(), flags);
+    if (status != ZX_OK) {
+      fprintf(stderr, "Failed to serve '%s': %s\n", name.c_str(), zx_status_get_string(status));
       return -1;
     }
-    if (zx_status_t status = outgoing.root_dir()->AddEntry(
-            name, fbl::MakeRefCounted<fs::RemoteDir>(std::move(client)));
-        status != ZX_OK) {
-      fprintf(stderr, "Failed to add outgoing entry: %s\n", zx_status_get_string(status));
+    fbl::RefPtr remote = fbl::MakeRefCounted<fs::RemoteDir>(std::move(client));
+    status = outgoing.root_dir()->AddEntry(name, std::move(remote));
+    if (status != ZX_OK) {
+      fprintf(stderr, "Failed to add '%s' to outgoing: %s\n", name.c_str(),
+              zx_status_get_string(status));
       return -1;
     }
   }

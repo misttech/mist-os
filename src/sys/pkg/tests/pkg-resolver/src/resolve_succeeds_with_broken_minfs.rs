@@ -64,13 +64,6 @@ where
         async move {
             while let Some(req) = stream.next().await {
                 match req.unwrap() {
-                    // TODO(https://fxbug.dev/378924331): Implement Clone2, migrate callers, and
-                    // remove Clone1.
-                    fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
-                        let stream = object.into_stream().unwrap().cast_stream();
-                        mock_filesystem::describe_dir(flags, &stream);
-                        fasync::Task::spawn(Arc::clone(&self).handle_stream(stream)).detach();
-                    }
                     fio::DirectoryRequest::Open {
                         flags,
                         mode: _,
@@ -101,8 +94,7 @@ where
                             )
                         });
                     }
-                    fio::DirectoryRequest::Close { .. } => (),
-                    req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
+                    request => panic!("Unhandled fuchsia.io/Directory request: {request:?}"),
                 }
             }
         }

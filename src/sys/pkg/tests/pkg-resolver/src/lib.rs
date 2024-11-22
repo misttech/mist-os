@@ -292,38 +292,18 @@ pub enum DirOrProxy {
 
 impl DirOrProxy {
     fn to_proxy(&self, rights: fio::Rights) -> fio::DirectoryProxy {
-        match &self {
-            DirOrProxy::Dir(d) => fuchsia_fs::directory::open_in_namespace(
-                d.path().to_str().unwrap(),
-                fio::Flags::from_bits(rights.bits()).unwrap(),
-            )
-            .unwrap(),
-            DirOrProxy::Proxy(p) => {
-                let mut open1_flags = fio::OpenFlags::empty();
-                if rights.contains(fio::R_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_READABLE;
-                }
-                if rights.contains(fio::W_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_WRITABLE;
-                }
-                if rights.contains(fio::X_STAR_DIR) {
-                    open1_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-                }
-                clone_directory_proxy(p, open1_flags)
+        let flags = fio::Flags::from_bits(rights.bits()).unwrap();
+        match self {
+            DirOrProxy::Dir(temp_dir) => {
+                let path = temp_dir.path().to_str().unwrap();
+                fuchsia_fs::directory::open_in_namespace(path, flags).unwrap()
+            }
+            DirOrProxy::Proxy(proxy) => {
+                fuchsia_fs::directory::open_directory_async(proxy, ".", flags).unwrap()
             }
         }
     }
 }
-
-pub fn clone_directory_proxy(
-    proxy: &fio::DirectoryProxy,
-    rights: fio::OpenFlags,
-) -> fio::DirectoryProxy {
-    let (client, server) = fidl::endpoints::create_endpoints();
-    proxy.clone(rights, server).unwrap();
-    ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap()
-}
-
 pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image:
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
