@@ -94,7 +94,6 @@ pub async fn get_remote_proxy(
                     _ => {
                         let retry_info =
                             format!("Retrying connection after non-fatal error encountered: {e}");
-                        eprintln!("{}", retry_info.as_str());
                         tracing::info!("{}", retry_info.as_str());
                         // Insert a small delay to prevent too tight of a spinning loop.
                         fuchsia_async::Timer::new(Duration::from_millis(20)).await;
