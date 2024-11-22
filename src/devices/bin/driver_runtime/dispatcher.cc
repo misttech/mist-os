@@ -34,7 +34,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/devices/bin/driver_runtime/callback_request.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 #include "src/devices/lib/log/log.h"
 
 namespace driver_runtime {
@@ -407,7 +407,7 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
     thread_pool = *result;
   }
   return CreateWithAdder(
-      options, name, scheduler_role, driver_context::GetCurrentDriver(), thread_pool,
+      options, name, scheduler_role, thread_context::GetCurrentDriver(), thread_pool,
       thread_pool->loop()->dispatcher(), [thread_pool]() { return thread_pool->AddThread(); },
       observer, out_dispatcher);
 }
@@ -417,7 +417,7 @@ zx_status_t Dispatcher::CreateUnmanagedDispatcher(
     Dispatcher** out_dispatcher) {
   auto unmanaged_thread_pool = GetDispatcherCoordinator().GetOrCreateUnmanagedThreadPool();
   return CreateWithAdder(
-      options, name, ThreadPool::kNoSchedulerRole, driver_context::GetCurrentDriver(),
+      options, name, ThreadPool::kNoSchedulerRole, thread_context::GetCurrentDriver(),
       unmanaged_thread_pool, unmanaged_thread_pool->loop()->dispatcher(),
       [unmanaged_thread_pool]() { return unmanaged_thread_pool->AddThread(); }, shutdown_observer,
       out_dispatcher);
@@ -571,8 +571,8 @@ void Dispatcher::CompleteShutdown() {
   }
 
   // We want |fdf_dispatcher_get_current_dispatcher| to work in cancellation and shutdown callbacks.
-  driver_context::PushDriver(owner_, this);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(owner_, this);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   // We remove one item at a time from the shutdown queue, in case someone
   // tries to cancel a wait (which has not been canceled yet) from within a
@@ -622,7 +622,7 @@ zx_status_t Dispatcher::Seal(uint32_t option) {
   {
     fbl::AutoLock lock(&callback_lock_);
 
-    if (driver_context::GetCurrentDispatcher() != this || !IsRunningLocked()) {
+    if (thread_context::GetCurrentDispatcher() != this || !IsRunningLocked()) {
       return ZX_ERR_BAD_STATE;
     }
 
@@ -687,7 +687,7 @@ zx_status_t Dispatcher::CancelWait(async_wait_t* wait) {
     // The async_wait is set to null right before the callback is invoked, so if it is null it's too
     // late to cancel. If the caller of |CancelWait| is not a dispatcher-managed thread then we
     // can't guarantee the dispatcher isn't currently invoking the callback.
-    if (async_wait == nullptr || driver_context::GetCurrentDispatcher() != this) {
+    if (async_wait == nullptr || thread_context::GetCurrentDispatcher() != this) {
       return ZX_ERR_NOT_FOUND;
     }
 
@@ -859,7 +859,7 @@ zx_status_t Dispatcher::UnbindIrq(async_irq_t* irq) {
     return ZX_ERR_NOT_FOUND;
   }
   // Check that the irq is unbound from the same dispatcher it was bound to.
-  auto cur_dispatcher = driver_context::GetCurrentDispatcher();
+  auto cur_dispatcher = thread_context::GetCurrentDispatcher();
   if (!cur_dispatcher || (cur_dispatcher != async_irq->GetDispatcherRef().get())) {
     return ZX_ERR_BAD_STATE;
   }
@@ -906,7 +906,7 @@ zx_status_t Dispatcher::GetSequenceId(async_sequence_id_t* out_sequence_id,
     *out_error = kSequenceIdWrongDispatcherType;
     return ZX_ERR_WRONG_TYPE;
   }
-  auto* current_dispatcher = driver_context::GetCurrentDispatcher();
+  auto* current_dispatcher = thread_context::GetCurrentDispatcher();
   if (current_dispatcher == nullptr) {
     *out_error = kSequenceIdUnknownThread;
     return ZX_ERR_INVALID_ARGS;
@@ -950,7 +950,7 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
     // Calling from a non-blocking dispatcher to a blocking dispatcher will lead to
     // the driver runtime queueing the callback onto the async loop.
     if (allow_sync_calls_) {
-      auto sender = driver_context::GetCurrentDispatcher();
+      auto sender = thread_context::GetCurrentDispatcher();
       bool sender_allows_sync = false;
       // Check if the sender is a blocking or non-blocking dispatcher.
       // We don't have to check further down the call stack, as we would never allow
@@ -997,11 +997,11 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
   // read callback on a thread not managed by the driver runtime.
   // We use |GetCurrentDriver| rather than |IsCallStackEmpty| as this also
   // handles the case where the testing dispatcher is set as the thread's default dispatcher.
-  if (!driver_context::GetCurrentDriver()) {
+  if (!thread_context::GetCurrentDriver()) {
     return fit::error(NonInlinedReason::kUnknownThread);
   }
-  if ((driver_context::GetCurrentDriver() == owner_) ||
-      driver_context::IsDriverInCallStack(owner_)) {
+  if ((thread_context::GetCurrentDriver() == owner_) ||
+      thread_context::IsDriverInCallStack(owner_)) {
     return fit::error(NonInlinedReason::kReentrant);
   }
   return fit::ok();
@@ -1242,8 +1242,8 @@ void Dispatcher::DispatchCallback(
   TRACE_DURATION("driver_runtime", "Dispatcher::DispatchCallback", "dispatcher_name",
                  name_.c_str());
 
-  driver_context::PushDriver(owner_, this);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(owner_, this);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   callback_request->Call(std::move(callback_request), ZX_OK);
 }
@@ -1748,7 +1748,7 @@ void DispatcherCoordinator::NotifyDispatcherShutdown(
   if (dispatcher_shutdown_observer) {
     // We should have already set up the driver call stack before calling
     // |NotifyDispatcherShutdown|.
-    ZX_ASSERT(driver_context::GetCurrentDispatcher() == &dispatcher);
+    ZX_ASSERT(thread_context::GetCurrentDispatcher() == &dispatcher);
     dispatcher_shutdown_observer->handler(static_cast<fdf_dispatcher_t*>(&dispatcher),
                                           dispatcher_shutdown_observer);
   }
@@ -1779,8 +1779,8 @@ void DispatcherCoordinator::NotifyDispatcherShutdown(
   {
     // Make sure the shutdown context looks like it is happening from the initial
     // dispatcher's thread.
-    driver_context::PushDriver(initial_dispatcher->owner(), initial_dispatcher.get());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(initial_dispatcher->owner(), initial_dispatcher.get());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     shutdown_callback();
   }
@@ -1879,7 +1879,7 @@ void DispatcherCoordinator::DestroyThreadPool(Dispatcher::ThreadPool* thread_poo
 }
 
 void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
-  if (driver_context::GetRoleProfileStatus().has_value()) {
+  if (thread_context::GetRoleProfileStatus().has_value()) {
     // We have already attempted to set the role profile for the current thread.
     return;
   }
@@ -1888,7 +1888,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
     // Failing to set the role profile is not a fatal error.
     LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
   }
-  driver_context::SetRoleProfileStatus(status);
+  thread_context::SetRoleProfileStatus(status);
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
@@ -2015,7 +2015,7 @@ void Dispatcher::ThreadPool::CacheUnboundIrq(std::unique_ptr<Dispatcher::AsyncIr
 }
 
 void Dispatcher::ThreadPool::OnThreadWakeup() {
-  uint32_t thread_irq_generation_id = driver_context::GetIrqGenerationId();
+  uint32_t thread_irq_generation_id = thread_context::GetIrqGenerationId();
   // Check if we have already tracked this thread wakeup for the current generation of irqs.
   // |cur_generatiom_id| is atomic - we do not acquire the lock here to avoid unnecessary lock
   // contention per thread wakeup. If the generation id changes in the meanwhile, the next wakeuup
@@ -2027,7 +2027,7 @@ void Dispatcher::ThreadPool::OnThreadWakeup() {
   fbl::AutoLock lock(&lock_);
   // We should set this first, as |cached_irqs_.NewThreadWakeupLocked| may increment the generation
   // id if it clears the current generation.
-  driver_context::SetIrqGenerationId(cached_irqs_.cur_generation_id());
+  thread_context::SetIrqGenerationId(cached_irqs_.cur_generation_id());
   cached_irqs_.NewThreadWakeupLocked(num_threads_);
 }
 

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_RUNTIME_DRIVER_CONTEXT_H_
-#define SRC_DEVICES_BIN_DRIVER_RUNTIME_DRIVER_CONTEXT_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_RUNTIME_THREAD_CONTEXT_H_
+#define SRC_DEVICES_BIN_DRIVER_RUNTIME_THREAD_CONTEXT_H_
 
 #include <zircon/types.h>
 
@@ -13,8 +13,7 @@ namespace driver_runtime {
 class Dispatcher;
 }  // namespace driver_runtime
 
-/// TODO(https://fxbug.dev/42053865): rename to thread_context.
-namespace driver_context {
+namespace thread_context {
 
 // Adds |driver| to the thread's current call stack.
 void PushDriver(const void* driver, driver_runtime::Dispatcher* dispatcher = nullptr);
@@ -54,6 +53,6 @@ std::optional<zx_status_t> GetRoleProfileStatus();
 // Sets the result of setting the role profile for the current thread.
 void SetRoleProfileStatus(zx_status_t status);
 
-}  // namespace driver_context
+}  // namespace thread_context
 
-#endif  // SRC_DEVICES_BIN_DRIVER_RUNTIME_DRIVER_CONTEXT_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_RUNTIME_THREAD_CONTEXT_H_

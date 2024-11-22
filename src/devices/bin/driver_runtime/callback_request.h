@@ -12,8 +12,8 @@
 
 #include <fbl/intrusive_double_list.h>
 
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/object.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 // Defined in "src/devices/bin/driver_runtime/dispatcher.h"
 namespace driver_runtime {
@@ -58,8 +58,8 @@ class CallbackRequest
     if (async_operation) {
       async_operation_ = async_operation;
     }
-    initiating_driver_ = driver_context::GetCurrentDriver();
-    initiating_dispatcher_ = driver_context::GetCurrentDispatcher();
+    initiating_driver_ = thread_context::GetCurrentDriver();
+    initiating_dispatcher_ = thread_context::GetCurrentDispatcher();
   }
 
   // Calls the callback, returning ownership of the request back the original requester,

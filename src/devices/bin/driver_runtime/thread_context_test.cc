@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_runtime/driver_context.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 #include <lib/driver/testing/cpp/driver_runtime.h>
 
@@ -10,11 +10,11 @@
 
 #include <zxtest/zxtest.h>
 
-namespace driver_context {
+namespace thread_context {
 
-class DriverContextTest : public zxtest::Test {
+class ThreadContextTest : public zxtest::Test {
  protected:
-  // Returns a fake driver pointer that can be used with driver_context APIs.
+  // Returns a fake driver pointer that can be used with thread_context APIs.
   // Do not try to access the internals of the pointer.
   const void* CreateFakeDriver() {
     // We don't actually need a real pointer.
@@ -37,7 +37,7 @@ class DriverContextTest : public zxtest::Test {
   int next_driver_ = 0xDEADBEEF;
 };
 
-TEST_F(DriverContextTest, PushPopStack) {
+TEST_F(ThreadContextTest, PushPopStack) {
   constexpr size_t kNumDrivers = 100;
   std::vector<const void*> drivers = CreateFakeDrivers(kNumDrivers);
 
@@ -59,11 +59,11 @@ TEST_F(DriverContextTest, PushPopStack) {
   }
 }
 
-TEST_F(DriverContextTest, PopEmptyStack) {
+TEST_F(ThreadContextTest, PopEmptyStack) {
   ASSERT_DEATH([] { PopDriver(); });
 }
 
-TEST_F(DriverContextTest, CallStackPerThread) {
+TEST_F(ThreadContextTest, CallStackPerThread) {
   const void* driverA = CreateFakeDriver();
   const void* driverB = CreateFakeDriver();
 
@@ -87,4 +87,4 @@ TEST_F(DriverContextTest, CallStackPerThread) {
   PopDriver();
 }
 
-}  // namespace driver_context
+}  // namespace thread_context

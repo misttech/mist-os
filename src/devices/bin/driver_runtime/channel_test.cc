@@ -23,10 +23,10 @@
 
 #include "src/devices/bin/driver_runtime/arena.h"
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/handle.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
 #include "src/devices/bin/driver_runtime/test_utils.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 class ChannelTest : public RuntimeTestCase {
  protected:
@@ -78,7 +78,7 @@ void ChannelTest::SetUp() {
   dispatcher_ = std::move(*dispatcher);
 
   // Pretend all calls are non-reentrant so we don't have to worry about threading.
-  driver_context::PushDriver(CreateFakeDriver());
+  thread_context::PushDriver(CreateFakeDriver());
 
   loop_.StartThread();
 }
@@ -94,7 +94,7 @@ void ChannelTest::TearDown() {
 
   ASSERT_EQ(0, driver_runtime::gHandleTableArena.num_allocated());
 
-  driver_context::PopDriver();
+  thread_context::PopDriver();
 }
 
 void ChannelTest::AllocateTestData(fdf_arena_t* arena, size_t size, void** out_data) {
@@ -352,8 +352,8 @@ TEST_F(ChannelTest, SyncDispatcherCancelQueuedRead) {
   ASSERT_FALSE(dispatcher.is_error());
 
   // Make calls reentrant so any callback will be queued on the async loop.
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto channel_read = std::make_unique<fdf::ChannelRead>(
       remote_.get(), 0,
@@ -401,8 +401,8 @@ TEST_F(ChannelTest, SyncDispatcherCancelQueuedReadFromTask) {
   ASSERT_FALSE(dispatcher.is_error());
 
   // Make calls reentrant so any callback will be queued on the async loop.
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto channel_read = std::make_unique<fdf::ChannelRead>(
       remote_.get(), 0,
@@ -453,8 +453,8 @@ TEST_F(ChannelTest, SyncDispatcherCancelTaskFromChannelRead) {
   ASSERT_FALSE(dispatcher.is_error());
 
   // Make calls reentrant so any callback will be queued on the async loop.
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   async::TaskClosure task;
   task.set_handler([] { ASSERT_FALSE(true); });
@@ -490,8 +490,8 @@ TEST_F(ChannelTest, SyncDispatcherCancelTaskFromChannelRead) {
 // Tests cancelling a channel read that has not yet been queued with the unsynchronized dispatcher.
 TEST_F(ChannelTest, UnsyncDispatcherCancelUnqueuedRead) {
   // Make calls reentrant so that any callback will be queued on the async loop.
-  driver_context::PushDriver(dispatcher_owner_);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(dispatcher_owner_);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   sync_completion_t completion;
   auto channel_read = std::make_unique<fdf::ChannelRead>(
@@ -509,8 +509,8 @@ TEST_F(ChannelTest, UnsyncDispatcherCancelUnqueuedRead) {
 // Tests cancelling a channel read that has been queued with the unsynchronized dispatcher.
 TEST_F(ChannelTest, UnsyncDispatcherCancelQueuedRead) {
   // Make calls reentrant so any callback will be queued on the async loop.
-  driver_context::PushDriver(dispatcher_owner_);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(dispatcher_owner_);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   sync_completion_t read_completion;
   auto channel_read = std::make_unique<fdf::ChannelRead>(
@@ -557,8 +557,8 @@ TEST_F(ChannelTest, UnsyncDispatcherCancelQueuedReadFails) {
   ASSERT_FALSE(dispatcher.is_error());
 
   // Make calls reentrant so that any callback will be queued on the async loop.
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   // We will queue 2 channel reads, the first will block so we can test what happens
   // when we try to cancel in-flight callbacks.
@@ -1138,8 +1138,8 @@ TEST_F(ChannelTest, CallManagedThreadAllowsSyncCalls) {
   {
     // Make the call non-reentrant.
     // This will still run the callback on an async thread, as the dispatcher allows sync calls.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_OK(sync_channel_read->Begin(dispatcher->get()));
   }
 
@@ -1594,7 +1594,7 @@ TEST_F(ChannelTest, CallNotifiedOnPeerClosed) {
     test_utils::AutoJoinThread service_thread(
         [&](fdf::Channel svc) {
           // Make the call non-reentrant.
-          driver_context::PushDriver(CreateFakeDriver());
+          thread_context::PushDriver(CreateFakeDriver());
 
           // Wait until call message is received.
           ASSERT_NO_FATAL_FAILURE(WaitUntilReadReady(svc.get()));

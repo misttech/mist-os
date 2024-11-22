@@ -10,8 +10,8 @@
 #include <fbl/string_printf.h>
 #include <perftest/perftest.h>
 
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace {
 

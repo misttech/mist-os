@@ -30,8 +30,8 @@
 #include "lib/async/cpp/task.h"
 #include "lib/fdf/dispatcher.h"
 #include "lib/zx/time.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace driver_runtime {
 extern DispatcherCoordinator& GetDispatcherCoordinator();
@@ -134,8 +134,8 @@ void DispatcherTest::CreateDispatcher(uint32_t options, std::string_view name,
   auto observer = std::make_unique<DispatcherShutdownObserver>();
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(owner, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(owner, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(options, name, scheduler_role,
                                                         observer->fdf_observer(), &dispatcher));
@@ -151,8 +151,8 @@ void DispatcherTest::CreateUnmanagedDispatcher(uint32_t options, std::string_vie
   auto observer = std::make_unique<DispatcherShutdownObserver>();
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(owner, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(owner, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateUnmanagedDispatcher(
                          options, name, observer->fdf_observer(), &dispatcher));
   }
@@ -222,8 +222,8 @@ TEST_F(DispatcherTest, SyncDispatcherDirectCall) {
   ASSERT_NO_FATAL_FAILURE(SignalOnChannelReadable(local_ch_, dispatcher, &read_completion));
 
   {
-    driver_context::PushDriver(remote_driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(remote_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     // As |local_driver| is not in the thread's call stack,
     // this should call directly into local driver's channel_read callback,
     // so do not call |fdf_testing_run_until_idle| here.
@@ -245,8 +245,8 @@ TEST_F(DispatcherTest, SyncDispatcherCallOnLoop) {
 
   {
     // Add the same driver to the thread's call stack.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     // This should queue the callback to run on an async loop thread.
     ASSERT_EQ(ZX_OK, fdf_channel_write(remote_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
@@ -279,8 +279,8 @@ TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacks) {
 
   {
     // This should make the callback run on the async loop, as it would be reentrant.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, fdf_channel_write(remote_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   }
 
@@ -289,8 +289,8 @@ TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacks) {
   // Write another request. This should also be queued on the async loop.
   std::thread t1 = std::thread([&] {
     // Make the call not reentrant.
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, fdf_channel_write(remote_ch2_, 0, nullptr, nullptr, 0, nullptr, 0));
   });
 
@@ -426,8 +426,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherAllowsParallelCallbacks) {
         [&](fdf_handle_t channel) {
           {
             // Ensure the call is not reentrant.
-            driver_context::PushDriver(CreateFakeDriver());
-            auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+            thread_context::PushDriver(CreateFakeDriver());
+            auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
             ASSERT_EQ(ZX_OK, fdf_channel_write(channel, 0, nullptr, nullptr, 0, nullptr, 0));
           }
         },
@@ -526,8 +526,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCall) {
 
   {
     // Simulate a driver writing a message to the driver with the blocking dispatcher.
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     // This is a non reentrant call, but we still shouldn't call into the driver directly.
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
@@ -624,8 +624,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDirectCalls) {
 
   {
     // Simulate a driver writing a message to the driver with the blocking dispatcher.
-    driver_context::PushDriver(driver_a, dispatcher_a);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver_a, dispatcher_a);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     // Allocate space for the runtime to write the txid.
     fdf::Arena arena = fdf::Arena('TEST');
@@ -656,8 +656,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCallUntilSealed) {
 
   {
     // Simulate a driver writing a message to the driver with the blocking dispatcher.
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     // This is a non reentrant call, but we still shouldn't call into the driver directly.
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
@@ -694,8 +694,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCallUntilSealed) {
                                                   entered_callback.get()));
 
   {
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     // This should call directly into the channel_read callback.
     ASSERT_FALSE(entered_callback.signaled());
@@ -732,8 +732,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotBlockGlobalLoop) {
 
   // Write a message for the blocking dispatcher.
   {
-    driver_context::PushDriver(blocking_driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(blocking_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, fdf_channel_write(blocking_local_ch, 0, nullptr, nullptr, 0, nullptr, 0));
   }
 
@@ -745,8 +745,8 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotBlockGlobalLoop) {
   {
     // Write a message which will be read on the non-blocking dispatcher.
     // Make the call reentrant so that the request is queued for the async loop.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   }
 
@@ -792,8 +792,8 @@ TEST_F(DispatcherTest, ReentrancySimpleSendAndReply) {
       RegisterAsyncReadReply(remote_ch_, dispatcher2, &driver2_lock, remote_ch_));
 
   {
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     fbl::AutoLock lock(&driver_lock);
     // This should call directly into the next driver. When the driver writes its reply,
@@ -833,8 +833,8 @@ TEST_F(DispatcherTest, ReentrancyMultipleDriversAndDispatchers) {
       RegisterAsyncReadReply(remote_ch_, dispatcher2, &driver2_lock, remote_ch2_));
 
   {
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     fbl::AutoLock lock(&driver_lock);
     // This should call directly into the next driver. When the driver writes its reply,
@@ -866,8 +866,8 @@ TEST_F(DispatcherTest, ReentrancyOneDriverMultipleChannels) {
       RegisterAsyncReadReply(remote_ch_, dispatcher, &driver_lock, remote_ch2_));
 
   {
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     fbl::AutoLock lock(&driver_lock);
     // Every call callback in this driver will be reentrant and should be run on the async loop.
@@ -917,8 +917,8 @@ TEST_F(DispatcherTest, ReentrancyManyDrivers) {
   }
 
   {
-    driver_context::PushDriver(dispatchers_[0]->owner());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(dispatchers_[0]->owner());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     fbl::AutoLock lock(&driver_locks[0]);
     // Write from the first driver.
@@ -971,8 +971,8 @@ TEST_F(DispatcherTest, SyncDispatcherShutdownBeforeWrite) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(0, "", scheduler_role,
                                                         observer.fdf_observer(), &dispatcher));
@@ -1013,8 +1013,8 @@ TEST_F(DispatcherTest, SyncDispatcherShutdownBeforeSignaled) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(0, "", scheduler_role,
                                                         observer.fdf_observer(), &dispatcher));
   }
@@ -1050,8 +1050,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdown) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
                                                         scheduler_role, observer.fdf_observer(),
@@ -1080,8 +1080,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdown) {
   channel_read.release();
 
   {
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     // This should be considered reentrant and be queued on the async loop.
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   }
@@ -1107,8 +1107,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdownBeforeWrite) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
                                                         scheduler_role, observer.fdf_observer(),
                                                         &dispatcher));
@@ -1149,8 +1149,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdownBeforeSignaled) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
                                                         scheduler_role, observer.fdf_observer(),
@@ -1186,8 +1186,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherInAsyncLoopCallback) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(
                          FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "", scheduler_role,
                          dispatcher_observer.fdf_observer(), &dispatcher));
@@ -1207,8 +1207,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherInAsyncLoopCallback) {
 
   {
     // Make the write reentrant so it is scheduled to run on the async loop.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   }
@@ -1226,8 +1226,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherFromTwoCallbacks) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     // We will not use managed threads, so that the channel reads don't get scheduled
     // until after we shut down the dispatcher.
     ASSERT_EQ(ZX_OK,
@@ -1257,8 +1257,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherFromTwoCallbacks) {
 
   {
     // Make the writes reentrant so they are scheduled to run on the async loop.
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch2_, 0, nullptr, nullptr, 0, nullptr, 0));
@@ -1285,8 +1285,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherQueueChannelReadCallback) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
                                                         scheduler_role, observer.fdf_observer(),
                                                         &dispatcher));
@@ -1307,8 +1307,8 @@ TEST_F(DispatcherTest, ShutdownDispatcherQueueChannelReadCallback) {
   channel_read.release();  // Deleted on callback.
 
   {
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     // This should be considered reentrant and be queued on the async loop.
     ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   }
@@ -1332,8 +1332,8 @@ TEST_F(DispatcherTest, ShutdownCallbackIsNotReentrant) {
     completion.Signal();
   };
 
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -1353,8 +1353,8 @@ TEST_F(DispatcherTest, ChannelPeerWriteDuringShutdown) {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) { shutdown.Signal(); };
 
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -1430,8 +1430,8 @@ TEST_F(DispatcherTest, TasksDoNotCallDirectly) {
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
 
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   libsync::Completion completion;
   ASSERT_OK(async::PostTask(async_dispatcher, [&completion] { completion.Signal(); }));
@@ -1552,8 +1552,8 @@ TEST_F(DispatcherTest, CancelWait) {
 
 TEST_F(DispatcherTest, CancelWaitFromWithinCanceledWait) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher =
       fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
@@ -1790,8 +1790,8 @@ TEST_F(DispatcherTest, IrqCancelOnShutdown) {
   libsync::Completion completion;
   auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
 
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
@@ -1886,8 +1886,8 @@ TEST_F(DispatcherTest, UnbindIrqAfterDispatcherShutdown) {
   libsync::Completion completion;
   auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
 
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
@@ -1987,8 +1987,8 @@ TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
   libsync::Completion completion;
   auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
 
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
@@ -2087,8 +2087,8 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   };
 
   auto driver = CreateFakeDriver();
-  driver_context::PushDriver(driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
@@ -2227,8 +2227,8 @@ TEST_F(DispatcherTest, WaitUntilIdleWithDirectCall) {
 
   std::thread t1 = std::thread([&] {
     // Make the call not reentrant, so that the read will run immediately once the write happens.
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, fdf_channel_write(remote_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
   });
 
@@ -2437,8 +2437,8 @@ TEST_F(DispatcherTest, SyncDispatcherCancelRequestDuringShutdown) {
 
   driver_runtime::Dispatcher* dispatcher;
   {
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(0, "", scheduler_role,
                                                         observer.fdf_observer(), &dispatcher));
   }
@@ -2581,8 +2581,8 @@ TEST_F(DispatcherTest, GetCurrentDispatcherShutdownCallback) {
   fdf::Dispatcher dispatcher;
 
   {
-    driver_context::PushDriver(CreateFakeDriver());
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     auto dispatcher_with_status = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
     ASSERT_FALSE(dispatcher_with_status.is_error());
@@ -2659,8 +2659,8 @@ TEST_F(DispatcherTest, ShutdownAllDriverDispatchers) {
 
   for (uint32_t i = 0; i < kNumDispatchers; i++) {
     const void* driver = i == 0 ? fake_driver : fake_driver2;
-    driver_context::PushDriver(driver, nullptr);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver, nullptr);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::Create(
                          0, "", scheduler_role, observers[i].fdf_observer(), &dispatchers[i]));
   }
@@ -2704,8 +2704,8 @@ TEST_F(DispatcherTest, DriverDestroysDispatcherShutdownByDriverHost) {
   };
 
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -2726,8 +2726,8 @@ TEST_F(DispatcherTest, CannotCreateNewDispatcherDuringDriverShutdown) {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) { completion.Signal(); };
 
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -2764,8 +2764,8 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersAlreadyShutdown) {
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) { completion.Signal(); };
 
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -2793,8 +2793,8 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersCurrentlyInShutdownCallback) {
   };
 
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
@@ -2819,8 +2819,8 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
   // Create drivers which leak their dispatchers.
   auto fake_driver = CreateFakeDriver();
   {
-    driver_context::PushDriver(fake_driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(fake_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     auto dispatcher =
         fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(dispatcher.is_error());
@@ -2829,8 +2829,8 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
 
   auto fake_driver2 = CreateFakeDriver();
   {
-    driver_context::PushDriver(fake_driver2);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(fake_driver2);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
     auto dispatcher2 =
         fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(dispatcher2.is_error());
@@ -2866,8 +2866,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
 
   for (uint32_t i = 0; i < kNumDispatchers; i++) {
     auto fake_driver = CreateFakeDriver();
-    driver_context::PushDriver(fake_driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(fake_driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
@@ -2897,8 +2897,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
 // observer is also registered.
 TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
@@ -2929,8 +2929,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
 
 TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
@@ -3073,8 +3073,8 @@ TEST_F(DispatcherTest, GetSequenceIdUnsynchronizedDispatcher) {
 
 // Tests that you cannot create an unsynchronized blocking dispatcher.
 TEST_F(DispatcherTest, CreateUnsynchronizedAllowSyncCallsFails) {
-  driver_context::PushDriver(CreateFakeDriver());
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(CreateFakeDriver());
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   DispatcherShutdownObserver observer(false /* require_callback */);
   driver_runtime::Dispatcher* dispatcher;
@@ -3094,8 +3094,8 @@ TEST_F(DispatcherTest, CreateDispatcherOnNonRuntimeThreadFails) {
 TEST_F(DispatcherTest, ExtraThreadIsReused) {
   {
     void* driver = reinterpret_cast<void*>(uintptr_t(1));
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 1);
 
@@ -3133,8 +3133,8 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
 TEST_F(DispatcherTest, MaximumTenThreads) {
   {
     void* driver = reinterpret_cast<void*>(uintptr_t(1));
-    driver_context::PushDriver(driver);
-    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+    thread_context::PushDriver(driver);
+    auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
     ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 1);
 
@@ -3200,8 +3200,8 @@ TEST_F(DispatcherTest, ThreadPoolSizeNeverGrowsPastMax) {
 // Tests shutting down and destroying multiple dispatchers concurrently.
 TEST_F(DispatcherTest, ConcurrentDispatcherDestroy) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   // Synchronize the dispatcher shutdown handlers to return at the same time,
   // so that |DispatcherCoordinator::NotifyShutdown| is more likely to happen concurrently.
@@ -3327,8 +3327,8 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
 
 TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   {
     libsync::Completion completion;
@@ -3360,8 +3360,8 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
 
 TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {
   auto fake_driver = CreateFakeDriver();
-  driver_context::PushDriver(fake_driver);
-  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+  thread_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
   {
     libsync::Completion completion;

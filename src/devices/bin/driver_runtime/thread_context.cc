@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_runtime/driver_context.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 #include <zircon/assert.h>
 
@@ -28,13 +28,13 @@ static thread_local std::optional<zx_status_t> g_role_profile_status;
 
 }  // namespace
 
-namespace driver_context {
+namespace thread_context {
 
 void PushDriver(const void* driver, driver_runtime::Dispatcher* dispatcher) {
   // TODO(https://fxbug.dev/42169761): re-enable this once driver host v1 is deprecated.
   // ZX_DEBUG_ASSERT(IsDriverInCallStack(driver) == false);
   if (IsDriverInCallStack(driver)) {
-    LOGF(TRACE, "DriverContext: tried to push driver %p that was already in stack\n", driver);
+    LOGF(TRACE, "ThreadContext: tried to push driver %p that was already in stack\n", driver);
   }
   g_driver_call_stack.push_back({driver, dispatcher});
 }
@@ -78,4 +78,4 @@ std::optional<zx_status_t> GetRoleProfileStatus() { return g_role_profile_status
 
 void SetRoleProfileStatus(zx_status_t status) { g_role_profile_status = status; }
 
-}  // namespace driver_context
+}  // namespace thread_context

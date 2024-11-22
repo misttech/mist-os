@@ -11,8 +11,8 @@
 
 #include "src/devices/bin/driver_runtime/arena.h"
 #include "src/devices/bin/driver_runtime/dispatcher.h"
-#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/handle.h"
+#include "src/devices/bin/driver_runtime/thread_context.h"
 
 namespace {
 
@@ -303,7 +303,7 @@ zx_status_t Channel::Call(uint32_t options, zx_time_t deadline,
   }
 
   // Check if the thread is allowing synchronous calls.
-  auto dispatcher = driver_context::GetCurrentDispatcher();
+  auto dispatcher = thread_context::GetCurrentDispatcher();
   if (dispatcher && !dispatcher->allow_sync_calls()) {
     return ZX_ERR_BAD_STATE;
   }
