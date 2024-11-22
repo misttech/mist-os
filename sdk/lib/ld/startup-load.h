@@ -57,46 +57,7 @@ struct StartupLoadResult {
   std::optional<size_t> stack_size;  // Requested initial stack size.
 };
 
-class TlsDescResolver {
- public:
-  // Handle an undefined weak TLSDESC reference.  There are special runtime
-  // resolvers for this case: one for zero addend, and one for nonzero addend.
-  TlsDescGot operator()(Addend addend) const {
-    if (addend == 0) {
-      return {.function = kRuntimeUndefinedWeak};
-    }
-    return {
-        .function = kRuntimeUndefinedWeakAddend,
-        .value = std::bit_cast<size_type>(addend),
-    };
-  }
-
-  // Handle a TLSDESC reference to a defined symbol.  The runtime resolver just
-  // loads the static TLS offset from the value slot.  When the relocation is
-  // applied the addend will be added to the value computed here from the
-  // symbol's value and module's PT_TLS offset.
-  template <class Definition>
-  fit::result<bool, TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
-    assert(!defn.undefined_weak());
-    return fit::ok(TlsDescGot{
-        .function = kRuntimeStatic,
-        .value = defn.symbol().value + defn.static_tls_bias(),
-    });
-  }
-
- private:
-  static inline const Addr kRuntimeStatic{
-      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_static),
-  };
-  static inline const Addr kRuntimeUndefinedWeak{
-      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak),
-  };
-  static inline const Addr kRuntimeUndefinedWeakAddend{
-      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak_addend),
-  };
-};
-
-inline constexpr TlsDescResolver kTlsDescResolver{};
+inline constexpr LocalRuntimeTlsDescResolver kTlsDescResolver{};
 
 // StartupLoadModule is the LoadModule type used in the startup dynamic linker.
 // Its LoadInfo uses fixed storage bounded by kMaxSegments.  The Module is

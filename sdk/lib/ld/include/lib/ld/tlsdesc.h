@@ -184,6 +184,7 @@ tlsdesc.value_offset = 8
 #include <lib/elfldltl/symbol.h>
 #include <lib/fit/result.h>
 
+#include <bit>
 #include <cstddef>
 #include <optional>
 
@@ -295,9 +296,7 @@ class StaticTlsDescResolver {
   // loads the static TLS offset from the value slot.  When the relocation is
   // applied the addend will be added to the value computed here from the
   // symbol's value and module's PT_TLS offset.
-  template <class Diagnostics, class Definition>
-  constexpr fit::result<bool, TlsDescGot> operator()(Diagnostics& diag,
-                                                     const Definition& defn) const {
+  constexpr fit::result<bool, TlsDescGot> operator()(auto& diag, const auto& defn) const {
     assert(!defn.undefined_weak());
     // Note that defn.uses_static_tls() need not be true: this resolver is only
     // used at all when the module being relocated is in the Initial Exec set,
@@ -311,6 +310,69 @@ class StaticTlsDescResolver {
 
  private:
   RuntimeHooks hooks_;
+};
+
+// This provides a callable object for resolving TLSDESC relocations.  It can
+// be passed directly to elfldltl::MakeSymbolResolver (by reference).
+//
+// This uses the _ld_tlsdesc_runtime_* entry points declared above and provided
+// in the library, and so is only appropriate for use within the same module,
+// address space, and ABI and where the TLSDESC accesses will be made.
+//
+// This handles only the static TLS cases, by using defn->static_tls_bias().
+// Where dynamic TLS is also possible, a subclass can do something like:
+// ```
+// using ld::LocalRuntimeTlsDescResolver::operator();
+// ...
+// fit::result<bool, TlsDescGot> operator()(auto& diag, const auto& defn) const {
+//   assert(defn->tls_module_id() != 0);
+//   if (IsInStaticTls(defn)) {
+//     return ld::LocalRuntimeTlsDescResolver::operator()(diag, defn);
+//   }
+//   return fit::ok(TlsDescGot{...});
+// }
+// ```
+class LocalRuntimeTlsDescResolver {
+ public:
+  using size_type = elfldltl::Elf<>::size_type;
+  using Addr = elfldltl::Elf<>::Addr;
+  using Addend = elfldltl::Elf<>::Addend;
+  using TlsDescGot = elfldltl::Elf<>::TlsDescGot;
+
+  // Handle an undefined weak TLSDESC reference.  There are special runtime
+  // resolvers for this case: one for zero addend, and one for nonzero addend.
+  TlsDescGot operator()(Addend addend) const {
+    if (addend == 0) {
+      return {.function = kRuntimeUndefinedWeak};
+    }
+    return {
+        .function = kRuntimeUndefinedWeakAddend,
+        .value = std::bit_cast<size_type>(addend),
+    };
+  }
+
+  // Handle a TLSDESC reference to a defined symbol.  The runtime resolver just
+  // loads the static TLS offset from the value slot.  When the relocation is
+  // applied the addend will be added to the value computed here from the
+  // symbol's value and module's PT_TLS offset.
+  fit::result<bool, TlsDescGot> operator()(auto& diag, const auto& defn) const {
+    assert(!defn.undefined_weak());
+    return fit::ok(TlsDescGot{
+        .function = kRuntimeStatic,
+        .value = defn.symbol().value + defn.static_tls_bias(),
+    });
+  }
+
+ private:
+  static inline const Addr kRuntimeStatic{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_static),
+  };
+  static inline const Addr kRuntimeUndefinedWeak{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak),
+  };
+  static inline const Addr kRuntimeUndefinedWeakAddend{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak_addend),
+  };
 };
 
 }  // namespace ld
