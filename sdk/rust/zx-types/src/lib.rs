@@ -540,6 +540,14 @@ multiconst!(u64, [
 multiconst!(u32, [
     ZX_EXCEPTION_CHANNEL_DEBUGGER = 1 << 0;
     ZX_EXCEPTION_TARGET_JOB_DEBUGGER = 1 << 0;
+
+    // Returned when probing a thread for its blocked state.
+    ZX_EXCEPTION_CHANNEL_TYPE_NONE = 0;
+    ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER = 1;
+    ZX_EXCEPTION_CHANNEL_TYPE_THREAD = 2;
+    ZX_EXCEPTION_CHANNEL_TYPE_PROCESS = 3;
+    ZX_EXCEPTION_CHANNEL_TYPE_JOB = 4;
+    ZX_EXCEPTION_CHANNEL_TYPE_JOB_DEBUGGER = 5;
 ]);
 
 /// A byte used only to control memory alignment. All padding bytes are considered equal
@@ -1927,6 +1935,34 @@ struct_decl_macro! {
     }
 }
 
+pub type zx_thread_state_t = u32;
+
+multiconst!(zx_thread_state_t, [
+    ZX_THREAD_STATE_NEW = 0x0000;
+    ZX_THREAD_STATE_RUNNING = 0x0001;
+    ZX_THREAD_STATE_SUSPENDED = 0x0002;
+    ZX_THREAD_STATE_BLOCKED = 0x0003;
+    ZX_THREAD_STATE_DYING = 0x0004;
+    ZX_THREAD_STATE_DEAD = 0x0005;
+    ZX_THREAD_STATE_BLOCKED_EXCEPTION = 0x0103;
+    ZX_THREAD_STATE_BLOCKED_SLEEPING = 0x0203;
+    ZX_THREAD_STATE_BLOCKED_FUTEX = 0x0303;
+    ZX_THREAD_STATE_BLOCKED_PORT = 0x0403;
+    ZX_THREAD_STATE_BLOCKED_CHANNEL = 0x0503;
+    ZX_THREAD_STATE_BLOCKED_WAIT_ONE = 0x0603;
+    ZX_THREAD_STATE_BLOCKED_WAIT_MANY = 0x0703;
+    ZX_THREAD_STATE_BLOCKED_INTERRUPT = 0x0803;
+    ZX_THREAD_STATE_BLOCKED_PAGER = 0x0903;
+]);
+
+#[repr(C)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, zerocopy::FromBytes, zerocopy::Immutable)]
+pub struct zx_info_thread_t {
+    pub state: zx_thread_state_t,
+    pub wait_exception_channel_type: u32,
+    pub cpu_affinity_mask: zx_cpu_set_t,
+}
+
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
@@ -2216,7 +2252,7 @@ pub const ZX_CPU_SET_MAX_CPUS: usize = 512;
 pub const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, zerocopy::FromBytes, zerocopy::Immutable)]
 pub struct zx_cpu_set_t {
     pub mask: [u64; ZX_CPU_SET_MAX_CPUS / ZX_CPU_SET_BITS_PER_WORD],
 }

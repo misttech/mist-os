@@ -91,6 +91,13 @@ impl Thread {
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_THREAD topic.
+    pub fn get_thread_info(&self) -> Result<ThreadInfo, Status> {
+        Ok(ThreadInfo::from_raw(object_get_info_single::<ThreadInfoQuery>(self.as_handle_ref())?))
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_STATS topic.
     pub fn get_stats(&self) -> Result<ThreadStats, Status> {
         Ok(ThreadStats::from_raw(object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())?))
@@ -169,6 +176,102 @@ impl ThreadStats {
         sys::zx_info_thread_stats_t { total_runtime, last_scheduled_cpu }: sys::zx_info_thread_stats_t,
     ) -> Self {
         Self { total_runtime: MonotonicDuration::from_nanos(total_runtime), last_scheduled_cpu }
+    }
+}
+
+struct ThreadInfoQuery;
+unsafe impl ObjectQuery for ThreadInfoQuery {
+    const TOPIC: Topic = Topic::THREAD;
+    type InfoTy = sys::zx_info_thread_t;
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ThreadInfo {
+    pub state: ThreadState,
+    pub cpu_affinity_mask: sys::zx_cpu_set_t,
+}
+
+impl ThreadInfo {
+    fn from_raw(raw: sys::zx_info_thread_t) -> Self {
+        Self {
+            state: ThreadState::from_raw(raw.state, raw.wait_exception_channel_type),
+            cpu_affinity_mask: raw.cpu_affinity_mask,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ThreadState {
+    New,
+    Running,
+    Suspended,
+    Blocked(ThreadBlockType),
+    Dying,
+    Dead,
+    Unknown(u32),
+}
+
+impl ThreadState {
+    fn from_raw(raw_state: u32, raw_wait_exception_channel_type: u32) -> Self {
+        match raw_state {
+            sys::ZX_THREAD_STATE_NEW => Self::New,
+            sys::ZX_THREAD_STATE_RUNNING => Self::Running,
+            sys::ZX_THREAD_STATE_SUSPENDED => Self::Suspended,
+            sys::ZX_THREAD_STATE_BLOCKED => Self::Blocked(ThreadBlockType::Unknown),
+            sys::ZX_THREAD_STATE_BLOCKED_EXCEPTION => Self::Blocked(ThreadBlockType::Exception(
+                ExceptionChannelType::from_raw(raw_wait_exception_channel_type),
+            )),
+            sys::ZX_THREAD_STATE_BLOCKED_SLEEPING => Self::Blocked(ThreadBlockType::Sleeping),
+            sys::ZX_THREAD_STATE_BLOCKED_FUTEX => Self::Blocked(ThreadBlockType::Futex),
+            sys::ZX_THREAD_STATE_BLOCKED_PORT => Self::Blocked(ThreadBlockType::Port),
+            sys::ZX_THREAD_STATE_BLOCKED_CHANNEL => Self::Blocked(ThreadBlockType::Channel),
+            sys::ZX_THREAD_STATE_BLOCKED_WAIT_ONE => Self::Blocked(ThreadBlockType::WaitOne),
+            sys::ZX_THREAD_STATE_BLOCKED_WAIT_MANY => Self::Blocked(ThreadBlockType::WaitMany),
+            sys::ZX_THREAD_STATE_BLOCKED_INTERRUPT => Self::Blocked(ThreadBlockType::Interrupt),
+            sys::ZX_THREAD_STATE_BLOCKED_PAGER => Self::Blocked(ThreadBlockType::Pager),
+            sys::ZX_THREAD_STATE_DYING => Self::Dying,
+            sys::ZX_THREAD_STATE_DEAD => Self::Dead,
+            _ => Self::Unknown(raw_state),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ThreadBlockType {
+    Exception(ExceptionChannelType),
+    Sleeping,
+    Futex,
+    Port,
+    Channel,
+    WaitOne,
+    WaitMany,
+    Interrupt,
+    Pager,
+    Unknown,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ExceptionChannelType {
+    None,
+    Debugger,
+    Thread,
+    Process,
+    Job,
+    JobDebugger,
+    Unknown(u32),
+}
+
+impl ExceptionChannelType {
+    fn from_raw(raw_wait_exception_channel_type: u32) -> Self {
+        match raw_wait_exception_channel_type {
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_NONE => Self::None,
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER => Self::Debugger,
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_THREAD => Self::Thread,
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_PROCESS => Self::Process,
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_JOB => Self::Job,
+            sys::ZX_EXCEPTION_CHANNEL_TYPE_JOB_DEBUGGER => Self::JobDebugger,
+            _ => Self::Unknown(raw_wait_exception_channel_type),
+        }
     }
 }
 
