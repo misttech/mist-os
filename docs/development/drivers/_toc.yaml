@@ -79,7 +79,6 @@ toc:
     path: /docs/development/sdk/index.md
   - title: "Navigating a Bazel-and-Fuchsia-SDK-based development environment"
     path: /docs/development/sdk/navigating-a-bazel-and-fuchsia-sdk-based-development-environment.md
-  - heading: "Driver development"
   - title: "Codelab: Build a driver"
     section:
     - include: /docs/get-started/sdk/learn/driver/_toc.yaml
