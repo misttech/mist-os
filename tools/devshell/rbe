@@ -11,6 +11,10 @@
 ##      Verify authentication to RBE services through reclient and bazel.
 ##      Options:
 ##        -f,--force: Always request a fresh authentication token.
+##        All other unknown options are forwarded to 'gcloud auth login'.
+##      Testing tips:
+##        To revoke gcloud credentials: gcloud auth revoke
+##        To revoke LOAS credentials: loas_destroy
 ##
 ##  fx rbe cleanlogs
 ##      Clean up reproxy log dirs (from using fuchsia-reproxy-wrap.sh).
@@ -93,16 +97,21 @@ function ensure_gcloud() {
   }
 }
 
-readonly gcloud_auth_args=(auth login --update-adc)
+readonly global_gcloud_auth_args=(auth login --update-adc)
 function gcloud_auth() {
+  # "$@" args are forwarded to 'gcloud auth login'
   ensure_gcloud &&
-    echo "running: gcloud ${gcloud_auth_args[@]}" &&
+    echo "running: gcloud ${global_gcloud_auth_args[@]}" "$@" &&
     echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit 'Y' to continue to use a personal account." &&
-    "$gcloud" "${gcloud_auth_args[@]}"
+    "$gcloud" "${global_gcloud_auth_args[@]}" "$@"
 }
 
-function reclient_auth() {
-  echo  # blank line
+function reclient_auth_test() {
+  cat <<EOF
+Testing a small remote-enabled reclient remote action end-to-end.
+If the first attempt fails, follow the authentication prompts.
+It will retry until success.
+EOF
   # Coerce the working directory to match the exec-root ($FUCHSIA_DIR), so the
   # remote environment does not try to run in a nonexistent subdir.
   # Normally subdirs are created automatically based on remote inputs and
@@ -114,7 +123,7 @@ function reclient_auth() {
     # gcert only works in environments that get unrestricted LOAS credentials
     # whereas gcloud auth will always work.
     # https://fuchsia.dev/internal/intree/concepts/remote-builds#authentication
-    gcloud_auth || {
+    gcloud_auth "$@" || {
       echo "Failed to authenticate with gcloud."
       return 1
     }
@@ -149,10 +158,15 @@ function test_bazel_rbe() {
   )
 }
 
-function bazel_auth() {
+function bazel_auth_test() {
+  cat <<EOF
+Testing a small remote-enabled bazel build end-to-end.
+If the first build attempt fails, follow the authentication prompts.
+It will retry until success.
+EOF
   until test_bazel_rbe
   do
-    gcloud_auth || {
+    gcloud_auth "$@" || {
       echo "Failed to authenticate with gcloud."
       return 1
     }
@@ -162,11 +176,12 @@ function bazel_auth() {
 
 function auth_subcommand() {
   local force=0
+  local gcloud_auth_args=()
   for opt in "$@"
   do
     case "$opt" in
       -f|--force) force=1 ;;
-      *) echo "Unknown option: $opt" ; return 1 ;;
+      *) gcloud_auth_args+=("$opt") ;;
     esac
   done
 
@@ -174,13 +189,17 @@ function auth_subcommand() {
   then
     # Start with a re-auth to get a fresh token.
     # This is a good idea if you don't know when your current token expires.
-    gcloud_auth || {
+    gcloud_auth "${gcloud_auth_args[@]}" || {
       echo "Failed to authenticate with gcloud."
       return 1
     }
   fi
 
-  bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
+  bazel_auth_test "${gcloud_auth_args[@]}" && \
+    echo && \
+    reclient_auth_test "${gcloud_auth_args[@]}" && \
+    echo && \
+    style::echo --bold --green "You can now 'fx build' with RBE."
 }
 
 # LINT.IfChange(reproxy_log_dirs)
