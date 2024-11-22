@@ -889,7 +889,7 @@ pub mod test {
         let malloc_id = new_bpf_type_identifier();
 
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 0,
                 name: "gather_bytes",
                 function_pointer: Arc::new(gather_bytes),
@@ -907,7 +907,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 1,
                 name: "memfrob",
                 function_pointer: Arc::new(memfrob),
@@ -926,7 +926,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 2,
                 name: "trash_registers",
                 function_pointer: Arc::new(trash_registers),
@@ -938,7 +938,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 3,
                 name: "sqrti",
                 function_pointer: Arc::new(sqrti),
@@ -950,7 +950,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 4,
                 name: "strcmp_ext",
                 function_pointer: Arc::new(strcmp_ext),
@@ -964,7 +964,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 100,
                 name: "null_or",
                 function_pointer: Arc::new(null_or),
@@ -978,7 +978,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 101,
                 name: "read_only",
                 function_pointer: Arc::new(read_only),
@@ -994,7 +994,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 102,
                 name: "write_only",
                 function_pointer: Arc::new(write_only),
@@ -1013,7 +1013,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 103,
                 name: "malloc",
                 function_pointer: Arc::new(malloc),
@@ -1032,7 +1032,7 @@ pub mod test {
             })
             .expect("register");
         builder
-            .register(&EbpfHelper {
+            .register_helper(EbpfHelper {
                 index: 104,
                 name: "free",
                 function_pointer: Arc::new(free),

@@ -873,6 +873,18 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         Ok(())
     }
 
+    fn load_map_ptr<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        _dst: Register,
+        _map_index: u32,
+        _jump_offset: i16,
+    ) -> Result<(), String> {
+        // ldimm64 instructions with src=BPF_PSEUDO_MAP_IDX should be replaced when the program is
+        // linked.
+        panic!("executing program with BPF_PSEUDO_MAP_IDX")
+    }
+
     fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,

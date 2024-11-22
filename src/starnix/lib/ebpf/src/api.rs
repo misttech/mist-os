@@ -168,5 +168,19 @@ pub const SKF_NET_OFF: i32 = linux_uapi::SKF_NET_OFF;
 // Offset used to reference Ethernet headers in cBPF.
 pub const SKF_LL_OFF: i32 = linux_uapi::SKF_LL_OFF;
 
+// Values that can be used in src reg with the `ldimm64`. These instructions
+// should be updated when the program is linked.
+pub const BPF_PSEUDO_MAP_FD: u8 = linux_uapi::BPF_PSEUDO_MAP_FD as u8;
+pub const BPF_PSEUDO_MAP_IDX: u8 = linux_uapi::BPF_PSEUDO_MAP_IDX as u8;
+pub const BPF_PSEUDO_MAP_VALUE: u8 = linux_uapi::BPF_PSEUDO_MAP_VALUE as u8;
+pub const BPF_PSEUDO_MAP_IDX_VALUE: u8 = linux_uapi::BPF_PSEUDO_MAP_IDX_VALUE as u8;
+pub const BPF_PSEUDO_BTF_ID: u8 = linux_uapi::BPF_PSEUDO_BTF_ID as u8;
+pub const BPF_PSEUDO_FUNC: u8 = linux_uapi::BPF_PSEUDO_FUNC as u8;
+
+// Values that can be used in src reg with the `call` instruction. These
+// instructions should be updated when the program is linked.
+pub const BPF_PSEUDO_CALL: u8 = linux_uapi::BPF_PSEUDO_CALL as u8;
+pub const BPF_PSEUDO_KFUNC_CALL: u8 = linux_uapi::BPF_PSEUDO_KFUNC_CALL as u8;
+
 pub type EbpfInstruction = linux_uapi::bpf_insn;
 pub type CbpfInstruction = linux_uapi::sock_filter;

@@ -11,7 +11,10 @@ pub enum EbpfError {
     VmRegisterError(String),
 
     #[error("Verification error loading program: {0}")]
-    ProgramLoadError(String),
+    ProgramVerifyError(String),
+
+    #[error("Failed to link program: {0}")]
+    ProgramLinkError(String),
 
     #[error("VM error loading program: {0}")]
     VmLoadError(String),

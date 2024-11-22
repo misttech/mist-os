@@ -7,9 +7,9 @@ use crate::{
     BPF_CALL, BPF_CLS_MASK, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
     BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
     BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW, BPF_LDX,
-    BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
-    BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE,
-    BPF_W, BPF_XCHG, BPF_XOR,
+    BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
+    BPF_PSEUDO_MAP_IDX, BPF_RSH, BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX,
+    BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W, BPF_XCHG, BPF_XOR,
 };
 use linux_uapi::bpf_insn;
 
@@ -487,6 +487,14 @@ pub trait BpfVisitor {
         jump_offset: i16,
     ) -> Result<(), String>;
 
+    fn load_map_ptr<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        map_index: u32,
+        jump_offset: i16,
+    ) -> Result<(), String>;
+
     fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
@@ -951,10 +959,30 @@ pub trait BpfVisitor {
                     if code.len() < 2 {
                         return Err(format!("incomplete lddw"));
                     }
+
                     let next_instruction = &code[1];
-                    let value: u64 = ((instruction.imm as u32) as u64)
-                        | (((next_instruction.imm as u32) as u64) << 32);
-                    return self.load64(context, instruction.dst_reg(), value, 1);
+                    if next_instruction.src_reg() != 0 || next_instruction.dst_reg() != 0 {
+                        return Err(format!("invalid lddw"));
+                    }
+
+                    match instruction.src_reg() {
+                        0 => {
+                            let value: u64 = ((instruction.imm as u32) as u64)
+                                | (((next_instruction.imm as u32) as u64) << 32);
+                            return self.load64(context, instruction.dst_reg(), value, 1);
+                        }
+                        BPF_PSEUDO_MAP_IDX => {
+                            return self.load_map_ptr(
+                                context,
+                                instruction.dst_reg(),
+                                instruction.imm as u32,
+                                1,
+                            );
+                        }
+                        _ => {
+                            return Err(format!("invalid lddw"));
+                        }
+                    }
                 }
                 let width = match instruction.code & BPF_SIZE_MASK {
                     BPF_B => DataWidth::U8,

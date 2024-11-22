@@ -7,7 +7,8 @@ use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
     new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldDescriptor, FieldMapping,
-    FieldType, FunctionSignature, MemoryId, MemoryParameterSize, StructDescriptor, Type,
+    FieldType, FunctionSignature, MemoryId, MemoryParameterSize, StructDescriptor, StructMapping,
+    Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_csum_update,
@@ -865,13 +866,7 @@ impl ArgBuilder {
         self.add_scalar(offset, 4);
     }
 
-    fn add_array_32(
-        &mut self,
-        start_offset: usize,
-        end_offset: usize,
-        remapped_start_offset: usize,
-        remapped_end_offset: usize,
-    ) {
+    fn add_array_32(&mut self, start_offset: usize, end_offset: usize) {
         // Create a memory id for the data array
         let array_id = new_bpf_type_identifier();
 
@@ -879,19 +874,14 @@ impl ArgBuilder {
             offset: start_offset,
             field_type: FieldType::PtrToArray { id: array_id.clone(), is_32_bit: true },
         });
-        self.add_mapping(start_offset, remapped_start_offset);
         self.add_field(FieldDescriptor {
             offset: end_offset,
             field_type: FieldType::PtrToEndArray { id: array_id, is_32_bit: true },
         });
-        self.add_mapping(end_offset, remapped_end_offset);
     }
 
     fn add_field(&mut self, descriptor: FieldDescriptor) {
         self.descriptor.fields.push(descriptor);
-    }
-    fn add_mapping(&mut self, source_offset: usize, target_offset: usize) {
-        self.descriptor.mappings.push(FieldMapping { source_offset, target_offset });
     }
     fn build(self) -> Vec<Type> {
         let Self { id, descriptor } = self;
@@ -980,11 +970,23 @@ static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     builder.add_array_32(
         std::mem::offset_of!(__sk_buff, data),
         std::mem::offset_of!(__sk_buff, data_end),
-        std::mem::offset_of!(SkBuf, data),
-        std::mem::offset_of!(SkBuf, data_end),
     );
 
     builder.build()
+});
+
+static SK_BUF_MAPPING: Lazy<StructMapping> = Lazy::new(|| StructMapping {
+    memory_id: SK_BUF_ID.clone(),
+    fields: vec![
+        FieldMapping {
+            source_offset: std::mem::offset_of!(__sk_buff, data),
+            target_offset: std::mem::offset_of!(SkBuf, data),
+        },
+        FieldMapping {
+            source_offset: std::mem::offset_of!(__sk_buff, data_end),
+            target_offset: std::mem::offset_of!(SkBuf, data_end),
+        },
+    ],
 });
 
 #[repr(C)]
@@ -997,22 +999,35 @@ struct XdpMd {
     pub egress_ifindex: u32,
     pub data_end: uref<u8>,
 }
+
+static XDP_MD_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
 static XDP_MD_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
+    builder.set_id(XDP_MD_ID.clone());
 
     // Define and map `data` and `data_end` fields.
-    builder.add_array_32(
-        std::mem::offset_of!(xdp_md, data),
-        std::mem::offset_of!(xdp_md, data_end),
-        std::mem::offset_of!(XdpMd, data),
-        std::mem::offset_of!(XdpMd, data_end),
-    );
+    builder
+        .add_array_32(std::mem::offset_of!(xdp_md, data), std::mem::offset_of!(xdp_md, data_end));
 
     // All fields starting from data_meta are readable
     let data_meta_offset = std::mem::offset_of!(xdp_md, data_meta);
     builder.add_scalar(data_meta_offset, std::mem::size_of::<xdp_md>() - data_meta_offset);
 
     builder.build()
+});
+
+static XDP_MD_MAPPING: Lazy<StructMapping> = Lazy::new(|| StructMapping {
+    memory_id: XDP_MD_ID.clone(),
+    fields: vec![
+        FieldMapping {
+            source_offset: std::mem::offset_of!(xdp_md, data),
+            target_offset: std::mem::offset_of!(XdpMd, data),
+        },
+        FieldMapping {
+            source_offset: std::mem::offset_of!(xdp_md, data_end),
+            target_offset: std::mem::offset_of!(XdpMd, data_end),
+        },
+    ],
 });
 
 static BPF_USER_PT_REGS_T_ARGS: Lazy<Vec<Type>> =
@@ -1072,20 +1087,22 @@ struct TraceEvent {
 
 static BPF_TRACEPOINT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<TraceEvent>());
 
-pub fn get_bpf_args(program_type: ProgramType) -> &'static [Type] {
+pub fn get_bpf_args_and_mapping(
+    program_type: ProgramType,
+) -> (&'static [Type], Option<&'static StructMapping>) {
     match program_type {
         ProgramType::CgroupSkb
         | ProgramType::SchedAct
         | ProgramType::SchedCls
-        | ProgramType::SocketFilter => &SK_BUF_ARGS,
-        ProgramType::Xdp => &XDP_MD_ARGS,
-        ProgramType::KProbe => &BPF_USER_PT_REGS_T_ARGS,
-        ProgramType::TracePoint => &BPF_TRACEPOINT_ARGS,
-        ProgramType::CgroupSock => &BPF_SOCK_ARGS,
-        ProgramType::CgroupSockopt => &BPF_SOCKOPT_ARGS,
-        ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
-        ProgramType::Fuse => &BPF_FUSE_ARGS,
-        ProgramType::Unknown(_) => &[],
+        | ProgramType::SocketFilter => (&SK_BUF_ARGS, Some(&SK_BUF_MAPPING)),
+        ProgramType::Xdp => (&XDP_MD_ARGS, Some(&XDP_MD_MAPPING)),
+        ProgramType::KProbe => (&BPF_USER_PT_REGS_T_ARGS, None),
+        ProgramType::TracePoint => (&BPF_TRACEPOINT_ARGS, None),
+        ProgramType::CgroupSock => (&BPF_SOCK_ARGS, None),
+        ProgramType::CgroupSockopt => (&BPF_SOCKOPT_ARGS, None),
+        ProgramType::CgroupSockAddr => (&BPF_SOCK_ADDR_ARGS, None),
+        ProgramType::Fuse => (&BPF_FUSE_ARGS, None),
+        ProgramType::Unknown(_) => (&[], None),
     }
 }
 

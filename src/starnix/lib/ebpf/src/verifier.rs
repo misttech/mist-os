@@ -6,12 +6,11 @@
 
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    DataWidth, EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE,
+    DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE,
     GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
-use linux_uapi::bpf_insn;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
@@ -116,16 +115,6 @@ impl FieldDescriptor {
     }
 }
 
-/// A mapping for a field in a struct where the original ebpf program knows a different offset and
-/// data size than the one it receives from the kernel.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FieldMapping {
-    /// The offset of the field as known by the original ebpf program.
-    pub source_offset: usize,
-    /// The actual offset of the field in the data provided by the kernel.
-    pub target_offset: usize,
-}
-
 /// The offset and width of a field in a struct.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Field {
@@ -144,68 +133,30 @@ impl Field {
 pub struct StructDescriptor {
     /// The list of fields.
     pub fields: Vec<FieldDescriptor>,
-
-    /// The list of mappings in the buffer. The verifier must rewrite the actual ebpf to ensure
-    /// the right offset and operand are use to access the mapped fields. Mappings are allowed
-    /// only for pointer fields.
-    //
-    // TODO(b/376284982): Remove this field. Struct access rewrite should performed separately
-    // from the verification step.
-    pub mappings: Vec<FieldMapping>,
 }
 
 impl StructDescriptor {
     /// Finds the field type for load/store at the specified location. None is returned if the
-    /// access is invalid and the program must be rejected. Second value indicates that the field
-    /// access should be remapped.
-    fn find_field(&self, base_offset: i64, field: Field) -> Option<(FieldType, Option<Field>)> {
+    /// access is invalid and the program must be rejected.
+    fn find_field(&self, base_offset: i64, field: Field) -> Option<&FieldDescriptor> {
         let offset: usize = (base_offset).checked_add(field.offset as i64)?.try_into().ok()?;
         let field_desc =
             self.fields.iter().find(|f| f.offset <= offset && offset < f.offset + f.size())?;
-        let mapping = self.mappings.iter().find(|m| m.source_offset == field_desc.offset);
-        let mapped_width;
-        match field_desc.field_type {
+        let is_valid_load = match field_desc.field_type {
             FieldType::Scalar { size } | FieldType::MutableScalar { size } => {
                 // For scalars check that the access is within the bounds of the field.
-                if offset + field.width.bytes() > field_desc.offset + size {
-                    return None;
-                }
-                mapped_width = field.width;
+                offset + field.width.bytes() <= field_desc.offset + size
             }
             FieldType::PtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
-                // Pointer loads with non-zero offsets are not allowed.
-                if offset != field_desc.offset as usize {
-                    return None;
-                }
                 let expected_width = if is_32_bit { DataWidth::U32 } else { DataWidth::U64 };
-                if field.width != expected_width {
-                    return None;
-                }
-
-                // 32-bit fields must be remapped.
-                assert!(!is_32_bit || mapping.is_some());
-
-                mapped_width = DataWidth::U64;
+                // Pointer loads are expected to load the whole field.
+                offset == field_desc.offset as usize && field.width == expected_width
             }
         };
 
-        let mapped_field = match mapping {
-            Some(mapping) => {
-                let offset = (field.offset as usize)
-                    .overflowing_sub(mapping.source_offset)
-                    .0
-                    .overflowing_add(mapping.target_offset)
-                    .0
-                    .try_into()
-                    .ok()?;
-                Some(Field { offset, width: mapped_width })
-            }
-            None => None,
-        };
-
-        Some((field_desc.field_type.clone(), mapped_field))
+        is_valid_load.then(|| field_desc)
     }
 }
 
@@ -690,9 +641,9 @@ pub struct FunctionSignature {
 
 #[derive(Debug, Default)]
 pub struct CallingContext {
-    /// For all pc that represents the load of a map address, keep track of the schema of the
-    /// associated map.
-    map_references: HashMap<ProgramCounter, MapSchema>,
+    /// List of map schemas of the associated map. The maps can be accessed using LDDW instruction
+    /// with `src_reg=BPF_PSEUDO_MAP_IDX`.
+    maps: Vec<MapSchema>,
     /// The registered external functions.
     functions: HashMap<u32, FunctionSignature>,
     /// The args of the program.
@@ -702,8 +653,10 @@ pub struct CallingContext {
 }
 
 impl CallingContext {
-    pub fn register_map_reference(&mut self, pc: ProgramCounter, schema: MapSchema) {
-        self.map_references.insert(pc, schema);
+    pub fn register_map(&mut self, schema: MapSchema) -> usize {
+        let index = self.maps.len();
+        self.maps.push(schema);
+        index
     }
     pub fn register_function(&mut self, index: u32, signature: FunctionSignature) {
         self.functions.insert(index, signature);
@@ -717,14 +670,33 @@ impl CallingContext {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct StructAccess {
+    pub(crate) pc: ProgramCounter,
+
+    // Memory Id of the struct being accessed.
+    pub(crate) memory_id: MemoryId,
+
+    // Offset of the field being loaded.
+    pub(crate) field_offset: usize,
+
+    // Indicates that this is a 32-bit pointer load. These instructions must be remapped.
+    pub(crate) is_32_bit_ptr_load: bool,
+}
+
+pub struct VerifiedEbpfProgram {
+    pub(crate) code: Vec<EbpfInstruction>,
+    pub(crate) struct_access_instructions: Vec<StructAccess>,
+    pub(crate) maps: Vec<MapSchema>,
+}
+
 /// Verify the given code depending on the type of the parameters and the registered external
-/// functions. This method will rewrite the code to ensure mapped fields are correctly handled.
-/// Returns the actual code to run.
+/// functions. Returned `VerifiedEbpfProgram` should be linked in order to execute it.
 pub fn verify(
-    mut code: Vec<bpf_insn>,
+    code: Vec<EbpfInstruction>,
     calling_context: CallingContext,
     logger: &mut dyn VerifierLogger,
-) -> Result<Vec<bpf_insn>, EbpfError> {
+) -> Result<VerifiedEbpfProgram, EbpfError> {
     if code.len() > BPF_MAX_INSTS {
         return error_and_log(logger, "ebpf program too long");
     }
@@ -732,7 +704,7 @@ pub fn verify(
     let mut context = ComputationContext::default();
     for (i, t) in calling_context.args.iter().enumerate() {
         // The parameter registers are r1 to r5.
-        context.set_reg((i + 1) as u8, t.clone()).map_err(EbpfError::ProgramLoadError)?;
+        context.set_reg((i + 1) as u8, t.clone()).map_err(EbpfError::ProgramVerifyError)?;
     }
     let states = vec![context];
     let mut verification_context = VerificationContext {
@@ -743,7 +715,7 @@ pub fn verify(
         counter: 0,
         iteration: 0,
         terminating_contexts: Default::default(),
-        transformations: Default::default(),
+        struct_access_instructions: Default::default(),
     };
     while let Some(mut context) = verification_context.states.pop() {
         if let Some(terminating_contexts) =
@@ -762,7 +734,7 @@ pub fn verify(
                     if let Some(parent) = Arc::into_inner(parent) {
                         parent
                             .terminate(&mut verification_context)
-                            .map_err(EbpfError::ProgramLoadError)?;
+                            .map_err(EbpfError::ProgramVerifyError)?;
                     }
                 }
                 continue;
@@ -783,16 +755,12 @@ pub fn verify(
         }
         verification_context.iteration += 1;
     }
-    // Once the code is verified, applied the transformations.
-    for transformation in verification_context.transformations.into_iter() {
-        if let (pc, Some(field)) = transformation {
-            let instruction = &mut code[pc];
-            instruction.off = field.offset;
-            instruction.code &= !BPF_SIZE_MASK;
-            instruction.code |= field.width.instruction_bits();
-        }
-    }
-    Ok(code)
+
+    let struct_access_instructions =
+        verification_context.struct_access_instructions.into_values().collect::<Vec<_>>();
+    let maps = verification_context.calling_context.maps;
+
+    Ok(VerifiedEbpfProgram { code, struct_access_instructions, maps })
 }
 
 struct VerificationContext<'a> {
@@ -803,7 +771,7 @@ struct VerificationContext<'a> {
     /// The `ComputationContext` yet to be validated.
     states: Vec<ComputationContext>,
     /// The program being analyzed.
-    code: &'a [bpf_insn],
+    code: &'a [EbpfInstruction],
     /// A counter used to generated unique ids for memory buffers and maps.
     counter: u64,
     /// The current iteration of the verifier. Used to ensure termination by limiting the number of
@@ -813,10 +781,10 @@ struct VerificationContext<'a> {
     /// incomparables as each time a bigger context is computed, the smaller ones are removed from
     /// the list.
     terminating_contexts: BTreeMap<ProgramCounter, Vec<TerminatingContext>>,
-    /// The current list of transformation to apply. This is also used to ensure that a given
-    /// instruction that acts on a mapped field always requires the same transformation. If this is
-    /// not the case, the verifier will reject the program.
-    transformations: HashMap<ProgramCounter, Option<Field>>,
+    /// The current set of struct access instructions that will need to be updated when the
+    /// program is linked. This is also used to ensure that a given instruction always loads the
+    /// same field. If this is not the case, the verifier will reject the program.
+    struct_access_instructions: HashMap<ProgramCounter, StructAccess>,
 }
 
 impl<'a> VerificationContext<'a> {
@@ -826,23 +794,19 @@ impl<'a> VerificationContext<'a> {
         id
     }
 
-    /// Register the given transformation (represented as the actual `Field` to access) for the
-    /// given `pc`. This method will fail if an incompatible transformation is already registered
-    /// at the given `pc`. In particular, instruction that requires no transformation are also
-    /// registered so that they conflict if the same instruction requires a transformation in
-    /// another context.
-    fn register_transformation(
-        &mut self,
-        pc: ProgramCounter,
-        transformation: Option<Field>,
-    ) -> Result<(), String> {
-        match self.transformations.entry(pc) {
+    /// Register an instruction that loads or stores a struct field. These instructions will need
+    /// to updated later when the program is linked.
+    fn register_struct_access(&mut self, struct_access: StructAccess) -> Result<(), String> {
+        match self.struct_access_instructions.entry(struct_access.pc) {
             std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(transformation);
+                entry.insert(struct_access);
             }
             std::collections::hash_map::Entry::Occupied(entry) => {
-                if *entry.get() != transformation {
-                    return Err(format!("Unable to consistently apply mapping at pc: {}", pc));
+                if *entry.get() != struct_access {
+                    return Err(format!(
+                        "Inconsistent struct field access at pc: {}",
+                        struct_access.pc
+                    ));
                 }
             }
         }
@@ -1292,16 +1256,21 @@ impl ComputationContext {
             Type::PtrToMemory { offset, buffer_size, .. } => {
                 self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
             }
-            Type::PtrToStruct { offset, ref descriptor, .. } => {
-                let (field_type, mapped_field) = descriptor
+            Type::PtrToStruct { ref id, offset, ref descriptor, .. } => {
+                let field_desc = descriptor
                     .find_field(offset, field)
                     .ok_or_else(|| format!("incorrect store at pc {}", self.pc))?;
 
-                if !matches!(field_type, FieldType::MutableScalar { .. }) {
+                if !matches!(field_desc.field_type, FieldType::MutableScalar { .. }) {
                     return Err(format!("store to a read-only field at pc {}", self.pc));
                 }
 
-                context.register_transformation(self.pc, mapped_field)?;
+                context.register_struct_access(StructAccess {
+                    pc: self.pc,
+                    memory_id: id.clone(),
+                    field_offset: field_desc.offset,
+                    is_32_bit_ptr_load: false,
+                })?;
             }
             Type::PtrToArray { ref id, offset } => {
                 self.check_memory_access(
@@ -1339,30 +1308,38 @@ impl ComputationContext {
                 Ok(Type::unknown_written_scalar_value())
             }
             Type::PtrToStruct { ref id, offset, ref descriptor, .. } => {
-                let (field_type, mapped_field) = descriptor
+                let field_desc = descriptor
                     .find_field(offset, field)
                     .ok_or_else(|| format!("incorrect load at pc {}", self.pc))?;
 
-                context.register_transformation(self.pc, mapped_field)?;
-
-                let return_type = match field_type {
+                let (return_type, is_32_bit_ptr_load) = match &field_desc.field_type {
                     FieldType::Scalar { .. } | FieldType::MutableScalar { .. } => {
-                        Type::unknown_written_scalar_value()
+                        (Type::unknown_written_scalar_value(), false)
                     }
-                    FieldType::PtrToArray { id: array_id, .. } => {
-                        Type::PtrToArray { id: array_id.prepended(id.clone()), offset: 0 }
+                    FieldType::PtrToArray { id: array_id, is_32_bit } => (
+                        Type::PtrToArray { id: array_id.prepended(id.clone()), offset: 0 },
+                        *is_32_bit,
+                    ),
+                    FieldType::PtrToEndArray { id: array_id, is_32_bit } => {
+                        (Type::PtrToEndArray { id: array_id.prepended(id.clone()) }, *is_32_bit)
                     }
-                    FieldType::PtrToEndArray { id: array_id, .. } => {
-                        Type::PtrToEndArray { id: array_id.prepended(id.clone()) }
-                    }
-                    FieldType::PtrToMemory { id: memory_id, buffer_size, .. } => {
+                    FieldType::PtrToMemory { id: memory_id, buffer_size, is_32_bit } => (
                         Type::PtrToMemory {
                             id: memory_id.prepended(id.clone()),
                             offset: 0,
-                            buffer_size: buffer_size as u64,
-                        }
-                    }
+                            buffer_size: *buffer_size as u64,
+                        },
+                        *is_32_bit,
+                    ),
                 };
+
+                context.register_struct_access(StructAccess {
+                    pc: self.pc,
+                    memory_id: id.clone(),
+                    field_offset: field_desc.offset,
+                    is_32_bit_ptr_load,
+                })?;
+
                 Ok(return_type)
             }
             Type::PtrToArray { ref id, offset } => {
@@ -2704,6 +2681,17 @@ impl BpfVisitor for DataDependencies {
         Ok(())
     }
 
+    fn load_map_ptr<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        _map_index: u32,
+        _jump_offset: i16,
+    ) -> Result<(), String> {
+        self.registers.remove(&dst);
+        Ok(())
+    }
+
     fn load_from_packet<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -3848,13 +3836,28 @@ impl BpfVisitor for ComputationContext {
         jump_offset: i16,
     ) -> Result<(), String> {
         bpf_log!(self, context, "lddw {}, 0x{:x}", display_register(dst), value);
-        let value =
-            if let Some(schema) = context.calling_context.map_references.get(&self.pc).cloned() {
-                let id = context.next_id();
-                Type::ConstPtrToMap { id, schema }
-            } else {
-                Type::from(value)
-            };
+        let value = Type::from(value);
+        let parent = Some(Arc::new(self.clone()));
+        let mut next = self.jump_with_offset(jump_offset, parent)?;
+        next.set_reg(dst, value.into())?;
+        context.states.push(next);
+        Ok(())
+    }
+
+    fn load_map_ptr<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        map_index: u32,
+        jump_offset: i16,
+    ) -> Result<(), String> {
+        bpf_log!(self, context, "lddw {}, map_by_index({:x})", display_register(dst), map_index);
+        let value = context
+            .calling_context
+            .maps
+            .get(usize::try_from(map_index).unwrap())
+            .map(|schema| Type::ConstPtrToMap { id: map_index.into(), schema: *schema })
+            .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?;
         let parent = Some(Arc::new(self.clone()));
         let mut next = self.jump_with_offset(jump_offset, parent)?;
         next.set_reg(dst, value.into())?;
@@ -3999,7 +4002,7 @@ fn error_and_log<T>(
 ) -> Result<T, EbpfError> {
     let msg = msg.to_string();
     logger.log(msg.as_bytes());
-    return Err(EbpfError::ProgramLoadError(msg));
+    return Err(EbpfError::ProgramVerifyError(msg));
 }
 
 fn associate_orderings(o1: Ordering, o2: Ordering) -> Option<Ordering> {
