@@ -12,10 +12,12 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
@@ -55,13 +57,13 @@ class DisplayEngineInterface {
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
   virtual config_check_result_t CheckConfiguration(
-      uint64_t display_id, cpp20::span<const layer_t> layers,
+      display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
       cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
       size_t* out_client_composition_opcodes_actual) = 0;
 
-  // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual void ApplyConfiguration(uint64_t display_id, cpp20::span<const layer_t> layers,
-                                  config_stamp_t config_stamp) = 0;
+  virtual void ApplyConfiguration(display::DisplayId display_id,
+                                  cpp20::span<const display::DriverLayer> layers,
+                                  display::ConfigStamp config_stamp) = 0;
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,

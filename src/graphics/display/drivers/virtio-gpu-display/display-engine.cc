@@ -37,13 +37,18 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -292,10 +297,10 @@ void DisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 }
 
 config_check_result_t DisplayEngine::CheckConfiguration(
-    uint64_t display_id, cpp20::span<const layer_t> layers,
+    display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
     cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
     size_t* out_client_composition_opcodes_actual) {
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_id) == kDisplayId);
+  ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
   ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= layers.size());
   ZX_DEBUG_ASSERT(!out_client_composition_opcodes_actual ||
@@ -303,33 +308,32 @@ config_check_result_t DisplayEngine::CheckConfiguration(
 
   ZX_DEBUG_ASSERT(layers.size() == 1);
 
-  const layer_t& layer = layers[0];
-  const rect_u_t display_area = {
+  const display::DriverLayer& layer = layers[0];
+  const display::Rectangle display_area({
       .x = 0,
       .y = 0,
-      .width = current_display_.scanout_info.geometry.width,
-      .height = current_display_.scanout_info.geometry.height,
-  };
+      .width = static_cast<int32_t>(current_display_.scanout_info.geometry.width),
+      .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
+  });
 
-  if (std::memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+  if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     return CONFIG_CHECK_RESULT_OK;
   }
-  if (std::memcmp(&layer.image_source, &layer.display_destination, sizeof(rect_u_t)) != 0) {
+  if (layer.image_source() != layer.display_destination()) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
     return CONFIG_CHECK_RESULT_OK;
   }
-  if (layer.image_metadata.width != layer.image_source.width ||
-      layer.image_metadata.height != layer.image_source.height) {
+  if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
     return CONFIG_CHECK_RESULT_OK;
   }
-  if (layer.alpha_mode != ALPHA_DISABLE) {
+  if (layer.alpha_mode() != display::AlphaMode::kDisable) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
     return CONFIG_CHECK_RESULT_OK;
   }
-  if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+  if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
     out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_TRANSFORM;
     return CONFIG_CHECK_RESULT_OK;
   }
@@ -337,15 +341,16 @@ config_check_result_t DisplayEngine::CheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::ApplyConfiguration(uint64_t display_id, cpp20::span<const layer_t> layers,
-                                       config_stamp_t config_stamp) {
+void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
+                                       cpp20::span<const display::DriverLayer> layers,
+                                       display::ConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT(layers.size() == 1);
-  uint64_t handle = layers[0].image_handle;
+  uint64_t handle = display::ToBanjoDriverImageId(layers[0].image_id());
 
   {
     fbl::AutoLock al(&flush_lock_);
     latest_fb_ = reinterpret_cast<imported_image_t*>(handle);
-    latest_config_stamp_ = display::ToConfigStamp(config_stamp);
+    latest_config_stamp_ = config_stamp;
   }
 }
 

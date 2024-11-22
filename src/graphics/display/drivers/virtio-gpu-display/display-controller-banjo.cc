@@ -21,10 +21,12 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
@@ -163,7 +165,14 @@ config_check_result_t DisplayControllerBanjo::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  return engine_.CheckConfiguration(banjo_display_config.display_id, banjo_layers,
+  if (!display::DriverLayer::IsValid(banjo_layers[0])) {
+    // TODO(costan): Add an error code that indicates invalid input.
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+  }
+  display::DriverLayer layer(banjo_layers[0]);
+  cpp20::span<const display::DriverLayer> layers(&layer, 1);
+
+  return engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
                                     out_client_composition_opcodes,
                                     out_client_composition_opcodes_actual);
 }
@@ -204,7 +213,15 @@ void DisplayControllerBanjo::DisplayEngineApplyConfiguration(
   ZX_DEBUG_ASSERT_MSG(banjo_display_config.cc_flags == 0,
                       "Display coordinator applied rejected color-correction config");
 
-  engine_.ApplyConfiguration(banjo_display_config.display_id, banjo_layers, *banjo_config_stamp);
+  if (!display::DriverLayer::IsValid(banjo_layers[0])) {
+    ZX_DEBUG_ASSERT_MSG(false, "Display coordinator applied rejected invalid layer config");
+    return;
+  }
+  display::DriverLayer layer(banjo_layers[0]);
+  cpp20::span<const display::DriverLayer> layers(&layer, 1);
+
+  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
+                             display::ToConfigStamp(*banjo_config_stamp));
 }
 
 zx_status_t DisplayControllerBanjo::DisplayEngineSetBufferCollectionConstraints(
