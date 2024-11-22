@@ -7,6 +7,7 @@ import("//build/config/clang/crash_diagnostics.gni")
 import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
+import("//build/config/enable_frame_pointers.gni")
 import("//build/config/fuchsia_cxx_version.gni")
 import("//build/config/linker.gni")
 import("//build/config/lto/config.gni")
@@ -22,22 +23,12 @@ if (support_rust) {
 }
 
 declare_args() {
-  if (is_fuchsia) {
-    # Controls whether the compiler emits full stack frames for function calls.
-    # This reduces performance but increases the ability to generate good
-    # stack traces, especially when we have bugs around unwind table generation.
-    # It applies only for Fuchsia targets (see below where it is unset).
-    #
-    # TODO(https://fxbug.dev/376749368) Enabling frame pointers breaks on RISCV release.
-    enable_frame_pointers = is_debug || target_cpu != "riscv64"
-  }
-
   # Controls whether to promote warnings to errors.
   deny_warnings = true
 }
 
 # No frame pointers for host compiles.
-if (!is_fuchsia) {
+if (current_toolchain == host_toolchain) {
   enable_frame_pointers = false
 }
 
