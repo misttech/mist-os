@@ -1064,7 +1064,10 @@ async fn test_channel_switch() {
 
     fullmac_driver
         .ifc_proxy
-        .on_channel_switch(&fidl_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 11 })
+        .on_channel_switch(&fidl_fullmac::WlanFullmacImplIfcOnChannelSwitchRequest {
+            new_channel: Some(11),
+            ..Default::default()
+        })
         .await
         .expect("Could not send OnChannelSwitch");
 

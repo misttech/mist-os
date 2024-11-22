@@ -460,10 +460,12 @@ pub fn convert_eapol_confirm(
         dst_addr: conf.dst_addr,
     }
 }
-pub fn convert_channel_switch_info(
-    info: fidl_fullmac::WlanFullmacChannelSwitchInfo,
-) -> fidl_internal::ChannelSwitchInfo {
-    fidl_internal::ChannelSwitchInfo { new_channel: info.new_channel }
+pub fn convert_channel_switch(
+    req: fidl_fullmac::WlanFullmacImplIfcOnChannelSwitchRequest,
+) -> Result<fidl_internal::ChannelSwitchInfo> {
+    Ok(fidl_internal::ChannelSwitchInfo {
+        new_channel: req.new_channel.context("missing new_channel")?,
+    })
 }
 
 pub fn convert_signal_report(

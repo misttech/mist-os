@@ -115,10 +115,10 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_eapol_confirm(resp),
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::OnChannelSwitch { ind, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::OnChannelSwitch { payload, responder } => {
             responder.send().context("Failed to respond to OnChannelSwitch")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnChannelSwitch {
-                resp: fullmac_to_mlme::convert_channel_switch_info(ind),
+                resp: fullmac_to_mlme::convert_channel_switch(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::SignalReport { payload, responder } => {

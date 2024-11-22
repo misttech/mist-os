@@ -1570,11 +1570,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let channel_switch_info = fidl_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 9 };
+        let channel_switch_req = fidl_fullmac::WlanFullmacImplIfcOnChannelSwitchRequest {
+            new_channel: Some(9),
+            ..Default::default()
+        };
         assert_variant!(
-            h.exec.run_until_stalled(
-                &mut h.fullmac_ifc_proxy.on_channel_switch(&channel_switch_info)
-            ),
+            h.exec
+                .run_until_stalled(&mut h.fullmac_ifc_proxy.on_channel_switch(&channel_switch_req)),
             Poll::Ready(Ok(()))
         );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);

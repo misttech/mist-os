@@ -79,8 +79,10 @@ TEST_F(ChannelSwitchTest, ChannelSwitch) {
   env_->Run(kTestDuration);
 
   // Channel switch will only be triggered when assciated.
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
+  ASSERT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
+  const auto& csa = client_ifc_.stats_.csa_indications.front();
+  ASSERT_TRUE(csa.new_channel().has_value());
+  EXPECT_EQ(csa.new_channel().value(), kSwitchedChannel.primary);
 }
 
 // This test case verifies that in a single CSA beacon interval, if AP want to switch back to old
@@ -116,8 +118,10 @@ TEST_F(ChannelSwitchTest, ChangeDstAddressWhenSwitching) {
 
   env_->Run(kTestDuration);
 
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSecondSwitchedChannel.primary);
+  ASSERT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
+  const auto& csa = client_ifc_.stats_.csa_indications.front();
+  ASSERT_TRUE(csa.new_channel().has_value());
+  EXPECT_EQ(csa.new_channel().value(), kSecondSwitchedChannel.primary);
 }
 
 // This test case verifies that two continuous channel switches will work as long as they are in two
@@ -137,10 +141,15 @@ TEST_F(ChannelSwitchTest, SwitchBackInDiffInterval) {
 
   env_->Run(kTestDuration);
 
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 2U);
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
+  ASSERT_EQ(client_ifc_.stats_.csa_indications.size(), 2U);
+  const auto& first_csa = client_ifc_.stats_.csa_indications.front();
+  ASSERT_TRUE(first_csa.new_channel().has_value());
+  EXPECT_EQ(first_csa.new_channel().value(), kSwitchedChannel.primary);
+
   client_ifc_.stats_.csa_indications.pop_front();
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kDefaultChannel.primary);
+  const auto& second_csa = client_ifc_.stats_.csa_indications.front();
+  ASSERT_TRUE(second_csa.new_channel().has_value());
+  EXPECT_EQ(second_csa.new_channel().value(), kDefaultChannel.primary);
 }
 
 // This test verifies CSA beacons from APs which are not associated with client will not trigger
@@ -189,8 +198,10 @@ TEST_F(ChannelSwitchTest, StopStillSwitch) {
 
   env_->Run(kTestDuration);
 
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
-  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
+  ASSERT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
+  const auto& csa = client_ifc_.stats_.csa_indications.front();
+  ASSERT_TRUE(csa.new_channel().has_value());
+  EXPECT_EQ(csa.new_channel().value(), kSwitchedChannel.primary);
 }
 
 // This test verifies that the CSA beacon will be ignored when its new channel is the same as

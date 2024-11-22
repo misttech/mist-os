@@ -117,8 +117,10 @@ void DynamicIfTest::ChannelCheck() {
     brcmf_simdev* sim = device->GetSim();
     wlan_common::WlanChannel channel;
     sim->sim_fw->convert_chanspec_to_channel(softap_chanspec, &channel);
-    EXPECT_GE(softap_ifc_.stats_.csa_indications.size(), 1U);
-    EXPECT_EQ(channel.primary, softap_ifc_.stats_.csa_indications.front().new_channel);
+    ASSERT_GE(softap_ifc_.stats_.csa_indications.size(), 1U);
+    const auto& csa = softap_ifc_.stats_.csa_indications.front();
+    ASSERT_TRUE(csa.new_channel().has_value());
+    EXPECT_EQ(channel.primary, csa.new_channel().value());
   });
 }
 
