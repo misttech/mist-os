@@ -113,7 +113,7 @@ See [Fuchsia tracing guides][fuchsia-tracing-guides] for more information.
 [add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md
 [trace-c-cpp-macros]: /docs/reference/tracing/c_cpp_macros.md
 [fx-workflows]: /docs/development/build/fx.md
-[ffx-trace]: /docs/development/sdk/ffx/record-traces.md
+[ffx-trace]: /docs/development/tools/ffx/workflows/record-traces.md
 [perfetto-viewer]: https://ui.perfetto.dev/#!/
 [fuchsia-tracing-guides]: /docs/development/tracing/README.md
 

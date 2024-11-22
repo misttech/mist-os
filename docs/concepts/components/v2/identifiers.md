@@ -130,7 +130,7 @@ Monikers may appear in system logs and the output of developer tools.
 
 [glossary.component-url]: /docs/glossary/README.md#component-url
 [glossary.moniker]: /docs/glossary/README.md#moniker
-[component-explore]: /docs/development/sdk/ffx/explore-components.md
+[component-explore]: /docs/development/tools/ffx/workflows/explore-components.md
 [component-select]: /docs/development/tools/ffx/commands/component-select.md
 [diagnostic-selectors]: /docs/reference/diagnostics/selectors.md
 [doc-manifests-children]: https://fuchsia.dev/reference/cml#children

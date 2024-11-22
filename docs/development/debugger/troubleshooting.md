@@ -49,7 +49,7 @@ fx serve
 ### Debug symbols are registered {#set-symbol-location}
 
 By default, zxdb obtains the locations of the debug symbols from the
-[symbol index](/docs/development/sdk/ffx/register-debug-symbols.md).
+[symbol index](/docs/development/tools/ffx/workflows/register-debug-symbols.md).
 The registrations of debug symbols from in-tree and most out-of-tree
 environments are automated.
 

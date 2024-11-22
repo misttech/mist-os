@@ -42,4 +42,4 @@ development environment.
 
 [fuchsia-packages]: package.md
 [tuf]: https://en.wikipedia.org/wiki/The_Update_Framework
-[ffx-repository-server]: /docs/development/sdk/ffx/start-package-servers.md
+[ffx-repository-server]: /docs/development/tools/ffx/workflows/start-package-servers.md

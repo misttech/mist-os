@@ -484,8 +484,8 @@ You can also turn on, turn off or reboot the NUC with the following terminal com
 [NUC8i3BEK]: https://ark.intel.com/content/www/us/en/ark/products/126149/intel-nuc-kit-nuc8i3bek.html
 [NUC8i3BEH]: https://ark.intel.com/content/www/us/en/ark/products/126150/intel-nuc-kit-nuc8i3beh.html
 [ffx]: https://fuchsia.dev/reference/tools/sdk/ffx
-[ffx-workflows]: /docs/development/sdk/ffx/index.md
-[fuchsia-ssh-keys]: /docs/development/sdk/ffx/create-ssh-keys-for-devices.md
+[ffx-workflows]: /docs/development/tools/ffx/workflows/README.md
+[fuchsia-ssh-keys]: /docs/development/tools/ffx/workflows/create-ssh-keys-for-devices.md
 [experimental-hardware]: /docs/contribute/governance/rfcs/0111_fuchsia_hardware_specifications.md#experimental-hardware
 [amt]: https://www.intel.com/content/www/us/en/architecture-and-technology/intel-active-management-technology.html
 [amtctrl]: https://github.com/sdague/amt

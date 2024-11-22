@@ -409,7 +409,7 @@ by improper stopping of components.
 
 <!-- xrefs -->
 
-[measuring-memory-usage]: /docs/development/sdk/ffx/explore-memory-usage.md
+[measuring-memory-usage]: /docs/development/tools/ffx/workflows/explore-memory-usage.md
 [http-client.cm]: https://cs.opensource.google/fuchsia/fuchsia/+/50b8825378e19078d84171ce21f9eb3d7e22d6db:src/connectivity/policy/http-client/meta/http_client.cml
 [until_stalled]: https://fuchsia-docs.firebaseapp.com/rust/detect_stall/fn.until_stalled.html
 [service_fs]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_component/server/struct.ServiceFs.html#method.until_stalled

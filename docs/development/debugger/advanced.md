@@ -154,9 +154,11 @@ Loading 17 modules for init Done.
 [zxdb]
 ```
 
+<!-- Reference links -->
+
 [koid-concept]: /docs/concepts/kernel/concepts.md#kernel_object_ids
 [zxdb-readme]: /docs/development/debugger/README.md
 [zxdb-readme-run]: /docs/development/debugger/README.md#run_zxdb
 [zxdb-tutorial-minidumps]: /docs/development/debugger/tutorial-minidumps.md
-[ffx-debug-symbol-index]: /docs/development/sdk/ffx/register-debug-symbols.md
+[ffx-debug-symbol-index]: /docs/development/tools/ffx/workflows/register-debug-symbols.md
 [about-symbol-settings]: symbols.md#about_symbol_settings

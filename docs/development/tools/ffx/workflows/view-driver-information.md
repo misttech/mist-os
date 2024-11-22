@@ -512,10 +512,10 @@ $ ffx driver disable fuchsia-pkg://fuchsia.com/my_example#meta/my_driver.cm
 
 <!-- Reference links -->
 
-[flash-a-device]: /docs/development/sdk/ffx/flash-a-device.md
-[fuchsia-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
-[ssh-connection]: /docs/development/sdk/ffx/create-ssh-keys-for-devices.md
-[ffx-target-show]: /docs/development/sdk/ffx/view-device-information.md#get_detailed_information_from_a_device
+[flash-a-device]: /docs/development/tools/ffx/workflows/flash-a-device.md
+[fuchsia-emulator]: /docs/development/tools/ffx/workflows/start-the-fuchsia-emulator.md
+[ssh-connection]: /docs/development/tools/ffx/workflows/create-ssh-keys-for-devices.md
+[ffx-target-show]: /docs/development/tools/ffx/workflows/view-device-information.md#get_detailed_information_from_a_device
 [dfv2]: /docs/concepts/drivers/driver_framework.md
 [device-nodes]: /docs/concepts/drivers/drivers_and_nodes.md
 [node-topology]: /docs/concepts/drivers/drivers_and_nodes.md#node_topology

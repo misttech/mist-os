@@ -481,5 +481,5 @@ None considered in this design.
 [platform-versioning]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [platform-versioning-evolution]: /docs/contribute/governance/rfcs/0002_platform_versioning.md#evolution
 [subpackages]: /docs/contribute/governance/rfcs/0154_subpackages.md
-[ffx-component]: /docs/development/sdk/ffx/view-component-information.md
+[ffx-component]: /docs/development/tools/ffx/workflows/view-component-information.md
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing

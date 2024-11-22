@@ -93,4 +93,4 @@ See the following tutorials under the **SDK** section:
 [driver-codelab]: /docs/get-started/sdk/learn/driver/introduction.md
 [write-bind-rules]: /docs/development/sdk/write-bind-rules-for-driver.md
 [driver-unit-testing]: /docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md
-[view-driver-info]: /docs/development/sdk/ffx/view-driver-information.md
+[view-driver-info]: /docs/development/tools/ffx/workflows/view-driver-information.md

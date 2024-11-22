@@ -4,5 +4,5 @@
 
 
 [get-started]: https://fuchsia.googlesource.com/sdk-samples/getting-started
-[start-femu]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
+[start-femu]: /docs/development/tools/ffx/workflows/start-the-fuchsia-emulator.md
 [sdk-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Bazel

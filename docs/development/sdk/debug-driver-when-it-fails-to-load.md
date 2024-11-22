@@ -268,9 +268,9 @@ the Driver codelab.
 [component-manifests]: /docs/concepts/components/v2/component_manifests.md
 [driver-framework]: /docs/concepts/drivers/driver_framework.md
 [driver-binding]: /docs/concepts/drivers/driver_binding.md
-[fuchsia-package-server]: /docs/development/sdk/ffx/create-a-package-repository.md
+[fuchsia-package-server]: /docs/development/tools/ffx/workflows/create-a-package-repository.md
 [bazel-run]: https://fuchsia.googlesource.com/sdk-samples/drivers
 [fuchsia-pci-bind]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bind/fuchsia.pci/fuchsia.pci.bind
-[ffx-component-show]: /docs/development/sdk/ffx/view-component-information.md
-[ffx-log]: /docs/development/sdk/ffx/view-device-logs.md
+[ffx-component-show]: /docs/development/tools/ffx/workflows/view-component-information.md
+[ffx-log]: /docs/development/tools/ffx/workflows/view-device-logs.md
 [implement-driver-hooks]: /docs/get-started/sdk/learn/driver/driver-binding.md#implement_driver_hooks
