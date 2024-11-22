@@ -564,11 +564,6 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartSecondDriver(bool col
 void TestDirectory::Bind(fidl::ServerEnd<fio::Directory> request) {
   bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
 }
-void TestDirectory::Clone(CloneRequest& request, CloneCompleter::Sync& completer) {
-  EXPECT_EQ(fio::OpenFlags::kCloneSameRights, request.flags());
-  fidl::ServerEnd<fio::Directory> dir(request.object().TakeChannel());
-  Bind(std::move(dir));
-}
 void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
   open_handler_(request.path(), std::move(request.object()));
 }
