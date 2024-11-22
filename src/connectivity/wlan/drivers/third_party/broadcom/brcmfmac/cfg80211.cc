@@ -6070,6 +6070,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
 
   uint16_t chanspec = 0;
   uint8_t ctl_chan;
+  fuchsia_wlan_fullmac_wire::WlanFullmacChannelSwitchInfo info = {};
   zx_status_t err = ZX_OK;
   struct brcmf_cfg80211_info* cfg = nullptr;
   struct wireless_dev* wdev = nullptr;
@@ -6094,6 +6095,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
   }
   BRCMF_DBG(CONN, "Channel switch ind IF: %d chanspec: 0x%x control channel: %d", ifp->ifidx,
             chanspec, ctl_chan);
+  info.new_channel = ctl_chan;
 
   // Inform wlanif of the channel switch.
   auto arena = fdf::Arena::Create(0, 0);
@@ -6101,11 +6103,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
-  const auto channel_switch =
-      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcOnChannelSwitchRequest::Builder(*arena)
-          .new_channel(ctl_chan)
-          .Build();
-  auto result = ndev->if_proto.buffer(*arena)->OnChannelSwitch(channel_switch);
+  auto result = ndev->if_proto.buffer(*arena)->OnChannelSwitch(info);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send channel switch info result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;

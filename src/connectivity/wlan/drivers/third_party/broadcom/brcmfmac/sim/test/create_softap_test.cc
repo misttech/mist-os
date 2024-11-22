@@ -95,7 +95,7 @@ class CreateSoftAPTest : public SimTest {
   void OnDisassocInd(const fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest* ind);
   void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
   void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
-  void OnChannelSwitch(const fuchsia_wlan_fullmac::WlanFullmacImplIfcOnChannelSwitchRequest* req);
+  void OnChannelSwitch(const wlan_fullmac_wire::WlanFullmacChannelSwitchInfo* info);
   // Status field in the last received authentication frame.
   wlan_ieee80211::StatusCode auth_resp_status_;
 
@@ -167,8 +167,7 @@ void SoftApInterface::StopConf(StopConfRequestView request, StopConfCompleter::S
 }
 void SoftApInterface::OnChannelSwitch(OnChannelSwitchRequestView request,
                                       OnChannelSwitchCompleter::Sync& completer) {
-  const auto csa = fidl::ToNatural(*request);
-  test_->OnChannelSwitch(&csa);
+  test_->OnChannelSwitch(&request->ind);
   completer.Reply();
 }
 
@@ -378,7 +377,7 @@ void CreateSoftAPTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfir
 }
 
 void CreateSoftAPTest::OnChannelSwitch(
-    const fuchsia_wlan_fullmac::WlanFullmacImplIfcOnChannelSwitchRequest* req) {}
+    const wlan_fullmac_wire::WlanFullmacChannelSwitchInfo* info) {}
 
 void CreateSoftAPTest::TxAssocReq(common::MacAddr client_mac) {
   // Get the mac address of the SoftAP

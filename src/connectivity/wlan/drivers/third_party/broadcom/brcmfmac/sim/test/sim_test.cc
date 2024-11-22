@@ -263,8 +263,7 @@ void SimInterface::EapolConf(EapolConfRequestView request, EapolConfCompleter::S
 
 void SimInterface::OnChannelSwitch(OnChannelSwitchRequestView request,
                                    OnChannelSwitchCompleter::Sync& completer) {
-  auto csa = fidl::ToNatural(*request);
-  stats_.csa_indications.push_back(csa);
+  stats_.csa_indications.push_back(request->ind);
   completer.Reply();
 }
 

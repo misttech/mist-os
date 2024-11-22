@@ -324,6 +324,10 @@ type WlanFullmacIfaceHistogramStats = table {
     4: snr_histograms vector<WlanFullmacSnrHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
 };
 
+type WlanFullmacChannelSwitchInfo = struct {
+    new_channel uint8;
+};
+
 type WlanFullmacPmkInfo = struct {
     pmk vector<uint8>:MAX;
     pmkid vector<uint8>:MAX;
@@ -469,11 +473,8 @@ closed protocol WlanFullmacImplIfc {
     strict EapolConf(struct {
         resp WlanFullmacEapolConfirm;
     }) -> ();
-
-    /// Report that a channel switch occurred.
-    strict OnChannelSwitch(table {
-        /// Current channel number.
-        1: new_channel uint8;
+    strict OnChannelSwitch(struct {
+        ind WlanFullmacChannelSwitchInfo;
     }) -> ();
 
     // MLME extensions
