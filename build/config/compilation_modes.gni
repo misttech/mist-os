@@ -23,7 +23,7 @@ declare_args() {
   #   * optimize:  The optimization mode to use.  Valid values are:
   #       * `none`: really unoptimized, usually only build-tested and not run
   #       * `debug`: "optimized for debugging", light enough to avoid confusion
-  #       * `default`: default optimization level
+  #       * `moderate`: moderate optimization level (clang's default -O2)
   #       * `size`:  optimized for space rather than purely for speed
   #       * `size_lto`:  optimize for space and use LTO
   #       * `speed`: optimized purely for speed

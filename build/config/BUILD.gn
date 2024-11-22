@@ -464,7 +464,7 @@ config("optimize_minimal") {
   rustflags = [ "-Copt-level=1" ]
 }
 
-config("optimize_default") {
+config("optimize_moderate") {
   cflags = [ "-O2" ]
   ldflags = cflags
   rustflags = [ "-Copt-level=2" ]
@@ -503,7 +503,7 @@ config("optimize_size") {
 # This is the default optimization level for "release" builds.
 config("optimize_size_lto") {
   if (zircon_toolchain != false) {
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     # Primarily optimize for size.
     configs = [ ":optimize_size" ]
@@ -546,7 +546,7 @@ config("optimize_profile") {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
     # See https://fxbug.dev/42146384 for more context.
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     cflags = [ "-O1" ]
     ldflags = cflags
@@ -559,7 +559,7 @@ config("optimize_coverage") {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
     # See https://fxbug.dev/42146384 for more context.
-    configs = [ ":optimize_default" ]
+    configs = [ ":optimize_moderate" ]
   } else {
     cflags = [ "-O1" ]
     ldflags = cflags
