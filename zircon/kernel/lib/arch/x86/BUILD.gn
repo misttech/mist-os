@@ -27,7 +27,9 @@ library_headers("headers") {
     "//zircon/system/ulib/hwreg:headers",
   ]
 
-  public_deps += [ ":gen-cpuid-asm" ]
+  if (!is_host) {
+    public_deps += [ ":gen-cpuid-asm" ]
+  }
 }
 
 static_library("x86") {
