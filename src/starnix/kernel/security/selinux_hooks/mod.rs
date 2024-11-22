@@ -243,7 +243,7 @@ fn compute_new_fs_node_sid(
 
     // Determine the SID with which the new `FsNode` would be labeled.
     match label.scheme {
-        // TODO: How should creation of new files under "genfscon" be handled?
+        // TODO: https://fxbug.dev/377915469 - How should creation of new files under "genfscon" be handled?
         FileSystemLabelingScheme::GenFsCon => {
             track_stub!(TODO("https://fxbug.dev/377915469"), "New file in genfscon fs");
             Ok(Some((label.sid, label)))
@@ -328,6 +328,8 @@ fn may_create(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
 
+    // Verify that the caller has permissions required to add new entries to the target
+    // directory node.
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid(parent);
 
@@ -346,6 +348,7 @@ fn may_create(
         DirPermission::AddName
     )?;
 
+    // Verify that the caller has permission to create new nodes of the desired type.
     let new_file_type = file_class_from_file_mode(new_file_mode)?;
     let new_file_sid = compute_new_fs_node_sid(
         security_server,
@@ -363,9 +366,16 @@ fn may_create(
         CommonFilePermission::Create.for_class(new_file_type)
     )?;
 
+    // Verify that the new node's label is permitted to be created in the target filesystem.
     let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
-        _ => error!(EPERM),
+        FileSystemLabelState::Unlabeled { .. } => {
+            track_stub!(
+                TODO("https://fxbug.dev/367585803"),
+                "may_create() should not be called until policy load has completed"
+            );
+            error!(EPERM)
+        }
     }?;
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check associate permission."),
@@ -374,6 +384,7 @@ fn may_create(
         filesystem_sid,
         FileSystemPermission::Associate
     )?;
+
     Ok(())
 }
 
