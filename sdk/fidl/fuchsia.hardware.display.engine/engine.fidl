@@ -95,13 +95,9 @@ type Layer = struct {
     /// If `image_id` is valid, the metadata must equal the argument passed
     /// to [`fuchsia.hardware.display.engine/Engine.ImportImage`].
     ///
-    /// A valid layer definition requires that the metadata is valid if
-    /// `image_id` is a valid handle. A valid layer definition requires that
-    /// the metadata specifies an empty (0x0) image with linear tiling if
-    /// `image_source` specifies an empty rectangle.
-    ///
-    /// To allow for future evolution, Layer consumers must ignore the
-    /// image metadata if `image_source` specifies an empty rectangle.
+    /// A valid layer definition requires that the metadata is valid. A valid
+    /// layer definition requires that the metadata specifies an empty (0x0)
+    /// image with linear tiling if `image_source` specifies an empty rectangle.
     image_metadata fuchsia.hardware.display.types.ImageMetadata;
 
     /// Fallback when the pixel data for the layer's image cannot be retrieved.
