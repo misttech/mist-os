@@ -214,13 +214,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   // Long-running initialization is performed in the DdkInit hook.
   zx_status_t Init();
 
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
-
   const std::unique_ptr<GttRegionImpl>& GetGttRegionImpl(uint64_t handle);
   void InitDisplays();
 

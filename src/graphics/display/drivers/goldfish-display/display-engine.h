@@ -145,13 +145,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     std::list<async::WaitOnce> pending_config_waits;
   };
 
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
-
   zx::result<display::DriverImageId> ImportVmoImage(
       const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
       zx::vmo vmo, size_t offset);

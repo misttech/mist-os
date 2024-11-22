@@ -125,13 +125,6 @@ class DisplayEngine final : public DisplayEngineInterface {
                                             size_t offset, uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
 
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
-
   DisplayInfo current_display_;
 
   // Flush thread
