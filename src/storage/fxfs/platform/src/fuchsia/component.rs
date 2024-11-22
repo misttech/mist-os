@@ -77,6 +77,7 @@ impl Deref for InspectedFxFilesystem {
 #[async_trait]
 impl FsInspect for InspectedFxFilesystem {
     fn get_info_data(&self) -> InfoData {
+        let earliest_version = self.0.super_block_header().earliest_version;
         InfoData {
             id: self.1,
             fs_type: fidl_fuchsia_fs::VfsType::Fxfs.into_primitive().into(),
@@ -85,8 +86,7 @@ impl FsInspect for InspectedFxFilesystem {
             version_minor: LATEST_VERSION.minor.into(),
             block_size: self.0.block_size() as u64,
             max_filename_length: fio::MAX_FILENAME,
-            // TODO(https://fxbug.dev/42175592): Determine how to report oldest on-disk version if required.
-            oldest_version: None,
+            oldest_version: Some((earliest_version.major.into(), earliest_version.minor.into())),
         }
     }
 
