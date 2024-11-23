@@ -127,7 +127,7 @@ namespace tcs {
 
 void Tcs3400InputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<int64_t> values(allocator, 4);
   values[0] = illuminance;
   values[1] = red;

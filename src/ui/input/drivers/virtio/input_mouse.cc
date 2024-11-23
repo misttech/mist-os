@@ -33,7 +33,7 @@ constexpr fuchsia_input_report::wire::Axis kMouseRange = {
 
 void MouseReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<uint8_t> pressed_buttons(allocator, kMaxButtonCount);
   size_t idx = 0;
   for (uint8_t i = 0; i < kMaxButtonCount; i++) {

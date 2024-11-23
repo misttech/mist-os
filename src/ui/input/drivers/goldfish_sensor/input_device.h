@@ -94,7 +94,7 @@ class AccelerationInputDevice : public InputDevice {
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   // Creates an AccelerationInputDevice. Takes an unowned pointer to |parent|.
@@ -124,7 +124,7 @@ class GyroscopeInputDevice : public InputDevice {
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   static fpromise::result<InputDevice*, zx_status_t> Create(RootDevice* parent,
@@ -155,7 +155,7 @@ class RgbcLightInputDevice : public InputDevice {
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
   };
 
   static fpromise::result<InputDevice*, zx_status_t> Create(RootDevice* parent,

@@ -15,7 +15,7 @@ namespace buttons {
 
 void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input_report::wire::ConsumerControlButton> buttons_rpt(
       allocator, fuchsia_input_report::wire::kConsumerControlMaxNumButtons);
   size_t count = 0;

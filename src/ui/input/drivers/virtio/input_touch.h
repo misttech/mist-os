@@ -20,7 +20,7 @@ struct TouchReport {
 
   void ToFidlInputReport(
       fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator);
+      fidl::AnyArena& allocator) const;
 };
 
 // The HidTouch class translates virtio touchscreen events into HID touchscreen events. It does this

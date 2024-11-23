@@ -46,7 +46,7 @@ constexpr size_t kYMax = 1024;
 
 void Gt92xxDevice::GtInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
                                                                                contact_count);
   for (size_t i = 0; i < contact_count; i++) {

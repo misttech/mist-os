@@ -174,7 +174,7 @@ constexpr std::array<fuchsia_input::wire::Key, kKeyCount> kKeys = []() {
 
 void KeyboardReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input::wire::Key> keys3(allocator, kMaxKeys);
   size_t idx = 0;
   for (const auto& key : usage) {

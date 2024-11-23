@@ -40,7 +40,7 @@ InputDevice::~InputDevice() {
 }
 
 void AccelerationInputDevice::InputReport::ToFidlInputReport(
-    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) {
+    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) const {
   auto sensor_report = fir_fidl::SensorInputReport::Builder(allocator);
   fidl::VectorView<int64_t> values(allocator, 3);
 
@@ -155,7 +155,7 @@ void AccelerationInputDevice::GetInputReportsReader(
 }
 
 void GyroscopeInputDevice::InputReport::ToFidlInputReport(
-    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) {
+    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) const {
   auto sensor_report = fir_fidl::SensorInputReport::Builder(allocator);
   fidl::VectorView<int64_t> values(allocator, 3);
   // Raw sensor reading uses unit |rad/s|, while InputReport uses unit
@@ -269,7 +269,7 @@ void GyroscopeInputDevice::GetInputReportsReader(GetInputReportsReaderRequestVie
 }
 
 void RgbcLightInputDevice::InputReport::ToFidlInputReport(
-    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) {
+    fidl::WireTableBuilder<fir_fidl::InputReport>& input_report, fidl::AnyArena& allocator) const {
   auto sensor_report = fir_fidl::SensorInputReport::Builder(allocator);
   fidl::VectorView<int64_t> values(allocator, 4);
   values[0] = static_cast<int64_t>(r);

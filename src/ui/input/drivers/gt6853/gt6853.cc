@@ -64,7 +64,7 @@ enum class Gt6853Device::DeviceCommand : uint8_t {
 
 void Gt6853InputReport::ToFidlInputReport(
     fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
+    fidl::AnyArena& allocator) const {
   fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> input_contacts(allocator,
                                                                                   num_contacts);
   for (size_t i = 0; i < num_contacts; i++) {

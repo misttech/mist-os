@@ -34,7 +34,7 @@ struct Tcs3400InputReport {
 
   void ToFidlInputReport(
       fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-      fidl::AnyArena& allocator);
+      fidl::AnyArena& allocator) const;
 
   bool is_valid() const { return event_time.get() != ZX_TIME_INFINITE_PAST; }
 };

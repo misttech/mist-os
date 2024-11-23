@@ -84,7 +84,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
 
     void ToFidlInputReport(
         fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-        fidl::AnyArena& allocator);
+        fidl::AnyArena& allocator) const;
 
     bool operator==(const ButtonsInputReport& other) const { return buttons == other.buttons; }
     bool operator!=(const ButtonsInputReport& other) const { return !(*this == other); }
