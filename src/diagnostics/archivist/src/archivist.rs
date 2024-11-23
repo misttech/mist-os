@@ -23,8 +23,6 @@ use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use futures::channel::oneshot;
-use futures::future::abortable;
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
 use std::path::Path;
@@ -38,9 +36,6 @@ use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_asy
 pub struct Archivist {
     /// Handles event routing between archivist parts.
     event_router: EventRouter,
-
-    /// Receive stop signal to kill this archivist.
-    stop_recv: oneshot::Receiver<()>,
 
     /// The diagnostics pipelines that have been installed.
     pipelines: Vec<Arc<Pipeline>>,
@@ -77,7 +72,7 @@ impl Archivist {
     /// Creates new instance, sets up inspect and adds 'archive' directory to output folder.
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
-    pub async fn new(config: Config, request_stream: LifecycleRequestStream) -> Self {
+    pub async fn new(config: Config) -> Self {
         let general_scope = fasync::Scope::new();
         let servers_scope = fasync::Scope::new();
 
@@ -176,15 +171,12 @@ impl Archivist {
             );
         }
 
-        let stop_recv = component_lifecycle::serve(request_stream, &general_scope);
-
         Self {
             accessor_server,
             log_server,
             log_stream_server,
             event_router,
             _inspect_sink_server: inspect_sink_server,
-            stop_recv,
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
@@ -266,18 +258,18 @@ impl Archivist {
         mut self,
         mut fs: ServiceFs<ServiceObj<'static, ()>>,
         is_embedded: bool,
+        request_stream: LifecycleRequestStream,
     ) -> Result<(), Error> {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
         self.serve_protocols(&mut fs);
-        let run_outgoing = fs.collect::<()>();
+        let svc_task = self.general_scope.spawn(fs.collect::<()>());
+
         let _inspect_server_task = inspect_runtime::publish(
             component::inspector(),
             inspect_runtime::PublishOptions::default(),
         );
-
-        let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
         let Self {
             pipelines: _pipelines,
@@ -290,7 +282,6 @@ impl Archivist {
             general_scope,
             incoming_events_scope,
             servers_scope,
-            stop_recv,
             event_router,
         } = self;
 
@@ -302,8 +293,7 @@ impl Archivist {
         general_scope.spawn(drain_events_fut);
 
         let servers_scope_handle = servers_scope.to_handle();
-        let stop_fut = async move {
-            stop_recv.into_future().await.ok();
+        general_scope.spawn(component_lifecycle::on_stop_request(request_stream, || async move {
             terminate_handle.terminate().await;
             debug!("Stopped ingesting new CapabilityRequested events");
             incoming_events_scope.cancel().await;
@@ -311,13 +301,13 @@ impl Archivist {
             servers_scope_handle.close();
             logs_repository.stop_accepting_new_log_sinks();
             debug!("Close any new connections to FIDL servers");
-            abort_handle.abort();
+            svc_task.cancel().await;
             debug!("Stop allowing new connections through the incoming namespace.");
             logs_repository.wait_for_termination().await;
             debug!("All LogSink connections have finished");
             servers_scope.join().await;
             debug!("All servers stopped.");
-        };
+        }));
 
         if is_embedded {
             debug!("Entering core loop.");
@@ -325,8 +315,9 @@ impl Archivist {
             info!("archivist: Entering core loop.");
         }
 
-        // Combine all three futures into a main future.
-        future::join(abortable_fut, stop_fut).map(|_| Ok(())).await
+        general_scope.await;
+
+        Ok(())
     }
 
     fn serve_protocols(&mut self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) {
@@ -399,12 +390,11 @@ mod tests {
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use futures::channel::oneshot;
     use std::marker::PhantomData;
     use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-    async fn init_archivist(
-        fs: &mut ServiceFs<ServiceObj<'static, ()>>,
-    ) -> (LifecycleProxy, Archivist) {
+    async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {
             enable_klog: false,
             log_to_debuglog: false,
@@ -419,9 +409,7 @@ mod tests {
             per_component_batch_timeout_seconds: -1,
         };
 
-        let (lifecycle_proxy, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
-        let mut archivist = Archivist::new(config, request_stream).await;
+        let mut archivist = Archivist::new(config).await;
 
         // Install a couple of iunattributed sources for the purposes of the test.
         let mut source = UnattributedSource::<LogSinkMarker>::default();
@@ -442,7 +430,7 @@ mod tests {
             source.new_connection(stream);
         });
 
-        (lifecycle_proxy, archivist)
+        archivist
     }
 
     pub struct UnattributedSource<P> {
@@ -496,10 +484,12 @@ mod tests {
         let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
         let mut fs = ServiceFs::new();
         fs.serve_connection(server_end).unwrap();
-        let (lifecycle_proxy, archivist) = init_archivist(&mut fs).await;
+        let archivist = init_archivist(&mut fs).await;
         let (signal_send, signal_recv) = oneshot::channel();
+        let (lifecycle_proxy, request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
         fasync::Task::spawn(async move {
-            archivist.run(fs, false).await.expect("Cannot run archivist");
+            archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
         })
         .detach();
@@ -511,9 +501,11 @@ mod tests {
         let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
         let mut fs = ServiceFs::new();
         fs.serve_connection(server_end).unwrap();
-        let (lifecycle_proxy, archivist) = init_archivist(&mut fs).await;
+        let archivist = init_archivist(&mut fs).await;
+        let (lifecycle_proxy, request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
         fasync::Task::spawn(async move {
-            archivist.run(fs, false).await.expect("Cannot run archivist");
+            archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
         })
         .detach();
         (directory, lifecycle_proxy)

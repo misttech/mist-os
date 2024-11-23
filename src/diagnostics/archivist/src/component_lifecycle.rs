@@ -6,9 +6,8 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use futures::channel::oneshot;
-use futures::StreamExt;
-use tracing::{debug, error};
+use futures::{Future, StreamExt};
+use tracing::{debug, warn};
 
 /// Takes the startup handle for LIFECYCLE and returns a stream listening for Lifecycle FIDL
 /// requests on it.
@@ -21,24 +20,22 @@ pub fn take_lifecycle_request_stream() -> LifecycleRequestStream {
 }
 
 /// Serves the Lifecycle protocol from the component runtime used for controlled shutdown of the
-/// archivist .
-pub(crate) fn serve(
-    mut request_stream: LifecycleRequestStream,
-    scope: &fasync::Scope,
-) -> oneshot::Receiver<()> {
-    let (stop_sender, stop_recv) = oneshot::channel();
-    let mut stop_sender = Some(stop_sender);
-
-    scope.spawn(async move {
-        debug!("Awaiting request to close");
-        while let Some(Ok(LifecycleRequest::Stop { .. })) = request_stream.next().await {
-            debug!("Initiating shutdown.");
-            if let Some(sender) = stop_sender.take() {
-                if sender.send(()).is_err() {
-                    error!("Archivist not shutting down. We lost the stop recv end");
-                }
-            }
+/// archivist. When Stop is requrested executes the given callback.
+pub async fn on_stop_request<F, Fut>(mut request_stream: LifecycleRequestStream, cb: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = ()>,
+{
+    match request_stream.next().await {
+        None => {
+            warn!("Lifecycle closed");
         }
-    });
-    stop_recv
+        Some(Err(err)) => {
+            warn!(?err, "Lifecycle error");
+        }
+        Some(Ok(LifecycleRequest::Stop { .. })) => {
+            debug!("Initiating shutdown.");
+            cb().await
+        }
+    }
 }

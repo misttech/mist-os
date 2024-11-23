@@ -43,8 +43,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .record_child("config", |config_node| config.record_inspect(config_node));
 
     let is_embedded = !config.log_to_debuglog;
-    let archivist =
-        Archivist::new(config, component_lifecycle::take_lifecycle_request_stream()).await;
+    let archivist = Archivist::new(config).await;
     debug!("Archivist initialized from configuration.");
 
     let startup_handle =
@@ -53,7 +52,8 @@ async fn async_main(config: Config) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
-    archivist.run(fs, is_embedded).await?;
+    let lifecycle_requests = component_lifecycle::take_lifecycle_request_stream();
+    archivist.run(fs, is_embedded, lifecycle_requests).await?;
 
     Ok(())
 }
