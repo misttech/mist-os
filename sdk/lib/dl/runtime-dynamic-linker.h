@@ -46,28 +46,15 @@ class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
 
-  static std::unique_ptr<RuntimeDynamicLinker> Create(
-      const std::vector<AbiModule>& loaded_abi_modules, fbl::AllocChecker& linker_ac) {
+  static std::unique_ptr<RuntimeDynamicLinker> Create(const ld::abi::Abi<>& abi,
+                                                      fbl::AllocChecker& linker_ac) {
+    assert(abi.loaded_modules);
+    assert(abi.static_tls_modules.size() == abi.static_tls_offsets.size());
     std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
-    if (dynamic_linker) [[likely]] {
-      // TODO(caslyn): put this logic into a function.
-      // Populate a RuntimeModule data structures and add it to the modules_ list for
-      // each AbiModule loaded with the program.
-      for (const AbiModule& abi_module : loaded_abi_modules) {
-        fbl::AllocChecker module_ac;
-        std::unique_ptr<RuntimeModule> module =
-            RuntimeModule::Create(module_ac, Soname{abi_module.link_map.name.get()});
-        if (!module_ac.check()) [[unlikely]] {
-          return nullptr;
-        }
-        module->module() = abi_module;
-        module->set_no_delete();
-        // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
-        // startup modules.
-        dynamic_linker->modules_.push_back(std::move(module));
-      }
+    if (dynamic_linker && dynamic_linker->PopulateStartupModules(abi)) [[likely]] {
+      return dynamic_linker;
     }
-    return dynamic_linker;
+    return nullptr;
   }
 
   constexpr const ModuleList& modules() const { return modules_; }
@@ -168,9 +155,12 @@ class RuntimeDynamicLinker {
   // list, as if it was just loaded with RTLD_GLOBAL.
   void MakeGlobal(const ModuleTree& module_tree);
 
+  // Create RuntimeModule data structures from the passive ABI and add them to
+  // the dynamic linker's modules_ list.
+  [[nodiscard]] bool PopulateStartupModules(const ld::abi::Abi<>& abi);
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
-  // TODO(https://fxbug.dev/324136831): support startup modules
   ModuleList modules_;
 };
 

@@ -18,6 +18,9 @@
 namespace dl::testing {
 namespace {
 
+// A container of abi modules (i.e. startup modules) loaded with this test.
+std::vector<AbiModule> gModuleStorage;
+
 // This class is a wrapper around the ld::ModuleMemory object that handles
 // addresses read from the .dynamic section in memory as modified by glibc.
 //
@@ -108,34 +111,38 @@ AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
 
 int AddModule(struct dl_phdr_info* phdr_info, size_t size, void* data) {
   assert(size >= sizeof(*phdr_info));
-  LoadedAbiModulesList* modules = reinterpret_cast<LoadedAbiModulesList*>(data);
-  AbiModule module = DecodeModule(*phdr_info);
-  modules->push_back(module);
+  gModuleStorage.push_back(DecodeModule(*phdr_info));
   return 0;
 }
 
 // This function decodes the loaded modules at startup to populate a list of
 // ld::abi::Abi<>::Module data structures to return to the caller.
-LoadedAbiModulesList PopulateLoadedAbiModules() {
-  LoadedAbiModulesList modules;
-  ZX_ASSERT(!dl_iterate_phdr(AddModule, &modules));
+const AbiModule* PopulateLoadedAbiModules() {
+  ZX_ASSERT(!dl_iterate_phdr(AddModule, nullptr));
 
   // Connect the link_map list pointers for each abi module and assign a
   // symbolizer_modid.
   uint32_t symbolizer_modid = 0;
-  auto prev = modules.begin();
-  for (auto it = std::next(prev); it != modules.end(); ++it) {
-    prev->link_map.next = &it->link_map;
-    it->link_map.prev = &prev->link_map;
+  auto prev = gModuleStorage.begin();
+  for (auto it = std::next(prev); it != gModuleStorage.end(); ++it) {
     it->symbolizer_modid = symbolizer_modid++;
+    auto& prev_link_map = prev->link_map;
+    auto& this_link_map = it->link_map;
+    prev_link_map.next = &this_link_map;
+    this_link_map.prev = &prev_link_map;
     prev = it;
   }
 
-  return modules;
+  return &gModuleStorage.front();
+  ;
 }
+
+const ld::abi::Abi<> gLdAbiStorage = {
+    .loaded_modules{PopulateLoadedAbiModules()},
+};
 
 }  // namespace
 
-const LoadedAbiModulesList gLoadedAbiModules = PopulateLoadedAbiModules();
+const ld::abi::Abi<>& gStartupLdAbi = gLdAbiStorage;
 
 }  // namespace dl::testing

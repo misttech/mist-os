@@ -57,4 +57,21 @@ void RuntimeDynamicLinker::MakeGlobal(const ModuleTree& module_tree) {
   }
 }
 
+bool RuntimeDynamicLinker::PopulateStartupModules(const ld::abi::Abi<>& abi) {
+  for (const AbiModule& abi_module : ld::AbiLoadedModules(abi)) {
+    fbl::AllocChecker ac;
+    std::unique_ptr<RuntimeModule> module =
+        RuntimeModule::Create(ac, Soname{abi_module.link_map.name.get()});
+    if (!ac.check()) [[unlikely]] {
+      return false;
+    }
+    module->module() = abi_module;
+    module->set_no_delete();
+    // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
+    // startup modules.
+    modules_.push_back(std::move(module));
+  }
+  return true;
+}
+
 }  // namespace dl
