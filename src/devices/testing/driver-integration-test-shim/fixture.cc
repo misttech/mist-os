@@ -58,37 +58,23 @@ class FakeSysinfo : public LocalComponentImpl,
   std::string board_name_;
 };
 
-class FakeBootArgs : public LocalComponentImpl, public fidl::WireServer<fuchsia_boot::Arguments> {
+class FakeBootArgsComponent : public LocalComponentImpl {
  public:
-  explicit FakeBootArgs(std::string boot_arg) : boot_arg_(std::move(boot_arg)) {}
+  explicit FakeBootArgsComponent(std::unique_ptr<fidl::WireServer<fuchsia_boot::Arguments>> server)
+      : server_(std::move(server)) {}
 
   void OnStart() override {
     auto service = std::make_unique<vfs::Service>([this](zx::channel request,
                                                          async_dispatcher_t* dispatcher) {
       bindings_.AddBinding(dispatcher, fidl::ServerEnd<fuchsia_boot::Arguments>(std::move(request)),
-                           this, fidl::kIgnoreBindingClosure);
+                           server_.get(), fidl::kIgnoreBindingClosure);
     });
     ZX_ASSERT(outgoing()->AddPublicService(std::move(service), "fuchsia.boot.Arguments") == ZX_OK);
   }
 
-  void GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) override {
-    std::vector<fidl::StringView> response = {
-        fidl::StringView(),
-        fidl::StringView(),
-        fidl::StringView::FromExternal(boot_arg_),
-    };
-    completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(response));
-  }
-
-  // Not implemented.
-  void GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) override {}
-  void GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& completer) override {}
-  void GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) override {}
-  void Collect(CollectRequestView request, CollectCompleter::Sync& completer) override {}
-
  private:
+  std::unique_ptr<fidl::WireServer<fuchsia_boot::Arguments>> server_;
   fidl::ServerBindingGroup<fuchsia_boot::Arguments> bindings_;
-  std::string boot_arg_;
 };
 
 zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
@@ -246,14 +232,17 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .source = {ChildRef{"fake-sysinfo"}},
       .targets = {ParentRef()},
   });
-  realm_builder.AddLocalChild("fake-bootargs", [boot_arg = std::string(args->boot_arg)]() mutable {
-    return std::make_unique<FakeBootArgs>(boot_arg);
-  });
-  realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.boot.Arguments"}},
-      .source = {ChildRef{"fake-bootargs"}},
-      .targets = {ParentRef()},
-  });
+  if (args->fake_boot_args) {
+    realm_builder.AddLocalChild("fake-bootargs",
+                                [impl = std::move(args->fake_boot_args)]() mutable {
+                                  return std::make_unique<FakeBootArgsComponent>(std::move(impl));
+                                });
+    realm_builder.AddRoute(Route{
+        .capabilities = {Protocol{"fuchsia.boot.Arguments"}},
+        .source = {ChildRef{"fake-bootargs"}},
+        .targets = {ParentRef()},
+    });
+  }
 
   std::vector<fuchsia_component_test::Capability> exposes = {{
       fuchsia_component_test::Capability::WithService(

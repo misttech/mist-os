@@ -18,7 +18,11 @@
 
 #include <fbl/string.h>
 #include <fbl/vector.h>
+#include <gpt/gpt.h>
 #include <zxtest/zxtest.h>
+
+#include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace {
 
@@ -104,6 +108,31 @@ void BlockDevice::CreateFromVmo(const fbl::unique_fd& devfs_root, const uint8_t*
   device->reset(new BlockDevice(client, block_count, block_size));
 }
 
+void BlockDevice::CreateWithGpt(const fbl::unique_fd& devfs_root, uint64_t block_count,
+                                uint32_t block_size,
+                                const std::vector<PartitionDescription>& init_partitions,
+                                std::unique_ptr<BlockDevice>* device) {
+  auto dev = std::make_unique<block_client::FakeBlockDevice>(block_count, block_size);
+  zx::result contents = dev->VmoChildReference();
+  ASSERT_OK(contents);
+  zx::result gpt_result = gpt::GptDevice::Create(std::move(dev), block_size, block_count);
+  ASSERT_OK(gpt_result);
+  std::unique_ptr<gpt::GptDevice> gpt = std::move(*gpt_result);
+  ASSERT_OK(gpt->Sync());
+
+  for (auto& part : init_partitions) {
+    uuid::Uuid instance = part.instance.value_or(uuid::Uuid::Generate());
+    ASSERT_OK(gpt->AddPartition(part.name.c_str(), part.type.bytes(), instance.bytes(), part.start,
+                                part.length, 0),
+              "%s", part.name.c_str());
+  }
+  ASSERT_OK(gpt->Sync());
+
+  constexpr const uint8_t kEmptyGuid[ZBI_PARTITION_GUID_LEN] = {0};
+  ASSERT_NO_FATAL_FAILURE(
+      CreateFromVmo(devfs_root, kEmptyGuid, std::move(*contents), block_size, device));
+}
+
 void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
   ASSERT_LE(blk_offset + blk_cnt, block_count());
   auto block_client = paver::BlockPartitionClient::Create(
@@ -129,9 +158,6 @@ void SkipBlockDevice::Create(fbl::unique_fd devfs_root,
   ASSERT_OK(ramdevice_client_test::RamNandCtl::Create(std::move(devfs_root), &ctl));
   std::optional<ramdevice_client::RamNand> ram_nand;
   ASSERT_OK(ctl->CreateRamNand(std::move(nand_info), &ram_nand));
-
-  ASSERT_OK(
-      device_watcher::RecursiveWaitForFile(ctl->devfs_root().get(), "sys/platform").status_value());
   device->reset(new SkipBlockDevice(std::move(ctl), *std::move(ram_nand), std::move(mapper)));
 }
 
@@ -191,3 +217,39 @@ zx::result<> FakePartitionClient::Trim() {
 }
 
 zx::result<> FakePartitionClient::Flush() { return zx::ok(); }
+
+FakeBootArgs::FakeBootArgs(std::string slot_suffix) {
+  AddStringArgs("zvb.current_slot", std::move(slot_suffix));
+}
+
+void FakeBootArgs::GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) {
+  auto iter = string_args_.find(std::string(request->key.data(), request->key.size()));
+  if (iter != string_args_.end()) {
+    completer.Reply(fidl::StringView::FromExternal(iter->second));
+  } else {
+    completer.Reply({});
+  }
+}
+
+void FakeBootArgs::GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) {
+  std::vector<fidl::StringView> response;
+  for (const auto& key : request->keys) {
+    auto iter = string_args_.find(std::string(key.data(), key.size()));
+    if (iter != string_args_.end()) {
+      response.push_back(fidl::StringView::FromExternal(iter->second));
+    }
+  }
+  response.push_back(fidl::StringView());
+  completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(response));
+}
+
+void FakeBootArgs::GetBool(GetBoolRequestView request, GetBoolCompleter::Sync& completer) {
+  if (strncmp(request->key.data(), "astro.sysconfig.abr-wear-leveling",
+              sizeof("astro.sysconfig.abr-wear-leveling")) == 0) {
+    completer.Reply(astro_sysconfig_abr_wear_leveling_);
+  } else {
+    completer.Reply(request->defaultval);
+  }
+}
+void FakeBootArgs::GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync& completer) {}
+void FakeBootArgs::Collect(CollectRequestView request, CollectCompleter::Sync& completer) {}

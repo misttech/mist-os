@@ -172,9 +172,9 @@ TEST(PartitionSpec, ToStringWithContentType) {
 class GptDevicePartitionerTests : public PaverTest {
  protected:
   explicit GptDevicePartitionerTests(fbl::String board_name = fbl::String(),
-                                     uint32_t block_size = 512, std::string boot_arg = "")
+                                     uint32_t block_size = 512, std::string slot_suffix = "")
       : board_name_(std::move(board_name)),
-        boot_arg_(std::move(boot_arg)),
+        slot_suffix_(std::move(slot_suffix)),
         block_size_(block_size) {}
 
   void SetUp() override {
@@ -182,7 +182,9 @@ class GptDevicePartitionerTests : public PaverTest {
     paver::g_wipe_timeout = 0;
     IsolatedDevmgr::Args args = BaseDevmgrArgs();
     args.board_name = board_name_;
-    args.boot_arg = boot_arg_;
+    if (!slot_suffix_.empty()) {
+      args.fake_boot_args = std::make_unique<FakeBootArgs>(slot_suffix_);
+    }
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
@@ -345,7 +347,7 @@ class GptDevicePartitionerTests : public PaverTest {
 
   IsolatedDevmgr devmgr_;
   fbl::String board_name_;
-  std::string boot_arg_;
+  std::string slot_suffix_;
   const uint32_t block_size_;
 };
 
@@ -702,7 +704,7 @@ void EfiDevicePartitionerTests::ResetPartitionTablesTest() {
                         }));
 
   // Create EFI device partitioner and initialise partition tables.
-  zx::result status = CreatePartitioner(gpt_dev.get());
+  zx::result status = CreatePartitioner({});
   ASSERT_OK(status);
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 

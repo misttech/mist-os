@@ -691,13 +691,13 @@ void BootManager::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
                        fidl::ServerEnd<fuchsia_paver::BootManager> server) {
   zx::result supports_abr = abr::SupportsVerifiedBoot(devices, svc_root);
   if (supports_abr.is_error()) {
-      ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
-      fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
-      return;
+    ERROR("Failed to check if system supports verified boot: %s\n", supports_abr.status_string());
+    fidl_epitaph_write(server.channel().get(), supports_abr.error_value());
+    return;
   } else if (!*supports_abr) {
-      LOG("System doesn't support verified boot; not creating BootManager\n");
-      fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
-      return;
+    LOG("System doesn't support verified boot; not creating BootManager\n");
+    fidl_epitaph_write(server.channel().get(), ZX_ERR_NOT_SUPPORTED);
+    return;
   }
 
   zx::result partitioner =
