@@ -57,13 +57,18 @@ void RuntimeDynamicLinker::MakeGlobal(const ModuleTree& module_tree) {
   }
 }
 
-bool RuntimeDynamicLinker::PopulateStartupModules(const ld::abi::Abi<>& abi) {
+void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
+                                                  const ld::abi::Abi<>& abi) {
+  // Arm the function-level AllocChecker with the result of the function.
+  auto set_result = [&func_ac](bool v) { func_ac.arm(sizeof(RuntimeModule), v); };
+
   for (const AbiModule& abi_module : ld::AbiLoadedModules(abi)) {
     fbl::AllocChecker ac;
     std::unique_ptr<RuntimeModule> module =
         RuntimeModule::Create(ac, Soname{abi_module.link_map.name.get()});
     if (!ac.check()) [[unlikely]] {
-      return false;
+      set_result(false);
+      return;
     }
     module->module() = abi_module;
     module->set_no_delete();
@@ -71,7 +76,8 @@ bool RuntimeDynamicLinker::PopulateStartupModules(const ld::abi::Abi<>& abi) {
     // startup modules.
     modules_.push_back(std::move(module));
   }
-  return true;
+
+  set_result(true);
 }
 
 }  // namespace dl

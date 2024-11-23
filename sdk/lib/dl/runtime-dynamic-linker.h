@@ -47,14 +47,27 @@ class RuntimeDynamicLinker {
   using Soname = elfldltl::Soname<>;
 
   static std::unique_ptr<RuntimeDynamicLinker> Create(const ld::abi::Abi<>& abi,
-                                                      fbl::AllocChecker& linker_ac) {
+                                                      fbl::AllocChecker& ac) {
     assert(abi.loaded_modules);
     assert(abi.static_tls_modules.size() == abi.static_tls_offsets.size());
+
+    // Arm the caller's AllocChecker with the return value of this function.
+    auto result = [&ac](std::unique_ptr<RuntimeDynamicLinker> v) {
+      ac.arm(sizeof(RuntimeDynamicLinker), v != nullptr);
+      return v;
+    };
+
+    fbl::AllocChecker linker_ac;
     std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
-    if (dynamic_linker && dynamic_linker->PopulateStartupModules(abi)) [[likely]] {
-      return dynamic_linker;
+    if (linker_ac.check()) [[likely]] {
+      fbl::AllocChecker populate_ac;
+      dynamic_linker->PopulateStartupModules(populate_ac, abi);
+      if (!populate_ac.check()) [[unlikely]] {
+        return result(nullptr);
+      }
     }
-    return nullptr;
+
+    return result(std::move(dynamic_linker));
   }
 
   constexpr const ModuleList& modules() const { return modules_; }
@@ -156,8 +169,10 @@ class RuntimeDynamicLinker {
   void MakeGlobal(const ModuleTree& module_tree);
 
   // Create RuntimeModule data structures from the passive ABI and add them to
-  // the dynamic linker's modules_ list.
-  [[nodiscard]] bool PopulateStartupModules(const ld::abi::Abi<>& abi);
+  // the dynamic linker's modules_ list. The caller is required to pass an
+  // AllocChecker and check it to verify the success/failure of loading the
+  // passive ABI into the RuntimeDynamicLinker.
+  void PopulateStartupModules(fbl::AllocChecker& ac, const ld::abi::Abi<>& abi);
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
