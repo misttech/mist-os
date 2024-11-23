@@ -10,8 +10,8 @@
 #else
 #include <lib/ddk/debug.h>  // nogncheck
 #endif
-#include <lib/ddk/phys-iter.h>
 #include <lib/fit/function.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <lib/operation/operation.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>
@@ -188,10 +188,10 @@ class RequestBase {
   // Starts or adds a step in a trace flow for the passed in request
   void TraceFlow() { usb_request_trace_flow(request()); }
 
-  // Initializes a ddk::PhysIter for a usb request.
+  // Initializes a io_buffer::PhysIter for a usb request.
   // |max_length| is the maximum length of a range returned the iterator.
   // |max_length| must be either a positive multiple of the system page size, or zero for no limit.
-  ddk::PhysIter phys_iter(size_t max_length) {
+  io_buffer::PhysIter phys_iter(size_t max_length) {
     static_assert(sizeof(phys_iter_sg_entry_t) == sizeof(sg_entry_t) &&
                   offsetof(phys_iter_sg_entry_t, length) == offsetof(sg_entry_t, length) &&
                   offsetof(phys_iter_sg_entry_t, offset) == offsetof(sg_entry_t, offset));
@@ -202,7 +202,7 @@ class RequestBase {
         .vmo_offset = request()->offset,
         .sg_list = reinterpret_cast<phys_iter_sg_entry_t*>(request()->sg_list),
         .sg_count = request()->sg_count};
-    return ddk::PhysIter(buf, max_length);
+    return io_buffer::PhysIter(buf, max_length);
   }
 
   size_t alloc_size() const { return request()->alloc_size; }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/ddk/phys-iter.h"
+#include <lib/io-buffer/phys-iter.h>
 
 #include <iterator>
 #include <utility>
@@ -13,7 +13,7 @@
 namespace {
 
 TEST(PhyIterTests, EmptyIteratorTest) {
-  ddk::PhysIter phys_iter(phys_iter_buffer_t{}, 0);
+  io_buffer::PhysIter phys_iter(phys_iter_buffer_t{}, 0);
   EXPECT_TRUE(phys_iter.begin() == phys_iter.end());
 }
 
@@ -31,7 +31,7 @@ TEST(PhyIterTests, SimpleIterationTest) {
       .sg_count = 0,
   };
 
-  ddk::PhysIter phys_iter(kIterBuffer, 0);
+  io_buffer::PhysIter phys_iter(kIterBuffer, 0);
   auto iter = phys_iter.begin();
   const auto end = phys_iter.end();
 
@@ -69,7 +69,7 @@ TEST(PhyIterTests, ContiguousTest) {
       .sg_count = 0,
   };
 
-  ddk::PhysIter phys_iter(kIterBuffer, 0);
+  io_buffer::PhysIter phys_iter(kIterBuffer, 0);
   auto iter = phys_iter.begin();
   const auto end = phys_iter.end();
 
@@ -99,7 +99,7 @@ TEST(PhyIterTests, DiscontiguousTest) {
       .sg_count = 0,
   };
 
-  ddk::PhysIter phys_iter(kIterBuffer, 0);
+  io_buffer::PhysIter phys_iter(kIterBuffer, 0);
   auto iter = phys_iter.begin();
   const auto end = phys_iter.end();
 
@@ -145,7 +145,7 @@ TEST(PhyIterTests, UnalignedTest) {
       .sg_count = 0,
   };
 
-  ddk::PhysIter phys_iter(kIterBuffer, 0);
+  io_buffer::PhysIter phys_iter(kIterBuffer, 0);
   auto iter = phys_iter.begin();
   const auto end = phys_iter.end();
 
@@ -195,7 +195,7 @@ TEST(PhyIterTests, ScatterGatherTest) {
       .sg_count = std::size(kScatterGatherList),
   };
 
-  ddk::PhysIter phys_iter(kIterBuffer, 0);
+  io_buffer::PhysIter phys_iter(kIterBuffer, 0);
   auto iter = phys_iter.begin();
   const auto end = phys_iter.end();
 

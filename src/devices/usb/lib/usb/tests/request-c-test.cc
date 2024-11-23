@@ -4,6 +4,7 @@
 
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <limits.h>
 #include <zircon/syscalls/iommu.h>
 

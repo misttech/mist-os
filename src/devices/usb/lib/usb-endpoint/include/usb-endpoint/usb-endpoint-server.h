@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_SERVER_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
+#include <lib/io-buffer/phys-iter.h>
 
 #include <usb/request-cpp.h>
 #include <usb/request-fidl.h>
@@ -34,7 +35,8 @@ class EndpointServer : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoi
   void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
 
   // Gets all the iterators for a request.
-  zx::result<std::vector<ddk::PhysIter>> get_iter(RequestVariant& req, size_t max_length) const;
+  zx::result<std::vector<io_buffer::PhysIter>> get_iter(RequestVariant& req,
+                                                        size_t max_length) const;
 
   const zx::bti& bti() { return bti_; }
   uint8_t ep_addr() const { return ep_addr_; }

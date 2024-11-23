@@ -47,6 +47,7 @@ source_set("usb-endpoint-server") {
   sources = [ "usb-endpoint-server.cc" ]
   public_deps = [
     "//src/devices/lib/driver",
+    "//src/devices/lib/io-buffer",
     "//src/devices/usb/lib/usb:usb",
     "//src/devices/usb/lib/usb:usb-fidl",
   ]
@@ -62,6 +63,7 @@ source_set("usb-endpoint-server-dfv2-compat-logging") {
   sources = [ "usb-endpoint-server.cc" ]
   public_deps = [
     "//sdk/lib/driver/compat/cpp:logging",
+    "//src/devices/lib/io-buffer",
     "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//src/devices/usb/lib/usb:usb-fidl",
   ]

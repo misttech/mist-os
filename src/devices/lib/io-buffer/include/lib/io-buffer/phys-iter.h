@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_DDK_INCLUDE_LIB_DDK_PHYS_ITER_H_
-#define SRC_LIB_DDK_INCLUDE_LIB_DDK_PHYS_ITER_H_
+#ifndef SRC_DEVICES_LIB_IO_BUFFER_INCLUDE_LIB_IO_BUFFER_PHYS_ITER_H_
+#define SRC_DEVICES_LIB_IO_BUFFER_INCLUDE_LIB_IO_BUFFER_PHYS_ITER_H_
 
 #include <zircon/types.h>
 
@@ -63,7 +63,7 @@ __END_CDECLS
 
 #include <utility>
 
-namespace ddk {
+namespace io_buffer {
 
 // Wrapper around phys_iter_t that provides C++ iterator support.
 class PhysIter {
@@ -128,7 +128,7 @@ class PhysIter {
   phys_iter_t iter_;
 };
 
-}  // namespace ddk
+}  // namespace io_buffer
 #endif
 
-#endif  // SRC_LIB_DDK_INCLUDE_LIB_DDK_PHYS_ITER_H_
+#endif  // SRC_DEVICES_LIB_IO_BUFFER_INCLUDE_LIB_IO_BUFFER_PHYS_ITER_H_

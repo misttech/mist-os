@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_REQUEST_FIDL_H_
 
 #include <fidl/fuchsia.hardware.usb.request/cpp/fidl.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
 
@@ -377,8 +378,8 @@ class FidlRequest {
     return ZX_OK;
   }
 
-  // Gets ddk::PhysIter for the buffer at request.data()->at(idx)
-  ddk::PhysIter phys_iter(size_t idx, size_t max_length) const {
+  // Gets io_buffer::PhysIter for the buffer at request.data()->at(idx)
+  io_buffer::PhysIter phys_iter(size_t idx, size_t max_length) const {
     ZX_ASSERT(request_.data()->at(idx).size());
     ZX_ASSERT(pinned_vmos_.find(idx) != pinned_vmos_.end());
     auto length = *request_.data()->at(idx).size();
@@ -392,7 +393,7 @@ class FidlRequest {
                               .vmo_offset = offset,
                               .sg_list = nullptr,
                               .sg_count = 0};
-    return ddk::PhysIter(buf, max_length);
+    return io_buffer::PhysIter(buf, max_length);
   }
 
   fuchsia_hardware_usb_request::Request* operator->() { return &request_; }

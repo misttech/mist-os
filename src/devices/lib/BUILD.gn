@@ -23,6 +23,7 @@ group("tests") {
     "fidl-metadata:tests",
     "fragment-irq:tests",
     "goldfish/pipe_io:tests",
+    "io-buffer:tests",
     "mmio:tests",
     "synchronous-executor:tests",
     "thermal:tests",

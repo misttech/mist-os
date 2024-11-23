@@ -5,6 +5,7 @@
 #include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
 
 #include <lib/fit/defer.h>
+#include <lib/io-buffer/phys-iter.h>
 
 #include <variant>
 
@@ -12,8 +13,8 @@ namespace usb {
 
 namespace {
 
-ddk::PhysIter phys_iter(uint64_t* phys_list, size_t phys_count, zx_off_t length,
-                        size_t max_length) {
+io_buffer::PhysIter phys_iter(uint64_t* phys_list, size_t phys_count, zx_off_t length,
+                              size_t max_length) {
   static_assert(sizeof(phys_iter_sg_entry_t) == sizeof(sg_entry_t) &&
                 offsetof(phys_iter_sg_entry_t, length) == offsetof(sg_entry_t, length) &&
                 offsetof(phys_iter_sg_entry_t, offset) == offsetof(sg_entry_t, offset));
@@ -23,14 +24,14 @@ ddk::PhysIter phys_iter(uint64_t* phys_list, size_t phys_count, zx_off_t length,
                             .vmo_offset = 0,
                             .sg_list = nullptr,
                             .sg_count = 0};
-  return ddk::PhysIter(buf, max_length);
+  return io_buffer::PhysIter(buf, max_length);
 }
 
 }  // namespace
 
-zx::result<std::vector<ddk::PhysIter>> EndpointServer::get_iter(RequestVariant& req,
-                                                                size_t max_length) const {
-  std::vector<ddk::PhysIter> iters;
+zx::result<std::vector<io_buffer::PhysIter>> EndpointServer::get_iter(RequestVariant& req,
+                                                                      size_t max_length) const {
+  std::vector<io_buffer::PhysIter> iters;
   if (std::holds_alternative<usb::BorrowedRequest<void>>(req)) {
     iters.push_back(std::get<usb::BorrowedRequest<void>>(req).phys_iter(max_length));
   } else {

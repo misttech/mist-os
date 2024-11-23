@@ -34,6 +34,7 @@ source_set("usb") {
     # <usb/request-cpp.h> has  #include <lib/operation/operation.h>.
     "//sdk/lib/fit",
     "//src/devices/lib/dev-operation",
+    "//src/devices/lib/io-buffer",
   ]
   deps = [
     "//sdk/banjo/ddk.hw.physiter:ddk.hw.physiter_banjo_cpp",
@@ -78,6 +79,7 @@ source_set("usb-dfv2-compat-logging") {
     # <usb/request-cpp.h> has  #include <lib/operation/operation.h>.
     "//sdk/lib/fit",
     "//src/devices/lib/dev-operation:dev-operation-dfv2-compat-logging",
+    "//src/devices/lib/io-buffer",
   ]
   deps = [
     "//sdk/banjo/ddk.hw.physiter:ddk.hw.physiter_banjo_cpp",
@@ -107,6 +109,7 @@ source_set("usb-fidl") {
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_c",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_c",
+    "//src/devices/lib/io-buffer",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",

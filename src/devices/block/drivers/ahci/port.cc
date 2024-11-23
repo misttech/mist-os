@@ -5,8 +5,8 @@
 #include "port.h"
 
 #include <inttypes.h>
-#include <lib/ddk/phys-iter.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/io-buffer/phys-iter.h>
 #include <lib/zx/clock.h>
 #include <unistd.h>
 

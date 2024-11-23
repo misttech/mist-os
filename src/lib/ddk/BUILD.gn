@@ -27,7 +27,6 @@ static_library("ddk") {
     "include/lib/ddk/hw/inout.h",
     "include/lib/ddk/io-buffer.h",
     "include/lib/ddk/metadata.h",
-    "include/lib/ddk/phys-iter.h",
     "include/lib/ddk/protodefs.h",
     "include/lib/ddk/trace/event.h",
   ]
@@ -36,7 +35,6 @@ static_library("ddk") {
     sources = [
       "io-buffer.c",
       "macros.h",
-      "phys-iter.c",
     ]
   }
 
