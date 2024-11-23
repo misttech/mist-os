@@ -515,7 +515,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 );
                 temporary_config
             }
-            SlaacConfig::Static { .. } => return,
+            SlaacConfig::Static { .. } => {
+                // TODO(https://fxbug.dev/42148800): Re-generate static
+                // addresses if we're not using hardware-derived IIDs.
+                return;
+            }
         };
 
     match reason {
@@ -1530,7 +1534,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 SlaacConfig::Static { valid_until },
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
-                // TODO(https://fxbug.dev/42178008): Support regenerating address.
+                // TODO(https://fxbug.dev/42148800): Support regenerating address.
                 either::Either::Left(core::iter::once(generate_global_static_address(
                     &subnet,
                     &iid[..],
@@ -1932,7 +1936,10 @@ mod tests {
     }
 
     impl SlaacContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
-        type SlaacAddrs<'a> = &'a mut FakeSlaacAddrs where FakeCoreCtxImpl: 'a;
+        type SlaacAddrs<'a>
+            = &'a mut FakeSlaacAddrs
+        where
+            FakeCoreCtxImpl: 'a;
 
         fn with_slaac_addrs_mut_and_configs<
             O,

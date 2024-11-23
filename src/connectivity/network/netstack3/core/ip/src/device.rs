@@ -1283,7 +1283,7 @@ fn enable_ipv6_device_with_config<
             );
         });
 
-    // TODO(https://fxbug.dev/42178008): Generate link-local address with opaque
+    // TODO(https://fxbug.dev/42148800): Generate link-local address with opaque
     // IIDs.
     if config.slaac_config.enable_stable_addresses {
         if let Some(iid) = core_ctx.get_eui64_iid(device_id) {
