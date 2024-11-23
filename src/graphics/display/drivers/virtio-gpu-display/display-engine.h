@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
