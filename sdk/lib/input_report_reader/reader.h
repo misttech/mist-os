@@ -48,7 +48,7 @@ using ReadInputReportsCompleterBase =
 //      int64_t x;
 //      int64_t y;
 //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
-//                             input_report, fidl::AnyArena& allocator);
+//                             input_report, fidl::AnyArena& allocator) const;
 //   };
 //
 //   InputReportReaderManager<TouchScreenReport> input_report_readers_;
@@ -115,10 +115,24 @@ class InputReportReaderManager final {
  private:
   // Assert that our template type `Report` has the following function:
   //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
+  //                             input_report, fidl::AnyArena& allocator) const;
+  // or
+  //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
   //                             input_report, fidl::AnyArena& allocator);
+  //
+  // TODO(https://fxbug.dev/380354758): Delete the non-const variant once
+  // all drivers are migrated to use const `ToFidlInputReport()` methods.
+  //
+  // TODO(https://fxbug.dev/380355303): Replace the type traits with concepts
+  // when concepts are supported.
   template <typename T>
   struct has_to_fidl_input_report {
    private:
+    template <typename C>
+    static std::true_type test(
+        decltype(static_cast<void (C::*)(
+                     fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
+                     fidl::AnyArena& allocator) const>(&C::ToFidlInputReport)));
     template <typename C>
     static std::true_type test(
         decltype(static_cast<void (C::*)(
@@ -134,7 +148,7 @@ class InputReportReaderManager final {
       has_to_fidl_input_report<Report>::value,
       "Report must implement void "
       "ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& "
-      "input_report, fidl::AnyArena& allocator);");
+      "input_report, fidl::AnyArena& allocator) const;");
 
   std::mutex lock_;
   size_t next_reader_id_ __TA_GUARDED(lock_) = 1;
