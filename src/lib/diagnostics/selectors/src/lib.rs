@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 pub mod error;
+mod ir;
 mod parser;
 mod selectors;
-mod types;
 mod validate;
 
 pub use error::*;

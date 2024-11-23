@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::{StringPatternError, ValidationError};
-use crate::types;
+use crate::ir;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 
 // NOTE: if we could use the negative_impls unstable feature, we could have a single ValidateExt
@@ -220,9 +220,9 @@ impl StringSelector for fdiagnostics::StringSelector {
     }
 }
 
-impl<'a> Selector for types::Selector<'a> {
-    type Component = types::ComponentSelector<'a>;
-    type Tree = types::TreeSelector<'a>;
+impl<'a> Selector for ir::Selector<'a> {
+    type Component = ir::ComponentSelector<'a>;
+    type Tree = ir::TreeSelector<'a>;
 
     fn component(&self) -> Option<&Self::Component> {
         Some(&self.component)
@@ -233,16 +233,16 @@ impl<'a> Selector for types::Selector<'a> {
     }
 }
 
-impl<'a> ComponentSelector for types::ComponentSelector<'a> {
-    type Segment = types::Segment<'a>;
+impl<'a> ComponentSelector for ir::ComponentSelector<'a> {
+    type Segment = ir::Segment<'a>;
 
     fn segments(&self) -> Option<&[Self::Segment]> {
         Some(&self.segments[..])
     }
 }
 
-impl<'a> TreeSelector for types::TreeSelector<'a> {
-    type Segment = types::Segment<'a>;
+impl<'a> TreeSelector for ir::TreeSelector<'a> {
+    type Segment = ir::Segment<'a>;
 
     fn node_path(&self) -> Option<&[Self::Segment]> {
         Some(&self.node)
@@ -253,7 +253,7 @@ impl<'a> TreeSelector for types::TreeSelector<'a> {
     }
 }
 
-impl<'a> StringSelector for types::Segment<'a> {
+impl<'a> StringSelector for ir::Segment<'a> {
     fn exact_match(&self) -> Option<&str> {
         match self {
             Self::ExactMatch(s) => Some(s),

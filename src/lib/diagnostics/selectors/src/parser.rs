@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::ParseError;
-use crate::types::*;
+use crate::ir::*;
 use crate::validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt};
 use bitflags::bitflags;
 use nom::branch::alt;

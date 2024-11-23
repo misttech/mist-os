@@ -26,10 +26,10 @@ rustc_library("selectors") {
 
   sources = [
     "src/error.rs",
+    "src/ir.rs",
     "src/lib.rs",
     "src/parser.rs",
     "src/selectors.rs",
-    "src/types.rs",
     "src/validate.rs",
   ]
 
