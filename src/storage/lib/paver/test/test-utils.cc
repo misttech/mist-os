@@ -133,12 +133,12 @@ void BlockDevice::CreateWithGpt(const fbl::unique_fd& devfs_root, uint64_t block
       CreateFromVmo(devfs_root, kEmptyGuid, std::move(*contents), block_size, device));
 }
 
-void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
-  ASSERT_LE(blk_offset + blk_cnt, block_count());
+void BlockDevice::Read(const zx::vmo& vmo, size_t size, size_t dev_offset,
+                       size_t vmo_offset) const {
   auto block_client = paver::BlockPartitionClient::Create(
       std::make_unique<paver::DevfsVolumeConnector>(ConnectToController()));
   ASSERT_OK(block_client);
-  ASSERT_OK(block_client->Read(vmo, blk_cnt, blk_offset, 0));
+  ASSERT_OK(block_client->Read(vmo, size, dev_offset, vmo_offset));
 }
 
 void SkipBlockDevice::Create(fbl::unique_fd devfs_root,

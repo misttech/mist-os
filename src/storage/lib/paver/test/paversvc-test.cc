@@ -2464,7 +2464,7 @@ TEST_F(PaverServiceLuisTest, OneShotRecovery) {
   fzl::VmoMapper block_read_vmo_mapper;
   ASSERT_OK(block_read_vmo_mapper.CreateAndMap(kDurableBootSize * kBlockSize, ZX_VM_PERM_READ,
                                                nullptr, &block_read_vmo));
-  gpt_dev_->Read(block_read_vmo, kDurableBootSize, kDurableBootStart);
+  gpt_dev_->Read(block_read_vmo, kDurableBootSize, kDurableBootStart, 0);
 
   AbrData disk_abr_data;
   memcpy(&disk_abr_data, block_read_vmo_mapper.start(), sizeof(disk_abr_data));
