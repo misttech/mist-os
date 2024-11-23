@@ -7,11 +7,12 @@ use crate::{
     serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
     MountAction,
 };
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail, Context, Error};
 use bstr::BString;
 use fasync::OnSignals;
-use fidl::endpoints::{ControlHandle, RequestStream};
+use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
+use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
@@ -168,6 +169,9 @@ struct Config {
     /// The data directory of the container, used to persist data.
     data_dir: Option<zx::Channel>,
 
+    /// The runtime directory of the container, used to provide CF introspection.
+    runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
+
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
@@ -225,6 +229,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         svc_dir,
         data_dir,
         component_instance,
+        runtime_dir: start_info.runtime_dir,
     }
 }
 
@@ -600,6 +605,11 @@ async fn create_container(
         config.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
 
+    // Serve the runtime directory.
+    if let Some(runtime_dir) = config.runtime_dir.take() {
+        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
+    }
+
     Ok(Container {
         kernel,
         memory_attribution_manager,
@@ -792,6 +802,42 @@ async fn wait_for_init_file(
             Ok(_) => break,
             Err(error) if error == ENOENT => continue,
             Err(error) => return Err(anyhow::Error::from(error)),
+        }
+    }
+    Ok(())
+}
+
+async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
+    let mut fs = fuchsia_component::server::ServiceFs::new();
+    match fs.serve_connection(runtime_dir) {
+        Ok(_) => {
+            fs.add_fidl_service(|job_requests: TaskProviderRequestStream| {
+                fuchsia_async::Task::local(async move {
+                    if let Err(e) = serve_task_provider(job_requests).await {
+                        log_warn!(?e, "Error serving TaskProvider");
+                    }
+                })
+                .detach();
+            });
+            fs.collect::<()>().await;
+        }
+        Err(e) => log_error!("Couldn't serve runtime directory: {e:?}"),
+    }
+}
+
+async fn serve_task_provider(mut job_requests: TaskProviderRequestStream) -> Result<(), Error> {
+    while let Some(request) = job_requests.next().await {
+        match request.context("getting next TaskProvider request")? {
+            TaskProviderRequest::GetJob { responder } => {
+                responder
+                    .send(
+                        fuchsia_runtime::job_default()
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .map_err(|s| s.into_raw()),
+                    )
+                    .context("sending job for runtime dir")?;
+            }
+            unknown => bail!("Unknown TaskProvider method {unknown:?}"),
         }
     }
     Ok(())
