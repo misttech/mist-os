@@ -49,22 +49,25 @@ namespace {
 
 namespace fio = fuchsia_io;
 
-template <typename FOnOpen, typename FOnRepresentation>
+template <typename FOnRepresentation>
 class EventHandler final : public fidl::WireSyncEventHandler<fuchsia_io::Directory> {
  public:
-  explicit EventHandler(FOnOpen on_open, FOnRepresentation on_representation)
-      : on_open_(std::move(on_open)), on_representation_(std::move(on_representation)) {}
+  explicit EventHandler(FOnRepresentation on_representation)
+      : on_representation_(std::move(on_representation)) {}
 
-  void OnOpen(fidl::WireEvent<fuchsia_io::Directory::OnOpen>* event) override { on_open_(event); }
+  void OnOpen(fidl::WireEvent<fuchsia_io::Directory::OnOpen>* event) override {
+    ZX_PANIC("Should not receive an OnOpen event!");
+  }
 
   void OnRepresentation(fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) override {
     on_representation_(event);
   }
 
-  void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_io::Directory> metadata) override {}
+  void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_io::Directory> metadata) override {
+    ZX_PANIC("Received unknown event!");
+  }
 
  private:
-  FOnOpen on_open_;
   FOnRepresentation on_representation_;
 };
 
@@ -331,38 +334,28 @@ int main(int argv, char** argc) {
   // directory to which entries are added once they are ready for blocking
   // operations.
   for (size_t i = 0; i < flat->count; ++i) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      FX_PLOGS(FATAL, endpoints.status_value()) << "failed to create endpoints";
-    }
-
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string_view path = flat->path[i];
-
+    constexpr fuchsia_io::Flags kFlags = fio::kPermReadable | fio::Flags::kPermInheritExecute |
+                                         fio::Flags::kPermInheritWrite |
+                                         fio::Flags::kFlagSendRepresentation;
     const fidl::Status result =
         fidl::WireCall(fidl::UnownedClientEnd<fuchsia_io::Directory>(flat->handle[i]))
-            ->Clone(fuchsia_io::wire::OpenFlags::kDescribe |
-                        fuchsia_io::wire::OpenFlags::kCloneSameRights,
-                    fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+            ->Open3(".", kFlags, {}, server_end.TakeChannel());
     if (!result.ok()) {
-      FX_PLOGS(ERROR, result.status()) << "failed to clone '" << path << "'";
+      FX_PLOGS(ERROR, result.status()) << "failed to reopen '" << path << "'";
       continue;
     }
 
     // TODO(https://fxbug.dev/42147799): Replace the use of threads with async clients when it is
     // possible to extract the channel from the client.
-    auto [thread,
-          inserted] = threads.emplace(path, [&root, client_end = std::move(endpoints->client),
-                                             dispatcher, path]() mutable {
-      EventHandler handler(
-          [&](fidl::WireEvent<fuchsia_io::Directory::OnOpen>* event) {
-            if (event->s != ZX_OK) {
-              FX_PLOGS(ERROR, event->s) << "failed to open '" << path << "'";
-              return;
-            }
-            // Must run on the dispatcher thread to avoid racing with VFS dispatch.
-            libsync::Completion completion;
-            async::PostTask(dispatcher, [&completion, &root, path,
-                                         client_end = std::move(client_end)]() mutable {
+    auto [thread, inserted] = threads.emplace(path, [&root, client_end = std::move(client_end),
+                                                     dispatcher, path]() mutable {
+      EventHandler handler([&](fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) {
+        // Must run on the dispatcher thread to avoid racing with VFS dispatch.
+        libsync::Completion completion;
+        async::PostTask(
+            dispatcher, [&completion, &root, path, client_end = std::move(client_end)]() mutable {
               const std::vector components = fxl::SplitString(path, "/", fxl::kKeepWhitespace,
                                                               fxl::SplitResult::kSplitWantNonEmpty);
               fbl::RefPtr<fs::Vnode> current = root;
@@ -376,7 +369,7 @@ int main(int argv, char** argc) {
                     FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
                                    << path << " component@" << component_ptr << "=" << component;
                   }
-                  return std::string_view{path.data(), static_cast<size_t>(fragment_len)};
+                  return path.substr(0, static_cast<size_t>(fragment_len));
                 }();
                 fbl::RefPtr<fs::Vnode> next;
                 if (i == components.size() - 1) {
@@ -402,13 +395,11 @@ int main(int argv, char** argc) {
               FX_LOGS(INFO) << "mounted '" << path << "'";
               completion.Signal();
             });
-            completion.Wait();
-          },
-          [&](fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) {
-            FX_PLOGS(FATAL, ZX_ERR_NOT_SUPPORTED) << "unexpected OnRepresentation";
-          });
+        completion.Wait();
+      });
+
       if (fidl::Status status = handler.HandleOneEvent(client_end); !status.ok()) {
-        FX_PLOGS(ERROR, status.status()) << "failed to receive OnOpen event for '" << path << "'";
+        FX_PLOGS(ERROR, status.status()) << "failed to handle event for '" << path << "'";
       }
     });
     if (!inserted) {
