@@ -5,6 +5,7 @@
     include: [
         "//src/sys/test_runners/lib.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -19,6 +20,10 @@
     use: [
         {
             protocol: [ "fuchsia.process.Launcher" ],
+        },
+        {
+            protocol: "fuchsia.component.Introspector",
+            from: "parent",
         },
     ],
     expose: [

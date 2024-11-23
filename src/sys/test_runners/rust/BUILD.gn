@@ -12,6 +12,7 @@ rustc_binary("bin") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.test:fuchsia.test_rust",
@@ -21,6 +22,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-provider",
     "//src/sys/lib/namespace",
     "//src/sys/test_runners:lib",
     "//third_party/rust_crates:anyhow",

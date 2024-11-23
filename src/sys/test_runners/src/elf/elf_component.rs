@@ -158,6 +158,9 @@ pub struct Component {
 
     /// The structured config vmo.
     pub config_vmo: Option<zx::Vmo>,
+
+    /// Component instance token, used only in tracing
+    pub component_instance: Option<fidl::Event>,
 }
 
 pub struct BuilderArgs {
@@ -275,6 +278,7 @@ impl Component {
                     zx::ProcessOptions::empty()
                 },
                 config_vmo,
+                component_instance: start_info.component_instance,
             },
             outgoing_dir,
             runtime_dir,
@@ -337,6 +341,7 @@ impl Component {
             executable_vmo,
             options: args.options,
             config_vmo: None,
+            component_instance: None,
         })
     }
 }
