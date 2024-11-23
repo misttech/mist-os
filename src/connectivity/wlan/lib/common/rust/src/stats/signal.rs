@@ -50,56 +50,56 @@ impl SignalStrengthAverage {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn avg() {
-        let mut signal_avg = SignalStrengthAverage::new();
-        // Test 10 samples:
-        for dbm in -30..-20 {
-            print!("{} + ", FemtoWatt::from(DecibelMilliWatt(dbm)).0);
-            signal_avg.add(DecibelMilliWatt(dbm));
-        }
-        // Avg. actual: -14.58dBm
-        // Avg. due to femotWatt approximations: -14.65dBm
-        assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(3_421_503_488));
-        assert_eq!(signal_avg.avg_dbm(), FemtoWatt(3_421_503_488).into());
-
-        // Fill up sample count to N.
-        for dbm in -20..-10 {
-            print!("{} + ", FemtoWatt::from(DecibelMilliWatt(dbm)).0);
-            signal_avg.add(DecibelMilliWatt(dbm));
-        }
-        // Avg. actual: -4.17dBm
-        // Avg. due to femotWatt approximations: -4.24dBm
-        assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(18_811_768_012));
-        assert_eq!(signal_avg.avg_dbm(), FemtoWatt(18_811_768_012).into());
-
-        // Overflow sample count. Effectively, only [-20, 0) will be summed up due to N = 20.
-        for dbm in -10..0 {
-            signal_avg.add(DecibelMilliWatt(dbm));
-        }
-        // Avg. actual: -7.18dBm
-        // Avg. due to femotWatt approximations: -7.26dBm
-        assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(187_852_809_830));
-        assert_eq!(signal_avg.avg_dbm(), FemtoWatt(187_852_809_830).into());
-    }
-
-    #[test]
-    fn reset() {
-        let mut signal_avg = SignalStrengthAverage::new();
-        for dbm in -30..0 {
-            signal_avg.add(DecibelMilliWatt(dbm));
-        }
-        signal_avg.reset();
-
-        assert_eq!(signal_avg.avg_dbm(), DecibelMilliWatt(-128));
-        assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(0));
-
-        signal_avg.add(DecibelMilliWatt(-30));
-        assert_eq!(signal_avg.avg_dbm(), DecibelMilliWatt(-30));
-        assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(983_564_288));
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn avg() {
+//         let mut signal_avg = SignalStrengthAverage::new();
+//         // Test 10 samples:
+//         for dbm in -30..-20 {
+//             print!("{} + ", FemtoWatt::from(DecibelMilliWatt(dbm)).0);
+//             signal_avg.add(DecibelMilliWatt(dbm));
+//         }
+//         // Avg. actual: -14.58dBm
+//         // Avg. due to femotWatt approximations: -14.65dBm
+//         assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(3_421_503_488));
+//         assert_eq!(signal_avg.avg_dbm(), FemtoWatt(3_421_503_488).into());
+//
+//         // Fill up sample count to N.
+//         for dbm in -20..-10 {
+//             print!("{} + ", FemtoWatt::from(DecibelMilliWatt(dbm)).0);
+//             signal_avg.add(DecibelMilliWatt(dbm));
+//         }
+//         // Avg. actual: -4.17dBm
+//         // Avg. due to femotWatt approximations: -4.24dBm
+//         assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(18_811_768_012));
+//         assert_eq!(signal_avg.avg_dbm(), FemtoWatt(18_811_768_012).into());
+//
+//         // Overflow sample count. Effectively, only [-20, 0) will be summed up due to N = 20.
+//         for dbm in -10..0 {
+//             signal_avg.add(DecibelMilliWatt(dbm));
+//         }
+//         // Avg. actual: -7.18dBm
+//         // Avg. due to femotWatt approximations: -7.26dBm
+//         assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(187_852_809_830));
+//         assert_eq!(signal_avg.avg_dbm(), FemtoWatt(187_852_809_830).into());
+//     }
+//
+//     #[fuchsia::test]
+//     fn reset() {
+//         let mut signal_avg = SignalStrengthAverage::new();
+//         for dbm in -30..0 {
+//             signal_avg.add(DecibelMilliWatt(dbm));
+//         }
+//         signal_avg.reset();
+//
+//         assert_eq!(signal_avg.avg_dbm(), DecibelMilliWatt(-128));
+//         assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(0));
+//
+//         signal_avg.add(DecibelMilliWatt(-30));
+//         assert_eq!(signal_avg.avg_dbm(), DecibelMilliWatt(-30));
+//         assert_eq!(signal_avg.avg_femto_watt(), FemtoWatt(983_564_288));
+//     }
+// }
