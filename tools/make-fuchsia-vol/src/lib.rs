@@ -502,8 +502,21 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         dependencies.push(path.as_path());
     }
 
-    // If there's a product bundle, use that for the image paths unless they've been specified
-    // explicitly on the command line.
+    // The order of precedence for file paths is as follows:
+    //
+    //  1) --zircon_[a|b], --vbmeta_[a|b], and fvm/fxfs image args first.
+    //  2) --zbi, for both zircon_a and zircon_b.
+    //  3) the images in the product bundle, and if using fxfs:
+    //      a)  the sparse image
+    //      b)  the full image (as it's being removed as an output)
+
+    // Apply the --zbi argument to the zircon_[a|b] args, if it's been specified.
+    if let Some(path) = &args.zbi {
+        args.zircon_a.get_or_insert_with(|| path.clone());
+        args.zircon_b.get_or_insert_with(|| path.clone());
+    }
+
+    // If there's a product bundle, use that for all remaining, unset, image paths.
     if let Some(product_bundle_dir) = &args.product_bundle {
         match LoadedProductBundle::try_load_from(product_bundle_dir)?.into() {
             ProductBundle::V2(product_bundle) => {
