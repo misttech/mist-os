@@ -16,6 +16,7 @@ group("tests") {
     "alpine:tests",
     "crash_reports:tests",
     "diagnostics:tests",
+    "fp_stack_glue:tests",
     "gvisor:tests",
     "memory_attribution:tests",
     "reboot:tests",

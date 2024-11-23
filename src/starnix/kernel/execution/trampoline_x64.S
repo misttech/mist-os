@@ -111,6 +111,10 @@ restricted_return_loop:
   // Load restricted state mapping address from stack to a callee-saved register.
   mov 8(%rsp), %r14
 
+  // Load frame pointer from restricted state to connect Starnix stack to Linux's.
+  // This offset matches the offset of rbp in the `zx_restricted_state_t` struct.
+  mov 0x10(%r14), %rbp
+
   // Emit CFI directives referring to the current restricted mode register state to
   // emulate the restricted mode code "calling" the restricted exit callback.
   .cfi_startproc
