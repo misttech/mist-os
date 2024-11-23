@@ -622,43 +622,6 @@ TEST(RestrictedMode, FloatingPointState) {
   }
 }
 
-void ReadExceptionFromChannel(const zx::channel& exception_channel,
-                              zx_thread_state_general_regs_t& general_regs, bool kick) {
-  zx_signals_t pending;
-  ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
-                                       zx::time::infinite(), &pending));
-  ASSERT_NE(0, pending & ZX_CHANNEL_READABLE, "exception channel peer closed (pending 0x%08x)",
-            pending);
-
-  // This test will cover the 'worst case' exception latency, so we read all the data that we
-  // can also access when using in-thread exception handlers. In other words we read all the
-  // data that we would otherwise get from the restricted mode state VMO when using in-thread
-  // exception handling.
-  zx::exception exception;
-  zx_exception_info_t exc_info;
-  uint32_t nbytes, nhandles;
-  ASSERT_OK(exception_channel.read(0, &exc_info, exception.reset_and_get_address(),
-                                   sizeof(exc_info), 1, &nbytes, &nhandles));
-
-  zx::thread thread;
-  ASSERT_OK(exception.get_thread(&thread));
-
-  zx_exception_report_t report = {};
-  ASSERT_OK(
-      thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr, nullptr));
-  ASSERT_OK(thread.read_state(ZX_THREAD_STATE_GENERAL_REGS, &general_regs, sizeof(general_regs)));
-
-  // Kick the thread if requested
-  if (kick) {
-    uint32_t options = 0;
-    ASSERT_OK(zx_restricted_kick(thread.get(), options));
-  }
-  ASSERT_OK(thread.write_state(ZX_THREAD_STATE_GENERAL_REGS, &general_regs, sizeof(general_regs)));
-  constexpr uint32_t kExceptionState = ZX_EXCEPTION_STATE_HANDLED;
-  ASSERT_OK(
-      exception.set_property(ZX_PROP_EXCEPTION_STATE, &kExceptionState, sizeof(kExceptionState)));
-}
-
 // This is a simple benchmark test that prints some rough performance numbers.
 TEST(RestrictedMode, Bench) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
