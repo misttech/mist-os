@@ -69,20 +69,43 @@ TEST(ThermalNtcTests, GetTemperatureCelsiusInvalidHigh) {
 TEST(ThermalNtcTests, GetTemperatureCelsiusLow) {
   Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
   float temp;
-  EXPECT_EQ(ntc.GetTemperatureCelsius(0.0f, &temp), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ntc.GetTemperatureCelsius(0.0f, &temp), ZX_OK);
+  EXPECT_FLOAT_EQ(temp, 125.0f);
 }
 
 TEST(ThermalNtcTests, GetTemperatureCelsiusHigh) {
   Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
   float temp;
-  EXPECT_EQ(ntc.GetTemperatureCelsius(0.99f, &temp), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ntc.GetTemperatureCelsius(0.99f, &temp), ZX_OK);
+  EXPECT_FLOAT_EQ(temp, -40.0f);
 }
 
 TEST(ThermalNtcTests, GetTemperatureCelsius) {
   Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
   float temp;
   EXPECT_EQ(ntc.GetTemperatureCelsius(0.88f, &temp), ZX_OK);
-  EXPECT_FLOAT_EQ(temp, 0.7304287f);
+  EXPECT_FLOAT_EQ(temp, 0.7303901f);
+}
+
+TEST(ThermalNtcTests, GetNormalizedSampleLow) {
+  Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
+  float sample;
+  EXPECT_EQ(ntc.GetNormalizedSample(-45.0f, &sample), ZX_OK);
+  EXPECT_FLOAT_EQ(sample, 0.9894242f);
+}
+
+TEST(ThermalNtcTests, GetNormalizedSampleHigh) {
+  Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
+  float sample;
+  EXPECT_EQ(ntc.GetNormalizedSample(125.0f, &sample), ZX_OK);
+  EXPECT_FLOAT_EQ(sample, 0.05092686f);
+}
+
+TEST(ThermalNtcTests, GetNormalizedSample) {
+  Ntc ntc(kFakeNtcInfo, kFakePullupOhms);
+  float sample;
+  EXPECT_EQ(ntc.GetNormalizedSample(2.5f, &sample), ZX_OK);
+  EXPECT_FLOAT_EQ(sample, 0.8700782f);
 }
 
 }  // namespace thermal
