@@ -67,10 +67,10 @@ inline uint32_t HashB(uint64_t value) {
 // until after the flow end event releases the flow id, allowing it to be reused. Given that the
 // (koid, msg) pair is guaranteed to be unique over the span of the flow, the likelihood of id
 // confusion is equivalent to the likelihood of hash collisions by temporally overlapping flows.
-uint64_t ChannelMessageFlowId(const MessagePacketPtr& msg, const ChannelDispatcher* channel) {
+uint64_t ChannelMessageFlowId(const MessagePacket& msg, const ChannelDispatcher* channel) {
   const zx_koid_t min_koid = ktl::min(channel->get_koid(), channel->get_related_koid());
   const uint64_t high = HashA(min_koid);
-  const uint64_t low = HashB(reinterpret_cast<uint64_t>(msg.get()));
+  const uint64_t low = HashB(reinterpret_cast<uint64_t>(&msg));
   return high << 32 | low;
 }
 
@@ -81,7 +81,7 @@ enum class MessageOp : uint8_t {
   ChannelCallReadResponse,
 };
 
-inline void TraceMessage(const MessagePacketPtr& msg, const ChannelDispatcher* channel,
+inline void TraceMessage(const MessagePacket& msg, const ChannelDispatcher* channel,
                          MessageOp message_op) {
   // We emit these trace events non-standardly to work around some compatibility issues:
   //
@@ -104,31 +104,27 @@ inline void TraceMessage(const MessagePacketPtr& msg, const ChannelDispatcher* c
   //    same timestamp, they will be read in the correct order and the flow events will be
   //    associated correctly.
 
-  if (msg) {
-    uint64_t ts;
-    const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
+  uint64_t ts;
+  const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
 
-    KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
-                                    ("ordinal", msg->fidl_header().ordinal),
-                                    ("txid", msg->fidl_header().txid));
+  KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
+                                  ("ordinal", msg.fidl_header().ordinal),
+                                  ("txid", msg.fidl_header().txid));
 
-    switch (message_op) {
-      case MessageOp::Write:
-      case MessageOp::ChannelCallWriteRequest:
-        KTRACE_FLOW_BEGIN_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
-                                    ChannelMessageFlowId(msg, channel));
-        break;
-      case MessageOp::Read:
-      case MessageOp::ChannelCallReadResponse:
-        KTRACE_FLOW_END_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+  switch (message_op) {
+    case MessageOp::Write:
+    case MessageOp::ChannelCallWriteRequest:
+      KTRACE_FLOW_BEGIN_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
                                   ChannelMessageFlowId(msg, channel));
-        break;
-    }
-
-    KTRACE_DURATION_END_TIMESTAMP("kernel:ipc", "ChannelMessage", ts);
-  } else {
-    printf("KERN: warning! failed to trace NULL message on channel %zu.\n", channel->get_koid());
+      break;
+    case MessageOp::Read:
+    case MessageOp::ChannelCallReadResponse:
+      KTRACE_FLOW_END_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+                                ChannelMessageFlowId(msg, channel));
+      break;
   }
+
+  KTRACE_DURATION_END_TIMESTAMP("kernel:ipc", "ChannelMessage", ts);
 }
 
 // Temporary hack to chase down bugs like https://fxbug.dev/42123699 where upwards of 250MB of ipc
@@ -307,7 +303,8 @@ zx_status_t ChannelDispatcher::Read(zx_koid_t owner, uint32_t* msg_size, uint32_
     ClearSignals(ZX_CHANNEL_READABLE);
   }
   if (status == ZX_OK) {
-    TraceMessage(*msg, this, MessageOp::Read);
+    // If status is OK then we popped a non-null message from messages_.
+    TraceMessage(**msg, this, MessageOp::Read);
   }
 
   return status;
@@ -318,7 +315,8 @@ zx_status_t ChannelDispatcher::Write(zx_koid_t owner, MessagePacketPtr msg) {
 
   Guard<CriticalMutex> guard{get_lock()};
 
-  TraceMessage(msg, this, MessageOp::Write);
+  DEBUG_ASSERT(msg);
+  TraceMessage(*msg, this, MessageOp::Write);
 
   // Failing this test is only possible if this process has two threads racing:
   // one thread is issuing channel_write() and one thread is moving the handle
@@ -429,7 +427,7 @@ zx_status_t ChannelDispatcher::Call(zx_koid_t owner, MessagePacketPtr msg, zx_ti
     waiter->set_txid(txid);
     msg->set_txid(txid);
 
-    TraceMessage(msg, this, MessageOp::ChannelCallWriteRequest);
+    TraceMessage(*msg, this, MessageOp::ChannelCallWriteRequest);
 
     // (0) Before writing the outbound message and waiting, add our
     // waiter to the list.
@@ -486,7 +484,9 @@ zx_status_t ChannelDispatcher::ResumeInterruptedCall(MessageWaiter* waiter,
       waiters_.erase(*waiter);
     }
 
-    TraceMessage(*reply, this, MessageOp::ChannelCallReadResponse);
+    if (*reply) {
+      TraceMessage(**reply, this, MessageOp::ChannelCallReadResponse);
+    }
 
     return status;
   }
