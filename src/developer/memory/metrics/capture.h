@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/fit/function.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/time.h>
 #include <zircon/syscalls.h>
@@ -18,9 +19,125 @@
 #include <unordered_map>
 #include <vector>
 
+#include <ffl/fixed.h>
+
 class TestMonitor;
 
 namespace memory {
+
+// TODO(https://fxbug.dev/338300808): Rename this to something more generic and incorporate it into
+// ffl, as it duplicates code used inside the kernel.
+struct FractionalBytes {
+  using Fraction = ffl::Fixed<uint64_t, 63>;
+  constexpr static Fraction kOneByte = Fraction(1);
+
+  FractionalBytes operator+(const uint64_t& other) const {
+    FractionalBytes ret{*this};
+    ret += other;
+    return ret;
+  }
+  FractionalBytes operator-(const uint64_t& other) const {
+    FractionalBytes ret{*this};
+    ret -= other;
+    return ret;
+  }
+  FractionalBytes operator/(const uint64_t& other) const {
+    FractionalBytes ret{*this};
+    ret /= other;
+    return ret;
+  }
+  FractionalBytes& operator+=(const uint64_t& other) {
+    [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, other, &integral);
+    FX_DCHECK(!overflow);
+    return *this;
+  }
+  FractionalBytes& operator-=(const uint64_t& other) {
+    [[maybe_unused]] bool overflow = __builtin_sub_overflow(integral, other, &integral);
+    FX_DCHECK(!overflow);
+    return *this;
+  }
+  FractionalBytes& operator/=(const uint64_t& other) {
+    // Handle fractions set to `Fraction::Max()` as sentinels indicating "invalid fraction".
+    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
+    // bytes from attribution codepaths.
+    if (fractional == Fraction::Max()) {
+      integral /= other;
+      return *this;
+    }
+
+    // Input fraction must always be <1 to guard against overflow.
+    // If this is true, the sum of fractions must be <1:
+    // The sum is:
+    //  `(fractional / other) + (1 / other) * remainder`
+    // which we can rewrite as
+    //  `(fractional + remainder) / other`
+    // We know that fractional < 1 and remainder < other, thus (fractional + remainder) < other and
+    // the rewritten sum cannot be >=1.
+    FX_DCHECK(fractional < kOneByte);
+    const uint64_t remainder = integral % other;
+    const Fraction scaled_remainder = (kOneByte / other) * remainder;
+    fractional = (fractional / other) + scaled_remainder;
+    FX_DCHECK(fractional < kOneByte);
+    integral /= other;
+
+    return *this;
+  }
+
+  FractionalBytes operator+(const FractionalBytes& other) const {
+    FractionalBytes ret{*this};
+    ret += other;
+    return ret;
+  }
+  FractionalBytes& operator+=(const FractionalBytes& other) {
+    // Handle fractions set to `Fraction::Max()` as sentinels indicating "invalid fraction".
+    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
+    // bytes from attribution codepaths.
+    if (fractional == Fraction::Max() || other.fractional == Fraction::Max()) {
+      fractional = Fraction::Max();
+      [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, other.integral, &integral);
+      FX_DCHECK(!overflow);
+      return *this;
+    }
+
+    // Input fractions must always be <1 to guard against overflow.
+    // If the fractional sum is >=1, then roll that overflow byte into the integral part.
+    FX_DCHECK(fractional < kOneByte);
+    FX_DCHECK(other.fractional < kOneByte);
+    fractional += other.fractional;
+    if (fractional >= kOneByte) {
+      [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, 1, &integral);
+      FX_DCHECK(!overflow);
+      fractional -= kOneByte;
+    }
+    [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, other.integral, &integral);
+    FX_DCHECK(!overflow);
+
+    return *this;
+  }
+
+  bool operator<(const FractionalBytes& other) const {
+    return integral < other.integral ||
+           (integral == other.integral && fractional < other.fractional);
+  }
+  bool operator>(const FractionalBytes& other) const {
+    return integral > other.integral ||
+           (integral == other.integral && fractional > other.fractional);
+  }
+  bool operator<=(const FractionalBytes& other) const { return *this < other || *this == other; }
+  bool operator>=(const FractionalBytes& other) const { return *this > other || *this == other; }
+  bool operator==(const uint64_t& other) const {
+    return integral == other && fractional == Fraction::FromRaw(0);
+  }
+  bool operator!=(const uint64_t& other) const { return !(*this == other); }
+  bool operator==(const FractionalBytes& other) const {
+    return integral == other.integral && fractional == other.fractional;
+  }
+  bool operator!=(const FractionalBytes& other) const { return !(*this == other); }
+
+  uint64_t integral = 0;
+  Fraction fractional = Fraction::FromRaw(0);
+};
+
 struct Process {
   zx_koid_t koid;
   zx_koid_t job;
@@ -30,19 +147,39 @@ struct Process {
 
 struct Vmo {
   explicit Vmo(const zx_info_vmo_t& v)
-      : koid(v.koid),
-        parent_koid(v.parent_koid),
-        committed_bytes(v.committed_bytes),
-        populated_bytes(v.populated_bytes),
-        allocated_bytes(v.size_bytes) {
+      : koid(v.koid), parent_koid(v.parent_koid), allocated_bytes(v.size_bytes) {
+    // Fractional byte values will be `Max` unless the kernel is exposing its new attribution model.
+    //
+    // Use the kernel's PSS value (i.e. `committed_scaled_bytes`) as it properly accounts for
+    // copy-on-write sharing.
+    // Otherwise use the existing "RSS" value and rely on the behavior in Summary that attributes
+    // clone parents to the clone's process.
+    // TODO(https://fxbug.dev/issues/338300808): Remove this check once the kernel's new
+    // attribution behavior is the default.
+    const bool using_new_kernel_behavior =
+        v.committed_fractional_scaled_bytes != FractionalBytes::Fraction::Max().raw_value();
+    if (using_new_kernel_behavior) {
+      // TODO(b/377993710): Rename to committed_scaled_bytes.
+      committed_bytes = FractionalBytes{
+          .integral = v.committed_scaled_bytes,
+          .fractional = FractionalBytes::Fraction::FromRaw(v.committed_fractional_scaled_bytes)};
+      populated_bytes = FractionalBytes{
+          .integral = v.populated_scaled_bytes,
+          .fractional = FractionalBytes::Fraction::FromRaw(v.populated_fractional_scaled_bytes)};
+    } else {
+      committed_bytes = FractionalBytes{.integral = v.committed_bytes,
+                                        .fractional = FractionalBytes::Fraction::Max()};
+      populated_bytes = FractionalBytes{.integral = v.populated_bytes,
+                                        .fractional = FractionalBytes::Fraction::Max()};
+    }
     strncpy(name, v.name, sizeof(name));
   }
   zx_koid_t koid;
   char name[ZX_MAX_NAME_LEN];
   zx_koid_t parent_koid;
-  uint64_t committed_bytes;
-  uint64_t populated_bytes;
   uint64_t allocated_bytes;
+  FractionalBytes committed_bytes;
+  FractionalBytes populated_bytes;
   std::vector<zx_koid_t> children;
 };
 

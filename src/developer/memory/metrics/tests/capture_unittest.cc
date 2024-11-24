@@ -6,6 +6,8 @@
 
 #include <zircon/types.h>
 
+#include <cstdint>
+
 #include <gtest/gtest.h>
 
 #include "src/developer/memory/metrics/tests/test_utils.h"
@@ -281,7 +283,10 @@ TEST_F(CaptureUnitTest, VMORooted) {
   TestUtils::CreateCapture(&c,
                            {.vmos =
                                 {
-                                    {.koid = 1, .name = "R1", .committed_bytes = 100},
+                                    {.koid = 1,
+                                     .name = "R1",
+                                     .committed_bytes = 100,
+                                     .committed_fractional_scaled_bytes = UINT64_MAX},
                                     {.koid = 2, .name = "C1", .size_bytes = 50, .parent_koid = 1},
                                     {.koid = 3, .name = "C2", .size_bytes = 25, .parent_koid = 2},
                                 },
@@ -291,9 +296,9 @@ TEST_F(CaptureUnitTest, VMORooted) {
                                 },
                             .rooted_vmo_names = {"R1"}});
   // Carve up the rooted vmo into child and grandchild.
-  EXPECT_EQ(50U, c.vmo_for_koid(1).committed_bytes);
-  EXPECT_EQ(25U, c.vmo_for_koid(2).committed_bytes);
-  EXPECT_EQ(25U, c.vmo_for_koid(3).committed_bytes);
+  EXPECT_EQ(50U, c.vmo_for_koid(1).committed_bytes.integral);
+  EXPECT_EQ(25U, c.vmo_for_koid(2).committed_bytes.integral);
+  EXPECT_EQ(25U, c.vmo_for_koid(3).committed_bytes.integral);
 }
 
 TEST_F(CaptureUnitTest, VMORootedPartialCommit) {
@@ -301,7 +306,10 @@ TEST_F(CaptureUnitTest, VMORootedPartialCommit) {
   TestUtils::CreateCapture(&c,
                            {.vmos =
                                 {
-                                    {.koid = 1, .name = "R1", .committed_bytes = 75},
+                                    {.koid = 1,
+                                     .name = "R1",
+                                     .committed_bytes = 75,
+                                     .committed_fractional_scaled_bytes = UINT64_MAX},
                                     {.koid = 2, .name = "C1", .size_bytes = 77, .parent_koid = 1},
                                     {.koid = 3, .name = "C2", .size_bytes = 100, .parent_koid = 2},
                                 },
@@ -311,9 +319,9 @@ TEST_F(CaptureUnitTest, VMORootedPartialCommit) {
                                 },
                             .rooted_vmo_names = {"R1"}});
   // The grandchild should take all available committed bytes from the root.
-  EXPECT_EQ(0U, c.vmo_for_koid(1).committed_bytes);
-  EXPECT_EQ(0U, c.vmo_for_koid(2).committed_bytes);
-  EXPECT_EQ(75U, c.vmo_for_koid(3).committed_bytes);
+  EXPECT_EQ(0U, c.vmo_for_koid(1).committed_bytes.integral);
+  EXPECT_EQ(0U, c.vmo_for_koid(2).committed_bytes.integral);
+  EXPECT_EQ(75U, c.vmo_for_koid(3).committed_bytes.integral);
 }
 
 TEST_F(CaptureUnitTest, Compression) {
@@ -333,7 +341,12 @@ TEST_F(CaptureUnitTest, Compression) {
       .koid = vmo_koid,
       .name = "V1",
       .size_bytes = vmo_size,
+      .committed_bytes = 0,
       .populated_bytes = 2 * vmo_size,
+      .committed_scaled_bytes = 0,
+      .populated_scaled_bytes = 0,
+      .committed_fractional_scaled_bytes = UINT64_MAX,
+      .populated_fractional_scaled_bytes = UINT64_MAX,
   };
   const static GetInfoResponse vmos_info_compressed = {
       proc_handle, ZX_INFO_PROCESS_VMOS, &_vmo_compressed, sizeof(_vmo_compressed), 1, ZX_OK};
@@ -362,7 +375,7 @@ TEST_F(CaptureUnitTest, Compression) {
   const auto& vmo = c.vmo_for_koid(vmo_koid);
   EXPECT_EQ(vmo_koid, vmo.koid);
   EXPECT_STREQ(vmo_name, vmo.name);
-  EXPECT_EQ(2 * vmo_size, vmo.populated_bytes);
+  EXPECT_EQ(2 * vmo_size, vmo.populated_bytes.integral);
 }
 
 }  // namespace test

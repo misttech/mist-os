@@ -83,6 +83,18 @@ void Summary::Init(const Capture& capture, Namer* namer,
           s.vmos_.insert(vmo_koid);
         }
         const auto& vmo = capture.vmo_for_koid(vmo_koid);
+        // Fractional byte values will be `Max` unless the kernel is exposing its new attribution
+        // model.
+        //
+        // Don't attribute parents of cloned VMOs to this process under the new model, because the
+        // kernel already accounts for the copy-on-write sharing internally.
+        // TODO(https://fxbug.dev/issues/338300808): Remove this do-while loop once the kernel's new
+        // attribution behavior is the default.
+        const bool using_new_kernel_behavior =
+            vmo.committed_bytes.fractional != FractionalBytes::Fraction::Max();
+        if (using_new_kernel_behavior) {
+          break;
+        }
         // The parent koid could be missing.
         if (!vmo.parent_koid || koid_to_vmo.find(vmo.parent_koid) == koid_to_vmo.end()) {
           break;
@@ -115,11 +127,11 @@ void Summary::Init(const Capture& capture, Namer* namer,
     }
   }
 
-  uint64_t vmo_bytes = 0;
+  FractionalBytes vmo_bytes{};
   for (const auto& [koid, vmo] : capture.koid_to_vmo()) {
     vmo_bytes += vmo.committed_bytes;
   }
-  process_summaries_.emplace_back(kstats_, vmo_bytes);
+  process_summaries_.emplace_back(kstats_, vmo_bytes.integral);
 }  // namespace memory
 
 const zx_koid_t ProcessSummary::kKernelKoid = 1;
@@ -134,9 +146,10 @@ ProcessSummary::ProcessSummary(const zx_info_kmem_stats_t& kmem, uint64_t vmo_by
   name_to_sizes_.emplace("other", kmem.other_bytes);
   name_to_sizes_.emplace("vmo", kmem_vmo_bytes);
 
+  const uint64_t total_bytes = kmem.wired_bytes + kmem.total_heap_bytes + kmem.mmu_overhead_bytes +
+                               kmem.ipc_bytes + kmem.other_bytes + kmem_vmo_bytes;
   sizes_.private_bytes = sizes_.scaled_bytes = sizes_.total_bytes =
-      kmem.wired_bytes + kmem.total_heap_bytes + kmem.mmu_overhead_bytes + kmem.ipc_bytes +
-      kmem.other_bytes + kmem_vmo_bytes;
+      FractionalBytes{.integral = total_bytes};
 }
 
 const Sizes& ProcessSummary::GetSizes(const std::string& name) const {

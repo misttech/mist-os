@@ -48,7 +48,7 @@ std::ostream& operator<<(std::ostream& os, const zx_info_vmo_t& vmo) {
 
 std::ostream& operator<<(std::ostream& os, const Vmo& vmo) {
   os << "Vmo{.koid: " << vmo.koid << ", .parent_koid: " << vmo.parent_koid
-     << ", .name: " << vmo.name << ", .committed_bytes: " << vmo.committed_bytes
+     << ", .name: " << vmo.name << ", .committed_bytes: " << vmo.committed_bytes.integral
      << ", .allocated_bytes: " << vmo.allocated_bytes << ", .children: " << vmo.children << "}";
   return os;
 }

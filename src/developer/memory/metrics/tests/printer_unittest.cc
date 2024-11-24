@@ -81,6 +81,8 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                                .size_bytes = 300,
                                                .parent_koid = 100,
                                                .committed_bytes = 200,
+                                               .committed_scaled_bytes = 0,
+                                               .committed_fractional_scaled_bytes = UINT64_MAX,
                                            },
                                        },
                                    .processes =
@@ -193,6 +195,8 @@ TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
                                                .size_bytes = 300,
                                                .parent_koid = 100,
                                                .committed_bytes = 200,
+                                               .committed_scaled_bytes = 0,
+                                               .committed_fractional_scaled_bytes = UINT64_MAX,
                                            },
                                        },
                                    .processes =
@@ -329,7 +333,10 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
                                            .ipc_bytes = 7ul * 1024,
                                            .other_bytes = 8ul * 1024,
                                        },
-                                   .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
+                                   .vmos = {{.koid = 1,
+                                             .name = "v1",
+                                             .committed_bytes = 1024,
+                                             .committed_fractional_scaled_bytes = UINT64_MAX}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
                                });
 
@@ -361,7 +368,10 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
                                            .ipc_bytes = 7ul * 1024,
                                            .other_bytes = 8ul * 1024,
                                        },
-                                   .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
+                                   .vmos = {{.koid = 1,
+                                             .name = "v1",
+                                             .committed_bytes = 1024,
+                                             .committed_fractional_scaled_bytes = UINT64_MAX}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
                                });
 
@@ -391,9 +401,18 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
                                    .kmem = {.vmo_bytes = 6ul * 1024},
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 1024},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 2ul * 1024},
-                                           {.koid = 3, .name = "v3", .committed_bytes = 3ul * 1024},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 1024,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .committed_bytes = 2ul * 1024,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 3,
+                                            .name = "v3",
+                                            .committed_bytes = 3ul * 1024,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -425,7 +444,10 @@ TEST_F(PrinterUnitTest, OutputSummarySingle) {
                                    .time = 1234L * 1000000000L,
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -492,8 +514,14 @@ TEST_F(PrinterUnitTest, OutputSummaryDouble) {
                                    .time = 1234L * 1000000000L,
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 200},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v2",
+                                            .committed_bytes = 200,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -532,11 +560,26 @@ TEST_F(PrinterUnitTest, OutputSummaryShared) {
                                    .time = 1234L * 1000000000L,
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 3, .name = "v1", .committed_bytes = 100},
-                                           {.koid = 4, .name = "v2", .committed_bytes = 100},
-                                           {.koid = 5, .name = "v3", .committed_bytes = 200},
+                                           {.koid = 1,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 3,
+                                            .name = "v1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 4,
+                                            .name = "v2",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 5,
+                                            .name = "v3",
+                                            .committed_bytes = 200,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -584,9 +627,18 @@ TEST_F(PrinterUnitTest, PrintDigest) {
                                        },
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "a1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "b1", .committed_bytes = 200},
-                                           {.koid = 3, .name = "c1", .committed_bytes = 300},
+                                           {.koid = 1,
+                                            .name = "a1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "b1",
+                                            .committed_bytes = 200,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 3,
+                                            .name = "c1",
+                                            .committed_bytes = 300,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {
@@ -629,9 +681,18 @@ TEST_F(PrinterUnitTest, OutputDigest) {
                                        },
                                    .vmos =
                                        {
-                                           {.koid = 1, .name = "a1", .committed_bytes = 100},
-                                           {.koid = 2, .name = "b1", .committed_bytes = 200},
-                                           {.koid = 3, .name = "c1", .committed_bytes = 300},
+                                           {.koid = 1,
+                                            .name = "a1",
+                                            .committed_bytes = 100,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 2,
+                                            .name = "b1",
+                                            .committed_bytes = 200,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                           {.koid = 3,
+                                            .name = "c1",
+                                            .committed_bytes = 300,
+                                            .committed_fractional_scaled_bytes = UINT64_MAX},
                                        },
                                    .processes =
                                        {

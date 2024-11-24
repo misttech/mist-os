@@ -158,13 +158,14 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   vmos.PushBack(vmo_header, a);
   for (const auto& [k, v] : capture.koid_to_vmo()) {
     rapidjson::Value vmo_value(rapidjson::kArrayType);
+    // TODO(b/377993710): Should also pass PSS RSS and USS for proper accounting.
     vmo_value.PushBack(v.koid, a)
         .PushBack(name_to_index[v.name], a)
         .PushBack(v.parent_koid, a)
-        .PushBack(v.committed_bytes, a)
+        .PushBack(v.committed_bytes.integral, a)
         .PushBack(v.allocated_bytes, a);
     if (capture.kmem_compression()) {
-      vmo_value.PushBack(v.populated_bytes, a);
+      vmo_value.PushBack(v.populated_bytes.integral, a);
     }
     vmos.PushBack(vmo_value, a);
   }
@@ -238,14 +239,14 @@ void Printer::PrintCaptureAndBucketConfig(const Capture& capture,
 void Printer::OutputSizes(const Sizes& sizes) {
   if (sizes.total_bytes == sizes.private_bytes) {
     char private_buf[kMaxFormattedStringSize];
-    os_ << FormatSize(sizes.private_bytes, private_buf) << "\n";
+    os_ << FormatSize(sizes.private_bytes.integral, private_buf) << "\n";
     return;
   }
   char private_buf[kMaxFormattedStringSize], scaled_buf[kMaxFormattedStringSize],
       total_buf[kMaxFormattedStringSize];
-  os_ << FormatSize(sizes.private_bytes, private_buf) << " "
-      << FormatSize(sizes.scaled_bytes, scaled_buf) << " "
-      << FormatSize(sizes.total_bytes, total_buf) << "\n";
+  os_ << FormatSize(sizes.private_bytes.integral, private_buf) << " "
+      << FormatSize(sizes.scaled_bytes.integral, scaled_buf) << " "
+      << FormatSize(sizes.total_bytes.integral, total_buf) << "\n";
 }
 
 void Printer::PrintSummary(const Summary& summary, CaptureLevel level, Sorted sorted) {
@@ -346,14 +347,14 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
         if (sizes.total_bytes == 0) {
           continue;
         }
-        os_ << time << "," << s.koid() << "," << name << "," << sizes.private_bytes << ","
-            << sizes.scaled_bytes << "," << sizes.total_bytes << "\n";
+        os_ << time << "," << s.koid() << "," << name << "," << sizes.private_bytes.integral << ","
+            << sizes.scaled_bytes.integral << "," << sizes.total_bytes.integral << "\n";
       }
       continue;
     }
     auto sizes = s.sizes();
-    os_ << time << "," << s.koid() << "," << s.name() << "," << sizes.private_bytes << ","
-        << sizes.scaled_bytes << "," << sizes.total_bytes << "\n";
+    os_ << time << "," << s.koid() << "," << s.name() << "," << sizes.private_bytes.integral << ","
+        << sizes.scaled_bytes.integral << "," << sizes.total_bytes.integral << "\n";
   }
   os_ << std::flush;
 }

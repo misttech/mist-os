@@ -295,9 +295,9 @@ void CaptureMaker::ReallocateDescendents(Vmo& parent,
   for (auto& child_koid : parent.children) {
     auto& child = koid_to_vmo.at(child_koid);
     if (child.parent_koid == parent.koid) {
-      uint64_t reallocated_bytes = std::min(parent.committed_bytes, child.allocated_bytes);
-      parent.committed_bytes -= reallocated_bytes;
-      child.committed_bytes = reallocated_bytes;
+      uint64_t reallocated_bytes = std::min(parent.committed_bytes.integral, child.allocated_bytes);
+      parent.committed_bytes.integral -= reallocated_bytes;
+      child.committed_bytes.integral = reallocated_bytes;
       ReallocateDescendents(child, koid_to_vmo);
     }
   }

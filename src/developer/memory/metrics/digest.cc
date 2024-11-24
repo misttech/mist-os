@@ -50,22 +50,22 @@ void Digester::Digest(const Capture& capture, class Digest* digest) {
 
   std::sort(digest->buckets_.begin(), digest->buckets_.end(),
             [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
-  uint64_t undigested_size = 0;
+  FractionalBytes undigested_size{};
   for (auto v : digest->undigested_vmos_) {
     undigested_size += capture.vmo_for_koid(v).committed_bytes;
   }
-  if (undigested_size > 0) {
-    digest->buckets_.emplace_back("Undigested", undigested_size);
+  if (undigested_size.integral > 0) {
+    digest->buckets_.emplace_back("Undigested", undigested_size.integral);
   }
 
   const auto& kmem = capture.kmem();
   if (kmem.total_bytes > 0) {
-    uint64_t vmo_size = 0;
+    FractionalBytes vmo_size;
     for (const auto& bucket : digest->buckets_) {
       vmo_size += bucket.size_;
     }
-    if (vmo_size < kmem.vmo_bytes) {
-      digest->buckets_.emplace_back("Orphaned", kmem.vmo_bytes - vmo_size);
+    if (vmo_size.integral < kmem.vmo_bytes) {
+      digest->buckets_.emplace_back("Orphaned", kmem.vmo_bytes - vmo_size.integral);
     }
 
     digest->buckets_.emplace_back("Kernel", kmem.wired_bytes + kmem.total_heap_bytes +

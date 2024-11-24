@@ -19,12 +19,15 @@
 namespace memory {
 
 struct Sizes {
-  Sizes() : private_bytes(0), scaled_bytes(0), total_bytes(0) {}
-  explicit Sizes(uint64_t b) : private_bytes(b), scaled_bytes(b), total_bytes(b) {}
+  Sizes() = default;
+  explicit Sizes(uint64_t b)
+      : private_bytes(FractionalBytes{.integral = b}),
+        scaled_bytes(FractionalBytes{.integral = b}),
+        total_bytes(FractionalBytes{.integral = b}) {}
 
-  uint64_t private_bytes;
-  uint64_t scaled_bytes;
-  uint64_t total_bytes;
+  FractionalBytes private_bytes{};
+  FractionalBytes scaled_bytes{};
+  FractionalBytes total_bytes{};
 };
 
 class ProcessSummary {
