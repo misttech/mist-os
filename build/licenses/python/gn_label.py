@@ -152,6 +152,7 @@ class GnLabel:
         # Add them here to ensure we skip collecting those licenses.
         extra_host_targets = [
             "prebuilt/third_party/rust/",
+            "prebuilt/third_party/python3/",
         ]
         if any(substring in self.path_str for substring in extra_host_targets):
             logging.debug(
