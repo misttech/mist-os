@@ -119,6 +119,14 @@ void UsbAdbDevice::Stop() {
     }
   }
 
+  {
+    fbl::AutoLock _(&bulk_in_ep_.mutex_);
+    while (!tx_pending_reqs_.empty()) {
+      CompleteTxn(tx_pending_reqs_.front().completer, ZX_ERR_CANCELED);
+      tx_pending_reqs_.pop();
+    }
+  }
+
   zx_status_t status = function_.SetInterface(nullptr, nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
