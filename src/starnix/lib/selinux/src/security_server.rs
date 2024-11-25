@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut, Reset};
+use crate::access_vector_cache::{
+    CacheStats, HasCacheStats, Manager as AvcManager, Query, QueryMut, Reset,
+};
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
@@ -268,6 +270,11 @@ impl SecurityServer {
             state.booleans.commit_pending();
             state.policy_change_count += 1;
         });
+    }
+
+    /// Returns a snapshot of the AVC usage statistics.
+    pub fn avc_cache_stats(&self) -> CacheStats {
+        self.avc_manager.get_shared_cache().cache_stats()
     }
 
     /// Returns the list of all class names.

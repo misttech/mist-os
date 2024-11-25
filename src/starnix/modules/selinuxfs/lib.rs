@@ -120,6 +120,14 @@ impl SeLinuxFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // Read-only files & directories, exposing SELinux internal state.
+        dir.subdir(current_task, "avc", 0o555, |dir| {
+            dir.entry(
+                current_task,
+                "cache_stats",
+                AvcCacheStatsFile::new_node(security_server.clone()),
+                mode!(IFREG, 0o444),
+            );
+        });
         dir.entry(current_task, "checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
         dir.entry(
             current_task,
@@ -807,6 +815,29 @@ impl FsNodeOps for PermsDirectory {
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))
+    }
+}
+
+/// Exposes AVC cache statistics from the SELinux security server to userspace.
+struct AvcCacheStatsFile {
+    security_server: Arc<SecurityServer>,
+}
+
+impl AvcCacheStatsFile {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
+impl BytesFileOps for AvcCacheStatsFile {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let stats = self.security_server.avc_cache_stats();
+        Ok(format!(
+            "lookups hits misses allocations reclaims frees\n{} {} {} {} {} {}\n",
+            stats.lookups, stats.hits, stats.misses, stats.allocs, stats.reclaims, stats.frees
+        )
+        .into_bytes()
+        .into())
     }
 }
 
