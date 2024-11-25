@@ -596,8 +596,14 @@ impl<'a> TokenBuilder<'a> {
     }
 
     fn turn_into_string(&mut self) {
-        if let Self::Slice { string, start, end: Some(end) } = self {
-            *self = Self::String(string[*start..=*end].to_string())
+        if let Self::Slice { string, start, end } = self {
+            if let Some(end) = end {
+                *self = Self::String(string[*start..=*end].to_string());
+            } else {
+                // if this is called before the first character is pushed (eg for '*abc'),
+                // `end` is None, but the state should still become `Self::String`
+                *self = Self::String(String::new());
+            }
         }
     }
 
@@ -874,6 +880,7 @@ mod tests {
     use std::path::PathBuf;
     use std::str::FromStr;
     use tempfile::TempDir;
+    use test_case::test_case;
 
     /// Loads all the selectors in the given directory.
     pub fn parse_selectors<E>(directory: &Path) -> Result<Vec<Selector>, Error>
@@ -1074,6 +1081,16 @@ a:b:c
             parsed.component_selector.as_ref().unwrap()
         )
         .unwrap());
+    }
+
+    #[test_case("a*", r"a\*" ; "when_star_not_leading")]
+    #[test_case("a:", r"a\:" ; "when_colon_not_leading")]
+    #[test_case(":", r"\:" ; "when_colon_leading")]
+    #[test_case("*", r"\*" ; "when_star_leading")]
+    #[test_case(r"*:\abc", r"\*\:\\abc" ; "when_mixed_with_leading_special_chars")]
+    #[fuchsia::test]
+    fn sanitize_string_for_selectors_works(input: &str, expected: &str) {
+        assert_eq!(sanitize_string_for_selectors(input), expected);
     }
 
     #[fuchsia::test]
