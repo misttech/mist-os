@@ -196,6 +196,29 @@ const std::set<std::string> kCreateThreadSymbols = {
     "pthread_create",
 };
 
+//  ________  _________  ________  ________
+// |\   ____\|\___   ___\\   __  \|\   __  \
+// \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+//  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+//   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+//     ____\_\  \   \ \__\ \ \_______\ \__\
+//    |\_________\   \|__|  \|_______|\|__|
+//    \|_________|
+//
+// No additional drivers should be added to this list.
+//
+// TODO(https://fxbug.dev/380482978): this list should be deleted once possible.
+const std::set<std::string> kAdditionalThreadSymbolsDriversAllowlist = {
+    "#meta/nanohub_driver_nohw_test.cm"};
+
+// The set of restricted symbols for manipulating threads which are only allowed for drivers in
+// |kAdditionalThreadSymbolsDriversAllowlist|.
+//
+// TODO(https://fxbug.dev/380482978): this list should be deleted once possible.
+const std::set<std::string> kAdditionalThreadSymbols = {
+    "pthread_sigmask",
+};
+
 // LINT.IfChange
 const std::set<std::string> kRestrictedLibcSymbols = {
     "a64l",
