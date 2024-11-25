@@ -289,4 +289,23 @@ bool verify_mapped_page_range(vaddr_t base, size_t mapping_size,
   END_TEST;
 }
 
+VmObject::AttributionCounts make_private_attribution_counts(uint64_t uncompressed,
+                                                            uint64_t compressed) {
+#if ENABLE_LEGACY_ATTRIBUTION
+  return vm::AttributionCounts{
+      .uncompressed_bytes = uncompressed,
+      .compressed_bytes = compressed,
+  };
+#else
+  return vm::AttributionCounts{
+      .uncompressed_bytes = uncompressed,
+      .compressed_bytes = compressed,
+      .private_uncompressed_bytes = uncompressed,
+      .private_compressed_bytes = compressed,
+      .scaled_uncompressed_bytes = vm::FractionalBytes(uncompressed),
+      .scaled_compressed_bytes = vm::FractionalBytes(compressed),
+  };
+#endif
+}
+
 }  // namespace vm_unittest
