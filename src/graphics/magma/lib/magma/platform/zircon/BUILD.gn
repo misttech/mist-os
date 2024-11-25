@@ -100,6 +100,31 @@ source_set("device") {
   ]
 }
 
+source_set("device_dfv2") {
+  configs += [ "..:platform_include_config" ]
+
+  sources = [
+    "zircon_platform_device_dfv2.cc",
+    "zircon_platform_device_dfv2.h",
+  ]
+
+  public_deps = [
+    ":interrupt",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//src/devices/lib/mmio",
+  ]
+
+  deps = [
+    ":bus_mapper",
+    ":handle",
+    ":mmio",
+    "..:device_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 source_set("connection_client") {
   configs += [ "..:platform_include_config" ]
 
