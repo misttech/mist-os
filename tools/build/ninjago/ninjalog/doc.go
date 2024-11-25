@@ -5,7 +5,7 @@
 /*
 Package ninjalog provides ninja_log parser
 
-It support ninja log v5.
+It support ninja log v5, v6 and v7, e.g.:
 
 	# ninja log v5
 	<start>	<end>	<restat>	<target>	<cmdhash>
