@@ -774,7 +774,7 @@ impl VfsDirectory for FxDirectory {
                         }
                         .boxed())
                     } else {
-                        FxFile::create_connection_async(node, scope, flags, object_request)
+                        FxFile::create_connection_async(node, scope, flags, object_request).await
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
@@ -816,7 +816,7 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(node, scope, flags, object_request)
+                    FxFile::create_connection_async(node, scope, flags, object_request).await
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
                     object_request.create_connection(

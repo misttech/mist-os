@@ -309,19 +309,6 @@ impl KeyManager {
         }
     }
 
-    /// Prefetches the keys to save latency when they are needed later.
-    pub async fn pre_fetch(
-        &self,
-        object_id: u64,
-        crypt: &dyn Crypt,
-        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
-        permanent: bool,
-    ) -> Result<(), Error> {
-        self.get_keys(object_id, crypt, &mut Some(wrapped_keys), permanent, /* force= */ false)
-            .await
-            .map(|_| ())
-    }
-
     /// Returns the key specified by `key_id`, or None if it isn't present. If the key specified by
     /// `key_id` cannot be unwrapped, this will return FxfsError::NoKey.
     pub async fn get_key(

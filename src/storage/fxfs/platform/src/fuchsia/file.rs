@@ -67,7 +67,8 @@ impl FxFile {
         file
     }
 
-    pub fn create_connection_async(
+    /// Creates a new connection on the given `scope`. May take a read lock on the object.
+    pub async fn create_connection_async(
         this: OpenedNode<FxFile>,
         scope: ExecutionScope,
         flags: impl ProtocolsExt,
@@ -76,7 +77,21 @@ impl FxFile {
         if let Some(rights) = flags.rights() {
             if rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES) {
                 if let Some(fut) = this.handle.pre_fetch_keys() {
-                    this.handle.owner().scope().spawn(fut);
+                    // Keep the object from being deleted until after the fetch is complete.
+                    let fs = this.handle.owner().store().filesystem();
+                    let read_lock = fs
+                        .clone()
+                        .lock_manager()
+                        .read_lock(lock_keys!(LockKey::object(
+                            this.handle.owner().store().store_object_id(),
+                            this.object_id()
+                        )))
+                        .await
+                        .into_owned(fs);
+                    this.handle.owner().scope().spawn(async move {
+                        let _read_lock = read_lock;
+                        fut.await
+                    });
                 }
             }
         }

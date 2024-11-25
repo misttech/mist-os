@@ -913,11 +913,12 @@ impl ObjectStore {
         let permanent = if let Some(crypt) = crypt {
             store
                 .key_manager
-                .pre_fetch(
+                .get_keys(
                     obj_id,
                     crypt.as_ref(),
-                    store.get_keys(obj_id),
-                    /* permanent: */ true,
+                    &mut Some(store.get_keys(obj_id)),
+                    /* permanent= */ true,
+                    /* force= */ false,
                 )
                 .await?;
             true

@@ -1782,7 +1782,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 
     /// Returns a future that will pre-fetches the keys so as to avoid paying the performance
-    /// penalty later.
+    /// penalty later. Must ensure that the object is not removed before the future completes.
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
         if let Encryption::CachedKeys = self.encryption {
             let owner = self.owner.clone();
@@ -1790,13 +1790,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             Some(async move {
                 let store = owner.as_ref().as_ref();
                 if let Some(crypt) = store.crypt() {
-                    let _: Result<_, _> = store
+                    let _ = store
                         .key_manager
-                        .pre_fetch(
+                        .get_keys(
                             object_id,
                             crypt.as_ref(),
-                            store.get_keys(object_id),
+                            &mut Some(store.get_keys(object_id)),
                             /* permanent= */ false,
+                            /* force= */ false,
                         )
                         .await;
                 }
