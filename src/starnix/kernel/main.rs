@@ -112,8 +112,9 @@ enum KernelServices {
 async fn build_container(
     stream: frunner::ComponentRunnerRequestStream,
     returned_config: &mut Option<ContainerServiceConfig>,
+    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Container, Error> {
-    let (container, config) = create_component_from_stream(stream).await?;
+    let (container, config) = create_component_from_stream(stream, structured_config).await?;
     *returned_config = Some(config);
     Ok(container)
 }
@@ -163,6 +164,11 @@ async fn main() -> Result<(), Error> {
     inspector.root().record_lazy_child("not_found", starnix_logging::not_found_lazy_node_callback);
     inspector.root().record_lazy_child("stubs", starnix_logging::track_stub_lazy_node_callback);
 
+    let structured_config = starnix_kernel_structured_config::Config::take_from_startup_handle();
+    inspector
+        .root()
+        .record_child("config", |config_node| structured_config.record_inspect(config_node));
+
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
     health.set_ok();
@@ -176,7 +182,7 @@ async fn main() -> Result<(), Error> {
             KernelServices::ContainerRunner(stream) => {
                 let mut config: Option<ContainerServiceConfig> = None;
                 let container = container
-                    .get_or_try_init(|| build_container(stream, &mut config))
+                    .get_or_try_init(|| build_container(stream, &mut config, &structured_config))
                     .await
                     .expect("failed to start container");
                 if let Some(config) = config {

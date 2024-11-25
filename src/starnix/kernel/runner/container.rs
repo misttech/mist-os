@@ -380,6 +380,7 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
+    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
@@ -387,7 +388,7 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream()?;
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut config, sender)
+                let container = create_container(&mut config, sender, structured_config)
                     .await
                     .with_source_context(|| format!("creating container \"{}\"", &config.name))?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
@@ -419,6 +420,7 @@ pub async fn create_component_from_stream(
 async fn create_container(
     config: &mut Config,
     task_complete: oneshot::Sender<TaskResult>,
+    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
@@ -438,7 +440,7 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let features = parse_features(&config.features)?;
+    let features = parse_features(&config.features, structured_config)?;
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
     if features.android_serialno {
         match get_serial_number().await {

@@ -137,6 +137,11 @@
             from: "parent",
             to: [ "#kernels" ],
         },
+        {
+            config: [ "fuchsia.ui.VisualDebuggingLevel" ],
+            from: "parent",
+            to: [ "#kernels" ],
+        },
     ],
     expose: [
         {

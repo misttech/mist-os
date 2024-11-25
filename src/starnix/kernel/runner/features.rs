@@ -81,7 +81,10 @@ pub struct Features {
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
-pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
+pub fn parse_features(
+    entries: &Vec<String>,
+    structured_config: &starnix_kernel_structured_config::Config,
+) -> Result<Features, Error> {
     let mut features = Features::default();
     for entry in entries {
         let (raw_flag, raw_args) =
@@ -131,6 +134,10 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 return Err(anyhow!("Unsupported feature: {}", f));
             }
         };
+    }
+
+    if structured_config.ui_visual_debugging_level > 0 {
+        features.kernel.enable_visual_debugging = true;
     }
 
     Ok(features)

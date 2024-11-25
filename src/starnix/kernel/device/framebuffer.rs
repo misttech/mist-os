@@ -49,7 +49,10 @@ impl Framebuffer {
     /// Creates a new `Framebuffer` fit to the screen, while maintaining the provided aspect ratio.
     ///
     /// If the `aspect_ratio` is `None`, the framebuffer will be scaled to the display.
-    pub fn new(aspect_ratio: Option<&AspectRatio>) -> Result<Arc<Self>, Errno> {
+    pub fn new(
+        aspect_ratio: Option<&AspectRatio>,
+        enable_visual_debugging: bool,
+    ) -> Result<Arc<Self>, Errno> {
         let mut info = fb_var_screeninfo::default();
 
         let display_size =
@@ -80,10 +83,16 @@ impl Framebuffer {
             let server = Arc::new(server);
             let memory = Arc::new(server.get_memory()?);
             let memory_len = memory.info()?.size_bytes as u32;
-            // Fill the buffer with white pixels as a placeholder.
-            if let Err(err) =
-                memory.write(&vec![0xff, 0x00, 0xff, 0xff].repeat((memory_len / 4) as usize), 0)
-            {
+
+            // Fill the buffer with black pixels as a placeholder, if visual debug is off.
+            // Fill the buffer with purple, if visual debug is on.
+            let background = if enable_visual_debugging {
+                vec![0xff, 0x00, 0xff, 0xff].repeat((memory_len / 4) as usize)
+            } else {
+                vec![0x00; memory_len as usize]
+            };
+
+            if let Err(err) = memory.write(&background, 0) {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 

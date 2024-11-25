@@ -118,6 +118,14 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            key: "ui_visual_debugging_level",
+            type: "uint8",
+            default: 0,
+            availability: "transitional",
+        },
     ],
     expose: [
         {
