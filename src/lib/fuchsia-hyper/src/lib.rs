@@ -8,16 +8,16 @@ use futures::task::{Context, Poll};
 use hyper::client::connect::{Connected, Connection};
 use hyper::client::Client;
 use hyper::Body;
+#[cfg(not(target_os = "fuchsia"))]
+use netext::MultithreadedTokioAsyncWrapper;
 use std::marker::PhantomData;
-use std::net::{
-    AddrParseError, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6,
-};
+use std::net::{AddrParseError, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::num::ParseIntError;
 use std::pin::Pin;
 use tokio::io::ReadBuf;
 
 #[cfg(not(target_os = "fuchsia"))]
-use async_net as net;
+use tokio::net;
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_async::net;
@@ -69,7 +69,10 @@ impl Future for HyperConnectorFuture {
 }
 
 pub struct TcpStream {
+    #[cfg(target_os = "fuchsia")]
     pub stream: net::TcpStream,
+    #[cfg(not(target_os = "fuchsia"))]
+    pub stream: MultithreadedTokioAsyncWrapper<net::TcpStream>,
 }
 
 impl tokio::io::AsyncRead for TcpStream {
@@ -100,8 +103,8 @@ impl tokio::io::AsyncWrite for TcpStream {
         Pin::new(&mut self.get_mut().stream).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(self.get_mut().stream.shutdown(Shutdown::Write))
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_close(cx)
     }
 
     // TODO: override poll_write_buf and call writev on the underlying stream

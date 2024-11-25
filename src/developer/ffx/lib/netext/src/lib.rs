@@ -165,6 +165,22 @@ impl Stream for UnixListenerStream {
     }
 }
 
+pub struct TcpListenerRefStream<'a>(pub &'a mut TcpListener);
+
+impl<'a> Stream for TcpListenerRefStream<'a> {
+    type Item = Result<TcpStream, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let listener = &mut this.0;
+
+        match listener.poll_accept(cx) {
+            Poll::Ready(value) => Poll::Ready(Some(value.map(|(stream, _)| stream))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 pub struct TcpListenerStream(pub TcpListener);
 
 impl Stream for TcpListenerStream {
