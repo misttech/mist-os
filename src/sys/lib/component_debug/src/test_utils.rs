@@ -9,7 +9,7 @@ use moniker::Moniker;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, write};
 use tempfile::TempDir;
-use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys};
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Clone)]
 pub struct File {
@@ -152,21 +152,31 @@ pub fn serve_realm_query(
                 fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
-                    flags,
+                    flags: deprecated_flags,
                     mode: _,
                     path,
                     object,
                     responder,
                 } => {
+                    let mut flags = fio::Flags::empty();
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                        flags |= fio::PERM_READABLE
+                    }
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+                        flags |= fio::PERM_WRITABLE
+                    }
+                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+                        flags |= fio::PERM_EXECUTABLE
+                    }
                     eprintln!(
-                        "Open call for {} for {:?} at path '{}' with flags {:?}",
-                        moniker, dir_type, path, flags
+                        "Open call for {} for {:?} at path '{}' with deprecated flags {:?} (open3 flags {:?})",
+                        moniker, dir_type, path, deprecated_flags, flags
                     );
                     let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                         let path = dir.path().join(path).display().to_string();
                         let namespace = fdio::Namespace::installed().unwrap();
-                        namespace.open_deprecated(&path, flags, object.into_channel()).unwrap();
+                        namespace.open(&path, flags, object.into_channel()).unwrap();
                         responder.send(Ok(())).unwrap();
                     } else {
                         responder.send(Err(fsys::OpenError::NoSuchDir)).unwrap();
