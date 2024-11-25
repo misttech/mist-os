@@ -11,6 +11,7 @@
 #include <soc/aml-a311d/a311d-gpio.h>
 
 #include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gic/arm-gicv2.h"
+#include "vim3-iommu.h"
 
 / {
 	compatible = "khadas,vim3", "amlogic,a311d";
@@ -33,7 +34,7 @@
 
 		sysmem: fuchsia,sysmem {
 			compatible = "fuchsia,sysmem";
-			iommus = <&dummy_iommu 14>;
+			iommus = <&dummy_iommu SYSMEM_BTI>;
 			pid = <PDEV_PID_AMLOGIC_A311D>;
 			vid = <PDEV_VID_AMLOGIC>;
 			size = <0x00 0x00>;
@@ -156,7 +157,7 @@
 		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
-		iommus = <&dummy_iommu 13>;
+		iommus = <&dummy_iommu DISPLAY_BTI>;
 		smcs = <2 1 0>;
 		gpios = <&gpio_expander 0 0>,
 			<&gpio A311D_GPIOH(2) 0>;
