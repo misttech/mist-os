@@ -91,7 +91,7 @@
 
 - name: 'Driver SDK'
   api_primary: 'jocelyndang@google.com'
-  api_secondary: 'cja@google.com'
+  api_secondary: 'surajmalhotra@google.com'
   description: |
     The set of APIs used to interact with devices via the driver manager. This
     may be used by developers to retrieve information about a device or change
@@ -423,7 +423,7 @@
 
 - name: 'Toolchain'
   api_primary: 'mcgrathr@google.com'
-  api_secondary: ''
+  api_secondary: 'phosek@google.com'
 
 - name: 'View System'
   api_primary: 'emircan@google.com'
