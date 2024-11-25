@@ -793,7 +793,6 @@ async fn connected_state(
                     "Roam request to candidate {:?} received, not yet implemented.",
                     roam_request.to_string_without_pii()
                 );
-                common_options.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
             }
         }
     }

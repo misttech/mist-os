@@ -5,7 +5,7 @@
 use crate::client::config_management::Credential;
 use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::lib::{
-    PastRoamList, RoamEvent, RoamTriggerData, RoamTriggerDataOutcome,
+    PastRoamList, RoamEvent, RoamTriggerData, RoamTriggerDataOutcome, RoamingMode, RoamingPolicy,
 };
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
@@ -19,7 +19,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{select, FutureExt};
 use std::any::Any;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub mod default_monitor;
 pub mod stationary_monitor;
@@ -61,6 +61,7 @@ pub trait RoamMonitorApi: Any {
 // roam requests), roam monitor implementation, and roam manager (roam search requests and results).
 pub async fn serve_roam_monitor(
     mut roam_monitor: Box<dyn RoamMonitorApi>,
+    roaming_policy: RoamingPolicy,
     mut trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
     connection_selection_requester: ConnectionSelectionRequester,
     mut roam_sender: mpsc::Sender<types::ScannedCandidate>,
@@ -99,19 +100,25 @@ pub async fn serve_roam_monitor(
                             error!("Error validating selected roam candidate: {}", e);
                             false
                         }) {
-                            info!("Requesting roam to candidate: {:?}", candidate.to_string_without_pii());
-                            if roam_sender.try_send(candidate).is_err() {
-                                warn!("Failed to send roam request, exiting monitor service loop.");
-                                break
-                            } else {
-                                // Record that a roam attempt is made.
-                                if let Some(mut past_roams) = past_roams.try_lock() {
-                                    past_roams.add(RoamEvent::new_roam_now());
-                                } else {
-                                    error!("Unexpectedly failed to acquire lock on past roam list; will not record roam");
+                            match roaming_policy {
+                                RoamingPolicy::Enabled { mode: RoamingMode::CanRoam, ..} => {
+                                    info!("Requesting roam to candidate: {:?}", candidate.to_string_without_pii());
+                                    if roam_sender.try_send(candidate).is_err() {
+                                        warn!("Failed to send roam request, exiting monitor service loop.");
+                                        break
+                                    }
+                                }
+                                _ => {
+                                    debug!("Roaming policy is {:?}. Skipping roam request.", roaming_policy);
+                                    telemetry_sender.send(TelemetryEvent::WouldRoamConnect)
                                 }
                             }
-
+                            // Record that a roam attempt is made.
+                            if let Some(mut past_roams) = past_roams.try_lock() {
+                                past_roams.add(RoamEvent::new_roam_now());
+                            } else {
+                                error!("Unexpectedly failed to acquire lock on past roam list; will not record roam");
+                            }
                     }
                 }
                 Err(e) => {
@@ -144,7 +151,7 @@ async fn get_roaming_connection_selection_future(
 mod test {
     use super::*;
     use crate::client::connection_selection::ConnectionSelectionRequest;
-    use crate::client::roaming::lib::NUM_PLATFORM_MAX_ROAMS_PER_DAY;
+    use crate::client::roaming::lib::{RoamingProfile, NUM_PLATFORM_MAX_ROAMS_PER_DAY};
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::fakes::FakeRoamMonitor;
     use crate::util::testing::{
@@ -224,9 +231,12 @@ mod test {
         // Start a serve loop with the fake roam monitor
         let serve_fut = serve_roam_monitor(
             Box::new(roam_monitor),
+            RoamingPolicy::Enabled {
+                profile: RoamingProfile::Stationary,
+                mode: RoamingMode::CanRoam,
+            },
             test_values.trigger_data_receiver,
             test_values.connection_selection_requester,
-            // test_values.roam_search_sender,
             test_values.roam_sender,
             test_values.telemetry_sender,
             test_values.past_roams,
@@ -272,10 +282,15 @@ mod test {
         }
     }
 
-    #[test_case(false; "should not send roam request")]
-    #[test_case(true; "should send roam request")]
+    #[test_case(false, RoamingMode::CanRoam; "should not send roam request can roam")]
+    #[test_case(false, RoamingMode::MetricsOnly; "should not send roam request metrics only")]
+    #[test_case(true, RoamingMode::CanRoam; "should send roam request can roam")]
+    #[test_case(true, RoamingMode::MetricsOnly; "should send roam request metrics only")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_serve_loop_handles_roam_search_results(response_to_should_send_roam_request: bool) {
+    fn test_serve_loop_handles_roam_search_results(
+        response_to_should_send_roam_request: bool,
+        roaming_mode: RoamingMode,
+    ) {
         let mut exec = TestExecutor::new();
         let mut test_values = setup_test();
 
@@ -291,8 +306,8 @@ mod test {
         // Start a serve loop with the fake roam monitor
         let serve_fut = serve_roam_monitor(
             Box::new(roam_monitor),
+            RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: roaming_mode },
             test_values.trigger_data_receiver,
-            // test_values.roam_search_sender,
             test_values.connection_selection_requester,
             test_values.roam_sender,
             test_values.telemetry_sender,
@@ -326,20 +341,21 @@ mod test {
         // Run loop forward
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        if response_to_should_send_roam_request {
-            // Verify metric was sent for upcoming roam scan
-            assert_variant!(
-                test_values.telemetry_receiver.try_next(),
-                Ok(Some(TelemetryEvent::RoamingScan))
-            );
+        // Verify metric was sent for upcoming roam scan
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::RoamingScan))
+        );
+
+        if response_to_should_send_roam_request && roaming_mode == RoamingMode::CanRoam {
             // Verify that a roam request is sent if the should_send_roam_request method returns
             // true.
             assert_variant!(test_values.roam_receiver.try_next(), Ok(Some(roam_request)) => {
                 assert_eq!(roam_request, candidate);
             });
         } else {
-            // Veriify that no roam request is sent if the should_send_roam_request method returns
-            // false.
+            // Verify that no roam request is sent if the should_send_roam_request method returns
+            // false, regardless of the roaming mode.
             assert_variant!(test_values.roam_receiver.try_next(), Err(_));
         }
     }
@@ -361,8 +377,11 @@ mod test {
         // Start a serve loop with the fake roam monitor
         let serve_fut = serve_roam_monitor(
             Box::new(roam_monitor),
+            RoamingPolicy::Enabled {
+                profile: RoamingProfile::Stationary,
+                mode: RoamingMode::CanRoam,
+            },
             test_values.trigger_data_receiver,
-            // test_values.roam_search_sender,
             test_values.connection_selection_requester,
             test_values.roam_sender,
             test_values.telemetry_sender,

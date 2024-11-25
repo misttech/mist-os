@@ -190,7 +190,6 @@ impl RoamMonitorApi for StationaryMonitor {
             info!("Selected roam candidate is the currently connected candidate, ignoring");
             return Ok(false);
         }
-
         // Only send roam scan if the selected candidate shows a significant signal improvement,
         // compared to the most up-to-date roaming connection data
         let latest_rssi = self.connection_data.signal_data.ewma_rssi.get();
@@ -204,7 +203,6 @@ impl RoamMonitorApi for StationaryMonitor {
             );
             return Ok(false);
         }
-
         Ok(true)
     }
 }
@@ -728,7 +726,7 @@ mod test {
             .should_send_roam_request(candidate)
             .expect("failed to check roam request"));
 
-        // Verify that a roam recommendation is made if RSSI improvement exceeds threshold.
+        // Verify that a roam recommendation is made if RSSI improvement exceeds threshold
         let candidate = types::ScannedCandidate {
             bss: types::Bss {
                 signal: types::Signal {
