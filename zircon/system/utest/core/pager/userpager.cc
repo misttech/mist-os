@@ -181,12 +181,21 @@ bool Vmo::PollPopulatedBytes(size_t expected_bytes) const {
     if (vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
       return false;
     }
-    if (info.populated_bytes == expected_bytes) {
-      return true;
+    if (info.populated_fractional_scaled_bytes == UINT64_MAX) {
+      if (info.populated_bytes == expected_bytes) {
+        return true;
+      }
+      printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
+             info.populated_bytes, info.populated_bytes / zx_system_get_page_size(), expected_bytes,
+             expected_bytes / zx_system_get_page_size());
+    } else {
+      if (info.populated_scaled_bytes == expected_bytes) {
+        return true;
+      }
+      printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
+             info.populated_scaled_bytes, info.populated_scaled_bytes / zx_system_get_page_size(),
+             expected_bytes, expected_bytes / zx_system_get_page_size());
     }
-    printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
-           info.populated_bytes, info.populated_bytes / zx_system_get_page_size(), expected_bytes,
-           expected_bytes / zx_system_get_page_size());
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
   }
 }

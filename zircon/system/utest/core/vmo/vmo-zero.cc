@@ -172,146 +172,290 @@ TEST(VmoZeroTestCase, ContentInParentAndChild) {
 }
 
 TEST(VmoZeroTestCase, EmptyCowChildren) {
+  // Create a parent VMO and commit the first page by writing to it.
+  //
+  // Expected attribution:
+  //  Page 0 shared 1 time
+  //  Page 1 shared 0 times (zero page in parent)
   zx::vmo parent;
   EXPECT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &parent));
-  // Commit the first page by writing to it.
   VmoWrite(parent, 1, 0);
 
+  // Create a SNAPSHOT child.
+  //
+  // Parent and child share attribution now.
+  // Expected attribution:
+  //  Page 0 shared 2 times (both)
+  //  Page 1 shared 0 times (zero page in both)
   zx::vmo child;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
+  VmoCheck(child, 1, 0);  // Validate child contents.
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2), VmoPopulatedBytes(child));
 
-  // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
-  EXPECT_EQ(0, VmoPopulatedBytes(child));
-
-  // Validate child contents.
-  VmoCheck(child, 1, 0);
-
-  // Zero the child. Should not change pages committed, but child should now read as 0.
-  EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
+  // Zero the child.
+  //
+  // Should not change total pages committed, but the child now sees the zero page.
+  // Expected attribution:
+  //  Page 0 shared 1 time (parent, zero page in child)
+  //  Page 1 shared 0 times (zero page in both)
+  EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0));
   VmoCheck(child, 0, 0);
   EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
   EXPECT_EQ(0, VmoPopulatedBytes(child));
 
-  // Now zero the parent. Should be no need to keep the underlying pages around, dropping committed.
-  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
+  // Now zero the parent.
+  //
+  // Parent now also sees the zero page, dropping committed.
+  // Expected attribution:
+  //  Page 0 shared 0 times (zero page in both)
+  //  Page 1 shared 0 times (zero page in both)
+  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0));
   VmoCheck(parent, 0, 0);
   EXPECT_EQ(0, VmoPopulatedBytes(parent));
   EXPECT_EQ(0, VmoPopulatedBytes(child));
 }
 
 TEST(VmoZeroTestCase, MergeZeroChildren) {
+  // Create a parent VMO and commit the first page by writing to it.
+  //
+  // Expected attribution:
+  //  Page 0 shared 1 time
+  //  Page 1 shared 0 times (zero page in parent)
   zx::vmo parent;
   EXPECT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &parent));
   VmoWrite(parent, 1, 0);
 
+  // Create a SNAPSHOT child.
+  //
+  // Parent and child share attribution now.
+  // Expected attribution:
+  //  Page 0 shared 2 times (both)
+  //  Page 1 shared 0 times (zero page in both)
   zx::vmo child;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &child));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2), VmoPopulatedBytes(child));
 
-  // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
-  EXPECT_EQ(0, VmoPopulatedBytes(child));
-
-  // Zero the parent. Pages should move to the child.
-  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
+  // Zero the parent.
+  //
+  // Committed page should move to the child and the parent sees the zero page.
+  // Expected attribution:
+  //  Page 0 shared 1 time (child, zero page in parent)
+  //  Page 1 shared 0 times (zero page in both)
+  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0));
   EXPECT_EQ(0, VmoPopulatedBytes(parent));
   EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
 
-  // Close the child. Pages should cease being committed and not move to the parent.
+  // Close the child. Other parts of the system may temporarily keep the child alive,
+  // so we must poll until it has closed.
+  //
+  // Page should cease being committed and not move to the parent.
+  // Expected attribution:
+  //  Page 0 shared 0 times (zero page in parent)
+  //  Page 1 shared 0 times (zero page in parent)
   child.reset();
   ASSERT_TRUE(PollVmoPopulatedBytes(parent, 0));
 }
 
-// Tests that after merging a child with its hidden parent that hidden pages are correctly preserved
+// Tests that after merging a child with its hidden parent that child pages are correctly preserved
 // and do not get replaced by hidden parents pages.
 TEST(VmoZeroTestCase, AllocateAfterMerge) {
+  // Create a parent VMO and commit pages by writing to them.
+  //
+  // Expected attribution:
+  //  Page 0 shared 1 time
+  //  Page 1 shared 1 time
   zx::vmo parent;
   InitPageTaggedVmo(2, &parent);
 
+  // Create a SNAPSHOT child.
+  //
+  // Parent and child share attribution now.
+  // Expected attribution:
+  //  Page 0 shared 2 times (both)
+  //  Page 1 shared 2 times (both)
   zx::vmo child;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
-
-  // Validate initial state.
   VmoCheck(child, 1, 0);
   VmoCheck(child, 2, zx_system_get_page_size());
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size() * 2, zx_system_get_page_size()),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size()), VmoPopulatedBytes(child));
 
-  // Zero first page of the child. This doesn't change number of pages committed as our sibling
-  // is still using it.
-  EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child));
+  // Zero first page of the child.
+  //
+  // This doesn't change number of pages committed as the parent is still using it.
+  // Expected attribution:
+  //  Page 0 shared 1 times (parent, zero page in child)
+  //  Page 1 shared 2 times (both)
+  EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0));
+  EXPECT_EQ(
+      ValueIfLegacyAttribution(zx_system_get_page_size() * 2, 3 * zx_system_get_page_size() / 2),
+      VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2), VmoPopulatedBytes(child));
 
-  // Close the parent to make the merge happen.
+  // Close the parent to make the merge happen. Other parts of the system may temporarily
+  // keep the child alive, so we must poll until it has closed.
+  //
+  // Child should still see the zero page for page #0, and only have page #1 attributed.
+  // Expected attribution:
+  //  Page 0 shared 0 times (zero page in child)
+  //  Page 1 shared 1 times (child)
   parent.reset();
-
-  // Should only have 1 page attributed to us, and reading should still give us our expected pages
-  // and not those of our merge partner.
   ASSERT_TRUE(PollVmoPopulatedBytes(child, zx_system_get_page_size()));
   VmoCheck(child, 0, 0);
   VmoCheck(child, 2, zx_system_get_page_size());
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
+
+  // Write to a different byte in child's zero page to ensure we can't uncover parent's old data.
+  // Expected attribution:
+  //  Page 0 shared 1 times (child)
+  //  Page 1 shared 1 times (child)
+  VmoWrite(child, 1, 64);
+  VmoCheck(child, 0, 0);
+  EXPECT_EQ(2 * zx_system_get_page_size(), VmoPopulatedBytes(child));
 }
 
-// Similar to AllocateAfterMerge, but by merging with a hidden child we will hit the non fast_merge
-// path in the kernel.
-TEST(VmoZeroTestCase, AllocateAfterMergeHiddenChild) {
+// Similar to AllocateAfterMerge, but with multiple children and more complex sharing.
+TEST(VmoZeroTestCase, AllocateAfterMergeMultipleChildren) {
+  // Create a parent VMO and commit pages by writing to them.
+  //
+  // Expected attribution:
+  //  Page 0 shared 1 time
+  //  Page 1 shared 1 time
+  //  Page 2 shared 1 time
   zx::vmo parent;
   InitPageTaggedVmo(3, &parent);
 
-  zx::vmo child1, child2;
+  // Create a SNAPSHOT child.
+  //
+  // Parent and child share attribution now.
+  // Expected attribution:
+  //  Page 0 shared 2 times (both)
+  //  Page 1 shared 2 times (both)
+  //  Page 2 shared 2 times (both)
+  zx::vmo child1;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 3, &child1));
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1));
+  EXPECT_EQ(
+      ValueIfLegacyAttribution(3 * zx_system_get_page_size(), 3 * zx_system_get_page_size() / 2),
+      VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, 3 * zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(child1));
 
-  // Zero a page in the parent before creating the next child. This places a zero page in the
-  // common hidden parent.
-  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1));
+  // Zero a page in the parent before creating the next child.
+  //
+  // This migrates the committed page to the first child.  The common hidden parent sees the zero
+  // page. Expected attribution:
+  //  Page 0 shared 1 times (child1, zero page in parent)
+  //  Page 1 shared 2 times (both)
+  //  Page 2 shared 2 times (both)
+  EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size() * 2, zx_system_get_page_size()),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), 2 * zx_system_get_page_size()),
+            VmoPopulatedBytes(child1));
 
+  // Create another SNAPSHOT child.
+  //
+  // All share attribution now.
+  // Expected attribution:
+  //  Page 0 shared 1 times (child1, zero page in others)
+  //  Page 1 shared 3 times (all)
+  //  Page 2 shared 3 times (all)
+  zx::vmo child2;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 3, &child2));
+  EXPECT_EQ(
+      ValueIfLegacyAttribution(zx_system_get_page_size() * 2, 2 * zx_system_get_page_size() / 3),
+      VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), 5 * zx_system_get_page_size() / 3),
+            VmoPopulatedBytes(child1));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, 2 * zx_system_get_page_size() / 3),
+            VmoPopulatedBytes(child2));
 
-  // Zero the middle page of child1. This leaves the number of comitted pages the same.
+  // Zero the middle page of child1.
+  //
+  // Child1 now sees the zero page here instead of sharing with the others.
+  // This leaves the number of comitted pages the same.
+  // Expected attribution:
+  //  Page 0 shared 1 times (child1, zero page in others)
+  //  Page 1 shared 2 times (parent and child2, zero page in child1)
+  //  Page 2 shared 3 times (all)
   EXPECT_OK(child1.op_range(ZX_VMO_OP_ZERO, zx_system_get_page_size(), zx_system_get_page_size(),
-                            NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 3,
-            VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1) + VmoPopulatedBytes(child2));
+                            nullptr, 0));
+  EXPECT_EQ(
+      ValueIfLegacyAttribution(zx_system_get_page_size() * 2, 5 * zx_system_get_page_size() / 6),
+      VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), 4 * zx_system_get_page_size() / 3),
+            VmoPopulatedBytes(child1));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, 5 * zx_system_get_page_size() / 6),
+            VmoPopulatedBytes(child2));
 
   // Validate page states.
-  VmoCheck(child2, 0, 0);
-  VmoCheck(child2, 2, zx_system_get_page_size());
-  VmoCheck(child2, 3, zx_system_get_page_size() * 2);
-  EXPECT_EQ(zx_system_get_page_size() * 3,
-            VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1) + VmoPopulatedBytes(child2));
-
-  // Close the first child, forcing that hidden parent to merge with the hidden parent of parent and
-  // child2. Child1's zero page should be discarded and not overwrite the forked version, and the
-  // page we zeroed in the parent should also not get overridden.
+  VmoCheck(parent, 0, 0);
+  VmoCheck(parent, 2, zx_system_get_page_size());
+  VmoCheck(parent, 3, zx_system_get_page_size() * 2);
   VmoCheck(child1, 1, 0);
   VmoCheck(child1, 0, zx_system_get_page_size());
   VmoCheck(child1, 3, zx_system_get_page_size() * 2);
-  child1.reset();
+  VmoCheck(child2, 0, 0);
+  VmoCheck(child2, 2, zx_system_get_page_size());
+  VmoCheck(child2, 3, zx_system_get_page_size() * 2);
 
+  // Close the first child.
+  //
+  // Child1's zero page should be discarded and not overwrite the forked version,
+  // and the page we zeroed in the parent should also not get overridden.
+  // In other words, parent and child2 should be unaffected.
+  // Expected attribution:
+  //  Page 0 shared 0 times (zero page in all remaining)
+  //  Page 1 shared 2 times (all remaining)
+  //  Page 2 shared 2 times (all remaining)
+  child1.reset();
   VmoCheck(parent, 0, 0);
   VmoCheck(parent, 2, zx_system_get_page_size());
   VmoCheck(parent, 3, zx_system_get_page_size() * 2);
   VmoCheck(child2, 0, 0);
   VmoCheck(child2, 2, zx_system_get_page_size());
   VmoCheck(child2, 3, zx_system_get_page_size() * 2);
-  // The reset of child1 may be ongoing due to another part of the system holding a reference, so
-  // poll the committed bytes individually until we know things are stable before continuing.
-  ASSERT_TRUE(PollVmoPopulatedBytes(parent, 2 * zx_system_get_page_size()));
-  ASSERT_TRUE(PollVmoPopulatedBytes(child2, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
+  // The reset of child1 may be ongoing due to another part of the system temporarily holding a
+  // reference, so poll the committed bytes individually until we know things are stable before
+  // continuing.
+  EXPECT_TRUE(PollVmoPopulatedBytes(
+      parent, ValueIfLegacyAttribution(2 * zx_system_get_page_size(), zx_system_get_page_size())));
+  EXPECT_TRUE(
+      PollVmoPopulatedBytes(child2, ValueIfLegacyAttribution(0, zx_system_get_page_size())));
+  EXPECT_EQ(ValueIfLegacyAttribution(2 * zx_system_get_page_size(), zx_system_get_page_size()),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size()), VmoPopulatedBytes(child2));
 
-  // Write to a different byte in our zero page to see if we can uncover child1's data.
+  // Write to a different byte in parent's zero page to ensure we can't uncover child1's old data.
+  // Expected attribution:
+  //  Page 0 shared 1 times (parent)
+  //  Page 1 shared 2 times (both)
+  //  Page 2 shared 2 times (both)
   VmoWrite(parent, 1, 64);
   VmoCheck(parent, 0, 0);
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
+  EXPECT_EQ(ValueIfLegacyAttribution(3 * zx_system_get_page_size(), 2 * zx_system_get_page_size()),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size()), VmoPopulatedBytes(child2));
 
   // Fork the middle page that child1 zeroed and ensure we CoW the correct underlying page.
+  // Expected attribution:
+  //  Page 0 shared 1 times (parent)
+  //  Page 1 shared 0 times (parent and child2 have unique copies)
+  //  Page 2 shared 2 times (both)
   VmoWrite(child2, 5, zx_system_get_page_size() + 64);
   VmoCheck(child2, 2, zx_system_get_page_size());
   VmoCheck(parent, 0, zx_system_get_page_size() + 64);
   VmoCheck(parent, 2, zx_system_get_page_size());
-  EXPECT_EQ(zx_system_get_page_size() * 4, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
+  EXPECT_EQ(
+      ValueIfLegacyAttribution(3 * zx_system_get_page_size(), 5 * zx_system_get_page_size() / 2),
+      VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), 3 * zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(child2));
 }
 
 TEST(VmoZeroTestCase, WriteCowParent) {
@@ -323,8 +467,9 @@ TEST(VmoZeroTestCase, WriteCowParent) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
-  EXPECT_EQ(0, VmoPopulatedBytes(child));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2), VmoPopulatedBytes(child));
 
   // Write to the parent to perform a COW copy.
   VmoCheck(parent, 1, 0);
@@ -345,6 +490,14 @@ TEST(VmoZeroTestCase, WriteCowParent) {
   parent.reset();
   VmoCheck(child, 0, 0);
   ASSERT_TRUE(PollVmoPopulatedBytes(child, 0));
+
+  // Write to a different byte in child's zero page to ensure we can't uncover parent's old data.
+  // Expected attribution:
+  //  Page 0 shared 1 times (child)
+  //  Page 1 shared 1 times (child)
+  VmoWrite(child, 1, 64);
+  VmoCheck(child, 0, 0);
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
 }
 
 TEST(VmoZeroTestCase, ChildZeroThenWrite) {
@@ -356,8 +509,9 @@ TEST(VmoZeroTestCase, ChildZeroThenWrite) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
-  EXPECT_EQ(0, VmoPopulatedBytes(child));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2), VmoPopulatedBytes(child));
 
   EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
 
@@ -388,17 +542,20 @@ TEST(VmoZeroTestCase, Nested) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &child2));
 
   // Should have 1 page total attributed to the parent.
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
-  EXPECT_EQ(0, VmoPopulatedBytes(child1));
-  EXPECT_EQ(0, VmoPopulatedBytes(child2));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 3),
+            VmoPopulatedBytes(parent));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 3), VmoPopulatedBytes(child1));
+  EXPECT_EQ(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 3), VmoPopulatedBytes(child2));
 
-  // Zero the parent, this will cause the page to have to get forked down the intermediate hidden
-  // nodes.
+  // Zero the parent, this will insert a zero page into the parent and only the 2 children
+  // will be able to see the forked page.
   EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
 
   EXPECT_EQ(0, VmoPopulatedBytes(parent));
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child1));
-  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child2));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(child1));
+  EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2),
+            VmoPopulatedBytes(child2));
 }
 
 TEST(VmoZeroTestCase, ZeroLengths) {

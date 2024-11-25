@@ -12,7 +12,6 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <link.h>
-#include <zircon/assert.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iommu.h>
 
@@ -264,139 +263,205 @@ TEST_F(VmoClone2TestCase, CloseClone) {
 
 // Basic memory accounting test that checks vmo memory attribution.
 TEST_F(VmoClone2TestCase, ObjMemAccounting) {
+  const uint64_t kOriginalSize = 2ul * zx_system_get_page_size();
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+
   // Create a vmo, write to both pages, and check the committed stats.
   zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(2 * zx_system_get_page_size(), 0, &vmo));
+  ASSERT_OK(zx::vmo::create(kOriginalSize, 0, &vmo));
 
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 1, 0));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 1, zx_system_get_page_size()));
 
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kOriginalSize);
 
-  // Create a clone and check the initialize committed stats.
+  // Create a clone and check the initial committed stats.
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the shared pages fronm the original VMO.
+  // No VMO can be blamed for more pages than its total size.
   zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 2 * zx_system_get_page_size(), &clone));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kCloneSize, &clone));
 
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 0);
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginalSplit = zx_system_get_page_size();  // 1/2 + 1/2
+  const uint64_t kImplCostCloneSplit = zx_system_get_page_size();     // 1/2 + 1/2
+  ASSERT_LE(kImplCostOriginalSplit, kOriginalSize);
+  ASSERT_LE(kImplCostCloneSplit, kCloneSize);
+  ASSERT_EQ(kImplCostOriginalSplit + kImplCostCloneSplit, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kImplCostAll, kImplCostOriginalSplit));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostCloneSplit));
 
-  // Write to the clone and check that that forks a page into the clone.
+  // Write to the original and check that forks a page into the clone.
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the shared pages fronm the original VMO plus a
+  // forked page.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 2, 0));
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
 
-  // Write to the original and check that that forks a page into the clone.
+  const uint64_t kImplCostAll2 = kOriginalSize + zx_system_get_page_size();
+  const uint64_t kImplCostOriginalSplit2 = 3ul * zx_system_get_page_size() / 2ul;  // 1 + 1/2
+  const uint64_t kImplCostCloneSplit2 = 3ul * zx_system_get_page_size() / 2ul;     // 1 + 1/2
+  ASSERT_LE(kImplCostOriginalSplit2, kOriginalSize);
+  ASSERT_LE(kImplCostCloneSplit2, kCloneSize);
+  ASSERT_EQ(kImplCostOriginalSplit2 + kImplCostCloneSplit2, kImplCostAll2);
+  EXPECT_EQ(VmoPopulatedBytes(vmo),
+            ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginalSplit2));
+  EXPECT_EQ(VmoPopulatedBytes(clone),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCostCloneSplit2));
+
+  // Write to the clone and check that forks a page into the clone.
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the shared pages fronm the original VMO plus both
+  // forked pages.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 2, zx_system_get_page_size()));
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 2 * zx_system_get_page_size());
+
+  const uint64_t kImplCostAll3 = kOriginalSize + 2ul * zx_system_get_page_size();
+  const uint64_t kImplCostOriginalSplit3 = 2ul * zx_system_get_page_size();  // 1 + 1
+  const uint64_t kImplCostCloneSplit3 = 2ul * zx_system_get_page_size();     // 1 + 1
+  ASSERT_LE(kImplCostOriginalSplit3, kOriginalSize);
+  ASSERT_LE(kImplCostCloneSplit3, kCloneSize);
+  ASSERT_EQ(kImplCostOriginalSplit3 + kImplCostCloneSplit3, kImplCostAll3);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCostOriginalSplit3);
+  EXPECT_EQ(VmoPopulatedBytes(clone), kImplCostCloneSplit3);
 
   // Write to the other pages, which shouldn't affect accounting.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 2, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 2, 0));
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 2 * zx_system_get_page_size());
+
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCostOriginalSplit3);
+  EXPECT_EQ(VmoPopulatedBytes(clone), kImplCostCloneSplit3);
 }
 
 // Tests that writes to a COW'ed zero page work and don't require redundant allocations.
 TEST_F(VmoClone2TestCase, ZeroPageWrite) {
+  const uint64_t kVmoSize = zx_system_get_page_size();
+
   zx::vmo vmos[4];
-  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, vmos));
 
-  // Create two clones of the original vmo and one clone of one of those clones.
-  ASSERT_OK(vmos[0].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), vmos + 1));
-  ASSERT_OK(vmos[0].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), vmos + 2));
-  ASSERT_OK(vmos[1].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), vmos + 3));
+  // Create A VMO, two clones of the original, and one clone of one of those clones.
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, vmos));
+  ASSERT_OK(vmos[0].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kVmoSize, vmos + 1));
+  ASSERT_OK(vmos[0].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kVmoSize, vmos + 2));
+  ASSERT_OK(vmos[1].create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kVmoSize, vmos + 3));
 
+  // Write to each VMO.
+  // Each VMO has a private page.
+  // Each VMO has exactly its total size in pages.
   for (unsigned i = 0; i < 4; i++) {
     ASSERT_NO_FATAL_FAILURE(VmoWrite(vmos[i], i + 1));
     for (unsigned j = 0; j < 4; j++) {
       ASSERT_NO_FATAL_FAILURE(VmoCheck(vmos[j], j <= i ? j + 1 : 0));
-      ASSERT_EQ(VmoPopulatedBytes(vmos[j]), (j <= i ? 1u : 0u) * zx_system_get_page_size());
+      ASSERT_EQ(VmoPopulatedBytes(vmos[j]), (j <= i ? 1u : 0u) * kVmoSize);
     }
   }
 }
 
 // Tests closing a vmo with the last reference to a mostly forked page.
 TEST_F(VmoClone2TestCase, SplitPageClosure) {
+  const uint64_t kOriginalPageCount = 1ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kClone1Size = zx_system_get_page_size();
+  const uint64_t kClone2Size = zx_system_get_page_size();
+
   // Create a chain of clones.
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(1, &vmo));
-
-  zx::vmo clone1;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 1 * zx_system_get_page_size(), &clone1));
-
-  zx::vmo clone2;
-  ASSERT_OK(clone1.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 1 * zx_system_get_page_size(), &clone2));
+  zx::vmo vmo, clone1, clone2;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone1Size, &clone1));
+  ASSERT_OK(clone1.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone2Size, &clone2));
 
   // Fork the page into the two clones.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone1, 3));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, 4));
 
-  // The page should be unique in each of the 3 vmos.
-  ASSERT_EQ(VmoPopulatedBytes(vmo), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone1), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), zx_system_get_page_size());
+  // Each VMO has a private page.
+  // Each VMO has exactly its total size in pages.
+  ASSERT_EQ(VmoPopulatedBytes(vmo), kOriginalSize);
+  ASSERT_EQ(VmoPopulatedBytes(clone1), kClone1Size);
+  ASSERT_EQ(VmoPopulatedBytes(clone2), kClone2Size);
 
   // Close the original vmo, check that data is correct and things were freed.
   vmo.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, 3));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone1, zx_system_get_page_size()));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, zx_system_get_page_size()));
+
+  // The page should still be private in each remaining vmo.
+  // Each VMO has exactly its total size in pages.
+  ASSERT_TRUE(PollVmoPopulatedBytes(clone1, kClone1Size));
+  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, kClone2Size));
 
   // Close the first clone, check that data is correct and things were freed.
   clone1.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, zx_system_get_page_size()));
+
+  // The page should still be private in the last remaining vmo.
+  // Each VMO has exactly its total size in pages.
+  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, kClone2Size));
 }
 
 // Tests that a clone with an offset accesses the right data and doesn't
 // unnecessarily retain pages when the parent is closed.
 TEST_F(VmoClone2TestCase, Offset) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+  const uint64_t kOriginalPageCount = 3ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = 3ul * zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
-                             3 * zx_system_get_page_size(), &clone));
+  // Create a parent and child clone.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kCloneSize, &clone));
+
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the shared pages from the original VMO.
+  // No VMO can be blamed for more pages than its total size.
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginalSplit = 2ul * zx_system_get_page_size();  // 1 + 1/2 + 1/2
+  const uint64_t kImplCostCloneSplit = zx_system_get_page_size();           // 1/2 + 1/2
+  ASSERT_LE(kImplCostOriginalSplit, kOriginalSize);
+  ASSERT_LE(kImplCostCloneSplit, kCloneSize);
+  ASSERT_EQ(kImplCostOriginalSplit + kImplCostCloneSplit, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo),
+            ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginalSplit));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostCloneSplit));
 
   // Check that the child has the right data.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 3, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, 2 * zx_system_get_page_size()));
 
+  // Write to one of the pages in the clone, close the original, and check that
+  // things are still correct.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 4, zx_system_get_page_size()));
-
   vmo.reset();
 
-  // Check that we don't change the child.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 4, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, 2 * zx_system_get_page_size()));
 
-  // Check that the clone doesn't unnecessarily retain pages.
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone, 2 * zx_system_get_page_size()));
+  // The clone shouldn't retain the last page (it is a zero page) - the clone's
+  // attributed memory is the size of the clone minus the last page.
+  const uint64_t kImplCostCloneNoSplit = kCloneSize - zx_system_get_page_size();
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone, kImplCostCloneNoSplit));
 }
 
 // Tests writing to the clones of a clone created with an offset.
 TEST_F(VmoClone2TestCase, OffsetTest2) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(4, &vmo));
+  const uint64_t kOriginalPageCount = 4ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kOffsetSize = 3ul * zx_system_get_page_size();
+  const uint64_t kClone1Size = 2ul * zx_system_get_page_size();
+  const uint64_t kClone2Size = zx_system_get_page_size();
 
-  // Create a clone at an offset.
-  zx::vmo offset_clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
-                             3 * zx_system_get_page_size(), &offset_clone));
+  // Create a parent and a child clone at an offset.
+  // Create two clones-of-a-clone to fully divide the offset clone.
+  zx::vmo vmo, offset_clone, clone1, clone2;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kOffsetSize,
+                             &offset_clone));
+  ASSERT_OK(offset_clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone1Size, &clone1));
+  ASSERT_OK(offset_clone.create_child(ZX_VMO_CHILD_SNAPSHOT, kClone1Size, kClone2Size, &clone2));
 
-  // Create two clones to fully divide the previous partial clone.
-  zx::vmo clone1;
-  ASSERT_OK(
-      offset_clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 2 * zx_system_get_page_size(), &clone1));
-
-  zx::vmo clone2;
-  ASSERT_OK(offset_clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 2 * zx_system_get_page_size(),
-                                      1 * zx_system_get_page_size(), &clone2));
-
+  // Check that the clones have the right data.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, 2));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, 3, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
@@ -410,33 +475,51 @@ TEST_F(VmoClone2TestCase, OffsetTest2) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, 3, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
 
-  // Check that the total amount of allocated memory is correct. It's not defined how
-  // many pages should be blamed to vmo and clone1 after closing offset_clone (which was
-  // forked), but no vmo can be blamed for more pages than its total size.
-  const uint64_t kImplCost1 = 4 * zx_system_get_page_size();
-  const uint64_t kImplCost2 = zx_system_get_page_size();
-  ASSERT_TRUE(PollVmoPopulatedBytes(vmo, kImplCost1));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone1, kImplCost2));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, 0));
-  assert(kImplCost1 <= 4 * zx_system_get_page_size() &&
-         kImplCost2 <= 2 * zx_system_get_page_size());
+  // The original and clones split shared pages equally and each VMO's attributed
+  // memory sums to the total - the shared pages fronm the original VMO.
+  // No VMO can be blamed for more pages than its total size.
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginalFullSplit =
+      5ul * zx_system_get_page_size() / 2ul;                         // 1 + 1/2 + 1/2 + 1/2
+  const uint64_t kImplCostClone1 = zx_system_get_page_size();        // 1/2 + 1/2
+  const uint64_t kImplCostClone2 = zx_system_get_page_size() / 2ul;  // 1/2
+  ASSERT_LE(kImplCostOriginalFullSplit, kOriginalSize);
+  ASSERT_LE(kImplCostClone1, kClone1Size);
+  ASSERT_LE(kImplCostClone2, kClone2Size);
+  ASSERT_EQ(kImplCostOriginalFullSplit + kImplCostClone1 + kImplCostClone2, kImplCostAll);
+  EXPECT_TRUE(PollVmoPopulatedBytes(
+      vmo, ValueIfLegacyAttribution(kImplCostAll, kImplCostOriginalFullSplit)));
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone1, kImplCostClone1));
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone2, ValueIfLegacyAttribution(0u, kImplCostClone2)));
 
-  // Clone the first clone and check that any extra pages were freed.
+  // Close the first clone and check that the total amount of allocated memory is still correct.
   clone1.reset();
-  ASSERT_TRUE(PollVmoPopulatedBytes(vmo, 4 * zx_system_get_page_size()));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, 0));
+  const uint64_t kImplCostOriginalPartialSplit =
+      7ul * zx_system_get_page_size() / 2ul;  // 1 + 1 + 1 + 1/2
+  ASSERT_LE(kImplCostOriginalPartialSplit, kOriginalSize);
+  ASSERT_EQ(kImplCostOriginalPartialSplit + kImplCostClone2, kImplCostAll);
+  EXPECT_TRUE(PollVmoPopulatedBytes(
+      vmo, ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginalPartialSplit)));
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone2, ValueIfLegacyAttribution(0u, kImplCostClone2)));
 
+  // Close the second clone and check that the total amount of allocated memory is still correct.
   clone2.reset();
+  const uint64_t kImplCostOriginalNoSplit = 4ul * zx_system_get_page_size();  // 1 + 1 + 1 + 1
+  ASSERT_EQ(kImplCostOriginalNoSplit, kOriginalSize);
+  EXPECT_TRUE(PollVmoPopulatedBytes(vmo, kImplCostOriginalNoSplit));
 }
 
 // Tests writes to a page in a clone that is offset from the original and has a clone itself.
 TEST_F(VmoClone2TestCase, OffsetProgressiveWrite) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(2, &vmo));
+  const uint64_t kOriginalPageCount = 2ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+  const uint64_t kClone2Size = zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
-                             2 * zx_system_get_page_size(), &clone));
+  // Create a parent and a child clone at an offset.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kCloneSize, &clone));
 
   // Check that the child has the right data.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
@@ -447,65 +530,153 @@ TEST_F(VmoClone2TestCase, OffsetProgressiveWrite) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 1));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 2, zx_system_get_page_size()));
 
-  zx::vmo clone2;
-  ASSERT_OK(clone.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
-                               zx_system_get_page_size(), &clone2));
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the first private page from the original VMO, and
+  // the 2 forked private copies of the second page from the original VMO.
+  // No VMO can be blamed for more pages than its total size.
+  const uint64_t kImplCostAll = kOriginalSize + zx_system_get_page_size();
+  const uint64_t kImplCostOriginal = 2 * zx_system_get_page_size();  // 1 + 1
+  const uint64_t kImplCostClone = zx_system_get_page_size();         // 1 + 0
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone, kImplCostAll);
+  ASSERT_EQ(VmoPopulatedBytes(vmo), kImplCostOriginal);
+  ASSERT_EQ(VmoPopulatedBytes(clone), kImplCostClone);
 
-  // Write to the clone again, and check that the write doesn't consume any
+  // Create a clone-of-a-clone at an offset.
+  zx::vmo clone2;
+  ASSERT_OK(
+      clone.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kClone2Size, &clone2));
+
+  // Write to the first clone again, and check that the write doesn't consume any
   // extra pages as the page isn't accessible by clone2.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 4));
 
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), 0);
+  // The original and clone split shared pages equally and each VMO's attributed
+  // memory sums to the total - the first private page from the original VMO, and
+  // the 2 forked private copies of the second page from the original VMO.
+  // No VMO can be blamed for more pages than its total size.
+  const uint64_t kImplCostClone2 = 0;
+  ASSERT_LE(kImplCostClone2, kClone2Size);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone + kImplCostClone2, kImplCostAll);
+  ASSERT_EQ(VmoPopulatedBytes(vmo), kImplCostOriginal);
+  ASSERT_EQ(VmoPopulatedBytes(clone), kImplCostClone);
+  ASSERT_EQ(VmoPopulatedBytes(clone2), kImplCostClone2);
 
   // Reset the original vmo and clone2, and make sure that the clone stays correct.
   vmo.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 4));
-
   clone2.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 4));
 
   // Check that the clone doesn't unnecessarily retain pages.
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone, zx_system_get_page_size()));
+  // The clone shouldn't retain the last page (it is a zero page) - the clone's
+  // attributed memory is the size of the clone minus the last page.
+  const uint64_t kImplCost2Clone = kCloneSize - zx_system_get_page_size();
+  ASSERT_TRUE(PollVmoPopulatedBytes(clone, kImplCost2Clone));
 }
 
 // Tests that a clone of a clone which overflows its parent properly interacts with
 // both of its ancestors (i.e. the original vmo and the first clone).
 TEST_F(VmoClone2TestCase, Overflow) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(1, &vmo));
+  const uint64_t kOriginalPageCount = 1ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+  const uint64_t kClone2Size = 3ul * zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 2 * zx_system_get_page_size(), &clone));
+  // Create a parent and a child clone.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kCloneSize, &clone));
 
-  // Check that the child has the right data.
+  // Check that the child has the right data, and check accounting.
+  // Total pages are the shared pages from the original VMO.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 1));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, zx_system_get_page_size()));
+
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginal = zx_system_get_page_size() / 2;  // 1/2
+  const uint64_t kImplCostClone = zx_system_get_page_size() / 2;     // 1/2 + 0
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostClone));
 
   // Write to the child and then clone it.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 2, zx_system_get_page_size()));
   zx::vmo clone2;
-  ASSERT_OK(clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 3 * zx_system_get_page_size(), &clone2));
+  ASSERT_OK(clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone2Size, &clone2));
 
-  // Check that the second clone is correct.
+  // Check that the second clone is correct, including accounting.
+  // Total pages are the shared page from the original VMO, plus the shared page
+  // from the first clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 1));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 2, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 0, 2 * zx_system_get_page_size()));
 
-  // Write the dedicated page in 2nd child and then check that accounting is correct.
+  const uint64_t kImplCost2All = kOriginalSize + zx_system_get_page_size();
+  const uint64_t kImplCost2Original = zx_system_get_page_size() / 3;    // 1/3
+  const uint64_t kImplCost2Clone = 5 * zx_system_get_page_size() / 6;   // 1/3 + 1/2
+  const uint64_t kImplCost2Clone2 = 5 * zx_system_get_page_size() / 6;  // 1/3 + 1/2 + 0
+  ASSERT_LE(kImplCost2Original, kOriginalSize);
+  ASSERT_LE(kImplCost2Clone, kCloneSize);
+  ASSERT_LE(kImplCost2Clone2, kClone2Size);
+  // A remaining byte gets spread 1/3 between each of the VMOs, and we can check the fractional
+  // bytes field for this. For this simple case we can do the fixed point arithmetic directly and
+  // calculate a third of a whole byte for comparison.
+  constexpr uint64_t kFractionalWholeByte = 0x8000000000000000;
+  constexpr uint64_t kFractionalThirdByte = kFractionalWholeByte / 3u;
+  EXPECT_EQ(kImplCost2Original + kImplCost2Clone + kImplCost2Clone2 + 1ul, kImplCost2All);
+  if (UsingLegacyAttribution()) {
+    EXPECT_EQ(VmoPopulatedBytes(vmo), zx_system_get_page_size());
+    EXPECT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
+    EXPECT_EQ(VmoPopulatedBytes(clone2), 0u);
+  } else {
+    EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCost2Original);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(vmo), kFractionalThirdByte);
+    EXPECT_EQ(VmoPopulatedBytes(clone), kImplCost2Clone);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(clone), kFractionalThirdByte);
+    EXPECT_EQ(VmoPopulatedBytes(clone2), kImplCost2Clone2);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(clone2), kFractionalThirdByte);
+  }
+
+  // Write the private page in 2nd clone and then check that accounting is correct.
+  // Total pages are the shared page from the original VMO, the shared page
+  // from the first clone, and the private page in the 2nd clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, 3, 2 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 3, 2 * zx_system_get_page_size()));
 
-  // Check that accounting is correct.
-  ASSERT_EQ(VmoPopulatedBytes(vmo), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), zx_system_get_page_size());
+  const uint64_t kImplCost3All = kOriginalSize + 2ul * zx_system_get_page_size();
+  const uint64_t kImplCost3Original = zx_system_get_page_size() / 3ul;       // 1/3
+  const uint64_t kImplCost3Clone = 5ul * zx_system_get_page_size() / 6ul;    // 1/3 + 1/2
+  const uint64_t kImplCost3Clone2 = 11ul * zx_system_get_page_size() / 6ul;  // 1/3 + 1/2 + 1
+  ASSERT_LE(kImplCost3Original, kOriginalSize);
+  ASSERT_LE(kImplCost3Clone, kCloneSize);
+  ASSERT_LE(kImplCost3Clone2, kClone2Size);
+  EXPECT_EQ(kImplCost3Original + kImplCost3Clone + kImplCost3Clone2 + 1ul, kImplCost3All);
+  if (UsingLegacyAttribution()) {
+    EXPECT_EQ(VmoPopulatedBytes(vmo), zx_system_get_page_size());
+    EXPECT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
+    EXPECT_EQ(VmoPopulatedBytes(clone2), zx_system_get_page_size());
+  } else {
+    EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCost3Original);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(vmo), kFractionalThirdByte);
+    EXPECT_EQ(VmoPopulatedBytes(clone), kImplCost3Clone);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(clone), kFractionalThirdByte);
+    EXPECT_EQ(VmoPopulatedBytes(clone2), kImplCost3Clone2);
+    EXPECT_EQ(VmoPopulatedFractionalBytes(clone2), kFractionalThirdByte);
+  }
 
-  // Completely fork the final clone and check that things are correct.
+  // Completely fork the final clone and check that things are correct, including accounting.
+  // Total pages are the shared page from the original VMO, the private page
+  // from the first clone, and the 3 private pages in the 2nd clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, 4, 0));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, 5, zx_system_get_page_size()));
-
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 1, 0));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 1, 0));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2, zx_system_get_page_size()));
@@ -513,89 +684,157 @@ TEST_F(VmoClone2TestCase, Overflow) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 5, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 3, 2 * zx_system_get_page_size()));
 
-  // Check that the total amount of allocated memory is correct. The amount allocated
-  // is implementation dependent, but no vmo can be blamed for more pages than its total size.
-  const uint64_t kImplCost1 = zx_system_get_page_size();
-  const uint64_t kImplCost2 = 2 * zx_system_get_page_size();
-  const uint64_t kImplCost3 = 3 * zx_system_get_page_size();
-  assert(kImplCost1 <= zx_system_get_page_size() && kImplCost2 <= 2 * zx_system_get_page_size() &&
-         kImplCost3 <= 3 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(vmo), kImplCost1);
-  ASSERT_EQ(VmoPopulatedBytes(clone), kImplCost2);
-  ASSERT_EQ(VmoPopulatedBytes(clone2), kImplCost3);
+  const uint64_t kImplCost4All = kOriginalSize + 4ul * zx_system_get_page_size();
+  const uint64_t kImplCost4Original = zx_system_get_page_size() / 2ul;     // 1/2
+  const uint64_t kImplCost4Clone = 3ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1
+  const uint64_t kImplCost4Clone2 = 3ul * zx_system_get_page_size();       // 1 + 1 + 1
+  ASSERT_LE(kImplCost4Original, kOriginalSize);
+  ASSERT_LE(kImplCost4Clone, kCloneSize);
+  ASSERT_LE(kImplCost4Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost4Original + kImplCost4Clone + kImplCost4Clone2, kImplCost4All);
+  EXPECT_EQ(VmoPopulatedBytes(vmo),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCost4Original));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(kCloneSize, kImplCost4Clone));
+  EXPECT_EQ(VmoPopulatedBytes(clone2), kImplCost4Clone2);
 
-  // Close the middle clone and check that things are still correct. Memory usage
-  // between the two vmos is not implementation dependent.
+  // Close the middle clone and check that things are still correct.
+  // Total pages are the now-private page from the original VMO and the 3 private
+  // pages in the 2nd clone.
+  // No VMO can be blamed for more pages than its total size.
   clone.reset();
-
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 1, 0));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 5, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 3, 2 * zx_system_get_page_size()));
 
-  ASSERT_TRUE(PollVmoPopulatedBytes(vmo, zx_system_get_page_size()));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone2, 3 * zx_system_get_page_size()));
+  const uint64_t kImplCost5All = kOriginalSize + 3ul * zx_system_get_page_size();
+  const uint64_t kImplCost5Original = zx_system_get_page_size();      // 1
+  const uint64_t kImplCost5Clone2 = 3ul * zx_system_get_page_size();  // 1 + 1 + 1
+  ASSERT_LE(kImplCost5Original, kOriginalSize);
+  ASSERT_LE(kImplCost5Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost5Original + kImplCost5Clone2, kImplCost5All);
+  EXPECT_TRUE(PollVmoPopulatedBytes(vmo, kImplCost5Original));
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone2, kImplCost5Clone2));
 }
 
 // Test that a clone that does not overlap the parent at all behaves correctly.
 TEST_F(VmoClone2TestCase, OutOfBounds) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(1, &vmo));
+  const uint64_t kOriginalPageCount = 1ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+  const uint64_t kClone2Size = 3ul * zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 2 * zx_system_get_page_size(),
-                             2 * zx_system_get_page_size(), &clone));
+  // Create a parent and a child clone which does not overlap the parent.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(
+      vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 2 * zx_system_get_page_size(), kCloneSize, &clone));
 
-  // Check that the child has the right data.
+  // Check that the child has the right data, and check accounting.
+  // Total pages are the private page from the original VMO.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, zx_system_get_page_size()));
+
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginal = zx_system_get_page_size();  // 1
+  const uint64_t kImplCostClone = 0;
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCostOriginal);
+  EXPECT_EQ(VmoPopulatedBytes(clone), kImplCostClone);
 
   // Write to the child and then clone it.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 2, zx_system_get_page_size()));
   zx::vmo clone2;
-  ASSERT_OK(clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 3 * zx_system_get_page_size(), &clone2));
+  ASSERT_OK(clone.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone2Size, &clone2));
 
-  // Check that the second clone is correct.
+  // Check that the second clone is correct, including accounting.
+  // Total pages are the private page from the original VMO, plus the shared page
+  // from the first clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 0));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 2, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 0, 2 * zx_system_get_page_size()));
 
+  const uint64_t kImplCost2All = kOriginalSize + zx_system_get_page_size();
+  const uint64_t kImplCost2Original = zx_system_get_page_size();      // 1
+  const uint64_t kImplCost2Clone = zx_system_get_page_size() / 2ul;   // 0 + 1/2
+  const uint64_t kImplCost2Clone2 = zx_system_get_page_size() / 2ul;  // 0 + 1/2 + 0
+  ASSERT_LE(kImplCost2Original, kOriginalSize);
+  ASSERT_LE(kImplCost2Clone, kCloneSize);
+  ASSERT_LE(kImplCost2Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost2Original + kImplCost2Clone + kImplCost2Clone2, kImplCost2All);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCost2Original);
+  EXPECT_EQ(VmoPopulatedBytes(clone),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCost2Clone));
+  EXPECT_EQ(VmoPopulatedBytes(clone2), ValueIfLegacyAttribution(0, kImplCost2Clone2));
+
   // Write the dedicated page in 2nd child and then check that accounting is correct.
+  // Total pages are the private page from the original VMO, the shared page from
+  // the first clone, and the private page from the second clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, 3, 2 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 3, 2 * zx_system_get_page_size()));
 
-  // Check that accounting is correct.
-  ASSERT_EQ(VmoPopulatedBytes(vmo), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), zx_system_get_page_size());
+  const uint64_t kImplCost3All = kOriginalSize + 2ul * zx_system_get_page_size();
+  const uint64_t kImplCost3Original = zx_system_get_page_size();            // 1
+  const uint64_t kImplCost3Clone = zx_system_get_page_size() / 2ul;         // 0 + 1/2
+  const uint64_t kImplCost3Clone2 = 3ul * zx_system_get_page_size() / 2ul;  // 0 + 1/2 + 1
+  ASSERT_LE(kImplCost3Original, kOriginalSize);
+  ASSERT_LE(kImplCost3Clone, kCloneSize);
+  ASSERT_LE(kImplCost3Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost3Original + kImplCost3Clone + kImplCost3Clone2, kImplCost3All);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCost3Original);
+  EXPECT_EQ(VmoPopulatedBytes(clone),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCost3Clone));
+  EXPECT_EQ(VmoPopulatedBytes(clone2),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCost3Clone2));
 }
 
 // Tests that a small clone doesn't require allocations for pages which it doesn't
 // have access to and that unneeded pages get freed if the original vmo is closed.
 TEST_F(VmoClone2TestCase, SmallClone) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+  const uint64_t kOriginalPageCount = 3ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
-                             zx_system_get_page_size(), &clone));
+  // Create a parent and a child clone which does not overlap the parent.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kCloneSize, &clone));
 
-  // Check that the child has the right data.
+  // Check that the child has the right data, and check accounting.
+  // Total pages are the pages from the original VMO - one shared with the clone.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
 
-  // Check that a write into the original vmo out of bounds of the first clone
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginal = 5ul * zx_system_get_page_size() / 2ul;  // 1 + 1/2 + 1
+  const uint64_t kImplCostClone = zx_system_get_page_size() / 2ul;           // 1/2
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostClone));
+
+  // Check that a write into the original VMO out of bounds of the first clone
   // doesn't allocate any memory.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 4, 0));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 5, 2 * zx_system_get_page_size()));
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 3 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 0);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostClone));
 
+  // Close the parent and check that clone has the right data and accounting.
+  // Total pages are the shared page from the parent which migrated into the clone.
+  // No VMO can be blamed for more pages than its total size.
   vmo.reset();
-
-  // Check that clone has the right data after closing the parent and that
-  // all the extra pages are freed.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
-  ASSERT_TRUE(PollVmoPopulatedBytes(clone, zx_system_get_page_size()));
+
+  const uint64_t kImplCost2Clone = zx_system_get_page_size();  // 1
+  ASSERT_LE(kImplCost2Clone, kCloneSize);
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone, kImplCost2Clone));
 }
 
 // Tests that a small clone properly interrupts access into the parent.
@@ -620,33 +859,54 @@ TEST_F(VmoClone2TestCase, SmallCloneChild) {
 
 // Tests that closing a vmo with multiple small clones properly frees pages.
 TEST_F(VmoClone2TestCase, SmallClones) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+  const uint64_t kOriginalPageCount = 3ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+  const uint64_t kClone2Size = zx_system_get_page_size();
 
-  // Create a clone and populate one of its pages
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 2 * zx_system_get_page_size(), &clone));
+  // Create a parent and a child clone.  Populate a page in the child.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(), kCloneSize, &clone));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 4, zx_system_get_page_size()));
 
-  // Create a second clone
+  // Create a second clone of the original.
   zx::vmo clone2;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, 1 * zx_system_get_page_size(), &clone2));
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone2Size, &clone2));
 
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 3 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), 0);
+  // Check that the child has the right data, and check accounting.
+  // Total pages are the shared pages from the original VMO and one private page in
+  // the first clone.
+  // No VMO can be blamed for more pages than its total size.
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
 
+  const uint64_t kImplCostAll = kOriginalSize + zx_system_get_page_size();
+  const uint64_t kImplCostOriginal = 2ul * zx_system_get_page_size();     // 1/2 + 1/2 + 1
+  const uint64_t kImplCostClone = 3ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1
+  const uint64_t kImplCostClone2 = zx_system_get_page_size() / 2ul;       // 1/2
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_LE(kImplCostClone2, kClone2Size);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone + kImplCostClone2, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone),
+            ValueIfLegacyAttribution(zx_system_get_page_size(), kImplCostClone));
+  EXPECT_EQ(VmoPopulatedBytes(clone2), ValueIfLegacyAttribution(0, kImplCostClone2));
+
+  // Close the original VMO and then check accounting.
+  // The original's inaccessible 3rd page should be freed, and original's page 2
+  // should havce migrated to the first clone.
+  // Total pages are the now-private pages in each clone.
   vmo.reset();
 
-  // The inaccessible 3rd page should be freed, and vmo's copy of page 2 should be freed. The
-  // fact that both are blamed to clone (vs 1 being blamed to clone2) is implementation
-  // dependent.
-  const uint64_t kImplClone1Cost = 2 * zx_system_get_page_size();
-  const uint64_t kImplClone2Cost = 0;
-  assert(kImplClone1Cost <= 2 * zx_system_get_page_size() &&
-         kImplClone2Cost <= zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), kImplClone1Cost);
-  ASSERT_EQ(VmoPopulatedBytes(clone2), kImplClone2Cost);
+  const uint64_t kImplCost2All = 3ul * zx_system_get_page_size();
+  const uint64_t kImplCost2Clone = 2ul * zx_system_get_page_size();  // 1 + 1
+  const uint64_t kImplCost2Clone2 = zx_system_get_page_size();       // 1
+  ASSERT_LE(kImplCost2Clone, kCloneSize);
+  ASSERT_LE(kImplCost2Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost2Clone + kImplCost2Clone2, kImplCost2All);
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone, kImplCost2Clone));
+  EXPECT_TRUE(PollVmoPopulatedBytes(clone2, kImplCost2Clone2));
 }
 
 // Tests that disjoint clones work (i.e. create multiple clones, none of which
@@ -864,8 +1124,16 @@ class VmoCloneResizeTests : public VmoClone2TestCase {
     ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 5, zx_system_get_page_size()));
     ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 5, 2 * zx_system_get_page_size()));
 
-    ASSERT_EQ(VmoPopulatedBytes(vmo), 4 * zx_system_get_page_size());
-    ASSERT_EQ(VmoPopulatedBytes(clone), 2 * zx_system_get_page_size());
+    // Check attribution for the vmos.
+    // The 2 pages written after cloning are each private to both the original
+    // vmo and the clone.
+    // The 2 pages unwritten after cloning are both shared equally.
+    const uint64_t kOriginalAttrBytes = 3ul * zx_system_get_page_size();  // 1/2 + 1 + 1 + 1/2
+    const uint64_t kCloneAttrBytes = 3ul * zx_system_get_page_size();     // 1/2 + 1 + 1 + 1/2
+    EXPECT_EQ(VmoPopulatedBytes(vmo),
+              ValueIfLegacyAttribution(4 * zx_system_get_page_size(), kOriginalAttrBytes));
+    EXPECT_EQ(VmoPopulatedBytes(clone),
+              ValueIfLegacyAttribution(2 * zx_system_get_page_size(), kCloneAttrBytes));
 
     const zx::vmo& resize_target = resize_child ? clone : vmo;
     const zx::vmo& original_size_vmo = resize_child ? vmo : clone;
@@ -889,33 +1157,51 @@ class VmoCloneResizeTests : public VmoClone2TestCase {
     }
     ASSERT_NO_FATAL_FAILURE(VmoCheck(resize_target, 1));
 
-    // Check that pages are properly allocated/blamed.
-    ASSERT_EQ(VmoPopulatedBytes(vmo), (resize_child ? 4 : 1) * zx_system_get_page_size());
-    ASSERT_EQ(VmoPopulatedBytes(clone), (resize_child ? 0 : 3) * zx_system_get_page_size());
+    // Check attribution for the vmos.
+    // The first page is unwritten after the cloning and shared equally.
+    // The non-resized vmo has 3 more private pages after the first.
+    const uint64_t kNonresizedAttrBytes = 7ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1 + 1 + 1
+    const uint64_t kResizedAttrBytes = zx_system_get_page_size() / 2ul;           // 1/2
+    if (UsingLegacyAttribution()) {
+      EXPECT_EQ(VmoPopulatedBytes(vmo),
+                resize_child ? 4 * zx_system_get_page_size() : zx_system_get_page_size());
+      EXPECT_EQ(VmoPopulatedBytes(clone), resize_child ? 0 : 3 * zx_system_get_page_size());
+    } else {
+      EXPECT_EQ(VmoPopulatedBytes(vmo), resize_child ? kNonresizedAttrBytes : kResizedAttrBytes);
+      EXPECT_EQ(VmoPopulatedBytes(clone), resize_child ? kResizedAttrBytes : kNonresizedAttrBytes);
+    }
 
     // Check that growing the shrunk vmo doesn't expose anything.
     ASSERT_OK(resize_target.set_size(2 * zx_system_get_page_size()));
     ASSERT_NO_FATAL_FAILURE(VmoCheck(resize_target, 0, zx_system_get_page_size()));
 
-    // Check that writes into the non-resized vmo don't require allocating pages.
-    ASSERT_NO_FATAL_FAILURE(VmoWrite(original_size_vmo, 6, 3 * zx_system_get_page_size()));
-    ASSERT_EQ(VmoPopulatedBytes(vmo), (resize_child ? 4 : 1) * zx_system_get_page_size());
-    ASSERT_EQ(VmoPopulatedBytes(clone), (resize_child ? 0 : 3) * zx_system_get_page_size());
+    // Check attribution for the vmos.
+    // Writes into the non-resized vmo don't require allocating pages.
+    ASSERT_NO_FATAL_FAILURE(VmoWrite(original_size_vmo, 6, 3ul * zx_system_get_page_size()));
+    if (UsingLegacyAttribution()) {
+      EXPECT_EQ(VmoPopulatedBytes(vmo),
+                resize_child ? 4ul * zx_system_get_page_size() : zx_system_get_page_size());
+      EXPECT_EQ(VmoPopulatedBytes(clone), resize_child ? 0 : 3ul * zx_system_get_page_size());
+    } else {
+      EXPECT_EQ(VmoPopulatedBytes(vmo), resize_child ? kNonresizedAttrBytes : kResizedAttrBytes);
+      EXPECT_EQ(VmoPopulatedBytes(clone), resize_child ? kResizedAttrBytes : kNonresizedAttrBytes);
+    }
 
     // Check that closing the non-resized vmo frees the inaccessible pages.
     if (contiguous) {
       ASSERT_NO_FATAL_FAILURE(CheckContigState<4>(bti, vmo));
     }
-
-    // Check that closing the non-resized VMO frees the inaccessible pages.
     if (resize_child) {
       vmo.reset();
     } else {
       clone.reset();
     }
 
+    // Check attribution for the vmos.
+    // The resized vmo should have 1 private page and another zero page.
+    const uint64_t kResizedAttrBytes2 = zx_system_get_page_size();  // 1 + 0
     ASSERT_NO_FATAL_FAILURE(VmoCheck(resize_target, 1));
-    ASSERT_TRUE(PollVmoPopulatedBytes(resize_target, zx_system_get_page_size()));
+    ASSERT_TRUE(PollVmoPopulatedBytes(resize_target, kResizedAttrBytes2));
   }
 };
 
@@ -929,27 +1215,39 @@ TEST_F(VmoCloneResizeTests, ResizeOriginal) {
 
 // Tests that growing a clone exposes zeros and doesn't consume memory on parent writes.
 TEST_F(VmoClone2TestCase, ResizeGrow) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(2, &vmo));
+  const uint64_t kOriginalPageCount = 2ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kCloneSize = zx_system_get_page_size();
+  const uint64_t kCloneNewSize = 2ul * zx_system_get_page_size();
 
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE, 0,
-                             zx_system_get_page_size(), &clone));
+  // Create a parent and a resizable child clone.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(
+      vmo.create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE, 0, kCloneSize, &clone));
 
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 1));
 
-  ASSERT_OK(clone.set_size(2 * zx_system_get_page_size()));
-
-  // Check that the new page in the clone is 0.
+  // Resize the clone and check that the new page in the clone is 0.
+  ASSERT_OK(clone.set_size(kCloneNewSize));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, zx_system_get_page_size()));
 
-  // Check that writing to the second page of the original vmo doesn't require
-  // forking a page and doesn't affect the clone.
+  // Write to the second page of the original VMO.
+  // This doesn't require forking a page and doesn't affect the clone.
+  // Total pages are the shared page from the original VMO and the private page
+  // in the original VMO.
+  // No VMO can be blamed for more pages than its total size.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 3, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, zx_system_get_page_size()));
 
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 2 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 0);
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginal = 3ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1
+  const uint64_t kImplCostClone = zx_system_get_page_size() / 2ul;           // 1/2 + 0
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneSize);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone), ValueIfLegacyAttribution(0, kImplCostClone));
 }
 
 // Tests that a vmo with a child that has a non-zero offset can be truncated without
@@ -972,21 +1270,29 @@ TEST_F(VmoClone2TestCase, ResizeOffsetChild) {
 // Tests that resize works with multiple disjoint children.
 TEST_F(VmoClone2TestCase, ResizeDisjointChild) {
   auto test_fn = [](uint32_t perm[]) -> void {
-    zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+    const uint64_t kOriginalPageCount = 3ul;
+    const uint64_t kCloneSize = zx_system_get_page_size();
 
-    // Clone one clone for each page.
+    // Create a parent and resizable clones for each page in the parent.
+    zx::vmo vmo;
     zx::vmo clones[3];
-    for (unsigned i = 0; i < 3; i++) {
+    ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+    for (uint32_t i = 0; i < 3; i++) {
       ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE,
-                                 i * zx_system_get_page_size(), zx_system_get_page_size(),
-                                 clones + i));
+                                 i * zx_system_get_page_size(), kCloneSize, clones + i));
       ASSERT_NO_FATAL_FAILURE(VmoCheck(clones[i], i + 1));
-      ASSERT_EQ(VmoPopulatedBytes(clones[i]), 0);
     }
 
-    // Nothing new should have been allocated and everything still belongs to the first vmo.
-    ASSERT_EQ(VmoPopulatedBytes(vmo), 3 * zx_system_get_page_size());
+    // Nothing new should have been allocated.  Each page in the original is
+    // shared with a clone.
+    const uint64_t kImplCostOriginal = 3ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1/2 + 1/2
+    const uint64_t kImplCostClone = zx_system_get_page_size() / 2ul;           // 1/2
+    EXPECT_EQ(VmoPopulatedBytes(vmo),
+              ValueIfLegacyAttribution(kOriginalPageCount * zx_system_get_page_size(),
+                                       kImplCostOriginal));
+    for (uint32_t i = 0; i < 3; i++) {
+      EXPECT_EQ(VmoPopulatedBytes(clones[i]), ValueIfLegacyAttribution(0, kImplCostClone));
+    }
 
     // Shrink two of the clones and then the original, and then check that the
     // remaining clone is okay.
@@ -994,15 +1300,16 @@ TEST_F(VmoClone2TestCase, ResizeDisjointChild) {
     ASSERT_OK(clones[perm[1]].set_size(0));
     ASSERT_OK(vmo.set_size(0));
 
+    const uint64_t kImplCost2Clone = zx_system_get_page_size();  // 1
     ASSERT_NO_FATAL_FAILURE(VmoCheck(clones[perm[2]], perm[2] + 1));
-    ASSERT_EQ(VmoPopulatedBytes(vmo), 0);
-    ASSERT_EQ(VmoPopulatedBytes(clones[perm[0]]), 0);
-    ASSERT_EQ(VmoPopulatedBytes(clones[perm[1]]), 0);
-    ASSERT_EQ(VmoPopulatedBytes(clones[perm[2]]), zx_system_get_page_size());
+    EXPECT_EQ(VmoPopulatedBytes(vmo), 0);
+    EXPECT_EQ(VmoPopulatedBytes(clones[perm[0]]), 0);
+    EXPECT_EQ(VmoPopulatedBytes(clones[perm[1]]), 0);
+    EXPECT_EQ(VmoPopulatedBytes(clones[perm[2]]), kImplCost2Clone);
 
     ASSERT_OK(clones[perm[2]].set_size(0));
 
-    ASSERT_EQ(VmoPopulatedBytes(clones[perm[2]]), 0);
+    EXPECT_EQ(VmoPopulatedBytes(clones[perm[2]]), 0);
   };
 
   ASSERT_NO_FATAL_FAILURE(CallPermutations(test_fn, 3));
@@ -1010,44 +1317,78 @@ TEST_F(VmoClone2TestCase, ResizeDisjointChild) {
 
 // Tests that resize works when with progressive writes.
 TEST_F(VmoClone2TestCase, ResizeMultipleProgressive) {
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+  const uint64_t kOriginalPageCount = 3ul;
+  const uint64_t kOriginalSize = kOriginalPageCount * zx_system_get_page_size();
+  const uint64_t kOriginalNewSize = 0;
+  const uint64_t kCloneSize = 2ul * zx_system_get_page_size();
+  const uint64_t kCloneNewSize = 0;
+  const uint64_t kClone2Size = zx_system_get_page_size();
 
-  // Clone the vmo and fork a page into both.
-  zx::vmo clone;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE, 0,
-                             2 * zx_system_get_page_size(), &clone));
+  // Create a parent and a resizable child clone.
+  zx::vmo vmo, clone;
+  ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(kOriginalPageCount, &vmo));
+  ASSERT_OK(
+      vmo.create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE, 0, kCloneSize, &clone));
+
+  // Fork a page into both and check contents.
   ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, 4, 0 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoWrite(clone, 5, 1 * zx_system_get_page_size()));
 
-  // Create another clone of the original vmo.
-  zx::vmo clone2;
-  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &clone2));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 4, 0 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 2, 1 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 3, 2 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 1, 0 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 5, 1 * zx_system_get_page_size()));
 
-  // Resize the first clone, check the contents and allocations.
-  ASSERT_OK(clone.set_size(0));
+  // Create another clone of the original VMO and check contents.
+  zx::vmo clone2;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kClone2Size, &clone2));
 
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 4, 0 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 2, 1 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 3, 2 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4, 0 * zx_system_get_page_size()));
 
-  // Nothing new should have been allocated and everything still belongs to the first vmo.
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 3 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone), 0 * zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(clone2), 0 * zx_system_get_page_size());
+  // Resize the first clone, check the contents and allocations.
+  ASSERT_OK(clone.set_size(kCloneNewSize));
 
-  // Resize the original vmo and make sure it frees the necessary pages. Which of the clones
-  // gets blamed is implementation dependent.
-  ASSERT_OK(vmo.set_size(0));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 4, 0 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 2, 1 * zx_system_get_page_size()));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, 3, 2 * zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4, 0 * zx_system_get_page_size()));
 
-  const uint64_t kImplClone1Cost = 0;
-  const uint64_t kImplClone2Cost = zx_system_get_page_size();
-  assert(kImplClone1Cost + kImplClone2Cost == zx_system_get_page_size());
-  ASSERT_EQ(VmoPopulatedBytes(vmo), 0);
-  ASSERT_EQ(VmoPopulatedBytes(clone), kImplClone1Cost);
-  ASSERT_EQ(VmoPopulatedBytes(clone2), kImplClone2Cost);
+  // Nothing new should have been allocated.
+  // Total pages are the first page from the original VMO shared with the remaining
+  // clone, and the other private pages from the original VMO.
+  // VMO and the second clone.
+  const uint64_t kImplCostAll = kOriginalSize;
+  const uint64_t kImplCostOriginal = 5ul * zx_system_get_page_size() / 2ul;  // 1/2 + 1 + 1
+  const uint64_t kImplCostClone = 0;
+  const uint64_t kImplCostClone2 = zx_system_get_page_size() / 2ul;  // 1/2
+  ASSERT_LE(kImplCostOriginal, kOriginalSize);
+  ASSERT_LE(kImplCostClone, kCloneNewSize);
+  ASSERT_LE(kImplCostClone2, kClone2Size);
+  ASSERT_EQ(kImplCostOriginal + kImplCostClone + kImplCostClone2, kImplCostAll);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), ValueIfLegacyAttribution(kOriginalSize, kImplCostOriginal));
+  EXPECT_EQ(VmoPopulatedBytes(clone), kImplCostClone);
+  EXPECT_EQ(VmoPopulatedBytes(clone2), ValueIfLegacyAttribution(0, kImplCostClone2));
+
+  // Resize the original vmo and make sure it frees the necessary pages.
+  // Total pages are the now-private page in the 2nd VMO.
+  ASSERT_OK(vmo.set_size(kOriginalNewSize));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4, 0 * zx_system_get_page_size()));
+
+  const uint64_t kImplCost2All = zx_system_get_page_size();
+  const uint64_t kImplCost2Original = 0;
+  const uint64_t kImplCost2Clone = 0;
+  const uint64_t kImplCost2Clone2 = zx_system_get_page_size();  // 1
+  ASSERT_LE(kImplCost2Original, kOriginalNewSize);
+  ASSERT_LE(kImplCost2Clone, kCloneNewSize);
+  ASSERT_LE(kImplCost2Clone2, kClone2Size);
+  ASSERT_EQ(kImplCost2Original + kImplCost2Clone + kImplCost2Clone2, kImplCost2All);
+  EXPECT_EQ(VmoPopulatedBytes(vmo), kImplCost2Original);
+  EXPECT_EQ(VmoPopulatedBytes(clone), kImplCost2Clone);
+  EXPECT_EQ(VmoPopulatedBytes(clone2), kImplCost2Clone2);
 }
 
 // This is a regression test for bug 53710 and checks that when a COW child is resized its
@@ -1270,19 +1611,11 @@ struct ProgressiveCloneDiscardTests : public VmoClone2TestCase {
 
     ASSERT_EQ(VmoPopulatedBytes(vmos[0]), kNumClones * zx_system_get_page_size());
 
-    // Repeatedly clone the vmo while simultaneously changing it. Then check the total memory
-    // consumption. This must consume less pages than manually duplicating the vmo, but the
-    // precise amount consumed and the amount blamed to each vmo is implementation dependent.
-    // Furthermore, the amount blamed should match the amount allocated.
+    // Repeatedly clone the vmo and fork a different page in each clone.
     for (unsigned i = 1; i < kNumClones; i++) {
       ASSERT_OK(vmos[0].create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE, 0,
                                      kNumClones * zx_system_get_page_size(), vmos + i));
       ASSERT_NO_FATAL_FAILURE(VmoWrite(vmos[i], kNumClones + 2, i * zx_system_get_page_size()));
-    }
-    constexpr uint64_t kImplTotalPages = (kNumClones * (kNumClones + 1)) / 2;
-    static_assert(kImplTotalPages <= kNumClones * kNumClones);
-    for (unsigned i = 0; i < kNumClones; i++) {
-      ASSERT_EQ(VmoPopulatedBytes(vmos[i]), (kNumClones - i) * zx_system_get_page_size());
     }
 
     // Check that the vmos have the right content.
@@ -1291,6 +1624,35 @@ struct ProgressiveCloneDiscardTests : public VmoClone2TestCase {
         uint32_t expected = (i != 0 && j == i) ? kNumClones + 2 : j + 1;
         ASSERT_NO_FATAL_FAILURE(VmoCheck(vmos[i], expected, j * zx_system_get_page_size()));
       }
+    }
+
+    // Check the total memory attribution.
+    // The amount is less than manually duplicating the original vmo, with each
+    // vmo forking one page and sharing the other `kNumClones -1` pages it can see.
+    // The amount attributed should match the amount allocated.
+    //
+    // To compute `kAttrBytesTotal`:
+    // Page attributions orig: 1 / (#clones) + (#clones - 1) * 1 / (#clones - 1)
+    // Page attributions others: 1 / (#clones) + 1 + (#clones - 2) * 1 / (#clones - 1)
+    // Page attributions: 1 + (#clones - 1) * 1 / (#clones - 1)
+    // which simplifies to: 2
+    // multiply by (#clones) vmos: 2 * #clones
+    // 9/5 + 1/6 = 54/30 + 5/30 = 59/30 * 5 = 295/30
+    // Orig 35 / 30 total = 330 / 30 = 11
+    const uint64_t kAttrBytesOriginal =
+        7ul * zx_system_get_page_size() / 6ul;  // 1/6 + 1/5 + 1/5 ...
+    const uint64_t kAttrBytesAllClones =
+        59ul * zx_system_get_page_size() / 6ul;  // 5 * (1 + 1/6 + 1/5 + 1/5 ...)
+    const uint64_t kAttrBytesClone = kAttrBytesAllClones / (kNumClones - 1);
+    const uint64_t kAttrBytesTotal = kAttrBytesAllClones + kAttrBytesOriginal;
+    const uint64_t kAttrBytesWorstCase = kNumClones * kNumClones * zx_system_get_page_size();
+    ASSERT_LT(kAttrBytesTotal, kAttrBytesWorstCase);
+    EXPECT_EQ(ValueIfLegacyAttribution(kNumClones * zx_system_get_page_size(), kAttrBytesOriginal),
+              VmoPopulatedBytes(vmos[0]));
+    for (unsigned i = 1; i < kNumClones; i++) {
+      EXPECT_EQ(
+          ValueIfLegacyAttribution((kNumClones - i) * zx_system_get_page_size(), kAttrBytesClone),
+          VmoPopulatedBytes(vmos[i]));
     }
 
     // Close the original vmo and check for correctness.
@@ -1307,20 +1669,29 @@ struct ProgressiveCloneDiscardTests : public VmoClone2TestCase {
       }
     }
 
-    // Check that some memory was freed and that all allocated memory is accounted for. The total
-    // amount retained is implementation dependent, but it must be less than manually copying
-    // the vmo. The amount blamed to each vmo does not need to be the same for both version
-    // of this test.
-    constexpr uint64_t kImplRemainingPages = kImplTotalPages - 1;
-    static_assert(kImplRemainingPages <= kNumClones * (kNumClones - 1));
-    uint64_t observed = 0;
-    for (unsigned i = 1; i < kNumClones; i++) {
-      observed += VmoPopulatedBytes(vmos[i]);
+    // Check the total memory attribution.
+    // Some memory was freed; the remaining allocated memory should be accounted for.
+    // The amount is less than manually duplicating the original vmo, with each
+    // vmo forking one page and sharing the other `kNumClones - 1` pages it can see.
+    // The amount attributed should match the amount allocated.
+    //
+    // To compute `kAttrBytesTotal2`:
+    // Page attributions: 1 + 1 / (#clones - 1) + (#clones - 2) * 1 / (#clones - 2)
+    // which simplifies to: 2 + 1 / (#clones - 1)
+    // which simplifies to: (2 * #clones - 2 + 1) / (#clones - 1)
+    // multiply by (#clones - 1) vmos: 2 * #clones - 1
+    const uint64_t kAttrBytesTotal2 = (2ul * kNumClones - 1ul) * zx_system_get_page_size();
+    const uint64_t kAttrBytesVmo2 = kAttrBytesTotal2 / (kNumClones - 1ul);
+    const uint64_t kAttrBytesWorstCase2 =
+        (kNumClones - 1ul) * kNumClones * zx_system_get_page_size();
+    ASSERT_LT(kAttrBytesTotal2, kAttrBytesWorstCase2);
+    if (!UsingLegacyAttribution()) {
+      for (unsigned i = 1; i < kNumClones; i++) {
+        EXPECT_EQ(kAttrBytesVmo2, VmoPopulatedBytes(vmos[i]));
+      }
     }
-    ASSERT_EQ(observed, kImplRemainingPages * zx_system_get_page_size());
 
-    // Close all but the last two vmos. The total amount of memory consumed by the two remaining
-    // vmos is *not* implementation dependent.
+    // Close all but the last two vmos and check for correctness.
     for (unsigned i = 1; i < kNumClones - 2; i++) {
       if (close) {
         vmos[i].reset();
@@ -1333,6 +1704,26 @@ struct ProgressiveCloneDiscardTests : public VmoClone2TestCase {
       for (unsigned j = 0; j < kNumClones; j++) {
         ASSERT_NO_FATAL_FAILURE(
             VmoCheck(vmos[i], j == i ? kNumClones + 2 : j + 1, j * zx_system_get_page_size()));
+      }
+    }
+
+    // Check the total memory attribution.
+    // Some memory was freed; the remaining allocated memory should be accounted for.
+    // The amount is less than manually duplicating the original vmo, with each
+    // vmo forking two pages and sharing the other pages it can see.
+    // The amount attributed should match the amount allocated.
+    //
+    // To compute `kAttrBytesTotal3`:
+    // Page attributions: (kNumClones - 2) * 1/2 + 2
+    // multiply by 2 clones left: kNumClones - 2 + 4
+    // which simplifies to: kNumClones + 2
+    const uint64_t kAttrBytesTotal3 = (kNumClones + 2ul) * zx_system_get_page_size();
+    const uint64_t kAttrBytesVmo3 = kAttrBytesTotal3 / 2ul;
+    const uint64_t kAttrBytesWorstCase3 = 2ul * kNumClones * zx_system_get_page_size();
+    ASSERT_LT(kAttrBytesTotal3, kAttrBytesWorstCase3);
+    if (!UsingLegacyAttribution()) {
+      for (unsigned i = kNumClones - 2; i < kNumClones; i++) {
+        EXPECT_EQ(kAttrBytesVmo3, VmoPopulatedBytes(vmos[i]));
       }
     }
   }
@@ -1774,9 +2165,9 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
     zx::vmar::root_self()->unmap(clone_addr, kNumPages * zx_system_get_page_size());
   });
 
-  // No pages committed in the clone.
+  // No private pages committed in the clone.
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.populated_bytes);
+  EXPECT_EQ(0u, info.populated_private_bytes);
 
   // Committed pages in the parent are unchanged.
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
@@ -1807,24 +2198,32 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
     // Fork a page in the child.
     ASSERT_NO_FATAL_FAILURE(VmoWrite(child, 4, zx_system_get_page_size()));
 
-    // The child is only attributed for the forked page.
-    ASSERT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
+    // The child shares a page with the parent, and has a forked page.
+    const uint64_t kAttrBytesCloneSplit = 3ul * zx_system_get_page_size() / 2ul;
+    const uint64_t kAttrBytesCloneNoSplit = 2ul * zx_system_get_page_size();
+    EXPECT_EQ(ValueIfLegacyAttribution(zx_system_get_page_size(), kAttrBytesCloneSplit),
+              VmoPopulatedBytes(child));
 
     // Use a three step ready protocol to ensure both threads can issue their requests at close to
     // the same time.
     std::atomic<bool> ready = true;
 
-    std::thread thread{[&ready, &child] {
+    std::thread thread{[&ready, &child, &kAttrBytesCloneSplit, &kAttrBytesCloneNoSplit] {
       ready = false;
       while (!ready) {
         yield();
       }
       size_t committed = VmoPopulatedBytes(child);
       // Depending on who wins the race between this thread and the thread destroying the parent,
-      // the child will either continue having a single page attributed to it, or both pages.
-      ASSERT_TRUE(
-          committed == zx_system_get_page_size() || committed == 2 * zx_system_get_page_size(),
-          "committed bytes in child: %zu\n", committed);
+      // the child will either continue sharing a page with the parent, or it will have both
+      // pages attributed to it.
+      if (UsingLegacyAttribution()) {
+        EXPECT_TRUE(committed == zx_system_get_page_size() ||
+                    committed == zx_system_get_page_size() * 2);
+      } else {
+        EXPECT_TRUE(committed == kAttrBytesCloneSplit || committed == kAttrBytesCloneNoSplit,
+                    "committed bytes in child: %zu\n", committed);
+      }
     }};
     while (ready) {
       yield();
@@ -1843,7 +2242,7 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
     // destroy the parent. When run as a component test, memory_monitor might be querying the
     // parent's attribution, keeping it alive. That should only be a small window though and the
     // parent should eventually be destroyed.
-    ASSERT_TRUE(PollVmoPopulatedBytes(child, 2 * zx_system_get_page_size()));
+    ASSERT_TRUE(PollVmoPopulatedBytes(child, kAttrBytesCloneNoSplit));
   }
 }
 

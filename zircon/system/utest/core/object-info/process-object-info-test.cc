@@ -41,38 +41,6 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsUnstartedSucceeds) {
   EXPECT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, &maps, 0, &actual, &avail));
 }
 
-// TODO(https://fxbug.dev/338300808): While in the transition phase for RFC-0254 the additional
-// attribution fields are not used, and we are in 'legacy attribution' mode. This test can be
-// removed once legacy attribution is removed and the tests are updated to validate the new
-// attribution model.
-TEST_F(ProcessGetInfoTest, ProcessMapsScaledSharedBytesSentinel) {
-  const MappingInfo& test_info = GetInfo();
-  const zx::process& process = GetProcess();
-
-  // Buffer big enough to read all of the test process's map entries.
-  const size_t entry_count = 4 * test_info.num_mappings;
-  std::unique_ptr<zx_info_maps_t[]> maps(new zx_info_maps_t[entry_count]);
-
-  // Read the map entries.
-  size_t actual;
-  size_t avail;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, static_cast<void*>(maps.get()),
-                             entry_count * sizeof(zx_info_maps_t), &actual, &avail));
-  EXPECT_EQ(actual, avail, "Should have read all entries");
-
-  for (size_t i = 0; i < actual; i++) {
-    const zx_info_maps_t& entry = maps[i];
-    if (entry.type == ZX_INFO_MAPS_TYPE_MAPPING) {
-      EXPECT_EQ(entry.u.mapping.committed_fractional_scaled_bytes, UINT64_MAX);
-      EXPECT_EQ(entry.u.mapping.populated_fractional_scaled_bytes, UINT64_MAX);
-      EXPECT_EQ(entry.u.mapping.committed_private_bytes, 0);
-      EXPECT_EQ(entry.u.mapping.populated_private_bytes, 0);
-      EXPECT_EQ(entry.u.mapping.committed_scaled_bytes, 0);
-      EXPECT_EQ(entry.u.mapping.populated_scaled_bytes, 0);
-    }
-  }
-}
-
 template <typename InfoT>
 void TestInfoProcessMapsSmokeTest(const MappingInfo& test_info, const zx::process& process,
                                   const uint32_t topic) {
@@ -425,39 +393,6 @@ constexpr auto thread_provider = []() -> const zx::thread& {
 TEST_F(ProcessGetInfoTest, InfoProcessMapsThreadHandleIsBadHandle) {
   ASSERT_NO_FATAL_FAILURE(
       CheckWrongHandleTypeFails<zx_info_maps_t>(ZX_INFO_PROCESS_MAPS, 32, thread_provider));
-}
-
-// TODO(https://fxbug.dev/338300808): While in the transition phase for RFC-0254 the additional
-// attribution fields are not used, and we are in 'legacy attribution' mode. This test can be
-// removed once legacy attribution is removed and the tests are updated to validate the new
-// attribution model.
-TEST_F(ProcessGetInfoTest, ProcessVmosScaledSharedBytesSentinel) {
-  const MappingInfo& test_info = GetInfo();
-  const zx::process& process = GetProcess();
-
-  // Buffer big enough to read all of the test process's VMO entries.
-  // There'll be one per mapping, one for the unmapped VMO, plus some
-  // extras (at least the vDSO and the mini-process stack).
-  const size_t entry_count = (test_info.num_mappings + 1 + 8);
-  std::unique_ptr<zx_info_vmo_t[]> vmos(new zx_info_vmo_t[entry_count]);
-
-  // Read the VMO entries.
-  size_t actual;
-  size_t available;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS_VMOS, vmos.get(), entry_count * sizeof(zx_info_vmo_t),
-                             &actual, &available));
-  EXPECT_EQ(actual, available, "Should have read all entries");
-
-  // LTRACEF("\n");
-  for (size_t i = 0; i < actual; i++) {
-    const zx_info_vmo_t& entry = vmos[i];
-    EXPECT_EQ(entry.committed_fractional_scaled_bytes, UINT64_MAX);
-    EXPECT_EQ(entry.populated_fractional_scaled_bytes, UINT64_MAX);
-    EXPECT_EQ(entry.committed_private_bytes, 0);
-    EXPECT_EQ(entry.populated_private_bytes, 0);
-    EXPECT_EQ(entry.committed_scaled_bytes, 0);
-    EXPECT_EQ(entry.populated_scaled_bytes, 0);
-  }
 }
 
 // Tests that ZX_INFO_PROCESS_VMOS seems to work.
