@@ -36,42 +36,6 @@ constexpr uint32_t kMemoryDomain = 3;
 
 namespace aml_nna {
 
-zx_status_t AmlNnaDevice::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
-  return pdev_.GetMmio(index, out_mmio);
-}
-
-zx_status_t AmlNnaDevice::PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
-  return pdev_.GetInterrupt(index, flags, out_irq);
-}
-
-zx_status_t AmlNnaDevice::PDevGetBti(uint32_t index, zx::bti* out_handle) {
-  return pdev_.GetBti(index, out_handle);
-}
-
-zx_status_t AmlNnaDevice::PDevGetSmc(uint32_t index, zx::resource* out_resource) {
-  return pdev_.GetSmc(index, out_resource);
-}
-
-zx_status_t AmlNnaDevice::PDevGetDeviceInfo(pdev_device_info_t* out_info) {
-  return pdev_.GetDeviceInfo(out_info);
-}
-
-zx_status_t AmlNnaDevice::PDevGetBoardInfo(pdev_board_info_t* out_info) {
-  return pdev_.GetBoardInfo(out_info);
-}
-// This is to be compatible with magma::ZirconPlatformDevice.
-zx_status_t AmlNnaDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
-  switch (proto_id) {
-    case ZX_PROTOCOL_PDEV:
-      proto->ops = &pdev_protocol_ops_;
-      proto->ctx = this;
-      return ZX_OK;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
 zx_status_t AmlNnaDevice::Init() {
   if (nna_block_.nna_power_version == kNnaPowerDomain) {
     zx_status_t status = PowerDomainControl(true);
