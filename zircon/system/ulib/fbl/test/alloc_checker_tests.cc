@@ -4,6 +4,8 @@
 
 #include <zircon/assert.h>
 
+#include <memory>
+
 #include <fbl/alloc_checker.h>
 #include <zxtest/zxtest.h>
 
@@ -46,5 +48,12 @@ TEST(AllocCheckerTests, DontPanicIfReusedWhenArmed) {
 }
 
 #endif
+
+TEST(AllocCheckerTests, ArmWithSmartPointer) {
+  std::unique_ptr<int> ptr;
+  fbl::AllocChecker ac;
+  ac.arm(sizeof(*ptr), ptr);
+  ASSERT_FALSE(ac.check());
+}
 
 }  // namespace
