@@ -89,6 +89,7 @@ impl NetstackVersion {
                 fposix_socket_raw::ProviderMarker::PROTOCOL_NAME,
                 fposix_socket::ProviderMarker::PROTOCOL_NAME,
                 fnet_debug::DiagnosticsMarker::PROTOCOL_NAME,
+                fupdate_verify::ComponentOtaHealthCheckMarker::PROTOCOL_NAME,
                 fupdate_verify::NetstackVerifierMarker::PROTOCOL_NAME,
                 $($name),*
             ]};

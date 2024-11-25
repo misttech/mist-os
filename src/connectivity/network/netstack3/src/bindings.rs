@@ -30,6 +30,7 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 
+mod health_check_worker;
 mod time;
 mod timers;
 mod util;
@@ -1152,6 +1153,7 @@ pub(crate) enum Service {
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     FilterControl(fidl_fuchsia_net_filter::ControlRequestStream),
     FilterState(fidl_fuchsia_net_filter::StateRequestStream),
+    HealthCheck(fidl_fuchsia_update_verify::ComponentOtaHealthCheckRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     MulticastAdminV4(fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerRequestStream),
@@ -1674,6 +1676,9 @@ impl NetstackSeed {
                         }
                         Service::Verifier(verifier) => {
                             verifier.serve_with(|rs| verifier_worker::serve(rs)).await
+                        }
+                        Service::HealthCheck(health_check) => {
+                            health_check.serve_with(|rs| health_check_worker::serve(rs)).await
                         }
                     }
                 })

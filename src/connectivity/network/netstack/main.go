@@ -661,6 +661,21 @@ func Main() {
 		)
 	}
 	{
+		stub := verify.ComponentOtaHealthCheckWithCtxStub{Impl: &healthCheck{}}
+		componentCtx.OutgoingService.AddService(
+			verify.ComponentOtaHealthCheckName,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(verify.ComponentOtaHealthCheckName, "%s", err)
+					},
+				})
+
+				return nil
+			},
+		)
+	}
+	{
 		tokenV4, err := zx.NewEvent(0 /* options */)
 		if err != nil {
 			panic("cannot initialize a zircon event")
@@ -1152,4 +1167,14 @@ func (*verifier) Verify(fidl.Context, verify.VerifyOptions) (verify.VerifierVeri
 	// Wait an arbitrary amount of time; if we didn't crash, we're probably healthy.
 	<-time.After(15 * time.Second)
 	return verify.VerifierVerifyResultWithResponse(verify.VerifierVerifyResponse{}), nil
+}
+
+var _ verify.ComponentOtaHealthCheckWithCtx = (*healthCheck)(nil)
+
+type healthCheck struct{}
+
+func (*healthCheck) GetHealthStatus(fidl.Context) (verify.HealthStatus, error) {
+	// Wait an arbitrary amount of time; if we didn't crash, we're probably healthy.
+	<-time.After(15 * time.Second)
+	return verify.HealthStatusHealthy, nil
 }
