@@ -131,6 +131,17 @@ TEST_F(SpmiCtlTest, ReadWrite) {
   EXPECT_EQ(spmi_->target_id(), 11);
   EXPECT_EQ(spmi_->read_size(), 4);
   EXPECT_EQ(spmi_->address(), 0x1234);
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w", "1", "2", "3", "4", "5", "6",
+                         "7", "8", "9"}),
+            0);
+  EXPECT_EQ(spmi_->target_id(), 0);
+  kCannedData = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  EXPECT_TRUE(spmi_->data() == kCannedData);
+  EXPECT_EQ(spmi_->address(), 0x1234);
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-r", "9"}), 0);
+  EXPECT_EQ(spmi_->target_id(), 0);
+  EXPECT_EQ(spmi_->read_size(), 9);
+  EXPECT_EQ(spmi_->address(), 0x1234);
 
   // Errors.
   ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-w", "0x12", "0x34", "0x56"}),
@@ -138,11 +149,6 @@ TEST_F(SpmiCtlTest, ReadWrite) {
   ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x5678", "-r", "4"}),
             -1);  // Unknown address.
   ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x10000", "-r", "4"}),
-            -1);  // Address too big.
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-r", "9"}),
-            -1);                                                              // Read too big.
+            -1);                                                              // Address too big.
   ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w"}), -1);  // Write no data.
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w", "1", "2", "3", "4", "5", "6",
-                         "7", "8", "9"}),
-            -1);  // Write too big.
 }

@@ -196,7 +196,7 @@ class SpmiRegisterAddr : public RegisterAddr<RegType> {
 // Helper for consolidating contiguous reads/writes to SPMI registers.
 class SpmiRegisterArray {
  public:
-  SpmiRegisterArray(uint32_t base_address, size_t size) : base_address_(base_address) {
+  SpmiRegisterArray(uint16_t base_address, size_t size) : base_address_(base_address) {
     regs_.resize(size);
   }
 
@@ -207,31 +207,20 @@ class SpmiRegisterArray {
 
   zx::result<SpmiRegisterArray> ReadFrom(
       const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
-    uint32_t address = base_address_;
-    size_t size = regs_.size();
-    auto data = regs_.data();
-
-    while (size) {
-      size_t read_size =
-          std::min<size_t>(size, fuchsia_hardware_spmi::wire::kMaxExtendedLongTransferSize);
-      auto response = fidl::WireCall(client)->ExtendedRegisterReadLong(address, read_size);
-      if (!response.ok()) {
-        return zx::error(response.status());
-      }
-      if (response.value().is_error()) {
-        return internal::MapError(response.value().error_value()).take_error();
-      }
-
-      if (response.value().value()->data.count() != read_size) {
-        return zx::error(ZX_ERR_BAD_STATE);
-      }
-
-      memcpy(data, response.value().value()->data.data(), read_size);
-
-      size -= read_size;
-      address += read_size;
-      data += read_size;
+    auto response = fidl::WireCall(client)->ExtendedRegisterReadLong(
+        base_address_, static_cast<uint32_t>(regs_.size()));
+    if (!response.ok()) {
+      return zx::error(response.status());
     }
+    if (response.value().is_error()) {
+      return internal::MapError(response.value().error_value()).take_error();
+    }
+
+    if (response.value().value()->data.count() != static_cast<uint32_t>(regs_.size())) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
+    memcpy(regs_.data(), response.value().value()->data.data(), regs_.size());
     return zx::ok(*this);
   }
 
@@ -240,25 +229,13 @@ class SpmiRegisterArray {
   }
 
   zx::result<> WriteTo(const fidl::UnownedClientEnd<fuchsia_hardware_spmi::Device>& client) {
-    uint32_t address = base_address_;
-    size_t size = regs_.size();
-    auto data = regs_.data();
-
-    while (size) {
-      size_t write_size =
-          std::min<size_t>(size, fuchsia_hardware_spmi::wire::kMaxExtendedLongTransferSize);
-      auto response = fidl::WireCall(client)->ExtendedRegisterWriteLong(
-          address, fidl::VectorView<uint8_t>::FromExternal(data, write_size));
-      if (!response.ok()) {
-        return zx::error(response.status());
-      }
-      if (response.value().is_error()) {
-        return internal::MapError(response.value().error_value()).take_error();
-      }
-
-      size -= write_size;
-      address += write_size;
-      data += write_size;
+    auto response = fidl::WireCall(client)->ExtendedRegisterWriteLong(
+        base_address_, fidl::VectorView<uint8_t>::FromExternal(regs_));
+    if (!response.ok()) {
+      return zx::error(response.status());
+    }
+    if (response.value().is_error()) {
+      return internal::MapError(response.value().error_value()).take_error();
     }
     return zx::ok();
   }
@@ -270,7 +247,7 @@ class SpmiRegisterArray {
   std::vector<uint8_t>& regs() { return regs_; }
 
  private:
-  uint32_t base_address_;
+  uint16_t base_address_;
   std::vector<uint8_t> regs_;
 };
 

@@ -7,9 +7,6 @@ library fuchsia.hardware.spmi;
 /// Maximum length of the SPMI device name.
 const MAX_SPMI_NAME_LEN uint32 = 64;
 
-/// The maximum number of bytes that can be read or written in a single Extended Long SPMI command.
-const MAX_EXTENDED_LONG_TRANSFER_SIZE uint32 = 8;
-
 /// An arbitrary limit on the number of register writes that can be returned to
 /// `WatchControllerWriteCommands()`.
 const MAX_CONTROLLER_WRITE_COMMANDS uint32 = 256;
@@ -50,22 +47,24 @@ type Register8 = struct {
 /// To support multiple SPMI devices, multiple nodes must be instantiated.
 @discoverable
 open protocol Device {
-    /// Issue one Extended Register Read Long SPMI command to the SPMI device.
-    /// Used to read from a 16 bit SPMI register space. Up to 8 bytes can be read at a time.
-    /// When successful, it returns `size_bytes` in `data` read from `address` in the device.
+    /// Issue Extended Register Read Long SPMI commands to the SPMI device.
+    /// Used to read from a 16 bit SPMI register space.
+    /// When successful, it returns `size_bytes` in `data` read contiguously starting from
+    /// `address` in the device.
     flexible ExtendedRegisterReadLong(struct {
         address uint16;
         size_bytes uint32;
     }) -> (struct {
-        data vector<uint8>:MAX_EXTENDED_LONG_TRANSFER_SIZE;
+        data vector<uint8>:MAX;
     }) error DriverError;
 
-    /// Issue one Extended Register Write Long SPMI command to the SPMI device.
-    /// Used to write to a 16 bit SPMI register space. Up to 8 bytes can be written at a time.
-    /// When this command is successful, `data` will be written to `address` in the device.
+    /// Issue Extended Register Write Long SPMI commands to the SPMI device.
+    /// Used to write to a 16 bit SPMI register space.
+    /// When this command is successful, `data` will be written contiguously starting from
+    /// `address` in the device.
     flexible ExtendedRegisterWriteLong(struct {
         address uint16;
-        data vector<uint8>:MAX_EXTENDED_LONG_TRANSFER_SIZE;
+        data vector<uint8>:MAX;
     }) -> () error DriverError;
 
     /// Get the properties of the SPMI device.
