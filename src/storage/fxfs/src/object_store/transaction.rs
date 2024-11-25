@@ -4,7 +4,7 @@
 
 use crate::checksum::Checksum;
 use crate::debug_assert_not_too_long;
-use crate::filesystem::TxnGuard;
+use crate::filesystem::{FxFilesystem, TxnGuard};
 use crate::log::*;
 use crate::lsm_tree::types::Item;
 use crate::object_handle::INVALID_OBJECT_ID;
@@ -30,7 +30,7 @@ use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::marker::PhantomPinned;
 use std::ops::{Deref, DerefMut, Range};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
 use std::{fmt, mem};
 
@@ -743,14 +743,14 @@ impl<'a> Transaction<'a> {
         options: Options<'a>,
         txn_locks: LockKeys,
     ) -> Result<Transaction<'a>, Error> {
-        txn_guard.fs.add_transaction(options.skip_journal_checks).await;
-        let fs = txn_guard.fs.clone();
+        txn_guard.fs().add_transaction(options.skip_journal_checks).await;
+        let fs = txn_guard.fs().clone();
         let guard = scopeguard::guard((), |_| fs.sub_transaction());
         let (metadata_reservation, allocator_reservation, hold) =
-            txn_guard.fs.reservation_for_transaction(options).await?;
+            txn_guard.fs().reservation_for_transaction(options).await?;
 
         let txn_locks = {
-            let lock_manager = txn_guard.fs.lock_manager();
+            let lock_manager = txn_guard.fs().lock_manager();
             let mut write_guard = lock_manager.txn_lock(txn_locks).await;
             std::mem::take(&mut write_guard.0.lock_keys)
         };
@@ -980,7 +980,7 @@ impl<'a> Transaction<'a> {
     /// Commits a transaction.  If successful, returns the journal offset of the transaction.
     pub async fn commit(mut self) -> Result<u64, Error> {
         debug!(txn = ?&self, "Commit");
-        self.txn_guard.fs.clone().commit_transaction(&mut self, &mut |_| {}).await
+        self.txn_guard.fs().clone().commit_transaction(&mut self, &mut |_| {}).await
     }
 
     /// Commits and then runs the callback whilst locks are held.  The callback accepts a single
@@ -995,7 +995,7 @@ impl<'a> Transaction<'a> {
         let mut f = Some(f);
         let mut result = None;
         self.txn_guard
-            .fs
+            .fs()
             .clone()
             .commit_transaction(&mut self, &mut |offset| {
                 result = Some(f.take().unwrap()(offset));
@@ -1008,9 +1008,9 @@ impl<'a> Transaction<'a> {
     /// dropped (but transaction locks will get downgraded to read locks).
     pub async fn commit_and_continue(&mut self) -> Result<(), Error> {
         debug!(txn = ?self, "Commit");
-        self.txn_guard.fs.clone().commit_transaction(self, &mut |_| {}).await?;
+        self.txn_guard.fs().clone().commit_transaction(self, &mut |_| {}).await?;
         assert!(self.mutations.is_empty());
-        self.txn_guard.fs.lock_manager().downgrade_locks(&self.txn_locks);
+        self.txn_guard.fs().lock_manager().downgrade_locks(&self.txn_locks);
         Ok(())
     }
 }
@@ -1020,7 +1020,7 @@ impl Drop for Transaction<'_> {
         // Call the filesystem implementation of drop_transaction which should, as a minimum, call
         // LockManager's drop_transaction to ensure the locks are released.
         debug!(txn = ?&self, "Drop");
-        self.txn_guard.fs.clone().drop_transaction(self);
+        self.txn_guard.fs().clone().drop_transaction(self);
     }
 }
 
@@ -1275,11 +1275,11 @@ impl LockManager {
     ) -> Either<ReadGuard<'a>, WriteGuard<'a>> {
         let mut guard = match &target_state {
             LockState::ReadLock => Left(ReadGuard {
-                manager: self,
+                manager: self.into(),
                 lock_keys: LockKeys::with_capacity(lock_keys.len()),
             }),
             LockState::Locked | LockState::WriteLock => Right(WriteGuard {
-                manager: self,
+                manager: self.into(),
                 lock_keys: LockKeys::with_capacity(lock_keys.len()),
             }),
         };
@@ -1542,8 +1542,25 @@ impl LockEntry {
 
 #[must_use]
 pub struct ReadGuard<'a> {
-    manager: &'a LockManager,
+    manager: LockManagerRef<'a>,
     lock_keys: LockKeys,
+}
+
+impl ReadGuard<'_> {
+    pub fn fs(&self) -> Option<&Arc<FxFilesystem>> {
+        if let LockManagerRef::Owned(fs) = &self.manager {
+            Some(fs)
+        } else {
+            None
+        }
+    }
+
+    pub fn into_owned(mut self, fs: Arc<FxFilesystem>) -> ReadGuard<'static> {
+        ReadGuard {
+            manager: LockManagerRef::Owned(fs),
+            lock_keys: std::mem::replace(&mut self.lock_keys, LockKeys::None),
+        }
+    }
 }
 
 impl Drop for ReadGuard<'_> {
@@ -1564,7 +1581,7 @@ impl fmt::Debug for ReadGuard<'_> {
 
 #[must_use]
 pub struct WriteGuard<'a> {
-    manager: &'a LockManager,
+    manager: LockManagerRef<'a>,
     lock_keys: LockKeys,
 }
 
@@ -1581,6 +1598,28 @@ impl fmt::Debug for WriteGuard<'_> {
             .field("manager", &(&self.manager as *const _))
             .field("lock_keys", &self.lock_keys)
             .finish()
+    }
+}
+
+enum LockManagerRef<'a> {
+    Borrowed(&'a LockManager),
+    Owned(Arc<FxFilesystem>),
+}
+
+impl Deref for LockManagerRef<'_> {
+    type Target = LockManager;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            LockManagerRef::Borrowed(m) => m,
+            LockManagerRef::Owned(f) => f.lock_manager(),
+        }
+    }
+}
+
+impl<'a> From<&'a LockManager> for LockManagerRef<'a> {
+    fn from(value: &'a LockManager) -> Self {
+        LockManagerRef::Borrowed(value)
     }
 }
 

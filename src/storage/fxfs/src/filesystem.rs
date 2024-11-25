@@ -568,16 +568,12 @@ impl FxFilesystem {
     /// by the same task since that can lead to deadlocks if another task tries to take a write
     /// lock.
     pub async fn txn_guard(self: Arc<Self>) -> TxnGuard<'static> {
-        unsafe fn extend_lifetime(guard: ReadGuard<'_>) -> ReadGuard<'static> {
-            std::mem::transmute(guard)
-        }
-
-        let guard = self.lock_manager.read_lock(lock_keys!(LockKey::Filesystem)).await;
-        // SAFETY: This is safe because we keep a reference to the filesystem until
-        // the guard is dropped.  See `TxnGuard`.
-        let guard = unsafe { extend_lifetime(guard) };
-
-        TxnGuard { fs: self, _guard: Some(guard) }
+        TxnGuard::Owned(
+            self.lock_manager
+                .read_lock(lock_keys!(LockKey::Filesystem))
+                .await
+                .into_owned(self.clone()),
+        )
     }
 
     pub async fn new_transaction<'a>(
@@ -585,10 +581,8 @@ impl FxFilesystem {
         locks: LockKeys,
         options: transaction::Options<'a>,
     ) -> Result<Transaction<'a>, Error> {
-        let guard = if options.txn_guard.is_some() {
-            // We can just pass None to guard.  The 'a lifetime on Options and Transaction mean that
-            // the guard will remain in place until after the new Transaction is dropped.
-            TxnGuard { _guard: None, fs: self }
+        let guard = if let Some(guard) = options.txn_guard.as_ref() {
+            TxnGuard::Borrowed(guard)
         } else {
             self.txn_guard().await
         };
@@ -806,10 +800,18 @@ impl FxFilesystem {
     }
 }
 
-pub struct TxnGuard<'a> {
-    // Elsewhere we rely on _guard being dropped before `fs`: see the `txn_guard` function above.
-    _guard: Option<ReadGuard<'a>>,
-    pub fs: Arc<FxFilesystem>,
+pub enum TxnGuard<'a> {
+    Borrowed(&'a TxnGuard<'a>),
+    Owned(ReadGuard<'static>),
+}
+
+impl TxnGuard<'_> {
+    pub fn fs(&self) -> &Arc<FxFilesystem> {
+        match self {
+            TxnGuard::Borrowed(b) => b.fs(),
+            TxnGuard::Owned(o) => o.fs().unwrap(),
+        }
+    }
 }
 
 /// Helper method for making a new filesystem.
