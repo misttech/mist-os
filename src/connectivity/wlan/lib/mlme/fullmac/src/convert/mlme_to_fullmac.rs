@@ -216,10 +216,11 @@ pub fn convert_eapol_request(
 
 pub fn convert_sae_handshake_response(
     resp: fidl_mlme::SaeHandshakeResponse,
-) -> fidl_fullmac::WlanFullmacSaeHandshakeResp {
-    fidl_fullmac::WlanFullmacSaeHandshakeResp {
-        peer_sta_address: resp.peer_sta_address,
-        status_code: resp.status_code,
+) -> fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+    fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+        peer_sta_address: Some(resp.peer_sta_address),
+        status_code: Some(resp.status_code),
+        ..Default::default()
     }
 }
 

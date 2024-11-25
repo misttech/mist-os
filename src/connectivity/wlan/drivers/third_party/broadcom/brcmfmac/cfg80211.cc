@@ -5748,14 +5748,20 @@ fail:
 }
 
 zx_status_t brcmf_if_sae_handshake_resp(
-    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp) {
+    net_device* ndev,
+    const fuchsia_wlan_fullmac_wire::WlanFullmacImplSaeHandshakeRespRequest* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   bcme_status_t fw_err = BCME_OK;
   zx_status_t status = ZX_OK;
 
-  if (!resp) {
-    BRCMF_ERR("Invalid arguments, resp is nullptr.");
+  if (!resp || !resp->has_peer_sta_address() || !resp->has_status_code()) {
+    if (!resp) {
+      BRCMF_ERR("Invalid arguments, resp is nullptr");
+    } else {
+      BRCMF_ERR("Invalid arguments, has_peer_sta_address: %u has_status_code: %u.",
+                resp->has_peer_sta_address(), resp->has_status_code());
+    }
     if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
       brcmf_bss_roam_done(ifp, brcmf_connect_status_t::AUTHENTICATION_FAILED,
                           fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedExternalReason);
@@ -5766,12 +5772,12 @@ zx_status_t brcmf_if_sae_handshake_resp(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (memcmp(resp->peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(),
+  if (memcmp(resp->peer_sta_address().data(), ifp->connect_req.selected_bss()->bssid().data(),
              ETH_ALEN)) {
     BRCMF_ERR("Auth MAC != Join MAC");
 #if !defined(NDEBUG)
     const uint8_t* old_mac = ifp->connect_req.selected_bss()->bssid().data();
-    const uint8_t* new_mac = resp->peer_sta_address.data();
+    const uint8_t* new_mac = resp->peer_sta_address().data();
     BRCMF_DBG(CONN, " auth mac: " FMT_MAC ", join mac: " FMT_MAC, FMT_MAC_ARGS(new_mac),
               FMT_MAC_ARGS(old_mac));
 #endif /* !defined(NDEBUG) */

@@ -23,7 +23,7 @@ pub enum FullmacRequest {
     EapolTx(fidl_fullmac::WlanFullmacImplEapolTxRequest),
     GetIfaceCounterStats,
     GetIfaceHistogramStats,
-    SaeHandshakeResp(fidl_fullmac::WlanFullmacSaeHandshakeResp),
+    SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest),
     SaeFrameTx(fidl_fullmac::WlanFullmacSaeFrame),
     WmmStatusReq,
     OnLinkStateChanged(fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest),
@@ -111,8 +111,8 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::GetIfaceHistogramStats { .. } => {
                 self.history.push(FullmacRequest::GetIfaceHistogramStats)
             }
-            WlanFullmacImpl_Request::SaeHandshakeResp { resp, .. } => {
-                self.history.push(FullmacRequest::SaeHandshakeResp(resp.clone()))
+            WlanFullmacImpl_Request::SaeHandshakeResp { payload, .. } => {
+                self.history.push(FullmacRequest::SaeHandshakeResp(payload.clone()))
             }
             WlanFullmacImpl_Request::SaeFrameTx { frame, .. } => {
                 self.history.push(FullmacRequest::SaeFrameTx(frame.clone()))

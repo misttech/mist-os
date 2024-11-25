@@ -700,7 +700,7 @@ async fn test_wpa3_connect_success() {
         assert_eq!(update_sink.len(), 0);
 
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImpl_Request::SaeHandshakeResp { resp: _, responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::SaeHandshakeResp { payload: _, responder } => {
                 responder
                     .send()
                     .expect("Failed to respond to SaeHandshakeResp");
@@ -780,9 +780,10 @@ async fn test_wpa3_connect_success() {
 
     assert_eq!(
         fullmac_request_history[3],
-        FullmacRequest::SaeHandshakeResp(fidl_fullmac::WlanFullmacSaeHandshakeResp {
-            peer_sta_address: fullmac_driver.sta_addr(),
-            status_code: fidl_ieee80211::StatusCode::Success,
+        FullmacRequest::SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest {
+            peer_sta_address: Some(fullmac_driver.sta_addr()),
+            status_code: Some(fidl_ieee80211::StatusCode::Success),
+            ..Default::default()
         })
     );
 

@@ -46,7 +46,7 @@ pub trait DeviceOps {
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
     fn sae_handshake_resp(
         &self,
-        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+        resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
     ) -> anyhow::Result<()>;
     fn sae_frame_tx(&self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()>;
     fn wmm_status_req(&self) -> anyhow::Result<()>;
@@ -217,7 +217,7 @@ impl DeviceOps for FullmacDevice {
     }
     fn sae_handshake_resp(
         &self,
-        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+        resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
     ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
             .sae_handshake_resp(&resp, zx::MonotonicInstant::INFINITE)
@@ -267,7 +267,7 @@ pub mod test_utils {
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
-        SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacSaeHandshakeResp },
+        SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
         SaeFrameTx { frame: fidl_fullmac::WlanFullmacSaeFrame },
         WmmStatusReq,
         OnLinkStateChanged { req: fidl_fullmac::WlanFullmacImplOnLinkStateChangedRequest },
@@ -504,7 +504,7 @@ pub mod test_utils {
         }
         fn sae_handshake_resp(
             &self,
-            resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+            resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest,
         ) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::SaeHandshakeResp { resp });
             Ok(())

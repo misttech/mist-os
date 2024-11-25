@@ -1005,8 +1005,11 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeHandshakeResp { resp })) => resp);
-        assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
-        assert_eq!(driver_req.status_code, fidl_ieee80211::StatusCode::AntiCloggingTokenRequired);
+        assert_eq!(driver_req.peer_sta_address.unwrap(), [1u8; 6]);
+        assert_eq!(
+            driver_req.status_code.unwrap(),
+            fidl_ieee80211::StatusCode::AntiCloggingTokenRequired
+        );
     }
 
     #[test]

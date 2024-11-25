@@ -502,8 +502,7 @@ void WlanInterface::GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync
 
 void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request,
                                      SaeHandshakeRespCompleter::Sync& completer) {
-  const fuchsia_wlan_fullmac::wire::WlanFullmacSaeHandshakeResp resp = request->resp;
-  brcmf_if_sae_handshake_resp(wdev_->netdev, &resp);
+  brcmf_if_sae_handshake_resp(wdev_->netdev, request);
   completer.Reply();
 }
 

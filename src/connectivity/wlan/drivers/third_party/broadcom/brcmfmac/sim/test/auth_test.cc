@@ -553,9 +553,15 @@ void AuthTest::OnSaeFrameRx(const wlan_fullmac_wire::WlanFullmacSaeFrame* frame)
     if (sae_ignore_confirm)
       return;
 
-    wlan_fullmac_wire::WlanFullmacSaeHandshakeResp resp = {
-        .status_code = wlan_ieee80211::StatusCode::kSuccess};
-    kDefaultBssid.CopyTo(resp.peer_sta_address.data());
+    fidl::Array<uint8_t, 6> mac_addr;
+    kDefaultBssid.CopyTo(mac_addr.data());
+
+    auto resp =
+        wlan_fullmac_wire::WlanFullmacImplSaeHandshakeRespRequest::Builder(client_ifc_.test_arena_)
+            .status_code(wlan_ieee80211::StatusCode::kSuccess)
+            .peer_sta_address(mac_addr)
+            .Build();
+
     auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SaeHandshakeResp(resp);
     EXPECT_TRUE(result.ok());
     sae_auth_state_ = DONE;
