@@ -221,6 +221,19 @@ source_set("thread_profile") {
   ]
 }
 
+source_set("thread_profile_dfv2") {
+  configs += [ "..:platform_include_config" ]
+
+  sources = [ "zircon_platform_thread_profile_dfv2.cc" ]
+
+  deps = [
+    "..:thread_header",
+    "//sdk/lib/scheduler/cpp",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
+  ]
+}
+
 source_set("event") {
   configs += [ "..:platform_include_config" ]
 

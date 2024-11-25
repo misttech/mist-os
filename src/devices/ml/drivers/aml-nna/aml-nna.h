@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -70,7 +71,8 @@ class AmlNnaDevice : public AmlNnaDeviceType,
         memory_pd_mmio_(std::move(memory_pd_mmio)),
         reset_(std::move(reset)),
         nna_block_(nna_block),
-        smc_monitor_(std::move(smc_monitor)) {}
+        smc_monitor_(std::move(smc_monitor)),
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   zx_status_t Init();
@@ -103,6 +105,7 @@ class AmlNnaDevice : public AmlNnaDeviceType,
 
   // Control PowerDomain
   zx::resource smc_monitor_;
+  component::OutgoingDirectory outgoing_;
 };
 
 }  // namespace aml_nna

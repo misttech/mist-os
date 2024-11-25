@@ -59,7 +59,7 @@ source_set("hardware_tests") {
 
   deps = [
     "../../src",
-    "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper_dfv2",
     "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
     "//src/graphics/magma/lib/magma_service/util:mapped_batch",
     "//third_party/googletest:gtest",
