@@ -192,11 +192,9 @@ where
     G: FnMut(Request<RS::Protocol>) -> Option<fidl::endpoints::ServerEnd<fio::DirectoryMarker>>,
 {
     while let Some(request) = stream.try_next().await? {
-        if let Some(directory_request) = get_directory_request_fn(request) {
-            if let Err(err) = directory_mutex.lock().await.clone(
-                fio::OpenFlags::RIGHT_READABLE,
-                ServerEnd::<fio::NodeMarker>::new(directory_request.into_channel()),
-            ) {
+        if let Some(server_end) = get_directory_request_fn(request) {
+            if let Err(err) = directory_mutex.lock().await.clone2(server_end.into_channel().into())
+            {
                 tracing::error!(
                     "Failed to clone directory connection for {}: {:?}",
                     RS::Protocol::DEBUG_NAME,
