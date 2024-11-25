@@ -46,29 +46,11 @@ class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
 
+  // Create a RuntimeDynamicLinker with the passed in passive `abi`. The caller
+  // is required to pass an AllocChecker and check it to verify the
+  // RuntimeDynamicLinker was created and initialized successfully.
   static std::unique_ptr<RuntimeDynamicLinker> Create(const ld::abi::Abi<>& abi,
-                                                      fbl::AllocChecker& ac) {
-    assert(abi.loaded_modules);
-    assert(abi.static_tls_modules.size() == abi.static_tls_offsets.size());
-
-    // Arm the caller's AllocChecker with the return value of this function.
-    auto result = [&ac](std::unique_ptr<RuntimeDynamicLinker> v) {
-      ac.arm(sizeof(RuntimeDynamicLinker), v != nullptr);
-      return v;
-    };
-
-    fbl::AllocChecker linker_ac;
-    std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
-    if (linker_ac.check()) [[likely]] {
-      fbl::AllocChecker populate_ac;
-      dynamic_linker->PopulateStartupModules(populate_ac, abi);
-      if (!populate_ac.check()) [[unlikely]] {
-        return result(nullptr);
-      }
-    }
-
-    return result(std::move(dynamic_linker));
-  }
+                                                      fbl::AllocChecker& ac);
 
   constexpr const ModuleList& modules() const { return modules_; }
 

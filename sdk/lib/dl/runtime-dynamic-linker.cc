@@ -80,4 +80,28 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
   set_result(true);
 }
 
+std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi::Abi<>& abi,
+                                                                   fbl::AllocChecker& ac) {
+  assert(abi.loaded_modules);
+  assert(abi.static_tls_modules.size() == abi.static_tls_offsets.size());
+
+  // Arm the caller's AllocChecker with the return value of this function.
+  auto result = [&ac](std::unique_ptr<RuntimeDynamicLinker> v) {
+    ac.arm(sizeof(RuntimeDynamicLinker), static_cast<bool>(v));
+    return v;
+  };
+
+  fbl::AllocChecker linker_ac;
+  std::unique_ptr<RuntimeDynamicLinker> dynamic_linker{new (linker_ac) RuntimeDynamicLinker};
+  if (linker_ac.check()) [[likely]] {
+    fbl::AllocChecker populate_ac;
+    dynamic_linker->PopulateStartupModules(populate_ac, abi);
+    if (!populate_ac.check()) [[unlikely]] {
+      return result(nullptr);
+    }
+  }
+
+  return result(std::move(dynamic_linker));
+}
+
 }  // namespace dl
