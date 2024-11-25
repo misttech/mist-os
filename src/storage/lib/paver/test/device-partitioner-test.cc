@@ -57,6 +57,7 @@
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/paver/android.h"
 #include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
@@ -1734,6 +1735,75 @@ TEST_F(Vim3PartitionerTests, Initialize) {
 
   ASSERT_NO_FATAL_FAILURE(VerifyBootloaderDevice(boot0_dev.get()));
   ASSERT_NO_FATAL_FAILURE(VerifyBootloaderDevice(boot1_dev.get()));
+}
+
+class AndroidPartitionerTests : public GptDevicePartitionerTests {
+ protected:
+  AndroidPartitionerTests() = default;
+
+  // Create a DevicePartition for a device.
+  zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(
+      BlockDevice* gpt = nullptr) {
+    fidl::ClientEnd<fuchsia_io::Directory> svc_root = RealmExposedDir();
+    zx::result controller = ControllerFromBlock(gpt);
+    if (controller.is_error()) {
+      return controller.take_error();
+    }
+    zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+    if (devices.is_error()) {
+      return devices.take_error();
+    }
+    return paver::AndroidDevicePartitioner::Initialize(*devices, svc_root, paver::Arch::kX64,
+                                                       std::move(controller.value()), {});
+  }
+};
+
+TEST_F(AndroidPartitionerTests, InitializeWithoutGptFails) {
+  std::unique_ptr<BlockDevice> primary_gpt_dev;
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(&primary_gpt_dev));
+  ASSERT_NO_FATAL_FAILURE(WaitForBlockDevices(1));
+
+  ASSERT_NOT_OK(CreatePartitioner());
+}
+
+TEST_F(AndroidPartitionerTests, Initialize) {
+  std::unique_ptr<BlockDevice> primary_gpt_dev;
+  std::unique_ptr<BlockDevice> other_gpt_dev;
+  constexpr uint64_t kBlockCount = 0x748034;
+  ASSERT_NO_FATAL_FAILURE(
+      CreateDiskWithGpt(&primary_gpt_dev, kBlockCount * block_size_,
+                        // partition size / location is arbitrary
+                        {
+                            {"misc", Uuid(kAbrMetaType), 0x10400, 0x10000},
+                            {"vbmeta_a", Uuid(kVbMetaType), 0x20400, 0x10000},
+                            {"vbmeta_b", Uuid(kVbMetaType), 0x30400, 0x10000},
+                            {"boot_a", Uuid(kBootloaderType), 0x50400, 0x10000},
+                            {"boot_b", Uuid(kBootloaderType), 0x60400, 0x10000},
+                            {"vendor_boot_a", Uuid(kZirconType), 0x70400, 0x10000},
+                            {"vendor_boot_b", Uuid(kZirconType), 0x80400, 0x10000},
+                            {"super", Uuid(kNewFvmType), 0x90400, 0x10000},
+                        }));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&other_gpt_dev, 512 * block_size_,
+                                            // partition size / location is arbitrary
+                                            {
+                                                {"vbmeta", Uuid(kVbMetaType), 0x30, 0x1},
+                                                {"frp", Uuid::Generate(), 0x31, 0x1},
+                                            }));
+  ASSERT_NO_FATAL_FAILURE(WaitForBlockDevices(2 + 2 + 8));
+
+  zx::result status = CreatePartitioner();
+  ASSERT_OK(status);
+  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
+
+  // Make sure we can find the important partitions.
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "boot_shim")));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB, "boot_shim")));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kAbrMeta)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaA)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaB)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
 }
 
 }  // namespace
