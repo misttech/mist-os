@@ -39,15 +39,19 @@ zx::result<OwnedChildNode> AddOwnedChild(
 
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
     fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent, fdf::Logger& logger,
-    std::string_view node_name, const fuchsia_driver_framework::NodePropertyVector& properties,
-    const std::vector<fuchsia_driver_framework::Offer>& offers) {
+    std::string_view node_name,
+    cpp20::span<const fuchsia_driver_framework::NodeProperty> properties,
+    cpp20::span<const fuchsia_driver_framework::Offer> offers) {
   auto [node_controller_client_end, node_controller_server_end] =
       fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
+  std::vector<fuchsia_driver_framework::NodeProperty> props{properties.begin(), properties.end()};
+  std::vector<fuchsia_driver_framework::Offer> offers2{offers.begin(), offers.end()};
+
   fuchsia_driver_framework::NodeAddArgs args{{
       .name = {std::string(node_name)},
-      .properties = properties,
-      .offers2 = offers,
+      .properties = std::move(props),
+      .offers2 = std::move(offers2),
   }};
 
   fidl::Result<fuchsia_driver_framework::Node::AddChild> result =
@@ -95,16 +99,19 @@ zx::result<OwnedChildNode> AddOwnedChild(
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
     fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent, fdf::Logger& logger,
     std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
-    const fuchsia_driver_framework::NodePropertyVector& properties,
-    const std::vector<fuchsia_driver_framework::Offer>& offers) {
+    cpp20::span<const fuchsia_driver_framework::NodeProperty> properties,
+    cpp20::span<const fuchsia_driver_framework::Offer> offers) {
   auto [node_controller_client_end, node_controller_server_end] =
       fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
+  std::vector<fuchsia_driver_framework::NodeProperty> props{properties.begin(), properties.end()};
+  std::vector<fuchsia_driver_framework::Offer> offers2{offers.begin(), offers.end()};
+
   fuchsia_driver_framework::NodeAddArgs args{{
       .name = {std::string(node_name)},
-      .properties = properties,
+      .properties = std::move(props),
       .devfs_args = std::move(devfs_args),
-      .offers2 = offers,
+      .offers2 = std::move(offers2),
   }};
 
   fidl::Result<fuchsia_driver_framework::Node::AddChild> result =
