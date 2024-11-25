@@ -18,7 +18,8 @@ rustc_library("nanohub") {
   sources = [
     "lib.rs",
     "nanohub.rs",
-    "socket_tunnel.rs",
+    "nanohub_comms_directory.rs",
+    "socket_tunnel_file.rs",
   ]
 
   deps = [

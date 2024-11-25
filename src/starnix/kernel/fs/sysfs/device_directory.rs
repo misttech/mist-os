@@ -34,7 +34,7 @@ impl DeviceDirectory {
         self.device.metadata.device_type
     }
 
-    fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
+    pub fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
         // TODO(https://fxbug.dev/42072346): Add power and subsystem nodes.
         vec![
             VecDirectoryEntry {

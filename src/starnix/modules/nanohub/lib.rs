@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod nanohub;
-mod socket_tunnel;
+mod nanohub_comms_directory;
+mod socket_tunnel_file;
 
 pub use nanohub::nanohub_device_init;

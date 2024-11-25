@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::socket_tunnel::socket_tunnel_device_init;
+use crate::nanohub_comms_directory::NanohubCommsDirectory;
+use crate::socket_tunnel_file::register_socket_tunnel_device;
+use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 
@@ -18,12 +20,24 @@ where
     ];
 
     for device in devices {
-        socket_tunnel_device_init(
+        register_socket_tunnel_device(
             locked,
             current_task,
             device[0].into(),
             device[1].into(),
             device[2].into(),
+            DeviceDirectory::new,
         );
     }
+
+    // /dev/nanohub_comms requires a set of additional sysfs nodes, so create this route
+    // with a specialized NanohubCommsDirectory implementation.
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        "/dev/nanohub_comms".into(),
+        "nanohub_comms".into(),
+        "nanohub".into(),
+        NanohubCommsDirectory::new,
+    );
 }
