@@ -287,7 +287,10 @@ source_set("bootstrap") {
 # eagerly link unused code into the standalone binary and rely on linker GC to
 # remove it, which is suboptimal.
 static_library("standalone") {
-  visibility = [ "./*" ]
+  visibility = [
+    "./*",
+    "//src/devices/bin/driver_manager/tests/modules/*",
+  ]
 
   complete_static_lib = true
 
