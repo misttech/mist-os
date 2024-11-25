@@ -585,7 +585,6 @@ mod tests {
     use super::*;
 
     use crate::permission_check::PermissionCheckResult;
-    use crate::sid_table::testing::allocate_sid;
     use crate::{CommonFilePermission, ProcessPermission};
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
@@ -593,8 +592,6 @@ mod tests {
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
     const MINIMAL_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/composite_policies/compiled/minimal_policy.pp");
-    const ALLOW_FORK_BINARY_POLICY: &[u8] =
-        include_bytes!("../testdata/composite_policies/compiled/allow_fork.pp");
 
     fn security_server_with_tests_policy() -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
@@ -944,7 +941,8 @@ mod tests {
     #[test]
     fn permissions_are_fresh_after_different_policy_load() {
         let minimal_bytes = MINIMAL_BINARY_POLICY.to_vec();
-        let allow_fork_bytes = ALLOW_FORK_BINARY_POLICY.to_vec();
+        let allow_fork_bytes =
+            include_bytes!("../testdata/composite_policies/compiled/allow_fork.pp").to_vec();
         let context = b"source_u:object_r:source_t:s0:c0";
 
         let security_server = SecurityServer::new();
@@ -955,7 +953,7 @@ mod tests {
         // Load the minimal policy and get a SID for the context.
         assert_eq!(
             Ok(()),
-            security_server.load_policy(minimal_bytes.clone()).map_err(|e| format!("{:?}", e))
+            security_server.load_policy(minimal_bytes).map_err(|e| format!("{:?}", e))
         );
         let sid = security_server.security_context_to_sid(context.into()).unwrap();
 
@@ -974,41 +972,124 @@ mod tests {
 
     #[test]
     fn unknown_sids_are_effectively_unlabeled() {
-        let security_server = security_server_with_tests_policy();
+        let with_unlabeled_access_domain_policy_bytes = include_bytes!(
+            "../testdata/composite_policies/compiled/with_unlabeled_access_domain_policy.pp"
+        )
+        .to_vec();
+        let with_additional_domain_policy_bytes = include_bytes!(
+            "../testdata/composite_policies/compiled/with_additional_domain_policy.pp"
+        )
+        .to_vec();
+        let allowed_type_context = b"source_u:object_r:allowed_t:s0:c0";
+        let additional_type_context = b"source_u:object_r:additional_t:s0:c0";
+
+        let security_server = SecurityServer::new();
         security_server.set_enforcing(true);
 
-        let valid_sid =
-            security_server.security_context_to_sid(b"user1:object_r:type0:s0:c0".into()).unwrap();
+        // Load a policy, get a SID for a context that is valid for that policy, and verify
+        // that a context that is not valid for that policy is not issued a SID.
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_unlabeled_access_domain_policy_bytes.clone())
+                .map_err(|e| format!("{:?}", e))
+        );
+        let allowed_type_sid =
+            security_server.security_context_to_sid(allowed_type_context.into()).unwrap();
+        assert!(security_server.security_context_to_sid(additional_type_context.into()).is_err());
 
-        // Synthesize a SID with no Security Context in the SID table, which would be the case if the
-        // SID had been allocated, but then removed because a policy load invalidated the Context.
-        let unlabeled_sid =
-            allocate_sid(&mut security_server.state.lock().expect_active_policy_mut().sid_table);
+        // Load the policy that makes the second context valid, and verify that it is valid, and
+        // verify that the first context remains valid (and unchanged).
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_additional_domain_policy_bytes.clone())
+                .map_err(|e| format!("{:?}", e))
+        );
+        let additional_type_sid =
+            security_server.security_context_to_sid(additional_type_context.into()).unwrap();
+        assert_eq!(
+            allowed_type_sid,
+            security_server.security_context_to_sid(allowed_type_context.into()).unwrap()
+        );
 
         let permission_check = security_server.as_permission_check();
 
-        // Test policy allows "type0" the process getsched capability to "unlabeled_t".
+        // "allowed_t" is allowed the process getsched capability to "unlabeled_t" - but since
+        // the currently-loaded policy defines "additional_t", the SID for "additional_t" does
+        // not get treated as effectively unlabeled, and these permission checks are denied.
         assert!(
-            permission_check
-                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::GetSched)
+            !permission_check
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::GetSched)
                 .permit
         );
         assert!(
             !permission_check
-                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::SetSched)
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::SetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::SetSched)
                 .permit
         );
 
-        // Test policy allows "unlabeled_t" the process setsched capability to "type0".
+        // We now flip back to the policy that does not recognize "additional_t"...
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_unlabeled_access_domain_policy_bytes)
+                .map_err(|e| format!("{:?}", e))
+        );
+
+        // The now-loaded policy allows "allowed_t" the process getsched capability
+        // to "unlabeled_t" and since the now-loaded policy does not recognize "additional_t",
+        // "allowed_t" is now allowed the process getsched capability to "additional_t".
+        assert!(
+            permission_check
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::GetSched)
+                .permit
+        );
         assert!(
             !permission_check
-                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::GetSched)
+                .has_permission(allowed_type_sid, additional_type_sid, ProcessPermission::SetSched)
+                .permit
+        );
+
+        // ... and the now-loaded policy also allows "unlabeled_t" the process
+        // setsched capability to "allowed_t" and since the now-loaded policy does not recognize
+        // "additional_t", "unlabeled_t" is now allowed the process setsched capability to
+        // "allowed_t".
+        assert!(
+            !permission_check
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::GetSched)
                 .permit
         );
         assert!(
             permission_check
-                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::SetSched)
+                .has_permission(additional_type_sid, allowed_type_sid, ProcessPermission::SetSched)
                 .permit
+        );
+
+        // We also verify that we do not get a serialization for unrecognized "additional_t"...
+        assert!(security_server.sid_to_security_context(additional_type_sid).is_none());
+
+        // ... but if we flip forward to the policy that recognizes "additional_t", then we see
+        // the serialization succeed and return the original context string.
+        assert_eq!(
+            Ok(()),
+            security_server
+                .load_policy(with_additional_domain_policy_bytes)
+                .map_err(|e| format!("{:?}", e))
+        );
+        assert_eq!(
+            additional_type_context.to_vec(),
+            security_server.sid_to_security_context(additional_type_sid).unwrap()
         );
     }
 

@@ -6,9 +6,19 @@ use crate::policy::parser::ByValue;
 use crate::policy::{Policy, SecurityContext};
 use crate::{InitialSid, SecurityId, FIRST_UNUSED_SID};
 
-use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+
+#[derive(Clone)]
+enum Entry {
+    /// Used in the "typical" case, when a SID is mapped to a [`SecurityContext`].
+    Valid { security_context: SecurityContext },
+
+    /// Used for the cases of unused initial SIDs (which are never mapped to [`SecurityContext`]s)
+    /// and of SIDs which after a load of a new policy are no longer mapped to valid
+    /// [`SecurityContext`]s.
+    Invalid { context_string: Vec<u8> },
+}
 
 /// Maintains the mapping between [`SecurityId`]s and [`SecurityContext`]s. Grows with use:
 /// `SecurityId`s are minted when code asks a `SidTable` for the `SecurityId` associated
@@ -18,97 +28,93 @@ pub struct SidTable {
     /// The policy associated with this [`SidTable`].
     policy: Arc<Policy<ByValue<Vec<u8>>>>,
 
-    /// Contexts keyed by SIDs.
-    context_by_sid: HashMap<SecurityId, SecurityContext>,
-
-    /// The next integer available to be used for a new SID.
-    next_sid: NonZeroU32,
+    /// The mapping from [`SecurityId`] (represented by integer position) to
+    /// [`SecurityContext`] (or for some [`SecurityId`]s, something other than a valid
+    /// [`SecurityContext`]).
+    entries: Vec<Entry>,
 }
 
 impl SidTable {
     pub fn new(policy: Arc<Policy<ByValue<Vec<u8>>>>) -> Self {
-        Self::new_from(policy, NonZeroU32::new(FIRST_UNUSED_SID).unwrap(), HashMap::new())
+        Self::new_from(
+            policy,
+            vec![Entry::Invalid { context_string: Vec::new() }; FIRST_UNUSED_SID as usize],
+        )
     }
 
     pub fn new_from_previous(policy: Arc<Policy<ByValue<Vec<u8>>>>, previous: &Self) -> Self {
-        let mut new_context_by_sid = HashMap::with_capacity(previous.context_by_sid.len());
+        let mut new_entries =
+            vec![Entry::Invalid { context_string: Vec::new() }; FIRST_UNUSED_SID as usize];
+        new_entries.reserve(previous.entries.len());
+
         // Remap any existing Security Contexts to use Ids defined by the new policy.
-        // TODO(b/330677360): Replace serialize/parse with an efficient implementation.
-        for (sid, previous_context) in &previous.context_by_sid {
-            let context_str = previous.policy.serialize_security_context(&previous_context);
-            let new_context = policy.parse_security_context(context_str.as_slice().into());
-            if let Some(new_context) = new_context.ok() {
-                new_context_by_sid.insert(*sid, new_context);
-            } else {
-                // TODO: b/366925222 - stash the previous_context as a plain string.
-            }
-        }
-        Self::new_from(policy, previous.next_sid, new_context_by_sid)
+        // TODO: https://fxbug.dev/330677360 - replace serialize/parse with an
+        // efficient implementation.
+        new_entries.extend(previous.entries[FIRST_UNUSED_SID as usize..].iter().map(
+            |previous_entry| {
+                let serialized_context = match previous_entry {
+                    Entry::Valid { security_context } => {
+                        previous.policy.serialize_security_context(&security_context)
+                    }
+                    Entry::Invalid { context_string } => context_string.clone(),
+                };
+                let context = policy.parse_security_context(serialized_context.as_slice().into());
+                if let Ok(context) = context {
+                    Entry::Valid { security_context: context }
+                } else {
+                    Entry::Invalid { context_string: serialized_context }
+                }
+            },
+        ));
+
+        Self::new_from(policy, new_entries)
     }
 
     /// Looks up `security_context`, adding it if not found, and returns the SID.
     pub fn security_context_to_sid(&mut self, security_context: &SecurityContext) -> SecurityId {
-        match self.context_by_sid.iter().find(|(_, sc)| **sc == *security_context) {
-            Some((sid, _)) => *sid,
-            None => {
-                // Create and insert a new SID for `security_context`.
-                let sid = SecurityId(self.next_sid);
-                self.next_sid = increment_sid_integer(self.next_sid);
-                assert!(
-                    self.context_by_sid.insert(sid, security_context.clone()).is_none(),
-                    "SID already exists."
-                );
-                sid
-            }
-        }
+        let existing = &self.entries[FIRST_UNUSED_SID as usize..]
+            .iter()
+            .position(|entry| match entry {
+                Entry::Valid { security_context: entry_security_context } => {
+                    security_context == entry_security_context
+                }
+                Entry::Invalid { .. } => false,
+            })
+            .map(|slice_relative_index| slice_relative_index + (FIRST_UNUSED_SID as usize));
+        let index = existing.unwrap_or_else(|| {
+            let index = self.entries.len();
+            self.entries.push(Entry::Valid { security_context: security_context.clone() });
+            index
+        });
+        SecurityId(NonZeroU32::new(index as u32).unwrap())
     }
 
     /// Returns the `SecurityContext` associated with `sid`.
     /// If `sid` was invalidated by a policy reload then the "unlabeled"
     /// context is returned instead.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> &SecurityContext {
-        self.context_by_sid.get(&sid).unwrap_or_else(|| {
-            self.context_by_sid.get(&SecurityId::initial(InitialSid::Unlabeled)).unwrap()
+        &self.try_sid_to_security_context(sid).unwrap_or_else(|| {
+            self.try_sid_to_security_context(SecurityId::initial(InitialSid::Unlabeled)).unwrap()
         })
     }
 
     /// Returns the `SecurityContext` associated with `sid`, unless `sid` was invalidated by a
     /// policy reload. Query implementations should use `sid_to_security_context()`.
     pub fn try_sid_to_security_context(&self, sid: SecurityId) -> Option<&SecurityContext> {
-        self.context_by_sid.get(&sid)
+        match &self.entries[sid.0.get() as usize] {
+            Entry::Valid { security_context } => Some(&security_context),
+            Entry::Invalid { .. } => None,
+        }
     }
 
-    fn new_from(
-        policy: Arc<Policy<ByValue<Vec<u8>>>>,
-        next_sid: NonZeroU32,
-        mut new_context_by_sid: HashMap<SecurityId, SecurityContext>,
-    ) -> Self {
-        // Replace the "initial" SID's associated Contexts.
-        for id in InitialSid::all_variants() {
-            let security_context = policy.initial_context(id);
-            new_context_by_sid.insert(SecurityId::initial(id), security_context);
+    fn new_from(policy: Arc<Policy<ByValue<Vec<u8>>>>, mut new_entries: Vec<Entry>) -> Self {
+        for initial_sid in InitialSid::all_variants() {
+            let initial_context = policy.initial_context(initial_sid);
+            new_entries[initial_sid as usize] =
+                Entry::Valid { security_context: initial_context.clone() };
         }
 
-        SidTable { policy, context_by_sid: new_context_by_sid, next_sid }
-    }
-}
-
-fn increment_sid_integer(sid_integer: NonZeroU32) -> NonZeroU32 {
-    sid_integer.checked_add(1).expect("exhausted SID namespace")
-}
-
-/// Test utilities shared `SidTable` users.
-#[cfg(test)]
-pub(crate) mod testing {
-    use super::increment_sid_integer;
-    use crate::sid_table::SidTable;
-    use crate::SecurityId;
-
-    /// Returns the first-unused (or next-to-be-allocated) SID integer.
-    pub(crate) fn allocate_sid(sid_table: &mut SidTable) -> SecurityId {
-        let sid_integer = sid_table.next_sid;
-        sid_table.next_sid = increment_sid_integer(sid_integer);
-        SecurityId(sid_integer)
+        SidTable { policy, entries: new_entries }
     }
 }
 
@@ -159,11 +165,11 @@ mod tests {
             .parse_security_context(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .unwrap();
         let mut sid_table = SidTable::new(policy);
-        let sid_count_before = sid_table.context_by_sid.len();
+        let sid_count_before = sid_table.entries.len();
         let sid1 = sid_table.security_context_to_sid(&security_context);
         let sid2 = sid_table.security_context_to_sid(&security_context);
         assert_eq!(sid1, sid2);
-        assert_eq!(sid_table.context_by_sid.len(), sid_count_before + 1);
+        assert_eq!(sid_table.entries.len(), sid_count_before + 1);
     }
 
     #[test]
@@ -173,9 +179,21 @@ mod tests {
             .parse_security_context(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .unwrap();
         let mut sid_table = SidTable::new(policy);
-        let sid_count_before = sid_table.context_by_sid.len();
+        let sid_count_before = sid_table.entries.len();
         let sid = sid_table.security_context_to_sid(&security_context);
-        assert_eq!(sid_table.context_by_sid.len(), sid_count_before + 1);
+        assert_eq!(sid_table.entries.len(), sid_count_before + 1);
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
+    }
+
+    #[test]
+    fn initial_sids_remapped_to_dynamic_sids() {
+        let file_initial_sid = SecurityId::initial(InitialSid::File);
+        let policy = test_policy();
+        let mut sid_table = SidTable::new(policy);
+        let file_initial_security_context = sid_table.sid_to_security_context(file_initial_sid);
+        let file_dynamic_sid =
+            sid_table.security_context_to_sid(&file_initial_security_context.clone());
+        assert_ne!(file_initial_sid.0.get(), file_dynamic_sid.0.get());
+        assert!(file_dynamic_sid.0.get() >= FIRST_UNUSED_SID);
     }
 }
