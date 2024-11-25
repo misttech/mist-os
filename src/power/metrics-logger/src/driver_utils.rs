@@ -5,20 +5,19 @@
 use anyhow::{format_err, Result};
 use fidl_fuchsia_device as fdevice;
 use serde_derive::Deserialize;
-use std::collections::HashMap;
 use tracing::{error, info};
 
 #[derive(Deserialize)]
 pub struct DriverAlias {
-    /// Human-readable alias.
-    pub name: String,
-    /// Topological path suffix.
-    pub topo_path_suffix: String,
+    /// Sensor name returned by GetSensorName of the driver.
+    pub sensor_name: String,
+    /// Alias for data logging and processing.
+    pub alias: String,
 }
 
 /// Helper struct to deserialize the optional config file loaded from CONFIG_PATH
-/// (//src/power/metrics-logger/src/main.rs). The config file maps the human-readable aliases
-/// to the topological paths of the drivers.
+/// (//src/power/metrics-logger/src/main.rs). The config file maps the sensor name of the driver
+/// to the alias used in data logging and processing.
 #[derive(Deserialize)]
 pub struct Config {
     pub temperature_drivers: Option<Vec<DriverAlias>>,
@@ -35,40 +34,7 @@ pub fn connect_proxy<T: fidl::endpoints::ProtocolMarker>(path: &str) -> Result<T
     Ok(proxy)
 }
 
-/// Maps from devices' topological paths to their class paths in the provided directories.
-pub async fn map_topo_paths_to_class_paths(
-    service_dirs: &[&str],
-) -> Result<HashMap<String, String>> {
-    let mut path_map = HashMap::new();
-    for dir_path in service_dirs {
-        let drivers = list_drivers(dir_path).await;
-        for driver in drivers.iter() {
-            let class_path = format!("{}/{}", dir_path, driver);
-            let topo_path = get_driver_topological_path(&class_path).await?;
-            path_map.insert(topo_path, class_path);
-        }
-    }
-    Ok(path_map)
-}
-
-/// Find driver alias using its full topological path from the provided map from topological path
-/// suffixes to aliases.
-/// TODO(https://fxbug.dev/42065074): Remove mapping from topological path to alias.
-pub fn get_driver_alias(
-    topo_suffix_to_aliases: &HashMap<String, String>,
-    topo_path: &str,
-) -> Option<String> {
-    let mut topo_suffix = topo_path;
-    while let Some((_, suffix)) = topo_suffix.split_once('/') {
-        if let Some(alias) = topo_suffix_to_aliases.get(&format!("/{}", suffix)) {
-            return Some(alias.to_string());
-        }
-        topo_suffix = suffix;
-    }
-    None
-}
-
-async fn get_driver_topological_path(path: &str) -> Result<String> {
+pub async fn get_driver_topological_path(path: &str) -> Result<String> {
     let controller_path = path.to_owned() + "/device_controller";
     let proxy = connect_proxy::<fdevice::ControllerMarker>(&controller_path)?;
     proxy
@@ -97,44 +63,12 @@ pub async fn list_drivers(path: &str) -> Vec<String> {
 // Representation of an actively-used driver.
 pub struct Driver<T> {
     pub alias: Option<String>,
-    pub topological_path: String,
+    pub sensor_name: String,
     pub proxy: T,
 }
 
 impl<T> Driver<T> {
     pub fn name(&self) -> &str {
-        &self.alias.as_ref().unwrap_or(&self.topological_path)
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_driver_alias() {
-        let mut topo_path = "/dev/sys/platform/aml-thermal-ddr/thermal";
-        let mut topo_suffix_to_alias = HashMap::from([
-            ("/thermal".to_string(), "soc_ddr".to_string()),
-            ("/aml-thermal-pll/thermal".to_string(), "soc_pll".to_string()),
-        ]);
-        assert_eq!(
-            get_driver_alias(&topo_suffix_to_alias, &topo_path),
-            Some("soc_ddr".to_string())
-        );
-
-        topo_path = "/dev/sys/platform/05:04:a/aml-thermal-pll/thermal";
-        topo_suffix_to_alias = HashMap::from([
-            ("/thermal".to_string(), "soc_ddr".to_string()),
-            ("/aml-thermal-pll/thermal".to_string(), "soc_pll".to_string()),
-        ]);
-        assert_eq!(
-            get_driver_alias(&topo_suffix_to_alias, &topo_path),
-            Some("soc_pll".to_string())
-        );
-
-        topo_path = "/dev/sys/platform/05:04:a/aml-thermal-pll/thermal";
-        topo_suffix_to_alias = HashMap::new();
-        assert_eq!(get_driver_alias(&topo_suffix_to_alias, &topo_path), None);
+        &self.alias.as_ref().unwrap_or(&self.sensor_name)
     }
 }
