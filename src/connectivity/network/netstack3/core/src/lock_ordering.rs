@@ -288,7 +288,8 @@ impl_lock_after!(IpStateRoutingTables<Ipv6> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
 impl_lock_after!(IpStateRoutingTable<Ipv6> => IpDeviceConfiguration<Ipv4>);
 impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
-impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
+impl_lock_after!(IpDeviceConfiguration<Ipv6> => DeviceLayerState);
+impl_lock_after!(DeviceLayerState => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
 impl_lock_after!(Ipv6DeviceSlaac => Ipv6DeviceAddressDad);
 impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);
@@ -308,11 +309,7 @@ impl_lock_after!(EthernetIpv4Arp => EthernetIpv6Nud);
 impl_lock_after!(EthernetIpv6Nud => AllDeviceSockets);
 
 impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
-impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
-impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
-
-// TODO(https://fxbug.dev/42072024): Double-check that locking IPv4 ethernet state
-// before IPv6 is correct and won't interfere with dual-stack sockets.
+impl_lock_after!(AnyDeviceSockets => EthernetDeviceIpState<Ipv4>);
 impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
 impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceGmp<Ipv6>);
@@ -333,5 +330,5 @@ impl_lock_after!(EthernetDeviceDynamicState => EthernetTxQueue);
 impl_lock_after!(EthernetTxQueue => PureIpDeviceDynamicState);
 impl_lock_after!(PureIpDeviceDynamicState => PureIpDeviceTxQueue);
 
-impl_lock_after!(DeviceLayerState => DeviceSockets);
+impl_lock_after!(AnyDeviceSockets => DeviceSockets);
 impl_lock_after!(DeviceSockets => DeviceSocketState);

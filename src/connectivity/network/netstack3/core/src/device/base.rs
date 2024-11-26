@@ -64,7 +64,10 @@ impl<BC: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOri
     for StackState<BC>
 {
     type Data = OriginTracker;
-    type Guard<'l> = &'l OriginTracker where Self: 'l;
+    type Guard<'l>
+        = &'l OriginTracker
+    where
+        Self: 'l;
     fn access(&self) -> Self::Guard<'_> {
         &self.device.origin
     }
@@ -869,7 +872,7 @@ pub(crate) fn ip_device_state_and_core_ctx<'a, BC: BindingsContext, L>(
 
 pub(crate) fn get_mtu<
     BC: BindingsContext,
-    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+    L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
 >(
     core_ctx: &mut CoreCtx<'_, BC, L>,
     device: &DeviceId<BC>,
@@ -1075,7 +1078,10 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCou
     for StackState<BC>
 {
     type Data = EthernetDeviceCounters;
-    type Guard<'l> = &'l EthernetDeviceCounters where Self: 'l;
+    type Guard<'l>
+        = &'l EthernetDeviceCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.device.ethernet_counters
@@ -1092,7 +1098,10 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCount
     for StackState<BC>
 {
     type Data = PureIpDeviceCounters;
-    type Guard<'l> = &'l PureIpDeviceCounters where Self: 'l;
+    type Guard<'l>
+        = &'l PureIpDeviceCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.device.pure_ip_counters
@@ -1178,7 +1187,10 @@ impl<T, BT: BindingsTypes> LockLevelFor<IpLinkDeviceStateInner<T, BT>>
 
 impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BT> {
     type Data = DeviceCounters;
-    type Guard<'l> = &'l DeviceCounters where Self: 'l;
+    type Guard<'l>
+        = &'l DeviceCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.device.counters
@@ -1220,7 +1232,10 @@ where
 
 impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::ArpCounters> for StackState<BT> {
     type Data = ArpCounters;
-    type Guard<'l> = &'l ArpCounters where Self: 'l;
+    type Guard<'l>
+        = &'l ArpCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.device.arp_counters

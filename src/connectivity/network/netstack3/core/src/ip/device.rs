@@ -521,8 +521,11 @@ impl<
     }
 }
 
-impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
-    ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
+impl<
+        I: IpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
+    > ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
 {
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         crate::device::integration::get_mtu(self, device_id)
@@ -576,7 +579,15 @@ impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
         BC,
     >
 {
-    type IpDeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s <I as IpDeviceIpExt>::Configuration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>, BC> where Self: 's;
+    type IpDeviceStateCtx<'s>
+        = CoreCtxWithIpDeviceConfiguration<
+        's,
+        &'s <I as IpDeviceIpExt>::Configuration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>,
+        BC,
+    >
+    where
+        Self: 's;
 
     fn ip_device_configuration_and_ctx(
         &mut self,
@@ -609,7 +620,15 @@ impl<'a, BC: BindingsContext> device::WithIpv6DeviceConfigurationMutInner<BC>
         BC,
     >
 {
-    type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>, BC> where Self: 's;
+    type Ipv6DeviceStateCtx<'s>
+        = CoreCtxWithIpDeviceConfiguration<
+        's,
+        &'s Ipv6DeviceConfiguration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
+        BC,
+    >
+    where
+        Self: 's;
 
     fn ipv6_device_configuration_and_ctx(
         &mut self,
@@ -913,7 +932,7 @@ impl<
         I: IpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
     > ip::IpDeviceMtuContext<I> for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
 {
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -1348,7 +1367,10 @@ impl<
         L: LockBefore<crate::lock_ordering::FilterState<I>>,
     > FilterHandlerProvider<I, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    type Handler<'b> = FilterImpl<'b, CoreCtx<'a, BC, L>> where Self: 'b;
+    type Handler<'b>
+        = FilterImpl<'b, CoreCtx<'a, BC, L>>
+    where
+        Self: 'b;
 
     fn filter_handler(&mut self) -> Self::Handler<'_> {
         let Self { config: _, core_ctx } = self;
@@ -1401,7 +1423,10 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounter
     for StackState<BC>
 {
     type Data = NudCounters<I>;
-    type Guard<'l> = &'l NudCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l NudCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.nud_counters()
@@ -1536,7 +1561,10 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
 
 impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BT> {
     type Data = SlaacCounters;
-    type Guard<'l> = &'l SlaacCounters where Self: 'l;
+    type Guard<'l>
+        = &'l SlaacCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv6.slaac_counters
