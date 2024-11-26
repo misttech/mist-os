@@ -116,12 +116,6 @@ class InputReportReaderManager final {
   // Assert that our template type `Report` has the following function:
   //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
   //                             input_report, fidl::AnyArena& allocator) const;
-  // or
-  //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
-  //                             input_report, fidl::AnyArena& allocator);
-  //
-  // TODO(https://fxbug.dev/380354758): Delete the non-const variant once
-  // all drivers are migrated to use const `ToFidlInputReport()` methods.
   //
   // TODO(https://fxbug.dev/380355303): Replace the type traits with concepts
   // when concepts are supported.
@@ -133,11 +127,6 @@ class InputReportReaderManager final {
         decltype(static_cast<void (C::*)(
                      fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
                      fidl::AnyArena& allocator) const>(&C::ToFidlInputReport)));
-    template <typename C>
-    static std::true_type test(
-        decltype(static_cast<void (C::*)(
-                     fidl::WireTableBuilder<fuchsia_input_report::wire::InputReport>& input_report,
-                     fidl::AnyArena& allocator)>(&C::ToFidlInputReport)));
     template <typename C>
     static std::false_type test(...);
 
