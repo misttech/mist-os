@@ -39,6 +39,11 @@ zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitioner::Initialize(
   if (gpt.is_error()) {
     return gpt.take_error();
   }
+  if (gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner = WrapUnique(new KolaPartitioner(std::move(gpt->gpt)));
 

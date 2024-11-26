@@ -31,7 +31,7 @@
             from: "self",
         },
         {
-            directory: "partitions",
+            service: "fuchsia.storagehost.PartitionService",
             from: "void",
             availability: "optional",
         },

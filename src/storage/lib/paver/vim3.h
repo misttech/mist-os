@@ -43,11 +43,14 @@ class Vim3Partitioner : public DevicePartitioner {
   zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
-  explicit Vim3Partitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
+  Vim3Partitioner(std::unique_ptr<GptDevicePartitioner> gpt, BlockDevices devfs_devices)
+      : gpt_(std::move(gpt)), devfs_devices_(std::move(devfs_devices)) {}
 
   zx::result<std::unique_ptr<PartitionClient>> GetEmmcBootPartitionClient() const;
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
+  // Some partitions aren't stored in the GPT, so we retain a connector for them.
+  BlockDevices devfs_devices_;
 };
 
 class Vim3PartitionerFactory : public DevicePartitionerFactory {

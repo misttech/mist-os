@@ -42,6 +42,7 @@ pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,
     disk: Option<disk_builder::Disk>,
+    extra_disks: Vec<disk_builder::Disk>,
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
     storage_host: bool,
@@ -53,6 +54,7 @@ impl TestFixtureBuilder {
             netboot: false,
             no_fuchsia_boot: false,
             disk: None,
+            extra_disks: vec![],
             fshost: fshost_builder::FshostBuilder::new(fshost_component_name),
             zbi_ramdisk: None,
             storage_host,
@@ -66,6 +68,16 @@ impl TestFixtureBuilder {
     pub fn with_disk(&mut self) -> &mut disk_builder::DiskBuilder {
         self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
         self.disk.as_mut().unwrap().builder()
+    }
+
+    pub fn with_extra_disk(&mut self) -> &mut disk_builder::DiskBuilder {
+        self.extra_disks.push(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
+        self.extra_disks.last_mut().unwrap().builder()
+    }
+
+    pub fn with_uninitialized_disk(mut self) -> Self {
+        self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::uninitialized()));
+        self
     }
 
     pub fn with_disk_from_vmo(mut self, vmo: zx::Vmo) -> Self {
@@ -220,6 +232,10 @@ impl TestFixtureBuilder {
 
             fixture.add_ramdisk(vmo).await;
             fixture.ramdisk_vmo = Some(vmo_clone);
+        }
+        for disk in self.extra_disks.into_iter() {
+            let vmo = disk.get_vmo().await;
+            fixture.add_ramdisk(vmo).await;
         }
 
         fixture

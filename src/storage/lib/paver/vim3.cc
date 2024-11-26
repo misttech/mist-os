@@ -36,8 +36,14 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3Partitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
+  if (status_or_gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
-  auto partitioner = WrapUnique(new Vim3Partitioner(std::move(status_or_gpt->gpt)));
+  auto partitioner =
+      WrapUnique(new Vim3Partitioner(std::move(status_or_gpt->gpt), devices.Duplicate()));
 
   LOG("Successfully initialized Vim3Partitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
@@ -68,7 +74,7 @@ bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
 
 zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      OpenBlockPartition(devfs_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
   if (boot0_part.is_error()) {
     return boot0_part.take_error();
   }
@@ -78,7 +84,7 @@ zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartiti
   }
 
   auto boot1_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      OpenBlockPartition(devfs_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
   if (boot1_part.is_error()) {
     return boot1_part.take_error();
   }

@@ -4,7 +4,8 @@
 
 use crate::gpt::GptManager;
 use anyhow::{Context as _, Error};
-use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
+use block_client::RemoteBlockClient;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _, ServiceMarker as _};
 use futures::lock::Mutex as AsyncMutex;
 use futures::stream::TryStreamExt as _;
 use std::sync::Arc;
@@ -35,14 +36,26 @@ pub struct StorageHostService {
 enum State {
     #[default]
     Stopped,
+    /// The GPT is malformed and needs to be reformatted with ResetPartitionTables before it can be
+    /// used.  The component will publish an empty partitions directory.
+    NeedsFormatting(fblock::BlockProxy),
     Running(Arc<GptManager>),
+}
+
+impl State {
+    fn is_stopped(&self) -> bool {
+        if let Self::Stopped = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl StorageHostService {
     pub fn new() -> Arc<Self> {
         let export_dir = vfs::directory::immutable::simple();
         let partitions_dir = vfs::directory::immutable::simple();
-        export_dir.add_entry("partitions", partitions_dir.clone()).unwrap();
         Arc::new(Self {
             state: Default::default(),
             scope: ExecutionScope::new(),
@@ -73,28 +86,40 @@ impl StorageHostService {
                 }
             }),
         )?;
-        svc_dir.add_entry(
-            fstoragehost::PartitionsManagerMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let weak = weak2.clone();
-                async move {
-                    if let Some(me) = weak.upgrade() {
-                        let _ = me.handle_partitions_manager_requests(requests).await;
+        svc_dir
+            .add_entry(
+                fstoragehost::PartitionServiceMarker::SERVICE_NAME,
+                self.partitions_dir.clone(),
+            )
+            .unwrap();
+
+        svc_dir
+            .add_entry(
+                fstoragehost::PartitionsAdminMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak2.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_partitions_admin_requests(requests).await;
+                        }
                     }
-                }
-            }),
-        )?;
-        svc_dir.add_entry(
-            fstoragehost::PartitionsAdminMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let weak = weak3.clone();
-                async move {
-                    if let Some(me) = weak.upgrade() {
-                        let _ = me.handle_partitions_admin_requests(requests).await;
+                }),
+            )
+            .unwrap();
+
+        svc_dir
+            .add_entry(
+                fstoragehost::PartitionsManagerMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak3.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_partitions_manager_requests(requests).await;
+                        }
                     }
-                }
-            }),
-        )?;
+                }),
+            )
+            .unwrap();
 
         self.export_dir.clone().open(
             self.scope.clone(),
@@ -153,17 +178,26 @@ impl StorageHostService {
 
     async fn start(self: &Arc<Self>, device: fblock::BlockProxy) -> Result<(), zx::Status> {
         let mut state = self.state.lock().await;
-        if let State::Running(..) = *state {
+        if !state.is_stopped() {
             tracing::warn!("Device already bound");
             return Err(zx::Status::ALREADY_BOUND);
         }
 
-        let runner = GptManager::new(device, self.partitions_dir.clone()).await.map_err(|err| {
-            tracing::error!(?err, "Failed to load GPT");
-            zx::Status::INTERNAL
-        })?;
-        *state = State::Running(runner);
-
+        // TODO(https://fxbug.dev/339491886): It would be better if `start` failed on a malformed
+        // device, rather than hiding this state from fshost.  However, fs_management isn't well set
+        // up to deal with this, because it ties the outgoing directory to a successful return from
+        // `start` (see `ServingMultiVolumeFilesystem`), and fshost resolves the queued requests for
+        // the filesystem only after `start` is successful.  We should refactor fs_management and
+        // fshost to better support this case, which might require changing how queueing works so
+        // there's more flexibility to either resolve queueing when the component starts up (what we
+        // need here), or when `Start` is successful (what a filesystem like Fxfs needs).
+        *state = match GptManager::new(&device, self.partitions_dir.clone()).await {
+            Ok(runner) => State::Running(runner),
+            Err(err) => {
+                tracing::error!(?err, "Failed to load GPT.  Reformatting may be required.");
+                State::NeedsFormatting(device)
+            }
+        };
         Ok(())
     }
 
@@ -174,6 +208,13 @@ impl StorageHostService {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             tracing::debug!(?request);
             match request {
+                fstoragehost::PartitionsManagerRequest::GetBlockInfo { responder } => {
+                    responder
+                        .send(self.get_block_info().await.map_err(|status| status.into_raw()))
+                        .unwrap_or_else(|e| {
+                            tracing::error!(?e, "Failed to send GetBlockInfo response")
+                        });
+                }
                 fstoragehost::PartitionsManagerRequest::CreateTransaction { responder } => {
                     responder
                         .send(self.create_transaction().await.map_err(|status| status.into_raw()))
@@ -194,6 +235,25 @@ impl StorageHostService {
             }
         }
         Ok(())
+    }
+
+    async fn get_block_info(&self) -> Result<(u64, u32), zx::Status> {
+        let state = self.state.lock().await;
+        match &*state {
+            State::Stopped => return Err(zx::Status::BAD_STATE),
+            State::NeedsFormatting(block) => {
+                let info = block
+                    .get_info()
+                    .await
+                    .map_err(|err| {
+                        tracing::error!(?err, "get_block_info: failed to query block info");
+                        zx::Status::IO
+                    })?
+                    .map_err(zx::Status::from_raw)?;
+                Ok((info.block_count, info.block_size))
+            }
+            State::Running(gpt) => Ok((gpt.block_count(), gpt.block_size())),
+        }
     }
 
     async fn create_transaction(&self) -> Result<zx::EventPair, zx::Status> {
@@ -234,8 +294,43 @@ impl StorageHostService {
         &self,
         partitions: Vec<fstoragehost::PartitionInfo>,
     ) -> Result<(), zx::Status> {
-        let gpt_manager = self.gpt_manager().await?;
-        gpt_manager.reset_partition_table(partitions).await
+        fn convert_partition_info(info: fstoragehost::PartitionInfo) -> gpt::PartitionInfo {
+            gpt::PartitionInfo {
+                label: info.name,
+                type_guid: gpt::Guid::from_bytes(info.type_guid.value),
+                instance_guid: gpt::Guid::from_bytes(info.instance_guid.value),
+                start_block: info.start_block,
+                num_blocks: info.num_blocks,
+                flags: info.flags,
+            }
+        }
+        let partitions = partitions.into_iter().map(convert_partition_info).collect::<Vec<_>>();
+
+        let mut state = self.state.lock().await;
+        match &mut *state {
+            State::Stopped => return Err(zx::Status::BAD_STATE),
+            State::NeedsFormatting(block) => {
+                tracing::info!("reset_partition_table: Reformatting GPT.");
+                let client = Arc::new(RemoteBlockClient::new(&*block).await?);
+
+                tracing::info!("reset_partition_table: Reformatting GPT...");
+                gpt::Gpt::format(client, partitions).await.map_err(|err| {
+                    tracing::error!(?err, "reset_partition_table: failed to init GPT");
+                    zx::Status::IO
+                })?;
+                *state = State::Running(
+                    GptManager::new(&*block, self.partitions_dir.clone()).await.map_err(|err| {
+                        tracing::error!(?err, "reset_partition_table: failed to re-launch GPT");
+                        zx::Status::BAD_STATE
+                    })?,
+                );
+            }
+            State::Running(gpt) => {
+                tracing::info!("reset_partition_table: Updating GPT.");
+                gpt.reset_partition_table(partitions).await?;
+            }
+        }
+        Ok(())
     }
 
     async fn handle_lifecycle_requests(&self, lifecycle_channel: zx::Channel) -> Result<(), Error> {
@@ -259,7 +354,7 @@ impl StorageHostService {
 
     async fn gpt_manager(&self) -> Result<Arc<GptManager>, zx::Status> {
         match &*self.state.lock().await {
-            State::Stopped => Err(zx::Status::BAD_STATE),
+            State::Stopped | State::NeedsFormatting(_) => Err(zx::Status::BAD_STATE),
             State::Running(gpt) => Ok(gpt.clone()),
         }
     }

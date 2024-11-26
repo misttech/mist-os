@@ -170,7 +170,9 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .capabilities =
           {
               Protocol{"fuchsia.fshost.Admin"},
-              Protocol{"fuchsia.storagehost.PartitionsAdmin"},
+              Protocol{"fuchsia.fshost.Recovery"},
+              Protocol{"fuchsia.storagehost.PartitionsManager"},
+              Service{"fuchsia.storagehost.PartitionService"},
           },
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},
@@ -200,13 +202,6 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},
   });
-  if (args->enable_storage_host) {
-    realm_builder.AddRoute(Route{
-        .capabilities = {Directory{.name = "partitions", .rights = fuchsia::io::R_STAR_DIR}},
-        .source = {ChildRef{"fshost"}},
-        .targets = {ParentRef()},
-    });
-  }
 
   realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::R_STAR_DIR}},

@@ -44,14 +44,14 @@ zx::result<std::unique_ptr<DevicePartitioner>> AndroidDevicePartitioner::Initial
   if (status.is_error()) {
     return status.take_error();
   }
+  if (status->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner =
       WrapUnique(new AndroidDevicePartitioner(std::move(status->gpt), std::move(context)));
-  if (status->initialize_partition_tables) {
-    if (auto status = partitioner->ResetPartitionTables(); status.is_error()) {
-      return status.take_error();
-    }
-  }
 
   LOG("Successfully initialized Android Device Partitioner\n");
   return zx::ok(std::move(partitioner));

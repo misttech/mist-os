@@ -45,7 +45,7 @@ TEST(AstroAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::AstroPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -62,7 +62,7 @@ TEST(SherlockAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::SherlockPartitionerFactory().New(
@@ -79,7 +79,7 @@ TEST(KolaAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::KolaPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -96,7 +96,7 @@ TEST(LuisAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::LuisPartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -113,7 +113,7 @@ TEST(X64AbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   std::shared_ptr<paver::Context> context;
   zx::result partitioner = paver::X64PartitionerFactory().New(*devices, devmgr.RealmExposedDir(),
@@ -149,25 +149,9 @@ class CurrentSlotUuidTest : public PaverTest {
 
   zx::result<paver::BlockDevices> CreateBlockDevices() {
     if (DevmgrArgs().enable_storage_host) {
-      auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
-      fidl::OneWayStatus result =
-          fidl::WireCall<fuchsia_io::Directory>(devmgr_.RealmExposedDir())
-              ->Open3(fidl::StringView::FromExternal("partitions"), fuchsia_io::kPermReadable, {},
-                      std::move(server).TakeChannel());
-      if (!result.ok()) {
-        return zx::error(result.status());
-      }
-      fbl::unique_fd partitions;
-      if (zx_status_t status = fdio_fd_create(std::move(client).TakeChannel().release(),
-                                              partitions.reset_and_get_address());
-          status != ZX_OK) {
-        fprintf(stderr, "Failed to open: %s\n", strerror(errno));
-        return zx::error(status);
-      }
-
-      return paver::BlockDevices::Create(devmgr_.devfs_root().duplicate(), std::move(partitions));
+      return paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir().borrow());
     }
-    return paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+    return paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
   }
 
   void CreateGptDevice(const std::vector<PartitionDescription>& partitions) {

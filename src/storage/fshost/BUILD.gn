@@ -62,6 +62,7 @@ rustc_binary("fshost") {
     "//src/storage/lib/key-bag",
     "//src/storage/lib/ramdevice_client/rust",
     "//src/storage/lib/vfs/rust:vfs",
+    "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:anyhow",

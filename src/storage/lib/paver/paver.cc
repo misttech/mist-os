@@ -362,7 +362,7 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
             status.status_string());
       return status.take_error();
     }
-    ERROR("Could not find \"%s\" Partition on device.  The device may need to be re-initalized.\n",
+    ERROR("Could not find \"%s\" Partition on device.  The device may need to be re-initialized.\n",
           spec.ToString().c_str());
     return status.take_error();
   }
@@ -431,17 +431,19 @@ WriteFirmwareResult CreateWriteFirmwareResult(std::variant<zx_status_t, bool>* v
 
 }  // namespace
 
-zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root,
-                                                 fbl::unique_fd partitions_root) {
-  zx::result devices = BlockDevices::Create(std::move(devfs_root), std::move(partitions_root));
+zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root) {
+  zx::result devices = BlockDevices::CreateDevfs(std::move(devfs_root));
   if (devices.is_error()) {
     return devices.take_error();
   }
-  zx::result svc_root = component::Connect<fuchsia_io::Directory>("/svc");
-  if (svc_root.is_error()) {
-    return {};
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  if (zx_status_t status =
+          fdio_open3("/svc", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                     server.TakeChannel().release());
+      status != ZX_OK) {
+    return zx::error(status);
   }
-  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(*svc_root)));
+  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(client)));
 }
 
 void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter::Sync& _completer) {

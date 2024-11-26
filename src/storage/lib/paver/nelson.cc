@@ -36,6 +36,11 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitioner::Initialize(
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
+  if (status_or_gpt->initialize_partition_tables) {
+    LOG("Found GPT but it was missing expected partitions.  The device should be re-initialized "
+        "via fastboot.\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
 
   auto partitioner = WrapUnique(new NelsonPartitioner(std::move(status_or_gpt->gpt)));
 

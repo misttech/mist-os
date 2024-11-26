@@ -2188,13 +2188,12 @@ class PaverServiceLuisTest : public PaverServiceGptDeviceTest {
 
   void SetUp() override {
     ASSERT_NO_FATAL_FAILURE(PaverServiceGptDeviceTest::SetUp());
-    constexpr uint8_t kDummyType[GPT_GUID_LEN] = {0xaf, 0x3d, 0xc6, 0x0f, 0x83, 0x84, 0x72, 0x47,
-                                                  0x8e, 0x79, 0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4};
     ASSERT_NO_FATAL_FAILURE(InitializeGptDevice(
         0x748034, 512,
         {
-            {GPT_DURABLE_BOOT_NAME, uuid::Uuid(kDummyType), kDurableBootStart, kDurableBootSize},
-            {GPT_FVM_NAME, uuid::Uuid(kDummyType), kFvmBlockStart, kFvmBlockSize},
+            {GPT_DURABLE_BOOT_NAME, uuid::Uuid(GUID_ZIRCON_A_VALUE), kDurableBootStart,
+             kDurableBootSize},
+            {GPT_FVM_NAME, uuid::Uuid(GUID_FVM_VALUE), kFvmBlockStart, kFvmBlockSize},
         }));
   }
 };

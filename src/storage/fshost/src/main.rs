@@ -121,7 +121,7 @@ async fn main() -> Result<(), Error> {
         "mnt" => vfs::pseudo_directory! {},
     };
     if config.storage_host {
-        export.add_entry("gpt", remote_dir(env.gpt_exposed_dir()?)).unwrap();
+        export.add_entry("gpt", remote_dir(env.partition_manager_exposed_dir()?)).unwrap();
     }
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let svc_dir = vfs::pseudo_directory! {
@@ -131,7 +131,12 @@ async fn main() -> Result<(), Error> {
                 config.clone(),
                 ramdisk_device.as_ref().map(|d| d.topological_path().to_string()),
                 launcher,
-                matcher_lock.clone()
+                matcher_lock.clone(),
+            ),
+        fshost::RecoveryMarker::PROTOCOL_NAME =>
+            service::fshost_recovery(
+                env.clone(),
+                config.clone(),
             ),
     };
     if config.fxfs_blob {

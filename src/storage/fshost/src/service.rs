@@ -24,19 +24,23 @@ use fs_management::partition::{
 };
 use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
 use fuchsia_async::TimeoutExt as _;
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_fs::directory::clone_onto;
 use fuchsia_fs::file::write;
 use fuchsia_runtime::HandleType;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 use vfs::service;
 use zx::sys::{zx_handle_t, zx_status_t};
 use zx::{self as zx, AsHandleRef, MonotonicDuration};
-use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_fshost as fshost, fidl_fuchsia_storagehost as fstoragehost,
+    fuchsia_async as fasync,
+};
 
 pub enum FshostShutdownResponder {
     Lifecycle(
@@ -591,6 +595,59 @@ async fn shred_data_volume(
     Ok(())
 }
 
+async fn init_system_partition_table(
+    partitions: Vec<fstoragehost::PartitionInfo>,
+    environment: &Arc<Mutex<dyn Environment>>,
+    config: &fshost_config::Config,
+) -> Result<(), zx::Status> {
+    if !config.netboot {
+        tracing::error!("init_system_partition_table only supported in netboot mode.");
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+    if !config.storage_host {
+        tracing::error!("init_system_partition_table only supported in storage-host mode.");
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+    if !config.gpt {
+        tracing::error!("init_system_partition_table called on a non-gpt system.");
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+
+    let registered_devices = environment.lock().await.registered_devices().clone();
+    const TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
+    let _ = registered_devices
+        .get_block_connector(DeviceTag::SystemPartitionTable)
+        .map_err(|error| {
+            tracing::error!(?error, "init_system_partition_table: unable to get block connector");
+            zx::Status::NOT_FOUND
+        })
+        .on_timeout(TIMEOUT, || {
+            tracing::error!("init_system_partition_table: Failed to find gpt within timeout");
+            Err(zx::Status::NOT_FOUND)
+        })
+        .await?;
+
+    tracing::info!("init_system_partition_table: Reformatting GPT...");
+    let exposed_dir = environment.lock().await.partition_manager_exposed_dir().map_err(|err| {
+        tracing::error!(
+            ?err,
+            "init_system_partition_table: Failed to connect to partition manager"
+        );
+        Err(zx::Status::BAD_STATE)
+    })?;
+    let client =
+        connect_to_protocol_at_dir_root::<fstoragehost::PartitionsAdminMarker>(&exposed_dir)
+            .unwrap();
+    client
+        .reset_partition_table(&partitions[..])
+        .await
+        .map_err(|err| {
+            tracing::error!(?err, "init_system_partition_table: FIDL error");
+            Err(zx::Status::PEER_CLOSED)
+        })?
+        .map_err(zx::Status::from_raw)
+}
+
 /// Make a new vfs service node that implements fuchsia.fshost.Admin
 pub fn fshost_admin(
     environment: Arc<Mutex<dyn Environment>>,
@@ -717,6 +774,57 @@ pub fn fshost_admin(
                         responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",
+                                e
+                            );
+                        });
+                    }
+                    Ok(fshost::AdminRequest::StorageHostEnabled { responder }) => {
+                        responder.send(config.storage_host).unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to send StorageHostEnabled response. error: {:?}",
+                                e
+                            );
+                        });
+                    }
+                    Err(e) => {
+                        tracing::error!("admin server failed: {:?}", e);
+                        return;
+                    }
+                }
+            }
+        }
+    })
+}
+
+pub fn fshost_recovery(
+    environment: Arc<Mutex<dyn Environment>>,
+    config: Arc<fshost_config::Config>,
+) -> Arc<service::Service> {
+    service::host(move |mut stream: fshost::RecoveryRequestStream| {
+        let env = environment.clone();
+        let config = config.clone();
+        async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(fshost::RecoveryRequest::InitSystemPartitionTable {
+                        partitions,
+                        responder,
+                    }) => {
+                        tracing::info!("recovery init gpt called");
+                        let res = match init_system_partition_table(partitions, &env, &config).await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                debug_log(&format!(
+                                    "recovery service: init_system_partition_table failed: {:?}",
+                                    e
+                                ));
+                                Err(e.into_raw())
+                            }
+                        };
+                        responder.send(res).unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to send InitSystemPartitionTable response. error: {:?}",
                                 e
                             );
                         });

@@ -126,8 +126,6 @@ impl Filesystem {
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         let options = self.config.options();
         let component_name = options.component_name;
-        let realm_proxy = connect_to_protocol::<RealmMarker>()?;
-
         match options.component_type {
             ComponentType::StaticChild => open_childs_exposed_directory(component_name, None).await,
             ComponentType::DynamicChild { collection_name } => {
@@ -167,6 +165,7 @@ impl Filesystem {
                         ..Default::default()
                     },
                 ];
+                let realm_proxy = connect_to_protocol::<RealmMarker>()?;
                 for child_decl in child_decls {
                     // Launch a new component in our collection.
                     realm_proxy

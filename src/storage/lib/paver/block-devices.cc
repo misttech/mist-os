@@ -21,9 +21,9 @@ namespace paver {
 
 namespace {
 
+// Connects to the volume protocol in an instance of fuchsia.storagehost.PartitionService.
 zx::result<std::unique_ptr<VolumeConnector>> CreateServiceBasedVolumeConnector(
-    int dir_fd, std::string filename) {
-  filename.append("/svc/fuchsia.storagehost.PartitionService");
+    int dir_fd, const std::string& filename) {
   zx::channel partition_local, partition_remote;
   if (zx_status_t status = zx::channel::create(0, &partition_local, &partition_remote);
       status != ZX_OK) {
@@ -137,21 +137,39 @@ fidl::ClientEnd<fuchsia_device::Controller> ServiceBasedVolumeConnector::TakeCon
 BlockDevices::BlockDevices(fbl::unique_fd devfs_root, fbl::unique_fd partitions_root)
     : devfs_root_(std::move(devfs_root)), partitions_root_(std::move(partitions_root)) {}
 
-zx::result<BlockDevices> BlockDevices::Create(fbl::unique_fd devfs_root,
-                                              fbl::unique_fd partitions_root) {
-  if (!partitions_root) {
-    // It's OK to swallow errors here, /partitions isn't always available.
-    [[maybe_unused]]
-    zx_status_t status = fdio_open3_fd("/partitions", 0, partitions_root.reset_and_get_address());
-  }
+zx::result<BlockDevices> BlockDevices::CreateDevfs(fbl::unique_fd devfs_root) {
   if (!devfs_root) {
-    if (zx_status_t status = fdio_open3_fd("/dev", 0, devfs_root.reset_and_get_address());
+    if (zx_status_t status = fdio_open3_fd("/dev", static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                                           devfs_root.reset_and_get_address());
         status != ZX_OK) {
       ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
       return zx::error(status);
     }
   }
-  return zx::ok(BlockDevices(std::move(devfs_root), std::move(partitions_root)));
+  return zx::ok(BlockDevices(std::move(devfs_root), {}));
+}
+
+zx::result<BlockDevices> BlockDevices::CreateStorageHost(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  auto [client, server] = std::move(*endpoints);
+  if (zx_status_t status = fdio_open3_at(
+          svc_root.handle()->get(), "fuchsia.storagehost.PartitionService",
+          static_cast<uint64_t>(fuchsia_io::wire::kPermReadable), server.TakeChannel().release());
+      status != ZX_OK) {
+    ERROR("Failed to open partition service: %s\n", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  fbl::unique_fd partition_dir;
+  if (zx_status_t status =
+          fdio_fd_create(client.TakeChannel().release(), partition_dir.reset_and_get_address());
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(BlockDevices({}, std::move(partition_dir)));
 }
 
 BlockDevices BlockDevices::CreateEmpty() { return BlockDevices({}, {}); }
@@ -160,7 +178,7 @@ BlockDevices BlockDevices::Duplicate() const {
   return BlockDevices(devfs_root_.duplicate(), partitions_root_.duplicate());
 }
 
-bool BlockDevices::HasPartitionsDirectory() const { return partitions_root_.is_valid(); }
+bool BlockDevices::IsStorageHost() const { return partitions_root_.is_valid(); }
 
 zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllPartitions(
     fit::function<bool(const zx::channel&)> filter) const {
@@ -278,10 +296,9 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
   if (partitions_root_) {
     dir_fd = partitions_root_.duplicate();
   } else {
-    if (zx_status_t status =
-            fdio_open3_fd_at(devfs_root_.get(), devfs_suffix,
-                             static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
-                             dir_fd.reset_and_get_address());
+    if (zx_status_t status = fdio_open3_fd_at(devfs_root_.get(), devfs_suffix,
+                                              static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                                              dir_fd.reset_and_get_address());
         status != ZX_OK) {
       ERROR("Failed to open /dev/%s: %s\n", devfs_suffix, zx_status_get_string(status));
       return zx::error(status);
