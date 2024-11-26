@@ -35,6 +35,7 @@ def _fuchsia_package_size_check_impl(ctx):
             "--output",
             budgets_file.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     # Size checker execution
