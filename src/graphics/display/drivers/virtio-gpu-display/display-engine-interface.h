@@ -43,16 +43,16 @@ class DisplayEngineInterface {
   virtual void OnCoordinatorConnected() = 0;
 
   virtual zx::result<> ImportBufferCollection(
-      display::DriverBufferCollectionId driver_buffer_collection_id,
+      display::DriverBufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) = 0;
   virtual zx::result<> ReleaseBufferCollection(
-      display::DriverBufferCollectionId driver_buffer_collection_id) = 0;
+      display::DriverBufferCollectionId buffer_collection_id) = 0;
 
   virtual zx::result<display::DriverImageId> ImportImage(
       const display::ImageMetadata& image_metadata,
-      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) = 0;
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual zx::result<display::DriverCaptureImageId> ImportImageForCapture(
-      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) = 0;
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual void ReleaseImage(display::DriverImageId driver_image_id) = 0;
 
   // TODO(costan): Switch from Banjo to FIDL or api-types-cpp types.
@@ -67,7 +67,7 @@ class DisplayEngineInterface {
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
-      display::DriverBufferCollectionId driver_buffer_collection_id) = 0;
+      display::DriverBufferCollectionId buffer_collection_id) = 0;
 
   virtual zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) = 0;
 

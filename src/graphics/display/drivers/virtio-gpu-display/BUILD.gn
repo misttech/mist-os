@@ -50,6 +50,10 @@ source_set("common_srcs") {
     "display-engine-interface.h",
     "display-engine.cc",
     "display-engine.h",
+    "imported-image.cc",
+    "imported-image.h",
+    "imported-images.cc",
+    "imported-images.h",
     "virtio-gpu-device.cc",
     "virtio-gpu-device.h",
     "virtio-pci-device.cc",
@@ -65,8 +69,6 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/lib/virtio:virtio-spec",
     "//src/lib/fxl",
-    "//zircon/system/ulib/image-format",
-    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

@@ -11,9 +11,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
-#include <lib/virtio/device.h>
-#include <lib/virtio/ring.h>
-#include <lib/zx/pmt.h>
+#include <lib/virtio/backends/backend.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
@@ -28,6 +26,7 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-interface.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-interface.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/imported-images.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -45,14 +44,6 @@ class Ring;
 
 class DisplayEngine final : public DisplayEngineInterface {
  public:
-  struct BufferInfo {
-    zx::vmo vmo = {};
-    size_t offset = 0;
-    uint32_t bytes_per_pixel = 0;
-    uint32_t bytes_per_row = 0;
-    fuchsia_images2::wire::PixelFormat pixel_format;
-  };
-
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
       std::unique_ptr<virtio::Backend> backend,
@@ -60,8 +51,8 @@ class DisplayEngine final : public DisplayEngineInterface {
 
   // Exposed for testing. Production code must use the Create() factory method.
   //
-  // `bus_device` and `coordinator_events` must not be null, and must outlive
-  // the newly created instance. `gpu_device` must not be null.
+  // `coordinator_events` must not be null, and must outlive the newly created
+  // instance. `gpu_device` must not be null.
   DisplayEngine(DisplayCoordinatorEventsInterface* coordinator_events,
                 fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                 std::unique_ptr<VirtioGpuDevice> gpu_device);
@@ -73,16 +64,16 @@ class DisplayEngine final : public DisplayEngineInterface {
   // DisplayEngineInterface:
   void OnCoordinatorConnected() override;
   zx::result<> ImportBufferCollection(
-      display::DriverBufferCollectionId driver_buffer_collection_id,
+      display::DriverBufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
   zx::result<> ReleaseBufferCollection(
-      display::DriverBufferCollectionId driver_buffer_collection_id) override;
+      display::DriverBufferCollectionId buffer_collection_id) override;
   zx::result<display::DriverImageId> ImportImage(
       const display::ImageMetadata& image_metadata,
-      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) override;
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
   zx::result<display::DriverCaptureImageId> ImportImageForCapture(
-      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) override;
-  void ReleaseImage(display::DriverImageId driver_image_id) override;
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
+  void ReleaseImage(display::DriverImageId image_id) override;
   config_check_result_t CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
       cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
@@ -92,7 +83,7 @@ class DisplayEngine final : public DisplayEngineInterface {
                           display::ConfigStamp config_stamp) override;
   zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
-      display::DriverBufferCollectionId driver_buffer_collection_id) override;
+      display::DriverBufferCollectionId buffer_collection_id) override;
   zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
   bool IsCaptureSupported() override;
   zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
@@ -106,24 +97,11 @@ class DisplayEngine final : public DisplayEngineInterface {
 
   const virtio_abi::ScanoutInfo* pmode() const { return &current_display_.scanout_info; }
 
-  zx::result<BufferInfo> GetAllocatedBufferInfoForImage(
-      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
-      const display::ImageMetadata& image_metadata) const;
-
   VirtioPciDevice& pci_device() { return gpu_device_->pci_device(); }
 
+  ImportedImages* imported_images_for_testing() { return &imported_images_; }
+
  private:
-  // TODO(https://fxbug.dev/42073721): Support more formats.
-  static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
-      static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-          fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-  };
-
-  zx::result<display::DriverImageId> Import(zx::vmo vmo,
-                                            const display::ImageMetadata& image_metadata,
-                                            size_t offset, uint32_t pixel_size, uint32_t row_bytes,
-                                            fuchsia_images2::wire::PixelFormat pixel_format);
-
   DisplayInfo current_display_;
 
   // Flush thread
@@ -132,17 +110,12 @@ class DisplayEngine final : public DisplayEngineInterface {
   fbl::Mutex flush_lock_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
+  ImportedImages imported_images_;
 
   DisplayCoordinatorEventsInterface& coordinator_events_;
 
-  // Imported sysmem buffer collections.
-  std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
-      buffer_collections_;
-
-  struct imported_image* latest_fb_ = nullptr;
-  struct imported_image* displayed_fb_ = nullptr;
+  uint32_t latest_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
+  uint32_t displayed_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
   display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
   display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
 

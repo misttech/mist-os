@@ -66,30 +66,42 @@ class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
     completer.Reply(fit::ok());
   }
 
-  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& _completer) override {
-    auto info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
-    info.settings(
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
+    static constexpr uint32_t kPixelSize = 4;
+    static constexpr uint32_t kRowSize = 640 * kPixelSize;
+    static constexpr uint32_t kImageSize = kRowSize * 480;
+
+    zx::vmo buffer_vmo;
+    ASSERT_OK(zx::vmo::create(kImageSize, 0, &buffer_vmo));
+
+    fuchsia_sysmem2::wire::VmoBuffer vmo_buffers[] = {
+        fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
+            .vmo(std::move(buffer_vmo))
+            .vmo_usable_start(0)
+            .Build(),
+    };
+
+    auto buffer_collection_info_builder =
+        fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
+    buffer_collection_info_builder.settings(
         fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
             .image_format_constraints(
                 fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena_)
                     .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
                     .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+                    .min_size(fuchsia_math::wire::SizeU{.width = 640, .height = 480})
+                    .min_bytes_per_row(kRowSize)
                     .max_size(fuchsia_math::wire::SizeU{.width = 1000, .height = 0xffffffff})
-                    .max_bytes_per_row(4000)
+                    .max_bytes_per_row(1000 * kPixelSize)
                     .Build())
             .Build());
+    buffer_collection_info_builder.buffers(vmo_buffers);
 
-    zx::vmo vmo;
-    ASSERT_OK(zx::vmo::create(4096, 0, &vmo));
-    info.buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
-                                 .vmo(std::move(vmo))
-                                 .vmo_usable_start(0)
-                                 .Build()});
     auto response =
         fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena_)
-            .buffer_collection_info(info.Build())
+            .buffer_collection_info(buffer_collection_info_builder.Build())
             .Build();
-    _completer.Reply(fit::ok(&response));
+    completer.Reply(fit::ok(&response));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -279,20 +291,17 @@ TEST_F(VirtioGpuTest, ImportVmo) {
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
-  static constexpr display::ImageMetadata kDefaultImageMetadata({
-      .width = 4,
-      .height = 4,
-      .tiling_type = display::ImageTilingType::kLinear,
-  });
   PerformBlockingWork([&] {
-    zx::result<DisplayEngine::BufferInfo> buffer_info_result =
-        device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0,
-                                                kDefaultImageMetadata);
-    ASSERT_OK(buffer_info_result);
+    ImportedBufferCollection* imported_buffer_collection =
+        device_->imported_images_for_testing()->FindBufferCollectionById(kBufferCollectionId);
+    ASSERT_TRUE(imported_buffer_collection != nullptr);
 
-    const auto& buffer_info = buffer_info_result.value();
-    EXPECT_EQ(4u, buffer_info.bytes_per_pixel);
-    EXPECT_EQ(16u, buffer_info.bytes_per_row);
+    zx::result<SysmemBufferInfo> sysmem_buffer_info_result =
+        imported_buffer_collection->GetSysmemMetadata(/*buffer_index=*/0);
+    ASSERT_OK(sysmem_buffer_info_result);
+
+    const SysmemBufferInfo& sysmem_buffer_info = sysmem_buffer_info_result.value();
+    EXPECT_EQ(uint32_t{640 * 4}, sysmem_buffer_info.minimum_bytes_per_row);
   });
 }
 
