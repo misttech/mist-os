@@ -23,7 +23,7 @@ pub use constants::*;
 pub type RawSeverity = u8;
 
 /// A log record.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Record<'a> {
     /// Time at which the log was emitted.
     pub timestamp: zx::BootInstant,

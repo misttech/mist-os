@@ -87,7 +87,7 @@ fn parse_argument_internal<'a>(
     state: &mut ParseState,
 ) -> Result<(Argument<'a>, &'a [u8]), ParseError> {
     let (header, after_header) =
-        Header::read_from_prefix(buf).map_err(|_| ParseError::InvalidHeader)?;
+        Header::read_from_prefix(buf).map_err(|_| ParseError::InvalidArgumentHeader)?;
     let arg_ty = ArgType::try_from(header.raw_type())?;
 
     let (name, after_name) = string_ref(header.name_ref(), after_header, false)?;
@@ -170,6 +170,10 @@ pub enum ParseError {
     #[error("found invalid header")]
     InvalidHeader,
 
+    /// We failed to parse a record header.
+    #[error("found invalid header in an argument")]
+    InvalidArgumentHeader,
+
     /// We failed to parse a record timestamp.
     #[error("found invalid timestamp after header")]
     InvalidTimestamp,
@@ -216,5 +220,25 @@ mod tests {
         let (timestamp, severity) = basic_info(encoded).unwrap();
         assert_eq!(timestamp, expected_timestamp);
         assert_eq!(severity, Severity::Error.into_primitive());
+    }
+
+    #[fuchsia::test]
+    fn parse_record_with_zeros() {
+        let expected_timestamp = zx::BootInstant::from_nanos(72);
+        let record = Record {
+            timestamp: expected_timestamp,
+            severity: Severity::Error as u8,
+            arguments: vec![],
+        };
+        let mut buffer = Cursor::new(vec![0u8; 1000]);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
+        encoder.write_record(record.clone()).unwrap();
+
+        // Ensure that some additional padding is ok to parse the record.
+        let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize + 3];
+
+        let (result_record, rem) = parse_record(encoded).unwrap();
+        assert_eq!(rem.len(), 3);
+        assert_eq!(record, result_record);
     }
 }

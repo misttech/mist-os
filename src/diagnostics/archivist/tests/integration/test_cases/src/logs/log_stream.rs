@@ -46,10 +46,16 @@ async fn listen_with_log_stream() {
         )
         .expect("connected socket");
 
-    let mut records = socket
-        .as_datagram_stream()
-        .take(2)
-        .map(|result| parse_record(&result.unwrap()).unwrap().0.into_owned());
+    let mut records = socket.as_datagram_stream().take(2).map(|result| {
+        let bytes = result.unwrap();
+        let record = match parse_record(&bytes) {
+            Ok((record, _)) => record,
+            Err(err) => {
+                panic!("Failed to parse record: {bytes:?}: {err:?}")
+            }
+        };
+        record.into_owned()
+    });
 
     let record = records.next().await.unwrap();
     assert_eq!(record.severity, fdiagnostics::Severity::Info as u8);
