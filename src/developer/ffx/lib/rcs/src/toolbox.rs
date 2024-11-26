@@ -29,7 +29,7 @@ pub const MONIKER: &str = "toolbox";
 pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
     let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>()?;
     let e = rcs
-        .open_capability(
+        .deprecated_open_capability(
             MONIKER,
             sys2::OpenDirType::NamespaceDir,
             &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
@@ -40,7 +40,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
 
     let (query, moniker) = if let Err(_) = e {
         let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>()?;
-        rcs.open_capability(
+        rcs.deprecated_open_capability(
             LEGACY_MONIKER,
             sys2::OpenDirType::NamespaceDir,
             &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),

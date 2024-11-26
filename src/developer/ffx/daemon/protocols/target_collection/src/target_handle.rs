@@ -327,7 +327,7 @@ mod tests {
                                     }))
                                     .unwrap();
                             }
-                            fidl_rcs::RemoteControlRequest::OpenCapability {
+                            fidl_rcs::RemoteControlRequest::DeprecatedOpenCapability {
                                 moniker,
                                 capability_set,
                                 capability_name,

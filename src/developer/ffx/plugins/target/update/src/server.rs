@@ -344,7 +344,7 @@ async fn get_rewrite_proxy(
         fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>()
             .map_err(|e| bug!(e))?;
     rcs_proxy
-        .open_capability(
+        .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
             OpenDirType::ExposedDir,
             fidl_fuchsia_pkg_rewrite::EngineMarker::PROTOCOL_NAME,
@@ -372,7 +372,7 @@ async fn get_repo_manager_proxy(
     >()
     .map_err(|e| bug!(e))?;
     rcs_proxy
-        .open_capability(
+        .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
             OpenDirType::ExposedDir,
             fidl_fuchsia_pkg::RepositoryManagerMarker::PROTOCOL_NAME,
@@ -608,7 +608,7 @@ mod tests {
         let (repo_manager, _) = FakeRepositoryManager::new();
         let (engine, _) = FakeEngine::new();
         match req {
-            RemoteControlRequest::OpenCapability {
+            RemoteControlRequest::DeprecatedOpenCapability {
                 capability_name,
                 server_channel,
                 responder,

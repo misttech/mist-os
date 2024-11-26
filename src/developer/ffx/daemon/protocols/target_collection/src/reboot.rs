@@ -76,7 +76,7 @@ impl RebootController {
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
         self.get_remote_proxy()
             .await?
-            .open_capability(
+            .deprecated_open_capability(
                 ADMIN_MONIKER,
                 fsys::OpenDirType::ExposedDir,
                 AdminMarker::PROTOCOL_NAME,
@@ -403,7 +403,11 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::OpenCapability { server_channel, responder, .. } => {
+                    RemoteControlRequest::DeprecatedOpenCapability {
+                        server_channel,
+                        responder,
+                        ..
+                    } => {
                         setup_admin(server_channel).unwrap();
                         responder.send(Ok(())).unwrap();
                     }

@@ -42,7 +42,7 @@ impl FfxConnector<'_> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
             .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
         remote_control
-            .open_capability(
+            .deprecated_open_capability(
                 &moniker,
                 fsys::OpenDirType::ExposedDir,
                 S::PROTOCOL_NAME,

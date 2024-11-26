@@ -690,7 +690,7 @@ mod test {
         fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
             let fake_rcs_proxy: RemoteControlProxy =
                 fho::testing::fake_proxy(move |req| match req {
-                    frcs::RemoteControlRequest::OpenCapability {
+                    frcs::RemoteControlRequest::DeprecatedOpenCapability {
                         moniker: _,
                         capability_set: _,
                         capability_name,
@@ -758,7 +758,7 @@ mod test {
                     fasync::Task::local(async move {
                         if let Ok(Some(req)) = s.try_next().await {
                             match req {
-                                frcs::RemoteControlRequest::OpenCapability {
+                                frcs::RemoteControlRequest::DeprecatedOpenCapability {
                                     moniker: _,
                                     capability_set: _,
                                     capability_name,

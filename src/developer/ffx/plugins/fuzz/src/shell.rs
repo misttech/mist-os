@@ -620,7 +620,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
             .context("failed to create proxy for fuchsia.fuzzer.Manager")?;
         let result = self
             .remote_control
-            .open_capability(
+            .deprecated_open_capability(
                 "/core/fuzz-manager",
                 fsys::OpenDirType::ExposedDir,
                 fuzz::ManagerMarker::PROTOCOL_NAME,
@@ -812,7 +812,7 @@ mod test_fixtures {
         let mut task = None;
         while let Some(request) = stream.next().await {
             match request {
-                Ok(rcs::RemoteControlRequest::OpenCapability {
+                Ok(rcs::RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,

@@ -232,7 +232,7 @@ impl DaemonProtocolProvider for Daemon {
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .open_capability(
+            .deprecated_open_capability(
                 moniker,
                 fsys::OpenDirType::ExposedDir,
                 capability_name,

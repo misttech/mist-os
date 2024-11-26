@@ -236,7 +236,7 @@ pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::Target
 async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsError> {
     let (knock_client, knock_remote) = rcs_proxy.client()?.create_channel().await?;
     let res = rcs_proxy
-        .open_capability(
+        .deprecated_open_capability(
             toolbox::MONIKER,
             OpenDirType::NamespaceDir,
             &format!("svc/{}", RemoteControlMarker::PROTOCOL_NAME),
@@ -250,7 +250,7 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
         // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
         let (knock_client, knock_remote) = rcs_proxy.client()?.create_channel().await?;
         rcs_proxy
-            .open_capability(
+            .deprecated_open_capability(
                 REMOTE_CONTROL_MONIKER,
                 OpenDirType::ExposedDir,
                 RemoteControlMarker::PROTOCOL_NAME,
@@ -293,7 +293,7 @@ pub async fn open_with_timeout_at(
     #[cfg(not(feature = "fdomain"))] server_end: fidl::Channel,
     #[cfg(feature = "fdomain")] server_end: fdomain_client::Channel,
 ) -> Result<()> {
-    let open_capability_fut = rcs_proxy.open_capability(
+    let open_capability_fut = rcs_proxy.deprecated_open_capability(
         moniker,
         capability_set,
         capability_name,

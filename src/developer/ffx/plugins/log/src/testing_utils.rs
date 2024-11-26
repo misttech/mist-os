@@ -263,7 +263,7 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                 RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(value.as_ref()).expect("should send");
                 }
-                RemoteControlRequest::OpenCapability {
+                RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,

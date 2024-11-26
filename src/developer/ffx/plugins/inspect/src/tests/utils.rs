@@ -9,7 +9,7 @@ use diagnostics_data::{
 use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
 use fidl::Channel;
 use fidl_fuchsia_developer_remotecontrol::{
-    RemoteControlMarker, RemoteControlOpenCapabilityResponder, RemoteControlProxy,
+    RemoteControlDeprecatedOpenCapabilityResponder, RemoteControlMarker, RemoteControlProxy,
     RemoteControlRequest,
 };
 use fidl_fuchsia_diagnostics::{
@@ -121,7 +121,7 @@ pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
         let querier = Rc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::OpenCapability {
+                RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,
@@ -159,7 +159,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
         let querier = Rc::new(mock_realm_query);
         if let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::OpenCapability {
+                RemoteControlRequest::DeprecatedOpenCapability {
                     moniker,
                     capability_set,
                     capability_name,
@@ -203,7 +203,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
 }
 
 fn handle_remote_control_connect(
-    responder: RemoteControlOpenCapabilityResponder,
+    responder: RemoteControlDeprecatedOpenCapabilityResponder,
     service_chan: Channel,
     accessor_proxy: ArchiveAccessorProxy,
 ) -> fuchsia_async::Task<()> {

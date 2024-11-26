@@ -386,7 +386,7 @@ mod tests {
                 let mut server = server.into_stream().unwrap();
                 while let Some(request) = server.next().await {
                     match request.unwrap() {
-                        rcs::RemoteControlRequest::OpenCapability {
+                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set,
                             capability_name,

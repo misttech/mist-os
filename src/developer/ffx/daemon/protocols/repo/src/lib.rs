@@ -1607,7 +1607,7 @@ mod tests {
 
                 match (req, target.as_deref()) {
                     (
-                        rcs::RemoteControlRequest::OpenCapability {
+                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set: _,
                             server_channel,

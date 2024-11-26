@@ -50,7 +50,7 @@ impl LaunchedComponentConnector {
         loop {
             let (proxy, server_end) = create_proxy::<StressorMarker>()?;
             match rcs_proxy
-                .open_capability(
+                .deprecated_open_capability(
                     &moniker,
                     fsys::OpenDirType::ExposedDir,
                     StressorMarker::PROTOCOL_NAME,

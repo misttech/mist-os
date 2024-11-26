@@ -518,7 +518,7 @@ mod test {
                     // store channels so that they do not die.
                     let mut server_channels = vec![];
                     match request {
-                        fremotecontrol::RemoteControlRequest::OpenCapability {
+                        fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker,
                             capability_set,
                             capability_name,
@@ -918,7 +918,7 @@ mod test {
             let mut once = false;
             while let Some(request) = stream.try_next().await.unwrap() {
                 match request {
-                    fremotecontrol::RemoteControlRequest::OpenCapability {
+                    fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
                         moniker,
                         capability_set,
                         capability_name,

@@ -119,11 +119,7 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
-            #[cfg(any(
-                fuchsia_api_level_less_than = "25",
-                fuchsia_api_level_at_least = "PLATFORM"
-            ))]
-            rcs::RemoteControlRequest::OpenCapability {
+            rcs::RemoteControlRequest::DeprecatedOpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
@@ -138,7 +134,6 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "25")]
             rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,

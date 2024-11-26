@@ -312,7 +312,7 @@ pub mod testing {
                 rcs_fidl::RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(&value).unwrap()
                 }
-                rcs_fidl::RemoteControlRequest::OpenCapability {
+                rcs_fidl::RemoteControlRequest::DeprecatedOpenCapability {
                     capability_name,
                     server_channel,
                     responder,
