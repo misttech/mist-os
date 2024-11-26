@@ -340,6 +340,10 @@ impl SmeForClientStateMachine {
             .await
     }
 
+    pub fn roam(&self, req: &fidl_sme::RoamRequest) -> Result<(), Error> {
+        self.proxy.roam(req).map_err(|e| format_err!("Failed to send roam command: {:}", e))
+    }
+
     pub fn take_event_stream(&self) -> fidl_sme::ClientSmeEventStream {
         self.proxy.take_event_stream()
     }
@@ -513,7 +517,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::channel::Cbw;
     use wlan_common::sequestered::Sequestered;
-    use wlan_common::{assert_variant, RadioConfig};
+    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
@@ -1760,6 +1764,36 @@ mod tests {
                 iface_id,
                 source: telemetry::TimeoutSource::Disconnect,
             })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_roam_sends_request() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a roam via the sme proxy
+        let roam_request =
+            fidl_sme::RoamRequest { bss_description: random_fidl_bss_description!() };
+        let _ = sme.roam(&roam_request).unwrap();
+
+        // Verify SME gets the request
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Roam {
+                req, ..
+            }) => {
+                assert_eq!(req, roam_request);
+            }
         );
     }
 
