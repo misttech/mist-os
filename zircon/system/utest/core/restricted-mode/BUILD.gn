@@ -2,23 +2,35 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+restricted_blob_name = "\"test/restricted-blob.$current_cpu.so\""
+
 source_set("restricted-mode") {
   testonly = true
 
-  sources = [ "restricted-mode.cc" ]
-  if (current_cpu == "x64") {
-    sources += [ "x64.S" ]
-  } else if (current_cpu == "arm64") {
-    sources += [ "arm64.S" ]
-  } else if (current_cpu == "riscv64") {
-    sources += [ "riscv64.S" ]
-  }
+  sources = [
+    "$current_cpu.S",
+    "restricted-mode.cc",
+  ]
+  defines = [ "RESTRICTED_BLOB_NAME=$restricted_blob_name" ]
   deps = [
     "..:needs-next",
+    "//src/lib/elfldltl",
+    "//src/lib/elfldltl/testing:elfldltl-zxtest",
+    "//src/lib/symbolizer-markup",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # The restricted blob is built in the linux environment for two reasons:
+  # 1. Most of the different ELF build environments for a given CPU are
+  #    equivalent for pure assembly code, and that's all that's used in the
+  #    restricted-blob.
+  # 2. TODO(https://fxbug.dev/372499348): The restricted-blob will eventually
+  #    also be built in the ARM32 build environment when building for ARM64,
+  #    and the Fuchsia build environments do not support ARM32.
+  data_deps = [ "restricted-blob(//build/toolchain:linux_$current_cpu)" ]
 }

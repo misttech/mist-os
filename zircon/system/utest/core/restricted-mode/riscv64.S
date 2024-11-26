@@ -2,48 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-.weak zx_restricted_enter
+#include <lib/arch/asm.h>
 
-// Do something to all the registers so we can read the state on the way out.
-.macro twiddle_registers
-  addi ra, ra, 1
-  addi sp, sp, 1
-  addi gp, gp, 1
-  // Skip TP as we want to write to TLS later.
-  addi t0, t0, 1
-  addi t1, t1, 1
-  addi t2, t2, 1
-  addi s0, s0, 1
-  addi s1, s1, 1
-  addi a0, a0, 1
-  addi a1, a1, 1
-  addi a2, a2, 1
-  addi a3, a3, 1
-  addi a4, a4, 1
-  addi a5, a5, 1
-  addi a6, a6, 1
-  addi a7, a7, 1
-  addi s2, s2, 1
-  addi s3, s3, 1
-  addi s4, s4, 1
-  addi s5, s5, 1
-  addi s6, s6, 1
-  addi s7, s7, 1
-  addi s8, s8, 1
-  addi s9, s9, 1
-  addi s10, s10, 1
-  addi s11, s11, 1
-  addi t3, t3, 1
-  addi t4, t4, 1
-  addi t5, t5, 1
-  addi t6, t6, 1
+#include "../needs-next.h"
 
-  // Save the contents of t0 to TLS prior to running a syscall.
-  sd t0, (tp)
-.endm
+NEEDS_NEXT_SYSCALL(zx_restricted_enter)
 
-.globl vectab
-vectab:
+.function restricted_exit, global
   // Back from restricted mode
   // a0 holds the context, which is the stack pointer
   // a1 holds the reason code
@@ -85,21 +50,9 @@ vectab:
   // Make it appear as if the wrapper had returned ZX_OK.
   mv a0, zero
   ret
+.end_function
 
-.globl syscall_bounce
-syscall_bounce:
-  // Do something to all the registers so we can read the state on the way out.
-  twiddle_registers
-0:
-  mv t0, zero
-  addi t0, t0, 64
-  ecall
-.globl syscall_bounce_post_syscall
-syscall_bounce_post_syscall:
-  jal syscall_bounce
-
-.globl restricted_enter_wrapper
-restricted_enter_wrapper:
+.function restricted_enter_wrapper, global
   // Args 0 - 1 are already in a0 and a1.
 
   // Make space for all of the normal mode context on the stack.
@@ -143,40 +96,10 @@ restricted_enter_wrapper:
   // Reset the stack.
   addi sp, sp, 128
   ret
-
-.globl exception_bounce
-exception_bounce:
-  // Do something to all the registers so we can read the state on the way out.
-  twiddle_registers
-
-.globl exception_bounce_exception_address
-exception_bounce_exception_address:
-  unimp
-  jal exception_bounce_exception_address
-
-// Stores 1 to *a0 in a loop.
-.globl store_one
-store_one:
-  addi a1, a1, 1
-  addi t0, zero, 1
-.store_one_loop:
-  sw t0, (a0)
-  jal .store_one_loop
-
-// Atomically adds 1 to *a0, then loops until *a1 is nonzero and then issues a syscall.
-.globl wait_then_syscall
-wait_then_syscall:
-  addi t0, zero, 1
-  amoadd.w t1, t0, (a0)
-.wait_then_syscall_loop:
-  lw t0, (a1)
-  beqz t0, .wait_then_syscall_loop
-  ecall
-  unimp // Should never be reached
+.end_function
 
 // Load the contents of the array in *a0 to the FPU registers.
-.globl load_fpu_registers
-load_fpu_registers:
+.function load_fpu_registers, global
   fld f0, (a0)
   fld f1, 8(a0)
   fld f2, 16(a0)
@@ -210,10 +133,10 @@ load_fpu_registers:
   fld f30, 240(a0)
   fld f31, 248(a0)
   ret
+.end_function
 
 // Store the contents of the FPU registers into the array in *a0.
-.globl store_fpu_registers
-store_fpu_registers:
+.function store_fpu_registers, global
   fsd f0, (a0)
   fsd f1, 8(a0)
   fsd f2, 16(a0)
@@ -247,3 +170,4 @@ store_fpu_registers:
   fsd f30, 240(a0)
   fsd f31, 248(a0)
   ret
+.end_function
