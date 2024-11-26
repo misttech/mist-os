@@ -10,12 +10,6 @@
 // are available.  The core-tests-standalone versions of the tests are always
 // linked in, but sometimes run with one vDSO and sometimes the other.
 
-#ifdef __ASSEMBLER__
-
-#define NEEDS_NEXT_SYSCALL(name) .weak name
-
-#else  // __ASSEMBLER__
-
 #include <zxtest/zxtest.h>
 
 // `NEEDS_NEXT_SYSCALL(zx_foo);` should appear at top level for each @next
@@ -35,7 +29,5 @@
   } while (0)
 
 bool NeedsNextShouldSkip();
-
-#endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_SYSTEM_UTEST_CORE_NEEDS_NEXT_H_

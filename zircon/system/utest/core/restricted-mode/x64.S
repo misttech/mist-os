@@ -2,12 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/arch/asm.h>
-#include "../needs-next.h"
+.weak zx_restricted_enter
 
-NEEDS_NEXT_SYSCALL(zx_restricted_enter)
+// do something to all the registers so we can read the state on the way out
+.macro twiddle_registers
+  inc  %rax
+  inc  %rbx
+  inc  %rcx
+  inc  %rdx
+  inc  %rsi
+  inc  %rdi
+  inc  %rbp
+  inc  %rsp
+  inc  %r8
+  inc  %r9
+  inc  %r10
+  inc  %r11
+  inc  %r12
+  inc  %r13
+  inc  %r14
+  inc  %r15
 
-.function restricted_exit, global
+  // write rcx and r11 to fs and gs base since they are both
+  // trashed by the syscall. also tests that fs and gs base are
+  // set properly.
+  mov   %rcx, %fs:0
+  mov   %r11, %gs:0
+
+.endm
+
+.globl vectab
+vectab:
   // back from restricted mode
   // rdi holds the context
   // rsi holds the reason code
@@ -30,9 +55,26 @@ NEEDS_NEXT_SYSCALL(zx_restricted_enter)
   // make it appear as if the wrapper had returned ZX_OK
   xor  %eax,%eax
   ret
-.end_function
 
-.function restricted_enter_wrapper, global
+.globl syscall_bounce
+syscall_bounce:
+  twiddle_registers
+0:
+  syscall
+.globl syscall_bounce_post_syscall
+syscall_bounce_post_syscall:
+  jmp 0b
+
+.globl exception_bounce
+exception_bounce:
+  twiddle_registers
+.globl exception_bounce_exception_address
+exception_bounce_exception_address:
+  ud2
+  jmp exception_bounce_exception_address
+
+.globl restricted_enter_wrapper
+restricted_enter_wrapper:
   // args 0 - 1 are already in place in rdi, rsi
 
   // save the return code pointer on the stack
@@ -57,10 +99,29 @@ NEEDS_NEXT_SYSCALL(zx_restricted_enter)
   // if we got here it must have failed
   add   $(8*8),%rsp // pop the previous state on the stack
   ret
-.end_function
+
+// Stores 1 to *rax in a loop.
+.globl store_one
+store_one:
+  inc %rbx
+.store_one_loop:
+  movl     $1, (%rax)
+  jmp     .store_one_loop
+
+// Atomically adds 1 to *rdi, then loops until *rsi is nonzero and then issues a syscall.
+.globl wait_then_syscall
+wait_then_syscall:
+  lock incl    (%rdi)
+.wait_then_syscall_loop:
+  movl    (%rsi), %eax
+  testl   %eax, %eax
+  je      .wait_then_syscall_loop
+  syscall
+  ud2  // Should never be reached
 
 // Load the contents of the array in *rdi to the FPU.
-.function load_fpu_registers, global
+.globl load_fpu_registers
+load_fpu_registers:
   // Load registers ST0-ST7 with data.
   fldt (%rdi)
   fldt 10(%rdi)
@@ -89,10 +150,10 @@ NEEDS_NEXT_SYSCALL(zx_restricted_enter)
   movups 304(%rdi), %xmm14
   movups 320(%rdi), %xmm15
   ret
-.end_function
 
 // Store the contents of the FPU into the array in *rdi.
-.function store_fpu_registers, global
+.globl store_fpu_registers
+store_fpu_registers:
   // Pop the float values out of ST0-ST7.
   // These registers are treated as a stack and thus must be popped LIFO.
   fstpt 70(%rdi)
@@ -122,4 +183,3 @@ NEEDS_NEXT_SYSCALL(zx_restricted_enter)
   movups %xmm14, 304(%rdi)
   movups %xmm15, 320(%rdi)
   ret
-.end_function
