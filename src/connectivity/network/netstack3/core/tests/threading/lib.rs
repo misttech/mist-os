@@ -308,7 +308,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: TestIpExt>() {
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]
 fn new_incomplete_neighbor_schedule_timer_atomic<I: TestIpExt>() {
-    loom_model(Default::default(), move || {
+    loom_model(low_preemption_bound_model(), move || {
         let mut builder = FakeCtxBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
