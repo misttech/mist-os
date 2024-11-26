@@ -251,12 +251,12 @@ mod tests {
 
     #[fuchsia::test]
     fn v1_filter_data_to_lines_test() {
-        let full_tree_selector = "*/realm2/session5/account_manager:root/accounts:active
-realm1/realm*/sessio*/account_manager:root/accounts:total
-realm1/realm2/session5/account_manager:root/auth_providers:types
-realm1/realm2/session5/account_manager:root/listeners:active
-realm1/realm2/session5/account_*:root/listeners:events
-realm1/realm2/session5/account_manager:root/listeners:total_opened";
+        let full_tree_selector = "*/realm2/session5/account_manager:[...]root/accounts:active
+realm1/realm*/sessio*/account_manager:[...]root/accounts:total
+realm1/realm2/session5/account_manager:[...]root/auth_providers:types
+realm1/realm2/session5/account_manager:[...]root/listeners:active
+realm1/realm2/session5/account_*:[...]root/listeners:events
+realm1/realm2/session5/account_manager:[...]root/listeners:total_opened";
 
         setup_and_run_selector_filtering(
             full_tree_selector,
@@ -272,7 +272,8 @@ realm1/realm2/session5/account_manager:root/listeners:total_opened";
             Some("realm1/realm2/session5/account_manager".to_string()),
         );
 
-        let single_value_selector = "realm1/realm2/session5/account_manager:root/accounts:active";
+        let single_value_selector =
+            "realm1/realm2/session5/account_manager:[...]root/accounts:active";
 
         setup_and_run_selector_filtering(
             single_value_selector,

@@ -7,7 +7,7 @@ use crate::commands::ListCommand;
 use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
-use fidl_fuchsia_diagnostics::{Selector, TreeNames};
+use fidl_fuchsia_diagnostics::{All, Selector, TreeNames};
 use fidl_fuchsia_sys2 as fsys2;
 use moniker::Moniker;
 use regex::Regex;
@@ -206,6 +206,11 @@ pub fn expand_selectors(
     for mut selector in selectors {
         if let Some(tree_name) = &tree_name {
             selector = add_tree_name(selector, tree_name.clone())?;
+        } else {
+            match selector.tree_names {
+                None => selector.tree_names = Some(TreeNames::All(All {})),
+                Some(_) => {}
+            }
         }
         result.push(selector)
     }
@@ -304,7 +309,7 @@ mod test {
         assert_eq!(actual, expected);
 
         let expected = vec![
-            parse_verbose("core/one:root").unwrap(),
+            parse_verbose("core/one:[...]root").unwrap(),
             parse_verbose("core/one:[name=xyz]root").unwrap(),
         ];
 

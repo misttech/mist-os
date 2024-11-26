@@ -123,7 +123,7 @@ async fn test_show_with_component_search() {
     ];
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
-            selectors::parse_verbose("test/moniker1:root").unwrap(),
+            selectors::parse_verbose("test/moniker1:[...]root").unwrap(),
         )]),
         inspects.clone(),
     );
@@ -164,7 +164,7 @@ async fn test_show_with_manifest_that_exists() {
     ];
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
-            selectors::parse_verbose("test/moniker1:root").unwrap(),
+            selectors::parse_verbose("test/moniker1:[...]root").unwrap(),
         )]),
         inspects.clone(),
     );
@@ -200,7 +200,7 @@ async fn test_show_with_selectors_with_no_data() {
     );
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
-            selectors::parse_verbose("test/moniker1:name:hello_not_real").unwrap(),
+            selectors::parse_verbose("test/moniker1:[...]name:hello_not_real").unwrap(),
         )]),
         vec![],
     );
@@ -236,7 +236,7 @@ async fn test_show_with_selectors_with_data() {
     let mut inspects = vec![make_inspect_with_length("test/moniker1", 6, 30)];
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
-            selectors::parse_verbose("test/moniker1:name:hello_6").unwrap(),
+            selectors::parse_verbose("test/moniker1:[...]name:hello_6").unwrap(),
         )]),
         inspects.clone(),
     );
