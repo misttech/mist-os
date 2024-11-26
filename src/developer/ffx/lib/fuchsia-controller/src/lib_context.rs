@@ -9,9 +9,11 @@ use async_lock::Mutex as AsyncMutex;
 use byteorder::{NativeEndian, WriteBytesExt};
 use fuchsia_async::{LocalExecutor, Task};
 use futures_lite::AsyncWriteExt;
+use netext::TokioAsyncReadExt;
 use std::ops::DerefMut;
 use std::os::fd::{FromRawFd, RawFd};
 use std::sync::{Arc, Mutex};
+use tokio::net::UnixStream;
 use zx_types;
 
 type Notifier = Arc<AsyncMutex<Option<LibNotifier>>>;
@@ -102,9 +104,9 @@ pub(crate) struct LibNotifier {
     pipe_rx: RawFd,
 }
 
-fn unix_stream(fd: RawFd) -> Result<async_net::unix::UnixStream, std::io::Error> {
-    let owned_fd = unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) };
-    async_net::unix::UnixStream::try_from(owned_fd)
+fn unix_stream(fd: RawFd) -> Result<UnixStream, std::io::Error> {
+    let std_str = unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) };
+    UnixStream::from_std(std_str)
 }
 
 impl LibNotifier {
@@ -112,10 +114,11 @@ impl LibNotifier {
     // executor to ensure spawned tasks are scheduled correctly.
     async fn new() -> Result<Self> {
         let (pipe_rx, pipe_tx) = nix::unistd::pipe()?;
-        let mut stream = unix_stream(pipe_tx)?;
+        let stream = unix_stream(pipe_tx)?;
         let (tx, rx) = async_channel::unbounded::<zx_types::zx_handle_t>();
         let pipe_reader_task = fuchsia_async::Task::local(async move {
             let mut bytes: [u8; 4] = [0, 0, 0, 0];
+            let mut stream = stream.into_futures_stream();
             while let Ok(raw_handle) = rx.recv().await {
                 bytes.as_mut().write_u32::<NativeEndian>(raw_handle).unwrap();
                 match stream.write_all(&bytes).await {
