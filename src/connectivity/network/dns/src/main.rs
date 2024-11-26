@@ -13,7 +13,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v6;
 use net_types::ip::IpAddress;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -387,6 +387,60 @@ impl ResolverLookup for Resolver {
     }
 }
 
+#[derive(Debug)]
+enum LookupIpErrorSource {
+    Ipv4,
+    Ipv6,
+    CanonicalName,
+}
+
+#[derive(Default)]
+struct LookupIpErrorsFromSource {
+    ipv4: Option<ResolveError>,
+    ipv6: Option<ResolveError>,
+    canonical_name: Option<ResolveError>,
+}
+
+impl LookupIpErrorsFromSource {
+    fn any_error(&self) -> Option<&ResolveError> {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        ipv4.as_ref().or_else(|| ipv6.as_ref()).or_else(|| canonical_name.as_ref())
+    }
+
+    fn accumulate(&mut self, src: LookupIpErrorSource, error: ResolveError) {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        let target = match src {
+            LookupIpErrorSource::Ipv4 => ipv4,
+            LookupIpErrorSource::Ipv6 => ipv6,
+            LookupIpErrorSource::CanonicalName => canonical_name,
+        };
+        debug_assert!(target.is_none(), "multiple errors observed for {src:?}");
+        *target = Some(error)
+    }
+
+    fn handle(self) -> fname::LookupError {
+        let Self { ipv4, ipv6, canonical_name } = self;
+        let mut ret = None;
+        for (src, err) in [
+            ("LookupIp(IPv4)", ipv4),
+            ("LookupIp(IPv6)", ipv6),
+            ("LookupIp(CanonicalName)", canonical_name),
+        ]
+        .into_iter()
+        .filter_map(|(src, err)| err.map(|e| (src, e)))
+        {
+            // We want to log all errors, but only convert one of them to the
+            // return. The fixed order IPv4, IPv6, CanonicalName is chosen to
+            // maximize the likelihood of the reported error being useful.
+            let err = handle_err(src, err);
+            if ret.is_none() {
+                ret = Some(err)
+            }
+        }
+        ret.unwrap_or(fname::LookupError::InternalError)
+    }
+}
+
 fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
     use trust_dns_proto::error::ProtoErrorKind;
 
@@ -473,7 +527,7 @@ fn handle_err(source: &str, err: ResolveError) -> fname::LookupError {
 
     if let Some((ioerr, raw_os_error)) = ioerr {
         match raw_os_error {
-            Some(libc::EHOSTUNREACH) => {
+            Some(libc::EHOSTUNREACH | libc::ENETUNREACH) => {
                 debug!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr)
             }
             _ => warn!("{} error: {:?}; (IO error {:?})", source, lookup_err, ioerr),
@@ -825,14 +879,26 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     let start_time = fasync::MonotonicInstant::now();
                     let (ret1, ret2, ret3) = futures::future::join3(
                         futures::future::OptionFuture::from(
-                            ipv4_lookup.then(|| resolver.lookup(hostname, RecordType::A)),
+                            ipv4_lookup.then(|| {
+                                resolver
+                                    .lookup(hostname, RecordType::A)
+                                    .map_err(|e| (LookupIpErrorSource::Ipv4, e))
+                            }),
                         ),
                         futures::future::OptionFuture::from(
-                            ipv6_lookup.then(|| resolver.lookup(hostname, RecordType::AAAA)),
+                            ipv6_lookup.then(|| {
+                                resolver
+                                    .lookup(hostname, RecordType::AAAA)
+                                    .map_err(|e| (LookupIpErrorSource::Ipv6, e))
+                            }),
                         ),
                         futures::future::OptionFuture::from(
                             canonical_name_lookup
-                                .then(|| resolver.lookup(hostname, RecordType::CNAME)),
+                                .then(|| {
+                                    resolver
+                                        .lookup(hostname, RecordType::CNAME)
+                                        .map_err(|e| (LookupIpErrorSource::CanonicalName, e))
+                                }),
                         ),
                     )
                     .await;
@@ -842,14 +908,11 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     }
                     let (addrs, cnames, error) =
                         result.into_iter().filter_map(std::convert::identity).fold(
-                            (Vec::new(), Vec::new(), None),
+                            (Vec::new(), Vec::new(), LookupIpErrorsFromSource::default()),
                             |(mut addrs, mut cnames, mut error), result| {
                                 let () = match result {
-                                    Err(err) => match error.as_ref() {
-                                        Some(_err) => {}
-                                        None => {
-                                            error = Some(err);
-                                        }
+                                    Err((src, err)) => {
+                                        error.accumulate(src, err);
                                     },
                                     Ok(lookup) => lookup.iter().for_each(|rdata| match rdata {
                                         RData::A(addr) if ipv4_lookup => addrs
@@ -875,35 +938,42 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                         });
                     let count = match NonZeroUsize::try_from(addrs.len() + cnames.len()) {
                         Ok(count) => Ok(count),
-                        Err(std::num::TryFromIntError { .. }) => {
-                            match error {
-                                None => {
-                                    // TODO(https://fxbug.dev/42062388): Remove
-                                    // this once Trust-DNS enforces that all
-                                    // responses with no records return a
-                                    // `NoRecordsFound` error.
-                                    //
-                                    // Note that returning here means that query
-                                    // stats for inspect will not get logged.
-                                    // This is ok since this case should be rare
-                                    // and is considered to be temporary.
-                                    // Moreover, the failed query counters are
-                                    // based on the `ResolverError::kind`, which
-                                    // isn't applicable here.
-                                    error!("resolver response unexpectedly contained no records and no error. See https://fxbug.dev/42062388.");
-                                    return Err(fname::LookupError::NotFound);
-                                },
-                                Some(e) => Err(e),
+                        Err(std::num::TryFromIntError { .. }) => match error.any_error() {
+                            None => {
+                                // TODO(https://fxbug.dev/42062388): Remove this
+                                // once Trust-DNS enforces that all responses
+                                // with no records return a `NoRecordsFound`
+                                // error.
+                                //
+                                // Note that returning here means that query
+                                // stats for inspect will not get logged. This
+                                // is ok since this case should be rare and is
+                                // considered to be temporary. Moreover, the
+                                // failed query counters are based on the
+                                // `ResolverError::kind`, which isn't applicable
+                                // here.
+                                error!("resolver response unexpectedly contained no records \
+                                        and no error. See https://fxbug.dev/42062388.");
+                                return Err(fname::LookupError::NotFound);
+                            },
+                            Some(any_err) => {
+                                Err(any_err)
                             }
                         }
                     };
                     let () = stats
                         .finish_query(
                             start_time,
-                            count.as_ref().copied().map_err(ResolveError::kind),
+                            count.as_ref().copied().map_err(|e| e.kind()),
                         )
                         .await;
-                    let _: NonZeroUsize = count.map_err(|err| handle_err("LookupIp", err))?;
+                    match count {
+                        Ok(_) => {},
+                        Err(_any_err) => {
+                            // Handle all the errors instead of just the one used for stats.
+                            return Err(error.handle());
+                        }
+                    }
                     let addrs = if sort_addresses {
                         sort_preferred_addresses(addrs, &routes).await?
                     } else {
