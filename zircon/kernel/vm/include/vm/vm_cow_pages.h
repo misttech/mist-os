@@ -618,8 +618,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  // TODO(https://fxbug.dev/42052489, https://fxbug.dev/42138396): Determine if this should act on
-  // pages supplied by the parent.
   zx_status_t DecompressInRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 

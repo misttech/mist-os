@@ -5028,37 +5028,67 @@ zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,
   uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  while (cur_offset < end_offset) {
-    VmPageOrMarkerRef ref;
-    uint64_t ref_offset = 0;
-    page_list_.ForEveryPageInRangeMutable(
-        [&](VmPageOrMarkerRef page_or_marker, uint64_t offset) {
-          if (page_or_marker->IsReference()) {
-            ref = page_or_marker;
-            ref_offset = offset;
-            return ZX_ERR_STOP;
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    while (cur_offset < end_offset) {
+      VmPageOrMarkerRef ref;
+      uint64_t ref_offset = 0;
+      page_list_.ForEveryPageInRangeMutable(
+          [&](VmPageOrMarkerRef page_or_marker, uint64_t offset) {
+            if (page_or_marker->IsReference()) {
+              ref = page_or_marker;
+              ref_offset = offset;
+              return ZX_ERR_STOP;
+            }
+            return ZX_ERR_NEXT;
+          },
+          cur_offset, end_offset);
+      if (!ref) {
+        return ZX_OK;
+      }
+      __UNINITIALIZED AnonymousPageRequest page_request;
+      zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
+      if (status == ZX_OK) {
+        cur_offset = ref_offset + PAGE_SIZE;
+      } else if (status == ZX_ERR_SHOULD_WAIT) {
+        guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
+        // With the lock dropped it's possible that our cur/end_offset are no longer within the
+        // range of the VMO, but if this is the case we will immediately find no pages in the
+        // page_list_ for this range and return.
+      }
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t status;
+  do {
+    __UNINITIALIZED AnonymousPageRequest page_request;
+    status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
+        [&cur_offset, &page_request](VmPageOrMarker* p, VmCowPages* owner, uint64_t this_offset,
+                                     uint64_t owner_offset) {
+          if (!p->IsReference()) {
+            return ZX_ERR_NEXT;
           }
-          return ZX_ERR_NEXT;
+          AssertHeld(owner->lock_ref());
+          zx_status_t status = owner->ReplaceReferenceWithPageLocked(VmPageOrMarkerRef(p),
+                                                                     owner_offset, &page_request);
+          if (status == ZX_OK) {
+            cur_offset = this_offset + PAGE_SIZE;
+            return ZX_ERR_NEXT;
+          }
+          return status;
         },
-        cur_offset, end_offset);
-    if (!ref) {
+        cur_offset, end_offset - cur_offset);
+    if (status == ZX_OK) {
       return ZX_OK;
     }
-    __UNINITIALIZED AnonymousPageRequest page_request;
-    zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
-    if (status == ZX_OK) {
-      cur_offset = ref_offset + PAGE_SIZE;
-    } else if (status == ZX_ERR_SHOULD_WAIT) {
+    if (status == ZX_ERR_SHOULD_WAIT) {
       guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
-      // With the lock dropped it's possible that our cur/end_offset are no longer within the range
-      // of the VMO, but if this is the case we will immediately find no pages in the page_list_
-      // for this range and return.
     }
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  return ZX_OK;
+  } while (status == ZX_OK);
+  return status;
 }
 
 int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
