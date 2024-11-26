@@ -209,7 +209,7 @@ const std::set<std::string> kCreateThreadSymbols = {
 //
 // TODO(https://fxbug.dev/380482978): this list should be deleted once possible.
 const std::set<std::string> kAdditionalThreadSymbolsDriversAllowlist = {
-    "#meta/nanohub_driver_nohw_test.cm"};
+    "#meta/nanohub_driver.cm"};
 
 // The set of restricted symbols for manipulating threads which are only allowed for drivers in
 // |kAdditionalThreadSymbolsDriversAllowlist|.
