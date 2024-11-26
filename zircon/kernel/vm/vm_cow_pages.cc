@@ -699,10 +699,7 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
     bool walk_up = false;
     auto page_callback = [func, cur, cur_to_self = start_in_cur - start_in_self, &stopped_early](
                              auto p, uint64_t page_offset) __ALWAYS_INLINE {
-      // Always provide a constant owner node to the callback - it should only ever be able to
-      // modify the passed in entry.
-      zx_status_t status =
-          func(p, static_cast<const S*>(cur), page_offset - cur_to_self, page_offset);
+      zx_status_t status = func(p, cur, page_offset - cur_to_self, page_offset);
       if (status == ZX_ERR_STOP) {
         stopped_early = true;
       }
