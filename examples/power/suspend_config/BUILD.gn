@@ -2,20 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("power") {
+group("suspend_config") {
   testonly = true
-  deps = [
-    "cpp",
-    "rust",
-    "suspend_config",
-  ]
+  deps = [ "rust" ]
 }
 
-group("hermetic_tests") {
+group("tests") {
   testonly = true
-  deps = [
-    "cpp:tests",
-    "rust:tests",
-    "suspend_config:tests",
-  ]
+  deps = [ "rust:tests" ]
 }
