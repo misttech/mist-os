@@ -41,6 +41,10 @@ clang_toolchain_suite("linux_arm") {
   toolchain_cpu = "arm"
   toolchain_os = "linux"
   use_strip = true
+
+  # TODO(https://fxbug.dev/380297204): Work around LTO bug preventing linking
+  # in some cases.
+  exclude_variant_tags = [ "lto" ]
 }
 
 clang_toolchain_suite("linux_riscv64") {
