@@ -70,8 +70,7 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
       set_result(false);
       return;
     }
-    module->module() = abi_module;
-    module->set_no_delete();
+    module->SetStartupModule(abi_module, abi);
     // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
     // startup modules.
     modules_.push_back(std::move(module));

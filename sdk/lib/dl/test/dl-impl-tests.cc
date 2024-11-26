@@ -21,6 +21,18 @@ namespace {
 // A container of abi modules (i.e. startup modules) loaded with this test.
 std::vector<AbiModule> gModuleStorage;
 
+using TlsModule = ld::abi::Abi<>::TlsModule;
+std::vector<TlsModule> gTlsModuleStorage;
+
+using Offset = ld::abi::Abi<>::Addr;
+std::vector<Offset> gTlsOffsetStorage;
+
+struct DecodedModule {
+  AbiModule abi_module;
+  std::optional<TlsModule> tls_module;
+  std::optional<Offset> tls_offset;
+};
+
 // This class is a wrapper around the ld::ModuleMemory object that handles
 // addresses read from the .dynamic section in memory as modified by glibc.
 //
@@ -56,8 +68,35 @@ class AdjustLoadBiasAdaptor : public ld::ModuleMemory {
   Elf::Addr load_bias_ = 0;
 };
 
+// TODO(https://fxbug.dev/324136435): Share SetTLs implementation with
+// //sdk/lib/ld/include/lib/ld/decoded-module.h
+std::optional<TlsModule> SetTls(auto& diag, const Elf::Phdr& tls_phdr, auto& memory) {
+  using PhdrError = elfldltl::internal::PhdrError<elfldltl::ElfPhdrType::kTls>;
+
+  Elf::size_type alignment = std::max<Elf::size_type>(tls_phdr.align, 1);
+  if (!cpp20::has_single_bit(alignment)) [[unlikely]] {
+    diag.FormatError(PhdrError::kBadAlignment);
+    return {};
+  }
+  if (tls_phdr.filesz > tls_phdr.memsz) [[unlikely]] {
+    diag.FormatError("PT_TLS header `p_filesz > p_memsz`");
+    return {};
+  }
+  auto initial_data = memory.template ReadArray<std::byte>(tls_phdr.vaddr, tls_phdr.filesz);
+  if (!initial_data) [[unlikely]] {
+    diag.FormatError("PT_TLS has invalid p_vaddr", elfldltl::FileAddress{tls_phdr.vaddr},
+                     " or p_filesz ", tls_phdr.filesz());
+    return {};
+  }
+  return TlsModule{
+      .tls_initial_data = *initial_data,
+      .tls_bss_size = tls_phdr.memsz - tls_phdr.filesz,
+      .tls_alignment = alignment,
+  };
+}
+
 // Decode an AbiModule from the provided `struct dl_phdr_info`.
-AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
+DecodedModule DecodeModule(const dl_phdr_info& phdr_info) {
   static const size_t kPageSize = sysconf(_SC_PAGE_SIZE);
 
   // Use panic diagnostics to abort and print to stderr in the event any of the
@@ -76,8 +115,6 @@ AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
       elfldltl::PhdrTlsObserver<Elf>(tls_phdr),
       elfldltl::PhdrLoadObserver<elfldltl::Elf<>>(kPageSize, vaddr_start, vaddr_size),
       load_info.GetPhdrObserver(kPageSize));
-
-  // TODO(https://fxbug.dev/331421403): set TLS
 
   vaddr_start += phdr_info.dlpi_addr;
   AbiModule module{
@@ -106,18 +143,37 @@ AbiModule DecodeModule(const dl_phdr_info& phdr_info) {
   // visibility.
   module.symbols_visible = true;
 
-  return module;
+  std::optional<TlsModule> tls_module;
+  std::optional<Offset> tls_offset;
+  if (module.tls_modid > 0) {
+    assert(tls_phdr);
+    tls_module = SetTls(diag, *tls_phdr, memory);
+    assert(phdr_info.dlpi_tls_data);
+    tls_offset = ld::TpRelativeToOffset(phdr_info.dlpi_tls_data);
+  } else {
+    assert(!tls_phdr);
+  }
+
+  return {.abi_module = module, .tls_module = tls_module, .tls_offset = tls_offset};
 }
 
 int AddModule(struct dl_phdr_info* phdr_info, size_t size, void* data) {
   assert(size >= sizeof(*phdr_info));
-  gModuleStorage.push_back(DecodeModule(*phdr_info));
+  DecodedModule decoded = DecodeModule(*phdr_info);
+  gModuleStorage.push_back(decoded.abi_module);
+  if (decoded.tls_module) {
+    assert(decoded.abi_module.tls_modid > 0);
+    ptrdiff_t idx = static_cast<ptrdiff_t>(decoded.abi_module.tls_modid) - 1;
+    gTlsModuleStorage.insert(gTlsModuleStorage.begin() + idx, *decoded.tls_module);
+    gTlsOffsetStorage.insert(gTlsOffsetStorage.begin() + idx, *decoded.tls_offset);
+  }
   return 0;
 }
 
-// This function decodes the loaded modules at startup to populate a list of
-// ld::abi::Abi<>::Module data structures to return to the caller.
-const AbiModule* PopulateLoadedAbiModules() {
+// This function populates an ld::abi::Abi<> object. It iterates over and
+// decodes the modules that are loaded with this test program to fill out abi
+// information and returns the finished abi object to the caller.
+ld::abi::Abi<> PopulateLdAbi() {
   ZX_ASSERT(!dl_iterate_phdr(AddModule, nullptr));
 
   // Connect the link_map list pointers for each abi module and assign a
@@ -133,16 +189,15 @@ const AbiModule* PopulateLoadedAbiModules() {
     prev = it;
   }
 
-  return &gModuleStorage.front();
-  ;
+  return {
+      .loaded_modules{&gModuleStorage.front()},
+      .static_tls_modules{gTlsModuleStorage},
+      .static_tls_offsets{gTlsOffsetStorage},
+  };
 }
-
-const ld::abi::Abi<> gLdAbiStorage = {
-    .loaded_modules{PopulateLoadedAbiModules()},
-};
 
 }  // namespace
 
-const ld::abi::Abi<>& gStartupLdAbi = gLdAbiStorage;
+const ld::abi::Abi<>& gStartupLdAbi = PopulateLdAbi();
 
 }  // namespace dl::testing
