@@ -264,12 +264,6 @@ void ZirconComponentManager::OnComponentEvent(fuchsia_component::Event event) {
   const auto& moniker = *event.header()->moniker();
   const auto& url = *event.header()->component_url();
   switch (*event.header()->event_type()) {
-    case fuchsia_component::EventType::kDiscovered: {
-      if (debug_agent_) {
-        debug_agent_->OnComponentDiscovered(moniker, url);
-      }
-      break;
-    }
     case fuchsia_component::EventType::kDebugStarted:
       if (debug_agent_) {
         debug_agent_->OnComponentStarted(moniker, url);

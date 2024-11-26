@@ -142,7 +142,7 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   // doesn't have an ELF program running with it. This will install the subsequent moniker prefix
   // filter that will be used to match a child component with an ELF process.
   harness()->system_interface()->mock_component_manager().InjectComponentEvent(
-      FakeEventType::kDiscovered, kFullRootMoniker,
+      FakeEventType::kDebugStarted, kFullRootMoniker,
       "fuchsia-pkg://devhost/root_package#meta/root_component.cm");
 
   status_reply = GetAgentStatus();
@@ -286,7 +286,7 @@ TEST_F(DebugAgentServerTest, GetMatchingProcesses) {
 
   // Create the subfilter.
   harness()->system_interface()->mock_component_manager().InjectComponentEvent(
-      FakeEventType::kDiscovered, kFullRootMoniker,
+      FakeEventType::kDebugStarted, kFullRootMoniker,
       "fuchsia-pkg://devhost/root_package#meta/root_component.cm");
 
   // Koid of job4 from MockSystemInterface.

@@ -37,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 66;
+constexpr uint32_t kCurrentProtocolVersion = 67;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -841,6 +841,8 @@ struct NotifyLog {
   void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | severity | location | log; }
 };
 
+// Deprecated in version 67, do not use.
+//
 // When a filter has been installed recursively, we need to let the front end know about it,
 // particularly if it's a weak filter. Otherwise the frontend will take the default approach to not
 // treat a process starting event as a weak attach.
@@ -860,7 +862,16 @@ struct NotifyComponentStarting {
 
   ComponentInfo component;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | component; }
+  // The filter that the backend installed to match this realm, if the matching filter had the
+  // |recursive| option set..
+  std::optional<Filter> filter;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | timestamp | component;
+    if (ver >= 67) {
+      ser | filter;
+    }
+  }
 };
 
 // Notify that a component has exited.
