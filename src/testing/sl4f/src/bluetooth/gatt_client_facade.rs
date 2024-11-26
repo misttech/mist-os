@@ -182,19 +182,11 @@ impl GattClientFacade {
 
     async fn active_remote_service_event_task(
         inner: Arc<RwLock<InnerGattClientFacade>>,
-        mut event_stream: RemoteServiceEventStream,
+        event_stream: RemoteServiceEventStream,
     ) {
         let tag = "GattClientFacade::active_remote_service_event_task";
-        while let Some(event) = event_stream.next().await {
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336801)
-            match event {
-                Ok(_) => {} // There are no events
-                Err(e) => {
-                    warn!(tag = &with_line!(tag), "RemoteService error: {:?}", e);
-                    break;
-                }
-            }
-        }
+        // There are no events
+        event_stream.map(|_| ()).collect::<()>().await;
         info!(tag = &with_line!(tag), "RemoteService closed");
         inner.write().active_remote_service = None;
     }
