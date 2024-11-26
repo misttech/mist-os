@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::program::BPF_PROG_TYPE_FUSE;
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
@@ -13,6 +12,7 @@ use crate::vfs::{
     FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
     SymlinkNode,
 };
+use ebpf_api::BPF_PROG_TYPE_FUSE;
 use starnix_logging::bug_ref;
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;

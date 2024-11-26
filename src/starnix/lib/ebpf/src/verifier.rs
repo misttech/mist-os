@@ -645,7 +645,7 @@ pub struct CallingContext {
     /// with `src_reg=BPF_PSEUDO_MAP_IDX`.
     maps: Vec<MapSchema>,
     /// The registered external functions.
-    functions: HashMap<u32, FunctionSignature>,
+    helpers: HashMap<u32, FunctionSignature>,
     /// The args of the program.
     args: Vec<Type>,
     /// The memory id of the network packets.
@@ -658,8 +658,8 @@ impl CallingContext {
         self.maps.push(schema);
         index
     }
-    pub fn register_function(&mut self, index: u32, signature: FunctionSignature) {
-        self.functions.insert(index, signature);
+    pub fn set_helpers(&mut self, helpers: HashMap<u32, FunctionSignature>) {
+        self.helpers = helpers;
     }
     pub fn set_args(&mut self, args: &[Type]) {
         assert!(args.len() <= 5);
@@ -2293,7 +2293,7 @@ impl BpfVisitor for DataDependencies {
         context: &mut Self::Context<'a>,
         index: u32,
     ) -> Result<(), String> {
-        let Some(signature) = context.calling_context.functions.get(&index).cloned() else {
+        let Some(signature) = context.calling_context.helpers.get(&index).cloned() else {
             return Err(format!("unknown external function {}", index));
         };
         // 0 is overwritten and 1 to 5 are scratch registers
@@ -3128,7 +3128,7 @@ impl BpfVisitor for ComputationContext {
         index: u32,
     ) -> Result<(), String> {
         bpf_log!(self, context, "call 0x{:x}", index);
-        let Some(signature) = context.calling_context.functions.get(&index).cloned() else {
+        let Some(signature) = context.calling_context.helpers.get(&index).cloned() else {
             return Err(format!("unknown external function {} at pc {}", index, self.pc));
         };
         debug_assert!(signature.args.len() <= 5);

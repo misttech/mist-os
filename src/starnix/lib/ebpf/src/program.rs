@@ -16,7 +16,6 @@ use derivative::Derivative;
 use linux_uapi::sock_filter;
 use std::collections::HashMap;
 use std::fmt::Formatter;
-use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// A counter that allows to generate new ids for parameters. The namespace is the same as for id
@@ -226,37 +225,18 @@ impl<C: EbpfRunContext> PacketAccessor<C> for EmptyPacketAccessor {
     }
 }
 
-pub struct EbpfHelper<C: EbpfRunContext> {
-    pub index: u32,
-    pub name: &'static str,
-    pub function_pointer: Arc<
-        dyn Fn(&mut C::Context<'_>, BpfValue, BpfValue, BpfValue, BpfValue, BpfValue) -> BpfValue
-            + Send
-            + Sync,
-    >,
-    pub signature: FunctionSignature,
-}
-
-impl<C: EbpfRunContext> Clone for EbpfHelper<C> {
-    fn clone(&self) -> Self {
-        Self {
-            index: self.index,
-            name: self.name,
-            function_pointer: Arc::clone(&self.function_pointer),
-            signature: self.signature.clone(),
-        }
-    }
-}
-
-impl<C: EbpfRunContext> std::fmt::Debug for EbpfHelper<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EbpfHelper")
-            .field("index", &self.index)
-            .field("name", &self.name)
-            .field("signature", &self.signature)
-            .finish()
-    }
-}
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct EbpfHelperImpl<C: EbpfRunContext>(
+    pub  for<'a> fn(
+        &mut C::Context<'a>,
+        BpfValue,
+        BpfValue,
+        BpfValue,
+        BpfValue,
+        BpfValue,
+    ) -> BpfValue,
+);
 
 /// A mapping for a field in a struct where the original ebpf program knows a different offset and
 /// data size than the one it receives from the kernel.
@@ -279,6 +259,7 @@ pub struct StructMapping {
     pub fields: Vec<FieldMapping>,
 }
 
+#[derive(Clone, Debug)]
 pub struct MapDescriptor {
     pub schema: MapSchema,
     pub ptr: BpfValue,
@@ -290,7 +271,7 @@ fn link_program<C: EbpfRunContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
     maps: &Vec<MapDescriptor>,
-    helpers: HashMap<u32, EbpfHelper<C>>,
+    helpers: HashMap<u32, EbpfHelperImpl<C>>,
 ) -> Result<EbpfProgram<C>, EbpfError> {
     let mut code = program.code.clone();
 
@@ -378,14 +359,15 @@ pub struct EbpfProgramBuilder<C: EbpfRunContext> {
     calling_context: CallingContext,
     struct_mappings: Vec<StructMapping>,
     maps: Vec<MapDescriptor>,
-    helpers: HashMap<u32, EbpfHelper<C>>,
+    helper_impls: HashMap<u32, EbpfHelperImpl<C>>,
 }
 
 impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("EbpfProgramBuilder")
-            .field("helpers", &self.helpers)
             .field("calling_context", &self.calling_context)
+            .field("struct_mappings", &self.struct_mappings)
+            .field("maps", &self.maps)
             .finish()
     }
 }
@@ -411,13 +393,12 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         self.struct_mappings.push(mapping);
     }
 
-    // This function signature will need more parameters eventually. The client needs to be able to
-    // supply a real callback and it's type. The callback will be needed to actually call the
-    // callback. The type will be needed for the verifier.
-    pub fn register_helper(&mut self, helper: EbpfHelper<C>) -> Result<(), EbpfError> {
-        self.calling_context.register_function(helper.index, helper.signature.clone());
-        self.helpers.insert(helper.index, helper);
-        Ok(())
+    pub fn set_helpers(&mut self, helpers: HashMap<u32, FunctionSignature>) {
+        self.calling_context.set_helpers(helpers);
+    }
+
+    pub fn set_helper_impls(&mut self, helper_impls: HashMap<u32, EbpfHelperImpl<C>>) {
+        self.helper_impls = helper_impls;
     }
 
     pub fn load(
@@ -425,17 +406,22 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         code: Vec<EbpfInstruction>,
         logger: &mut dyn VerifierLogger,
     ) -> Result<EbpfProgram<C>, EbpfError> {
-        let Self { calling_context, struct_mappings, maps, helpers } = self;
+        let Self { calling_context, struct_mappings, maps, helper_impls } = self;
         let verified_program = verify(code, calling_context, logger)?;
-        link_program(&verified_program, &struct_mappings, &maps, helpers)
+        link_program(&verified_program, &struct_mappings, &maps, helper_impls)
     }
 }
 
 /// An abstraction over an eBPF program and its registered helper functions.
-#[derive(Debug)]
 pub struct EbpfProgram<C: EbpfRunContext> {
     pub code: Vec<EbpfInstruction>,
-    pub helpers: HashMap<u32, EbpfHelper<C>>,
+    pub helpers: HashMap<u32, EbpfHelperImpl<C>>,
+}
+
+impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgram<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("EbpfProgramBuilder").field("code", &self.code).finish()
+    }
 }
 
 impl<C: EbpfRunContext> EbpfProgram<C> {
@@ -518,7 +504,7 @@ mod test {
     use crate::conformance::test::parse_asm;
     use crate::{FieldDescriptor, FieldMapping, FieldType, NullVerifierLogger, StructDescriptor};
     use linux_uapi::*;
-    use std::sync::LazyLock;
+    use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;

@@ -35,6 +35,10 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub enum BpfHandle {
     Program(Arc<Program>),
+
+    // Stub used to fake loading of programs of unknown types.
+    ProgramStub(u32),
+
     Map(PinnedMap),
     BpfTypeFormat(Arc<BpfTypeFormat>),
 }

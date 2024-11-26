@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::program::{Program, ProgramType};
+use crate::bpf::program::Program;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
@@ -17,6 +17,7 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
+use ebpf_api::ProgramType;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
@@ -905,9 +906,7 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let Ok(s) = bpf_program.run(locked, current_task, &mut ()) else {
-                return Some(message);
-            };
+            let s = bpf_program.run(locked, current_task, &mut ());
             if s == 0 {
                 None
             } else {

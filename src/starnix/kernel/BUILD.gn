@@ -351,6 +351,7 @@ rustc_library("starnix_core") {
     "//src/lib/vulkan",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/ebpf",
+    "//src/starnix/lib/ebpf-api",
     "//src/starnix/lib/expando",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",

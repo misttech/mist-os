@@ -4,8 +4,7 @@
 
 use crate::bpf::fs::get_bpf_object;
 use crate::bpf::helpers::{
-    get_bpf_args_and_mapping, get_packet_memory_id, HelperFunctionContext,
-    HelperFunctionContextMarker, BPF_HELPERS,
+    get_bpf_struct_mapping, HelperFunctionContext, HelperFunctionContextMarker, BPF_HELPER_IMPLS,
 };
 use crate::bpf::map::{Map, PinnedMap};
 use crate::task::CurrentTask;
@@ -15,82 +14,30 @@ use ebpf::{
     MapDescriptor, VerifierLogger, BPF_LDDW, BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD,
     BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
+use ebpf_api::ProgramType;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{BpfHelperOps, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{
-    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
-    bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT, bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS,
-    bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
-    bpf_prog_type_BPF_PROG_TYPE_XDP, errno, error,
-};
+use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use zerocopy::{FromBytes, Immutable, IntoBytes};
-
-pub const BPF_PROG_TYPE_FUSE: u32 = 0x77777777;
-
-/// The different type of BPF programs.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ProgramType {
-    SocketFilter,
-    KProbe,
-    SchedCls,
-    SchedAct,
-    TracePoint,
-    Xdp,
-    CgroupSkb,
-    CgroupSock,
-    CgroupSockopt,
-    CgroupSockAddr,
-    /// Custom id for Fuse
-    Fuse,
-    /// Unhandled program type.
-    Unknown(u32),
-}
-
-impl From<u32> for ProgramType {
-    fn from(program_type: u32) -> Self {
-        match program_type {
-            #![allow(non_upper_case_globals)]
-            bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Self::SocketFilter,
-            bpf_prog_type_BPF_PROG_TYPE_KPROBE => Self::KProbe,
-            bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS => Self::SchedCls,
-            bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT => Self::SchedAct,
-            bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT => Self::TracePoint,
-            bpf_prog_type_BPF_PROG_TYPE_XDP => Self::Xdp,
-            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB => Self::CgroupSkb,
-            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK => Self::CgroupSock,
-            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT => Self::CgroupSockopt,
-            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR => Self::CgroupSockAddr,
-            BPF_PROG_TYPE_FUSE => Self::Fuse,
-            program_type @ _ => {
-                track_stub!(
-                    TODO("https://fxbug.dev/324043750"),
-                    "Unknown BPF program type",
-                    program_type
-                );
-                Self::Unknown(program_type)
-            }
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
     pub program_type: ProgramType,
 }
 
-impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
-    fn from(info: &bpf_attr__bindgen_ty_4) -> Self {
-        Self { program_type: info.prog_type.into() }
+impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
+    type Error = Errno;
+
+    fn try_from(info: &bpf_attr__bindgen_ty_4) -> Result<Self, Self::Error> {
+        Ok(Self { program_type: info.prog_type.try_into().map_err(map_ebpf_error)? })
     }
 }
 
 #[derive(Debug)]
 pub struct Program {
     pub info: ProgramInfo,
-    vm: Option<EbpfProgram<HelperFunctionContextMarker>>,
+    vm: EbpfProgram<HelperFunctionContextMarker>,
     _maps: Vec<PinnedMap>,
 }
 
@@ -108,19 +55,15 @@ impl Program {
     ) -> Result<Program, Errno> {
         let mut builder = EbpfProgramBuilder::<HelperFunctionContextMarker>::default();
 
-        for (filter, helper) in BPF_HELPERS.iter() {
-            if filter.accept(info.program_type) {
-                builder.register_helper(helper.clone()).map_err(map_ebpf_error)?;
-            }
-        }
-        let (args, mapping) = get_bpf_args_and_mapping(info.program_type);
-        builder.set_args(args);
-        if let Some(mapping) = mapping {
-            builder.register_struct_mapping(mapping.clone());
+        builder.set_helpers(info.program_type.get_helpers());
+        builder.set_helper_impls(BPF_HELPER_IMPLS.clone());
+
+        if let Some(memory_id) = info.program_type.get_packet_memory_id() {
+            builder.set_packet_memory_id(memory_id);
         }
 
-        if let Some(memory_id) = get_packet_memory_id(info.program_type) {
-            builder.set_packet_memory_id(memory_id);
+        if let Some(mapping) = get_bpf_struct_mapping(info.program_type) {
+            builder.register_struct_mapping(mapping.clone());
         }
 
         let maps = link_maps_fds(current_task, &mut code)?;
@@ -134,11 +77,7 @@ impl Program {
         let mut logger = BufferVeriferLogger::new(logger);
         let vm = builder.load(code, &mut logger).map_err(map_ebpf_error)?;
 
-        Ok(Program { info, vm: Some(vm), _maps: maps })
-    }
-
-    pub fn new_stub(info: ProgramInfo) -> Program {
-        Program { info, vm: None, _maps: vec![] }
+        Ok(Program { info, vm, _maps: maps })
     }
 
     pub fn run<L, T>(
@@ -146,24 +85,18 @@ impl Program {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut T,
-    ) -> Result<u64, ()>
+    ) -> u64
     where
         L: LockBefore<BpfHelperOps>,
         T: IntoBytes + FromBytes + Immutable,
     {
-        if let Some(vm) = self.vm.as_ref() {
-            let mut context = HelperFunctionContext {
-                locked: &mut locked.cast_locked::<BpfHelperOps>(),
-                current_task,
-            };
+        let mut context = HelperFunctionContext {
+            locked: &mut locked.cast_locked::<BpfHelperOps>(),
+            current_task,
+        };
 
-            // TODO(https://fxbug.dev/287120494) Use real PacketAccessor.
-            Ok(vm.run(&mut context, &EmptyPacketAccessor {}, data))
-        } else {
-            // vm is only None when bpf is faked. Return an error on execution, as random value
-            // might have stronger side effects.
-            Err(())
-        }
+        // TODO(https://fxbug.dev/287120494) Use real PacketAccessor.
+        self.vm.run(&mut context, &EmptyPacketAccessor {}, data)
     }
 }
 

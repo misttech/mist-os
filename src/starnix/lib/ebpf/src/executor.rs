@@ -480,14 +480,8 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         index: u32,
     ) -> Result<(), String> {
         let helper = &self.program.helpers[&index];
-        let result = (helper.function_pointer)(
-            context,
-            self.reg(1),
-            self.reg(2),
-            self.reg(3),
-            self.reg(4),
-            self.reg(5),
-        );
+        let result =
+            helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
         self.next();
         self.set_reg(0, result);
         Ok(())
