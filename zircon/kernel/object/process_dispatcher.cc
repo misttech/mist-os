@@ -27,6 +27,7 @@
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/attribution.h>
+#include <vm/pmm.h>
 #include <vm/vm.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
@@ -1052,6 +1053,12 @@ zx_status_t ProcessDispatcher::MakeAndAddHandle(fbl::RefPtr<Dispatcher> dispatch
                                                 zx_rights_t rights, zx_handle_t* out) {
   HandleOwner handle = Handle::Make(ktl::move(dispatcher), rights);
   if (!handle) {
+    // Report handle allocation failure in order to trigger an OOM action.  We do this for two
+    // reasons.  First, syscalls that create PeeredDispatcher's can end up "leaking" handles in some
+    // cases (see https://fxbug.dev//379936010#comment8).  Second, usermode programs are generally
+    // not equipped to deal with handle allocation failure.  The system is likely hosed if we get
+    // here.
+    pmm_report_alloc_failure();
     return ZX_ERR_NO_MEMORY;
   }
   *out = handle_table().MapHandleToValue(handle);
@@ -1063,6 +1070,8 @@ zx_status_t ProcessDispatcher::MakeAndAddHandle(KernelHandle<Dispatcher> kernel_
                                                 zx_rights_t rights, zx_handle_t* out) {
   HandleOwner handle = Handle::Make(ktl::move(kernel_handle), rights);
   if (!handle) {
+    // See comment in the other MakeAndAddHandle overload above.
+    pmm_report_alloc_failure();
     return ZX_ERR_NO_MEMORY;
   }
   *out = handle_table().MapHandleToValue(handle);
