@@ -250,26 +250,20 @@ pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Ch
     let mut stdout = std::process::Stdio::null();
     let mut stderr = std::process::Stdio::null();
 
-    if ffx_config::logging::is_enabled(context).await {
+    if ffx_config::logging::is_enabled(context) {
         let file = PathBuf::from(DAEMON_LOG_FILENAME);
-        stdout = std::process::Stdio::from(
-            ffx_config::logging::log_file(
-                context,
-                &file,
-                ffx_config::logging::LogDirHandling::WithDirWithRotate,
-            )
-            .await?,
-        );
+        stdout = std::process::Stdio::from(ffx_config::logging::log_file(
+            context,
+            &file,
+            ffx_config::logging::LogDirHandling::WithDirWithRotate,
+        )?);
         // Third argument says not to rotate the logs.  We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = std::process::Stdio::from(
-            ffx_config::logging::log_file(
-                context,
-                &file,
-                ffx_config::logging::LogDirHandling::WithDirWithoutRotate,
-            )
-            .await?,
-        );
+        stderr = std::process::Stdio::from(ffx_config::logging::log_file(
+            context,
+            &file,
+            ffx_config::logging::LogDirHandling::WithDirWithoutRotate,
+        )?);
     }
 
     cmd.stdin(std::process::Stdio::null())

@@ -180,7 +180,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         app.log_destination.clone()
     };
 
-    ffx_config::logging::init(&context, app.verbose, &log_dest).await?;
+    ffx_config::logging::init(&context, app.verbose, &log_dest)?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
     tracing::info!("with context: {kind:#?}", kind = context.env_kind());
 

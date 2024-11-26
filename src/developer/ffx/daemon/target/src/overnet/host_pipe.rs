@@ -102,7 +102,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
         node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
+        let verbose_ssh = ffx_config::logging::debugging_on(&ctx);
 
         HostPipeChild::new_inner(
             self.ssh_path(),

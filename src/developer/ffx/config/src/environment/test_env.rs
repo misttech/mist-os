@@ -71,14 +71,12 @@ impl TestEnv {
         let user_file = NamedTempFile::new().context("tmp access failed")?;
         let user_file_path = user_file.path().to_owned();
 
-        let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
-            crate::logging::configure_subscribers(
+        let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> =
+            Arc::new(crate::logging::configure_subscribers(
                 &context,
                 vec![LogDestination::TestWriter],
                 LevelFilter::DEBUG,
-            )
-            .await,
-        );
+            ));
 
         // Dropping the subscriber guard causes test flakes as the tracing library panics when
         // closing an instrumentation span on a different subscriber.

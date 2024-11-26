@@ -274,17 +274,17 @@ fn rotate_file(
     Ok(None)
 }
 
-async fn init_global_log_file(
+fn init_global_log_file(
     ctx: &EnvironmentContext,
     name: &PathBuf,
     log_dir_handling: LogDirHandling,
 ) -> Result<()> {
-    let (f, log_path) = log_file_with_info(ctx, name, log_dir_handling).await?;
+    let (f, log_path) = log_file_with_info(ctx, name, log_dir_handling)?;
     init_log_file_holder(log_path, f);
     Ok(())
 }
 
-pub async fn log_file_with_info(
+pub fn log_file_with_info(
     ctx: &EnvironmentContext,
     name: &PathBuf,
     log_dir_handling: LogDirHandling,
@@ -312,12 +312,12 @@ pub async fn log_file_with_info(
     Ok((f, log_path))
 }
 
-pub async fn log_file(
+pub fn log_file(
     ctx: &EnvironmentContext,
     name: &PathBuf,
     log_dir_handling: LogDirHandling,
 ) -> Result<File> {
-    let (f, _) = log_file_with_info(ctx, name, log_dir_handling).await?;
+    let (f, _) = log_file_with_info(ctx, name, log_dir_handling)?;
     Ok(f)
 }
 
@@ -325,16 +325,16 @@ fn open_log_file(path: &Path) -> Result<std::fs::File> {
     OpenOptions::new().write(true).append(true).create(true).open(path).context("opening log file")
 }
 
-pub async fn is_enabled(ctx: &EnvironmentContext) -> bool {
+pub fn is_enabled(ctx: &EnvironmentContext) -> bool {
     ctx.query(LOG_ENABLED).get().unwrap_or(false)
 }
 
-pub async fn debugging_on(ctx: &EnvironmentContext) -> bool {
-    let level = filter_level(ctx).await;
+pub fn debugging_on(ctx: &EnvironmentContext) -> bool {
+    let level = filter_level(ctx);
     level >= LevelFilter::DEBUG
 }
 
-async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
+fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
     ctx.query(LOG_LEVEL)
         .get::<String>()
         .ok()
@@ -354,7 +354,7 @@ async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
         .unwrap_or(LevelFilter::INFO)
 }
 
-pub async fn init(
+pub fn init(
     ctx: &EnvironmentContext,
     mut log_to_stdio: bool,
     log_destination: &Option<LogDestination>,
@@ -366,15 +366,14 @@ pub async fn init(
     // * log_destination is File(path)
     // Otherwise we only log to stdio
     // Logging can't be completely disabled, but the user can specify the destination as /dev/null
-    if is_enabled(ctx).await {
+    if is_enabled(ctx) {
         match log_destination {
             None => {
                 init_global_log_file(
                     ctx,
                     &PathBuf::from(LOG_FILENAME),
                     LogDirHandling::WithDirWithRotate,
-                )
-                .await?;
+                )?;
                 destinations.push(LogDestination::Global);
             }
             Some(f @ LogDestination::File(_)) => {
@@ -390,15 +389,15 @@ pub async fn init(
                 destinations.push(d.clone());
             }
         }
-    };
+    }
 
     if log_to_stdio {
         destinations.push(LogDestination::Stdout);
     }
 
-    let level = filter_level(ctx).await;
+    let level = filter_level(ctx);
 
-    configure_subscribers(ctx, destinations, level).await.init();
+    configure_subscribers(ctx, destinations, level).init();
 
     tracing::info!(
         "ffx logging initialized. ffx version info: {:?}",
@@ -420,7 +419,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for DisableableFilter {
     }
 }
 
-async fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
+fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
     // Parse the targets from the config. Ideally we'd log errors, but since there might be no log
     // sink, filter out any unexpected values.
 
@@ -443,19 +442,19 @@ async fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
     vec![]
 }
 
-async fn include_spans(ctx: &EnvironmentContext) -> bool {
+fn include_spans(ctx: &EnvironmentContext) -> bool {
     ctx.query(LOG_INCLUDE_SPANS).get().unwrap_or(false)
 }
 
-pub(crate) async fn configure_subscribers(
+pub(crate) fn configure_subscribers(
     ctx: &EnvironmentContext,
     destinations: Vec<LogDestination>,
     level: LevelFilter,
 ) -> impl tracing::Subscriber + Send + Sync {
     let filter_targets =
-        filter::Targets::new().with_targets(target_levels(ctx).await).with_default(level);
+        filter::Targets::new().with_targets(target_levels(ctx)).with_default(level);
 
-    let include_spans = include_spans(ctx).await;
+    let include_spans = include_spans(ctx);
     let event_format = LogFormat::new(*LOGGING_ID, include_spans);
     // I'd love to loop through the options, but because each layer is strongly-typed, it's hard to
     // make that work.
