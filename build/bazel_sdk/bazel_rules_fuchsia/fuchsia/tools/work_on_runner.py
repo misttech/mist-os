@@ -289,8 +289,15 @@ class FetchProductBundle(Step):
             )
 
         # Register the product bundle repository
-        ctx.ffx().run("repository", "server", "start")
-        ctx.ffx().run("repository", "add", ctx.pb_path)
+        ctx.ffx().run(
+            "repository",
+            "server",
+            "start",
+            "--background",
+            "--no-device",
+            "--repo-path",
+            ctx.pb_path,
+        )
 
     def cleanup(self, ctx):
         pass
@@ -312,7 +319,7 @@ class WatchForTarget(Step):
         while True:
             try:
                 found_targets = json.loads(
-                    ctx.ffx().run("--machine", "JSON", "target", "list")
+                    ctx.ffx().run("--machine", "json", "target", "list")
                 )
             except subprocess.CalledProcessError:
                 found_targets = []

@@ -171,7 +171,6 @@ func (r *TestOrchestrator) setupFfx() error {
 		{"config", "set", "proactive_log.enabled", "false"},
 		{"config", "set", "daemon.autostart", "false"},
 		{"config", "set", "overnet.cso", "only"},
-		{"config", "set", "ffx-repo-add", "true"},
 		// Set a unique repository server name for this run.
 		{"config", "set", "repository.default", r.repoName},
 		// Disable the daemon based repo server.
@@ -273,6 +272,9 @@ func (r *TestOrchestrator) startEmulator(productDir string) error {
 	// Wait up to 5 minutes for the emulator to start up.
 	// This helps with local test reproduction workflows where the host machine
 	// does not have kvm enabled.
+
+	emu_name := fmt.Sprintf("fuchsia-emulator-%d", os.Getpid())
+
 	if _, err := r.ffx.RunCmdSync(
 		"emu",
 		"start",
@@ -282,9 +284,18 @@ func (r *TestOrchestrator) startEmulator(productDir string) error {
 		"--headless",
 		"--startup-timeout",
 		"300",
+		"--name",
+		emu_name,
 	); err != nil {
 		return fmt.Errorf("ffx emu start: %w", err)
 	}
+
+	// Set the emulator as the default
+	_, err := r.ffx.RunCmdSync("target", "default", "set", emu_name)
+	if err != nil {
+		return fmt.Errorf("ffx target default set to emulator: %w", err)
+	}
+
 	return nil
 }
 
@@ -367,10 +378,14 @@ func (r *TestOrchestrator) reachDevice() error {
 		}
 	}
 
+	if _, err := r.ffx.RunCmdSync("--machine", "json-pretty", "target", "list"); err != nil {
+		return fmt.Errorf("ffx target list: %w", err)
+	}
+
 	if _, err := r.ffx.RunCmdSync("target", "wait"); err != nil {
 		return fmt.Errorf("ffx target wait: %w", err)
 	}
-	if _, err := r.ffx.RunCmdSync("target", "show"); err != nil {
+	if _, err := r.ffx.RunCmdSync("--machine", "json-pretty", "target", "show"); err != nil {
 		return fmt.Errorf("ffx target show: %w", err)
 	}
 	if err := r.dumpFfxLog(); err != nil {

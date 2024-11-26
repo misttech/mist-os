@@ -25,6 +25,9 @@ def run(*command):
 
 
 class FuchsiaTaskPublish(FuchsiaTask):
+    def __init(self):
+        self.prompt_repo_cleanup = True
+
     def parse_args(self, parser: ScopedArgumentParser) -> argparse.Namespace:
         """Parses arguments."""
 
@@ -76,27 +79,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
         )
         return parser.parse_args()
 
-    def enable_ffx_repository(self, args):
-        if args.publish_only:
-            return
-        if (
-            json.loads(
-                run(
-                    args.ffx,
-                    "--machine",
-                    "json",
-                    "repository",
-                    "server",
-                    "status",
-                )
-            )["state"]
-            != "running"
-        ):
-            print(
-                "The ffx repository server is not running, starting it now..."
-            )
-            run(args.ffx, "repository", "server", "start")
-
     def ensure_target_device(self, args):
         if args.publish_only:
             return
@@ -121,8 +103,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
         def ffx_default_repo():
             default = run(
                 args.ffx,
-                "-c",
-                "ffx_repository=true",
                 "repository",
                 "default",
                 "get",
@@ -154,34 +134,65 @@ class FuchsiaTaskPublish(FuchsiaTask):
             user_specified_repo_name() or ffx_default_repo() or prompt_repo()
         )
 
+    def _get_running_repo(self, args):
+        """Returns the repository server information that matches args.repo_name or None."""
         # Determine the package repo path (use the existing one from ffx, or create a new one).
+        #  {
+        #    "ok": {
+        #      "data": [
+        #        {
+        #          "name": "default",
+        #          "address": "[::]:8083",
+        #          "repo_path": {
+        #            "file": "/usr/local/google/home/wilkinsonclay/tq/fuchsia/out/default/amber-files"
+        #          },
+        #          "registration_aliases": [],
+        #          "registration_storage_type": "ephemeral",
+        #          "registration_alias_conflict_mode": "replace",
+        #          "server_mode": "background",
+        #          "pid": 2935703
+        #        }
+        #      ]
+        #    }
+        #  }
+
         existing_repos = json.loads(
             run(
                 args.ffx,
                 "--machine",
                 "json",
                 "repository",
+                "server",
                 "list",
             )
         )
-        existing_repo = (
-            [repo for repo in existing_repos if repo["name"] == args.repo_name]
-            or [None]
-        )[0]
-        existing_repo_path = (
-            existing_repo
-            and existing_repo["spec"]
-            and (
-                Path(existing_repo["spec"]["metadata_repo_path"]).parent
-                if "metadata_repo_path" in existing_repo["spec"]
-                else Path(existing_repo["spec"]["path"])
+        if "ok" in existing_repos:
+            repo_data = existing_repos["ok"]["data"]
+        else:
+            raise ValueError(
+                f"Invalid response from ffx repository list: {existing_repos}"
             )
-        )
-        args.repo_path = existing_repo_path or Path(tempfile.mkdtemp())
+
+        for repo in repo_data:
+            if repo["name"] == args.repo_name:
+                return repo
+        return None
 
     def ensure_repo(self, args):
+        """Ensures that the repository is initialized and starts the repo server if needed."""
         if args.publish_only:
             return
+
+        # Check for a running repository with the same name.
+        existing_repo = self._get_running_repo(args)
+        print(f"_get_running_repo returned: {existing_repo}")
+        if existing_repo and "repo_path" in existing_repo:
+            args.repo_path = Path(existing_repo["repo_path"]["file"])
+            print(f"Using existing repo: {args.repo_name}: {args.repo_path}")
+        else:
+            args.repo_path = Path(tempfile.mkdtemp())
+            print(f"Using new repo: {args.repo_name}: {args.repo_path}")
+
         # Ensure repository.
         if (args.repo_path / "repository").is_dir():
             print(f"Using existing repo: {args.repo_path}")
@@ -195,18 +206,44 @@ class FuchsiaTaskPublish(FuchsiaTask):
                 args.repo_path,
             )
 
-        # Ensure ffx repository.
-        print(f"Associating {args.repo_name} to {args.repo_path}")
-        run(
-            args.ffx,
-            "repository",
-            "add-from-pm",
-            "--repository",
-            args.repo_name,
-            args.repo_path,
+        # This is for troubleshooting, the daemon based server should always
+        # be not running.
+        print(
+            "Daemon server status:",
+            run(args.ffx, "repository", "server", "status"),
+        )
+        print(
+            "Running repo servers:",
+            run(
+                args.ffx,
+                "--machine",
+                "json-pretty",
+                "repository",
+                "server",
+                "list",
+            ),
         )
 
-        # Ensure ffx target repository.
+        # Start the repository server if it is not already running.
+        if not existing_repo:
+            run(
+                args.ffx,
+                "repository",
+                "server",
+                "start",
+                "--no-device",
+                "--address",
+                "[::]:0",
+                "--background",
+                "--repository",
+                args.repo_name,
+                "--repo-path",
+                args.repo_path,
+            )
+
+        # Ensure ffx target repository. This has to be done after starting the server.
+        # We don't add the typical aliases here, since we use the repo_name to construct
+        # the package URL.
         print(f"Registering {args.repo_name} to target device {args.target}")
         run(
             args.ffx,
@@ -256,25 +293,23 @@ class FuchsiaTaskPublish(FuchsiaTask):
         if self.prompt_repo_cleanup:
             input("Press enter to delete this repository, or ^C to quit.")
 
+            # stop the repo server
+            run(args.ffx, "repository", "server", "stop", args.repo_name)
+
             # Delete the package repository.
             rmtree(args.repo_path)
             print(f"Deleted {args.repo_path}")
-
-            # Remove the ffx repository.
-            run(args.ffx, "repository", "remove", args.repo_name)
-            print(f"Removed the ffx repository {args.repo_name}")
 
     def run(self, parser: ScopedArgumentParser) -> None:
         # Parse arguments.
         args = self.parse_args(parser)
 
         # Check environment and gather information for publishing.
-        self.enable_ffx_repository(args)
+
         self.ensure_target_device(args)
         self.resolve_repo(args)
-
-        # Perform the publishing.
         self.ensure_repo(args)
+        # Perform the publishing.
         self.publish_packages(args)
 
         self.workflow_state["environment_variables"][

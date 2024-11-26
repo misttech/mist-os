@@ -215,17 +215,20 @@ def fuchsia_package_tasks(
         tags = intermediate_target_tags,
         **kwargs
     )
+
     fuchsia_task_ffx(
         name = verbs.delete_repo(anonymous_publish_task),
         arguments = [
             "repository",
-            "remove",
+            "server",
+            "stop",
             anonymous_repo_name,
         ],
         default_argument_scope = "explicit",
         tags = intermediate_target_tags,
         **kwargs
     )
+
     publish_only_task = "%s_only" % publish_task
     fuchsia_task_publish(
         name = publish_only_task,
