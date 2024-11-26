@@ -78,7 +78,6 @@ impl Value {
 
     /// Cast a `Value<Forbid>` to a `Value<T>` for any `T`
     pub fn upcast<T>(self) -> Value<T> {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336530)
         match self {
             Value::Null => Value::Null,
             Value::Bool(a) => Value::Bool(a),
@@ -103,7 +102,6 @@ impl Value {
             Value::ServerEnd(a, b) => Value::ServerEnd(a, b),
             Value::ClientEnd(a, b) => Value::ClientEnd(a, b),
             Value::Handle(a, b) => Value::Handle(a, b),
-            Value::OutOfLine(_) => unreachable!(),
         }
     }
 }
