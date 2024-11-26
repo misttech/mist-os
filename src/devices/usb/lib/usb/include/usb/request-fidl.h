@@ -6,16 +6,27 @@
 #define SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_REQUEST_FIDL_H_
 
 #include <fidl/fuchsia.hardware.usb.request/cpp/fidl.h>
+
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
+
 #include <lib/io-buffer/phys-iter.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
 
+#include <map>
+#include <optional>
 #include <queue>
+#include <utility>
+#include <vector>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "src/devices/usb/lib/usb/include/usb/usb-request.h"
+#include "src/devices/usb/lib/usb/align.h"
 
 namespace usb {
 
@@ -333,24 +344,35 @@ class FidlRequest {
           return ZX_ERR_NOT_SUPPORTED;
       }
 
-      // Pin VMO.
-      usb_request_t req = {
-          .vmo_handle = vmo_handle,
-          .size = *d.size(),
-          .offset = *d.offset(),
-          .pmt = ZX_HANDLE_INVALID,
-          .phys_list = nullptr,
-          .phys_count = 0,
-      };
-      // Abusing usb_request_physmap
-      auto status = usb_request_physmap(&req, bti.get());
+      // zx_bti_pin returns whole pages, so take into account unaligned vmo
+      // offset and length when calculating the amount of pages returned
+      uint64_t page_offset = USB_ROUNDDOWN(*d.offset(), kPageSize);
+      // The buffer size is the vmo size from offset 0.
+      uint64_t page_length = *d.size() - page_offset;
+      uint64_t pages = USB_ROUNDUP(page_length, kPageSize) / kPageSize;
+
+      std::unique_ptr<zx_paddr_t[]> paddrs{new zx_paddr_t[pages]};
+      const size_t sub_offset = page_offset & (kPageSize - 1);
+      const size_t pin_offset = page_offset - sub_offset;
+      const size_t pin_length = USB_ROUNDUP(page_length + sub_offset, kPageSize);
+
+      if (pin_length / kPageSize != pages) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      zx_handle_t pmt;
+      uint32_t options = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE;
+      zx_status_t status = zx_bti_pin(bti.get(), options, vmo_handle, pin_offset, pin_length,
+                                      paddrs.get(), pages, &pmt);
       if (status != ZX_OK) {
+        zxlogf(ERROR, "zx_bti_pin(): %s", zx_status_get_string(status));
         return status;
       }
-      pinned_vmos_[idx] = {req.pmt,
-                           req.phys_list,
-                           req.phys_count,
-                           {reinterpret_cast<zx_vaddr_t>(mapped), *d.size()}};
+
+      // Account for the initial misalignment if any
+      paddrs.get()[0] += sub_offset;
+
+      pinned_vmos_[idx] = {
+          pmt, paddrs.release(), pages, {reinterpret_cast<zx_vaddr_t>(mapped), *d.size()}};
     }
 
     return ZX_OK;
@@ -373,7 +395,7 @@ class FidlRequest {
 
       auto status = zx_pmt_unpin(pinned.pmt);
       ZX_DEBUG_ASSERT(status == ZX_OK);
-      free(pinned.phys_list);
+      delete[] pinned.phys_list;
     }
     return ZX_OK;
   }
@@ -384,9 +406,6 @@ class FidlRequest {
     ZX_ASSERT(pinned_vmos_.find(idx) != pinned_vmos_.end());
     auto length = *request_.data()->at(idx).size();
     auto offset = *request_.data()->at(idx).offset();
-    static_assert(sizeof(phys_iter_sg_entry_t) == sizeof(sg_entry_t) &&
-                  offsetof(phys_iter_sg_entry_t, length) == offsetof(sg_entry_t, length) &&
-                  offsetof(phys_iter_sg_entry_t, offset) == offsetof(sg_entry_t, offset));
     phys_iter_buffer_t buf = {.phys = pinned_vmos_.at(idx).phys_list,
                               .phys_count = pinned_vmos_.at(idx).phys_count,
                               .length = length,
@@ -418,6 +437,8 @@ class FidlRequest {
   }
 
  private:
+  const size_t kPageSize = zx_system_get_page_size();
+
   // request_: FIDL request object.
   fuchsia_hardware_usb_request::Request request_;
 

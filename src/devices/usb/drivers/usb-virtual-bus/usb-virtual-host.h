@@ -11,6 +11,7 @@
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
+#include <usb/descriptors.h>
 #include <usb/request-fidl.h>
 
 namespace usb_virtual_bus {

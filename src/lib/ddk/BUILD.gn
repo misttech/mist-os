@@ -279,6 +279,7 @@ static_library("ddk") {
     "//src/devices/usb/drivers/usb-virtual-bus:*",
     "//src/devices/usb/drivers/xhci:*",
     "//src/devices/usb/lib/usb:*",
+    "//src/devices/usb/lib/usb-endpoint:*",
     "//src/devices/usb/lib/usb/tests:*",
     "//src/devices/usb/testing/usb-virtual-bus-launcher:*",
     "//src/devices/usb/tests/usb-hci-test:*",
