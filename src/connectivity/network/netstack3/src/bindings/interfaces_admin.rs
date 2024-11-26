@@ -143,11 +143,9 @@ async fn run_device_control(
     let mut detached = false;
     let mut tasks = futures::stream::FuturesUnordered::new();
     let res = loop {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         let result = futures::select! {
             req = req_stream.try_next() => req,
             r = worker_fut => match r {
-                Ok(never) => match never {},
                 Err(e) => Err(e)
             },
             ready_task = tasks.next() => {

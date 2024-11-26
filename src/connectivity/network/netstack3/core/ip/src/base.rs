@@ -2738,7 +2738,6 @@ where
 
     let fits_mtu =
         match body.serialize_new_buf(PacketConstraints::UNCONSTRAINED, AlwaysFailBufferAlloc) {
-            Ok(never) => match never {},
             // We hit the allocator that refused to allocate new data, which
             // means the MTU is respected.
             Err(SerializeError::Alloc(())) => true,

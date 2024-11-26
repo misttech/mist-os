@@ -98,9 +98,7 @@ pub(crate) fn serialize_dhcp_message_to_ip_packet(
         Ok(buf) => buf,
         Err(e) => {
             let (e, _serializer) = e;
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336175)
             match e {
-                packet::SerializeError::Alloc(infallible) => match infallible {},
                 packet::SerializeError::SizeLimitExceeded => {
                     unreachable!("no MTU constraints on serializer")
                 }

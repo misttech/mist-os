@@ -593,7 +593,6 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
             snd_wnd_scale,
         }: SynRcvd<I, Infallible>,
     ) -> Self {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match simultaneous_open {
             None => State::SynRcvd(SynRcvd {
                 iss,
@@ -606,7 +605,6 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
                 rcv_wnd_scale,
                 snd_wnd_scale,
             }),
-            Some(infallible) => match infallible {},
         }
     }
 }
@@ -1875,7 +1873,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     snd_wnd_scale,
                                 },
                             ) => {
-                                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
                                 match simultaneous_open {
                                     None => {
                                         assert_eq!(
@@ -1896,7 +1893,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                             NewlyClosed::No
                                         )
                                     }
-                                    Some(infallible) => match infallible {},
                                 }
                                 Some(syn_ack)
                             }

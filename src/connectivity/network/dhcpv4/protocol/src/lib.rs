@@ -1380,10 +1380,8 @@ pub trait FidlCompatible<F>: Sized {
 #[cfg(target_os = "fuchsia")]
 pub trait FromFidlExt<F>: FidlCompatible<F, FromError = Never> {
     fn from_fidl(fidl: F) -> Self {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336175)
         match Self::try_from_fidl(fidl) {
             Ok(slf) => slf,
-            Err(err) => match err {},
         }
     }
 }
@@ -1392,10 +1390,8 @@ pub trait FromFidlExt<F>: FidlCompatible<F, FromError = Never> {
 #[cfg(target_os = "fuchsia")]
 pub trait IntoFidlExt<F>: FidlCompatible<F, IntoError = Never> {
     fn into_fidl(self) -> F {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336175)
         match self.try_into_fidl() {
             Ok(fidl) => fidl,
-            Err(err) => match err {},
         }
     }
 }

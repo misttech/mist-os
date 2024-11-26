@@ -100,11 +100,13 @@ where
     S: Serializer,
     B: AsFragmentableIpPacketBuilder<I> + PacketBuilder,
 {
-    type Builder<'a> = B::Builder<'a>
+    type Builder<'a>
+        = B::Builder<'a>
     where
         Self: 'a;
 
-    type Body<'a> = Buf<Vec<u8>>
+    type Body<'a>
+        = Buf<Vec<u8>>
     where
         Self: 'a;
 
@@ -115,7 +117,6 @@ where
             .serialize_new_buf(PacketConstraints::UNCONSTRAINED, packet::new_buf_vec)
             .map_err(|e| match e {
                 SerializeError::SizeLimitExceeded => FragmentationError::SizeLimitExceeded,
-                SerializeError::Alloc(never) => match never {},
             })?;
         Ok((builder, body))
     }
@@ -170,7 +171,8 @@ impl<B> AsFragmentableIpPacketBuilder<Ipv4> for B
 where
     B: InnerIpv4FragmentBuilder,
 {
-    type Builder<'a> = Ipv4FragmentBuilder<'a, Self>
+    type Builder<'a>
+        = Ipv4FragmentBuilder<'a, Self>
     where
         Self: 'a;
 
@@ -259,7 +261,8 @@ impl<B> AsFragmentableIpPacketBuilder<Ipv6> for B
 where
     for<'a> &'a B: Ipv6PacketBuilderBeforeFragment,
 {
-    type Builder<'a> = Ipv6FragmentBuilder<'a, Self>
+    type Builder<'a>
+        = Ipv6FragmentBuilder<'a, Self>
     where
         Self: 'a;
 
@@ -307,10 +310,12 @@ where
     I: FragmentationIpExt,
     B: BufferMut,
 {
-    type Builder<'a> = I::ForwardedFragmentBuilder
+    type Builder<'a>
+        = I::ForwardedFragmentBuilder
     where
         Self: 'a;
-    type Body<'a> = Buf<&'a [u8]>
+    type Body<'a>
+        = Buf<&'a [u8]>
     where
         Self: 'a;
 

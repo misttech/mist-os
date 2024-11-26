@@ -1558,14 +1558,12 @@ fn route_set_err_stream<I: FidlRouteAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct In<I: FidlRouteAdminIpExt>(<I::RouteSetMarker as ProtocolMarker>::Proxy);
 
-    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
     let IpInvariant(err_stream) = net_types::map_ip_twice!(I, In(route_set), |In(route_set)| {
         IpInvariant(
             route_set
                 .take_event_stream()
                 .map(|result| match result {
                     Err(err) => err,
-                    Ok(event) => match event {},
                 })
                 .boxed(),
         )
