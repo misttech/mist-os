@@ -84,7 +84,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   };
 
   struct KeyByNameTraits {
-    static fbl::String GetKey(const Entry& entry) { return entry.name(); }
+    static const fbl::String& GetKey(const Entry& entry) { return entry.name(); }
     static bool LessThan(const fbl::String& key1, const fbl::String& key2) { return key1 < key2; }
     static bool EqualTo(const fbl::String& key1, const fbl::String& key2) { return key1 == key2; }
   };
@@ -98,14 +98,18 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
     ~Intermediate();
 
     bool has_children() const { return !entries_by_id_.is_empty(); }
-    void AddEntry(fbl::RefPtr<LocalVnode> vn);
+    // Returns (child, false) if a child with |name| exists, otherwise creates a new child with
+    // |name| using |builder| and returns (child, true). Returns the error if |builder| fails.
+    zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LookupOrInsert(
+        fbl::String name,
+        fit::function<zx::result<fbl::RefPtr<LocalVnode>>(Intermediate&, fbl::String)> builder);
     void RemoveEntry(LocalVnode* vn);
 
     const EntryByIdMap& GetEntriesById() const { return entries_by_id_; }
 
     // Returns a child if it has the name |name|.
     // Otherwise, returns nullptr.
-    fbl::RefPtr<LocalVnode> Lookup(std::string_view name) const;
+    fbl::RefPtr<LocalVnode> Lookup(const fbl::String& name) const;
 
     // Invoke |Fn()| on all entries in this Intermediate node_type.
     // May be used as a const visitor-pattern for all entries.

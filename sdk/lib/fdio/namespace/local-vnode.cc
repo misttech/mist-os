@@ -22,14 +22,25 @@
 
 namespace fdio_internal {
 
-void LocalVnode::Intermediate::AddEntry(fbl::RefPtr<LocalVnode> vn) {
-  // |fdio_namespace| already checked that the entry does not exist.
-  ZX_DEBUG_ASSERT(entries_by_name_.find(vn->Name()) == entries_by_name_.end());
+zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LocalVnode::Intermediate::LookupOrInsert(
+    fbl::String name,
+    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(Intermediate&, fbl::String)> builder) {
+  auto it = entries_by_name_.find(name);
+  if (it != entries_by_name_.end()) {
+    return zx::ok(std::make_tuple(it->node(), false));
+  }
+  zx::result vn_res = builder(*this, std::move(name));
+  if (vn_res.is_error()) {
+    return vn_res.take_error();
+  }
+  auto& vn = vn_res.value();
 
-  auto entry = std::make_unique<Entry>(next_node_id_, std::move(vn));
+  auto entry = std::make_unique<Entry>(next_node_id_, vn);
   entries_by_name_.insert(entry.get());
   entries_by_id_.insert(std::move(entry));
   next_node_id_++;
+
+  return zx::ok(std::make_tuple(std::move(vn), true));
 }
 
 void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn) {
@@ -41,8 +52,8 @@ void LocalVnode::Intermediate::RemoveEntry(LocalVnode* vn) {
   }
 }
 
-fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(std::string_view name) const {
-  auto it = entries_by_name_.find(fbl::String{name});
+fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(const fbl::String& name) const {
+  auto it = entries_by_name_.find(name);
   if (it != entries_by_name_.end()) {
     return it->node();
   }

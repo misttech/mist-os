@@ -560,6 +560,15 @@ zx_status_t fdio_namespace::Bind(
       return ZX_ERR_BAD_PATH;
     }
 
+    auto next_path_segment_builder = [&](LocalVnode::Intermediate& parent,
+                                         fbl::String name) -> zx::result<fbl::RefPtr<LocalVnode>> {
+      if (is_last_segment) {
+        return builder(&parent, std::move(name));
+      }
+      return zx::ok(fbl::MakeRefCounted<LocalVnode>(
+          &parent, std::move(name), std::in_place_type_t<LocalVnode::Intermediate>()));
+    };
+
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // a bind attempt, or a need to continue parsing the path to find the bind location.
     std::optional walk_status_opt = std::visit(
@@ -569,42 +578,25 @@ zx_status_t fdio_namespace::Bind(
               // implies shadowing, which is not supported.
               return ZX_ERR_NOT_SUPPORTED;
             },
-            [&, is_last_segment = is_last_segment, next_path_segment = next_path_segment](
-                LocalVnode::Intermediate& c) -> std::optional<zx_status_t> {
+            [&](LocalVnode::Intermediate& c) -> std::optional<zx_status_t> {
+              zx::result res = c.LookupOrInsert(next_path_segment, next_path_segment_builder);
+              if (res.is_error()) {
+                return res.error_value();
+              }
+              auto& [child, created] = res.value();
+              vn = std::move(child);
               if (is_last_segment) {
                 // If the final segment already exists as a child on our working node,
                 // we cannot overwrite.
-                if (c.Lookup(next_path_segment) != nullptr) {
+                if (!created) {
                   return ZX_ERR_ALREADY_EXISTS;
                 }
-
-                zx::result vn_res = builder(&c, fbl::String(next_path_segment));
-                if (vn_res.is_error()) {
-                  return vn_res.error_value();
-                }
-
-                vn = std::move(vn_res.value());
-                c.AddEntry(vn);
                 return ZX_OK;
               }
-
-              if (fbl::RefPtr<LocalVnode> child = c.Lookup(next_path_segment); child != nullptr) {
-                // Re-use an existing intermediate node, and continue
-                // the search.
-                vn = child;
-                return std::nullopt;
-              }
-
-              // Create a new intermediate node.
-              vn =
-                  fbl::MakeRefCounted<LocalVnode>(&c, fbl::String(next_path_segment),
-                                                  std::in_place_type_t<LocalVnode::Intermediate>());
-              c.AddEntry(vn);
-
               // Keep track of the first node we create. If any subsequent
               // operation fails during bind, we will need to delete all nodes
               // in this subtree.
-              if (first_new_node == nullptr) {
+              if (created && first_new_node == nullptr) {
                 first_new_node = vn;
               }
 
