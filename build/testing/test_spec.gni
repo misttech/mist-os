@@ -95,12 +95,6 @@ if (allowed_device_types == []) {
       "QEMU",
       "crosvm",
     ]
-  } else if (board_name == "qemu-x64") {
-    allowed_device_types = [
-      "AEMU",
-      "QEMU",
-      "crosvm",
-    ]
   } else if (board_name == "astro") {
     allowed_device_types = [ "Astro" ]
   } else if (board_name == "luis") {

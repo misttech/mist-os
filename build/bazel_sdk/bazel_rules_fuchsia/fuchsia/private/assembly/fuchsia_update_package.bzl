@@ -93,7 +93,7 @@ fuchsia_update_package = rule(
             providers = [FuchsiaProductImageInfo],
         ),
         "board_name": attr.string(
-            doc = "Name of the board this update package runs on. E.g. qemu-x64.",
+            doc = "Name of the board this update package runs on. E.g. x64.",
             mandatory = True,
         ),
         "partitions_config": attr.label(

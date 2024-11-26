@@ -83,7 +83,7 @@ _FFX_TARGET_SHOW_JSON: dict[str, Any] = {
     "build": {
         "version": "2023-02-01T17:26:40+00:00",
         "product": "workstation_eng",
-        "board": "qemu-x64",
+        "board": "x64",
         "commit": "2023-02-01T17:26:40+00:00",
     },
 }
@@ -93,7 +93,7 @@ _FFX_TARGET_SHOW_INFO = ffx_types.TargetInfoData(**_FFX_TARGET_SHOW_JSON)
 
 _FFX_TARGET_LIST_OUTPUT: str = (
     '[{"nodename":"fuchsia-emulator","rcs_state":"Y","serial":"<unknown>",'
-    '"target_type":"workstation_eng.qemu-x64","target_state":"Product",'
+    '"target_type":"workstation_eng.x64","target_state":"Product",'
     '"addresses":["fe80::6a47:a931:1e84:5077%qemu"],"is_default":true}]\n'
 )
 
@@ -102,7 +102,7 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
         "nodename": _TARGET_NAME,
         "rcs_state": "Y",
         "serial": "<unknown>",
-        "target_type": "workstation_eng.qemu-x64",
+        "target_type": "workstation_eng.x64",
         "target_state": "Product",
         "addresses": ["fe80::6a47:a931:1e84:5077%qemu"],
         "is_default": True,

@@ -723,7 +723,7 @@ _build_fuchsia_product_bundle = rule(
     executable = True,
     attrs = {
         "board_name": attr.string(
-            doc = "Name of the board this PB runs on. E.g. qemu-x64.",
+            doc = "Name of the board this PB runs on. E.g. x64.",
             mandatory = True,
         ),
         "product_bundle_name": attr.string(
