@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_bluetooth as fidl;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::log::WriteInspect;
 use std::fmt;
 use std::str::FromStr;
@@ -60,6 +61,7 @@ impl Into<fidl::PeerId> for PeerId {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WriteInspect for PeerId {
     fn write_inspect(
         &self,

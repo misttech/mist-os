@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys, fuchsia_inspect as inspect};
+#[cfg(target_os = "fuchsia")]
+use fuchsia_inspect as inspect;
+use {fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys};
 
 use crate::error::Error;
+#[cfg(target_os = "fuchsia")]
 use crate::inspect::{InspectData, IsInspectable, ToProperty};
 use crate::types::uuid::Uuid;
 use crate::types::{Address, OneOrBoth, PeerId};
 
 #[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
 struct LeInspect {
     _inspect: inspect::Node,
     _services: inspect::StringProperty,
@@ -30,6 +34,7 @@ struct LeInspect {
     _csrk_encryption_key_size: Option<inspect::UintProperty>,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl LeInspect {
     fn new(d: &LeBondData, inspect: inspect::Node) -> LeInspect {
         LeInspect {
@@ -109,6 +114,7 @@ impl LeInspect {
 }
 
 #[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
 struct BredrInspect {
     _inspect: inspect::Node,
     _role_preference: Option<inspect::StringProperty>,
@@ -118,6 +124,7 @@ struct BredrInspect {
     _lk_encryption_key_size: Option<inspect::UintProperty>,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl BredrInspect {
     fn new(d: &BredrBondData, inspect: inspect::Node) -> BredrInspect {
         BredrInspect {
@@ -148,6 +155,7 @@ impl BredrInspect {
 }
 
 #[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
 pub struct BondingDataInspect {
     _inspect: inspect::Node,
     _address_type: inspect::StringProperty,
@@ -155,6 +163,7 @@ pub struct BondingDataInspect {
     _bredr_inspect: Option<BredrInspect>,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl InspectData<BondingData> for BondingDataInspect {
     fn new(bd: &BondingData, inspect: inspect::Node) -> BondingDataInspect {
         BondingDataInspect {
@@ -166,6 +175,7 @@ impl InspectData<BondingData> for BondingDataInspect {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl IsInspectable for BondingData {
     type I = BondingDataInspect;
 }

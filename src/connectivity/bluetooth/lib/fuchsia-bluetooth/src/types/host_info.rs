@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth_sys as fsys;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect::{self as inspect, Property};
 use std::fmt;
 
 use crate::error::Error;
+#[cfg(target_os = "fuchsia")]
 use crate::inspect::{DebugExt, InspectData, Inspectable, IsInspectable, ToProperty};
 use crate::types::{addresses_to_custom_string, Address, HostId};
 
@@ -106,6 +108,7 @@ impl fmt::Display for HostInfo {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl Inspectable<HostInfo> {
     pub fn update(&mut self, info: HostInfo) {
         self.inspect.update(&info);
@@ -113,6 +116,7 @@ impl Inspectable<HostInfo> {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 pub struct HostInfoInspect {
     _inspect: inspect::Node,
     identifier: inspect::UintProperty,
@@ -122,6 +126,7 @@ pub struct HostInfoInspect {
     discovering: inspect::UintProperty,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl HostInfoInspect {
     fn update(&mut self, info: &HostInfo) {
         self.identifier.set(info.id.0);
@@ -132,10 +137,12 @@ impl HostInfoInspect {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl IsInspectable for HostInfo {
     type I = HostInfoInspect;
 }
 
+#[cfg(target_os = "fuchsia")]
 impl InspectData<HostInfo> for HostInfoInspect {
     fn new(info: &HostInfo, inspect: inspect::Node) -> HostInfoInspect {
         HostInfoInspect {

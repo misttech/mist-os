@@ -26,18 +26,18 @@
 //!   // Then check that the action completed successfully
 //!   action_success.satisfied(state)
 //!   ```
-
+#![cfg(target_os = "fuchsia")]
 use anyhow::{format_err, Error};
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_sync::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard};
-
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use slab::Slab;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{self, Poll};
+use std::task;
+use std::task::Poll;
 
 use crate::expectation::Predicate;
 

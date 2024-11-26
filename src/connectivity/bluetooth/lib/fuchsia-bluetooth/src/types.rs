@@ -14,7 +14,9 @@ pub mod bonding_data;
 pub use bonding_data::*;
 
 /// Channel type
+#[cfg(target_os = "fuchsia")]
 mod channel;
+#[cfg(target_os = "fuchsia")]
 pub use channel::*;
 
 pub mod host_info;

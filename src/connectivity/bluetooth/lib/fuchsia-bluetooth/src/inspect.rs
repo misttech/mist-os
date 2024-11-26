@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(target_os = "fuchsia")]
 use fuchsia_async as fasync;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect::{self as inspect, Node, NumericProperty, Property};
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
+#[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_derive::Inspect;
 use std::fmt;
 
@@ -87,10 +91,12 @@ impl<T: fmt::Debug> DebugExt for T {
 
 /// Represents inspect data that is tied to a specific object. This inspect data and the object of
 /// type T should always be bundled together.
+#[cfg(target_os = "fuchsia")]
 pub trait InspectData<T> {
     fn new(object: &T, inspect: inspect::Node) -> Self;
 }
 
+#[cfg(target_os = "fuchsia")]
 pub trait IsInspectable
 where
     Self: Sized + Send + Sync + 'static,
@@ -100,11 +106,13 @@ where
 
 /// A wrapper around a type T that bundles some inspect data alongside instances of the type.
 #[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
 pub struct Inspectable<T: IsInspectable> {
     pub(crate) inner: T,
     pub(crate) inspect: T::I,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl<T: IsInspectable> Inspectable<T> {
     /// Create a new instance of an `Inspectable` wrapper type containing the T instance that
     /// it wraps along with populated inspect data.
@@ -115,6 +123,7 @@ impl<T: IsInspectable> Inspectable<T> {
 
 /// `Inspectable`s can always safely be immutably dereferenced as the type T that they wrap
 /// because the data will not be mutated through this reference.
+#[cfg(target_os = "fuchsia")]
 impl<T: IsInspectable> std::ops::Deref for Inspectable<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -126,16 +135,19 @@ impl<T: IsInspectable> std::ops::Deref for Inspectable<T> {
 /// allows for a simpler "fire and forget" representation of the inspect data associated with an
 /// object. This is because inspect handles for the data will never need to be accessed after
 /// creation.
+#[cfg(target_os = "fuchsia")]
 pub trait ImmutableDataInspect<T> {
     fn new(data: &T, manager: Node) -> Self;
 }
 
 /// "Fire and forget" representation of some inspect data that does not allow access inspect
 /// handles after they are created.
+#[cfg(target_os = "fuchsia")]
 pub struct ImmutableDataInspectManager {
     pub(crate) _manager: Node,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl<T, I: ImmutableDataInspect<T>> InspectData<T> for I {
     /// Create a new instance of some type `I` that represents the immutable inspect data for a type
     /// `T`. This is done by handing `I` a `Node` and calling into the
@@ -146,6 +158,7 @@ impl<T, I: ImmutableDataInspect<T>> InspectData<T> for I {
 }
 
 /// The values associated with a data transfer.
+#[cfg(target_os = "fuchsia")]
 struct DataTransferStats {
     /// The time at which the data transfer was recorded.
     time: fasync::MonotonicInstant,
@@ -155,6 +168,7 @@ struct DataTransferStats {
     bytes: usize,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl DataTransferStats {
     /// Calculates and returns the throughput of the `bytes` received in the
     /// data transfer.
@@ -169,6 +183,7 @@ impl DataTransferStats {
 
 /// An inspect node that represents a stream of data, recording the total amount of data
 /// transferred and an instantaneous rate.
+#[cfg(target_os = "fuchsia")]
 #[derive(Inspect, Default)]
 pub struct DataStreamInspect {
     /// The total number of bytes transferred in this stream
@@ -191,6 +206,7 @@ pub struct DataStreamInspect {
     inspect_node: inspect::Node,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl DataStreamInspect {
     pub fn start(&mut self) {
         let now = fasync::MonotonicInstant::now();
@@ -239,6 +255,7 @@ impl DataStreamInspect {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "fuchsia")]
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
