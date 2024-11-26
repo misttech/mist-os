@@ -162,7 +162,8 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // Get direct pointers to the file header and the program headers inside
     // the mapped file image.
     constexpr elfldltl::NoArrayFromFile<Phdr> kNoPhdrAllocator;
-    auto headers = elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo_, kNoPhdrAllocator);
+    auto headers =
+        elfldltl::LoadHeadersFromFile<Elf>(diag, mapped_vmo_, kNoPhdrAllocator, std::nullopt);
     if (!headers) [[unlikely]] {
       // TODO(mcgrathr): LoadHeadersFromFile doesn't propagate Diagnostics
       // return value on failure.
@@ -180,7 +181,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     const Ehdr& ehdr = ehdr_owner;
     const std::span<const Phdr> phdrs = phdrs_owner;
     constexpr elfldltl::NoArrayFromFile<std::byte> kNoBuildIdAllocator;
-    auto result = DecodeModulePhdrs(  //
+    auto result = DecodeModulePhdrs<Elf>(  //
         diag, phdrs, this->load_info().GetPhdrObserver(page_size),
         PhdrFileBuildIdObserver<Elf>(mapped_vmo_, kNoBuildIdAllocator, this->module()));
     if (!result) [[unlikely]] {
@@ -209,7 +210,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     }
 
     auto memory = metadata_memory();
-    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory);
+    SetModulePhdrs<Elf>(this->module(), ehdr, this->load_info(), memory);
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     // The TLS module ID is not meaningful here, it just has to be nonzero.
