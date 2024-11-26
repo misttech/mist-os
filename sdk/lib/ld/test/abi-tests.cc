@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/testing/typed-test.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
 #include <lib/ld/tls.h>
@@ -15,29 +16,40 @@
 
 namespace {
 
-constexpr size_t kPageSize = 0x1000;
+constexpr uint32_t kPageSize = 0x1000;
 
-using Abi = ld::abi::Abi<>;
-static_assert(std::is_default_constructible_v<Abi>);
-static_assert(std::is_trivially_copy_constructible_v<Abi>);
-static_assert(std::is_trivially_copy_assignable_v<Abi>);
-static_assert(std::is_trivially_destructible_v<Abi>);
+template <class ElfLayout>
+struct LdTests : public elfldltl::testing::FormatTypedTest<ElfLayout> {
+  using typename elfldltl::testing::FormatTypedTest<ElfLayout>::Elf;
+  using Abi = ld::abi::Abi<Elf>;
 
-// Since Module is only used by reference in Abi, it has to be separately
-// instantiated and tested.
-using Module = Abi::Module;
-static_assert(std::is_default_constructible_v<Module>);
-static_assert(std::is_trivially_copy_constructible_v<Module>);
-static_assert(std::is_trivially_copy_assignable_v<Module>);
-static_assert(std::is_trivially_destructible_v<Module>);
+  static_assert(std::is_default_constructible_v<Abi>);
+  static_assert(std::is_trivially_copy_constructible_v<Abi>);
+  static_assert(std::is_trivially_copy_assignable_v<Abi>);
+  static_assert(std::is_trivially_destructible_v<Abi>);
 
-using RDebug = Abi::RDebug;
-static_assert(std::is_default_constructible_v<RDebug>);
-static_assert(std::is_trivially_copy_constructible_v<RDebug>);
-static_assert(std::is_trivially_copy_assignable_v<RDebug>);
-static_assert(std::is_trivially_destructible_v<RDebug>);
+  // Since Module is only used by reference in Abi, it has to be separately
+  // instantiated and tested.
+  using Module = Abi::Module;
+  static_assert(std::is_default_constructible_v<Module>);
+  static_assert(std::is_trivially_copy_constructible_v<Module>);
+  static_assert(std::is_trivially_copy_assignable_v<Module>);
+  static_assert(std::is_trivially_destructible_v<Module>);
 
-TEST(LdTests, AbiTypes) {
+  using RDebug = Abi::RDebug;
+  static_assert(std::is_default_constructible_v<RDebug>);
+  static_assert(std::is_trivially_copy_constructible_v<RDebug>);
+  static_assert(std::is_trivially_copy_assignable_v<RDebug>);
+  static_assert(std::is_trivially_destructible_v<RDebug>);
+};
+
+TYPED_TEST_SUITE(LdTests, elfldltl::testing::AllFormatsTypedTest);
+
+TYPED_TEST(LdTests, AbiTypes) {
+  using Abi = typename TestFixture::Abi;
+  using Module = typename TestFixture::Module;
+  using RDebug = typename TestFixture::RDebug;
+
   Abi abi;
   abi = Abi{abi};
 
@@ -53,24 +65,27 @@ TEST(LdTests, AbiTypes) {
   EXPECT_THAT(storage, testing::Each(testing::Eq(std::byte(0))));
 }
 
-constexpr Module MakeModule(uint32_t modid, const char* name, std::span<const std::byte> build_id,
-                            Abi::Addr load_addr, std::span<const Abi::Phdr> phdrs,
-                            bool symbols_visible, const Module* next, const Module* prev) {
-  Module result;
+template <class Abi>
+constexpr Abi::Module MakeModule(uint32_t modid, const char* name,
+                                 std::span<const std::byte> build_id, typename Abi::Addr load_addr,
+                                 std::span<const typename Abi::Phdr> phdrs, bool symbols_visible,
+                                 const typename Abi::Module* next,
+                                 const typename Abi::Module* prev) {
+  typename Abi::Module result;
   result.symbolizer_modid = modid;
   result.link_map.name = name;
   result.build_id = build_id;
   result.link_map.addr = load_addr;
   result.vaddr_start = load_addr + phdrs.front().vaddr;
-  result.vaddr_end =
-      (load_addr + phdrs.back().vaddr + phdrs.back().memsz + kPageSize - 1) & -Abi::Addr{kPageSize};
+  result.vaddr_end = (load_addr + phdrs.back().vaddr + phdrs.back().memsz + kPageSize - 1) &
+                     -typename Abi::Addr{kPageSize};
   result.symbols_visible = symbols_visible;
   result.phdrs = phdrs;
   if (next) {
-    result.link_map.next = &const_cast<Module*>(next)->link_map;
+    result.link_map.next = &const_cast<Abi::Module*>(next)->link_map;
   }
   if (prev) {
-    result.link_map.prev = &const_cast<Module*>(prev)->link_map;
+    result.link_map.prev = &const_cast<Abi::Module*>(prev)->link_map;
   }
   return result;
 }
@@ -83,63 +98,55 @@ constexpr std::array kBuildId1 = {std::byte{0x12}, std::byte{0x34}};
 constexpr std::array kBuildId2 = {std::byte{0x56}, std::byte{0x78}};
 constexpr std::array kBuildId3 = {std::byte{0xaa}, std::byte{0xbb}, std::byte{0xcc}};
 
-constexpr Abi::Phdr kPhdrs1[] = {
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead,
-        .vaddr = 0,
-        .memsz = 0x1000,
-    },
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead | Abi::Phdr::kExecute,
-        .vaddr = 0x1000,
-        .memsz = 0x2000,
-    },
-};
-constexpr Abi::Phdr kPhdrs2[] = {
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead | Abi::Phdr::kExecute,
-        .vaddr = 0,
-        .memsz = 0x1234,
-    },
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead | Abi::Phdr::kWrite,
-        .vaddr = 0x2234,
-        .memsz = 0x1000,
-    },
-};
-constexpr Abi::Phdr kPhdrs3[] = {
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead,
-        .vaddr = 0,
-        .memsz = 0x3000,
-    },
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kExecute,
-        .vaddr = 0x3000,
-        .memsz = 0x4000,
-    },
-    {
-        .type = elfldltl::ElfPhdrType::kLoad,
-        .flags = Abi::Phdr::kRead | Abi::Phdr::kWrite,
-        .vaddr = 0x7000,
-        .memsz = 0x8000,
-    },
+// This is actually the same in all instantiations.
+using PhdrFlags = elfldltl::Elf<>::Phdr::Flags;
+
+// Different field order in Elf32 vs Elf64 makes designated initializers
+// annoying for Phdr.
+template <class Elf>
+consteval typename Elf::Phdr MakeLoad(typename Elf::Word flags, typename Elf::Addr vaddr,
+                                      typename Elf::Addr memsz) {
+  typename Elf::Phdr phdr = {.type = elfldltl::ElfPhdrType::kLoad};
+  phdr.flags = flags;
+  phdr.vaddr = vaddr;
+  phdr.memsz = memsz;
+  return phdr;
+}
+
+template <class Elf>
+constexpr Elf::Phdr kPhdrs1[] = {
+    MakeLoad<Elf>(PhdrFlags::kRead, 0, 0x1000),
+    MakeLoad<Elf>(PhdrFlags::kRead | PhdrFlags::kExecute, 0x1000, 0x2000),
 };
 
-constexpr Module kModules[3] = {
-    MakeModule(0, kName1, kBuildId1, 0x1000, kPhdrs1, true, &kModules[1], nullptr),
-    MakeModule(1, kName2, kBuildId2, 0x2000, kPhdrs2, false, &kModules[2], &kModules[0]),
-    MakeModule(2, kName3, kBuildId3, 0x3000, kPhdrs3, true, nullptr, &kModules[1]),
+template <class Elf>
+constexpr Elf::Phdr kPhdrs2[] = {
+    MakeLoad<Elf>(PhdrFlags::kRead | PhdrFlags::kExecute, 0, 0x1234),
+    MakeLoad<Elf>(PhdrFlags::kRead | PhdrFlags::kWrite, 0x2234, 0x1000),
 };
 
-TEST(LdTests, AbiModuleList) {
-  constexpr Abi abi{.loaded_modules{&kModules[0]}};
+template <class Elf>
+constexpr ld::abi::Abi<Elf>::Phdr kPhdrs3[] = {
+    MakeLoad<Elf>(PhdrFlags::kRead, 0, 0x3000),
+    MakeLoad<Elf>(PhdrFlags::kExecute, 0x3000, 0x4000),
+    MakeLoad<Elf>(PhdrFlags::kRead | PhdrFlags::kWrite, 0x7000, 0x8000),
+};
+
+template <class Elf>
+constexpr ld::abi::Abi<Elf>::Module kModules[3] = {
+    MakeModule<ld::abi::Abi<Elf>>(0, kName1, kBuildId1, 0x1000, kPhdrs1<Elf>, true,
+                                  &kModules<Elf>[1], nullptr),
+    MakeModule<ld::abi::Abi<Elf>>(1, kName2, kBuildId2, 0x2000, kPhdrs2<Elf>, false,
+                                  &kModules<Elf>[2], &kModules<Elf>[0]),
+    MakeModule<ld::abi::Abi<Elf>>(2, kName3, kBuildId3, 0x3000, kPhdrs3<Elf>, true, nullptr,
+                                  &kModules<Elf>[1]),
+};
+
+TYPED_TEST(LdTests, AbiModuleList) {
+  using Abi = typename TestFixture::Abi;
+  using Elf = typename TestFixture::Elf;
+
+  constexpr Abi abi{.loaded_modules{&kModules<Elf>[0]}};
   const auto modules = ld::AbiLoadedModules(abi);
   auto it = modules.begin();
   ASSERT_NE(it, modules.end());
@@ -151,8 +158,11 @@ TEST(LdTests, AbiModuleList) {
   ASSERT_EQ(it, modules.end());
 }
 
-TEST(LdTests, AbiSymbolicModuleList) {
-  constexpr Abi abi{.loaded_modules{&kModules[0]}};
+TYPED_TEST(LdTests, AbiSymbolicModuleList) {
+  using Abi = typename TestFixture::Abi;
+  using Elf = typename TestFixture::Elf;
+
+  constexpr Abi abi{.loaded_modules{&kModules<Elf>[0]}};
   auto modules = ld::AbiLoadedSymbolModules(abi);
   auto it = modules.begin();
   ASSERT_NE(it, modules.end());
@@ -165,8 +175,11 @@ TEST(LdTests, AbiSymbolicModuleList) {
   ASSERT_EQ((--it)->link_map.name.get(), kName1);
 }
 
-TEST(LdTests, ModuleSymbolizerContext) {
-  auto module_context = [](const Module& module) -> std::string {
+TYPED_TEST(LdTests, ModuleSymbolizerContext) {
+  using Abi = typename TestFixture::Abi;
+  using Elf = typename TestFixture::Elf;
+
+  auto module_context = [](const Abi::Module& module) -> std::string {
     std::string markup_text;
     symbolizer_markup::Writer writer{
         [&markup_text](std::string_view str) { markup_text += str; },
@@ -176,15 +189,15 @@ TEST(LdTests, ModuleSymbolizerContext) {
     return markup_text;
   };
 
-  EXPECT_EQ(module_context(kModules[0]),
+  EXPECT_EQ(module_context(kModules<Elf>[0]),
             "{{{module:0:first:elf:1234}}}\n"
             "{{{mmap:0x1000:0x1000:load:0:r:0x0}}}\n"
             "{{{mmap:0x2000:0x3000:load:0:rx:0x1000}}}\n");
-  EXPECT_EQ(module_context(kModules[1]),
+  EXPECT_EQ(module_context(kModules<Elf>[1]),
             "{{{module:1:second:elf:5678}}}\n"
             "{{{mmap:0x2000:0x2000:load:1:rx:0x0}}}\n"
             "{{{mmap:0x4000:0x3000:load:1:rw:0x2000}}}\n");
-  EXPECT_EQ(module_context(kModules[2]),
+  EXPECT_EQ(module_context(kModules<Elf>[2]),
             "{{{module:2:third:elf:aabbcc}}}\n"
             "{{{mmap:0x3000:0x3000:load:2:r:0x0}}}\n"
             "{{{mmap:0x6000:0x7000:load:2:x:0x3000}}}\n"
