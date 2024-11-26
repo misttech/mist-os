@@ -37,7 +37,7 @@ inline void RestartAndWait(std::string driver_url) {
   }
 
   // Loop until a new device with the correct specs is found.
-  auto deadline_time = zx::clock::get_monotonic() + zx::sec(5);
+  auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
   while (zx::clock::get_monotonic() < deadline_time) {
     for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
       auto magma_client =
