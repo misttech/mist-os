@@ -32,19 +32,16 @@ pub struct SecurityContext {
 
 impl SecurityContext {
     /// Returns a new instance with the specified field values.
-    // TODO(b/319232900): Validate that the specified fields are consistent
-    // in the context of the supplied policy.
-    pub(super) fn new<PS: ParseStrategy>(
-        policy: &PolicyIndex<PS>,
+    /// Fields are not validated against the policy until explicitly via `validate()`,
+    /// or implicitly via insertion into a [`SidTable`].
+    pub(super) fn new(
         user: UserId,
         role: RoleId,
         type_: TypeId,
         low_level: SecurityLevel,
         high_level: Option<SecurityLevel>,
-    ) -> Result<Self, SecurityContextError> {
-        let context = Self { user, role, type_, low_level, high_level };
-        context.validate(policy)?;
-        Ok(context)
+    ) -> Self {
+        Self { user, role, type_, low_level, high_level }
     }
 
     /// Returns the user component of the security context.
@@ -146,14 +143,13 @@ impl SecurityContext {
             .ok_or_else(|| SecurityContextError::UnknownType { name: type_.into() })?
             .id();
 
-        Self::new(
-            policy_index,
+        Ok(Self::new(
             user,
             role,
             type_,
             SecurityLevel::parse(policy_index, low_level)?,
             high_level.map(|x| SecurityLevel::parse(policy_index, x)).transpose()?,
-        )
+        ))
     }
 
     /// Returns this Security Context serialized to a byte string.
@@ -172,7 +168,9 @@ impl SecurityContext {
         parts.join(b":".as_ref())
     }
 
-    fn validate<PS: ParseStrategy>(
+    /// Validates that this `SecurityContext`'s fields are consistent with policy constraints
+    /// (e.g. that the role is valid for the user).
+    pub(super) fn validate<PS: ParseStrategy>(
         &self,
         policy_index: &PolicyIndex<PS>,
     ) -> Result<(), SecurityContextError> {
@@ -675,19 +673,29 @@ mod tests {
 
         // TODO(b/319232900): Should fail validation because the low security level has
         // categories that the high level does not.
-        assert!(policy
+        let context = policy
             .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1".into())
-            .is_ok());
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_ok());
 
         // Fails validation because the sensitivity is not valid for the user.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s0".into()).is_err());
+        let context = policy
+            .parse_security_context(b"user1:object_r:type0:s0".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_err());
 
         // Fails validation because the role is not valid for the user.
-        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0".into()).is_err());
+        let context = policy
+            .parse_security_context(b"user0:subject_r:type0:s0".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_err());
 
         // Passes validation even though the role is not explicitly allowed for the user,
         // because it is the special "object_r" role, used when labelling resources.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s1".into()).is_ok());
+        let context = policy
+            .parse_security_context(b"user1:object_r:type0:s1".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_ok());
     }
 
     #[test]

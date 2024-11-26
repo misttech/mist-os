@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::policy::parser::ByValue;
-use crate::policy::{Policy, SecurityContext};
+use crate::policy::{Policy, SecurityContext, SecurityContextError};
 use crate::{InitialSid, SecurityId, FIRST_UNUSED_SID};
 
 use std::num::NonZeroU32;
@@ -70,8 +70,15 @@ impl SidTable {
         Self::new_from(policy, new_entries)
     }
 
-    /// Looks up `security_context`, adding it if not found, and returns the SID.
-    pub fn security_context_to_sid(&mut self, security_context: &SecurityContext) -> SecurityId {
+    /// Returns a `SecurityId` (SID) representing the supplied `security_context`.
+    /// If an entry already exists that matches `security_context` then the existing SID is
+    /// returned.
+    /// Otherwise the `security_context`'s fields are validated against the policy constraints,
+    /// and an explanatory error returned if they are inconsistent.
+    pub fn security_context_to_sid(
+        &mut self,
+        security_context: &SecurityContext,
+    ) -> Result<SecurityId, SecurityContextError> {
         let existing = &self.entries[FIRST_UNUSED_SID as usize..]
             .iter()
             .position(|entry| match entry {
@@ -81,12 +88,15 @@ impl SidTable {
                 Entry::Invalid { .. } => false,
             })
             .map(|slice_relative_index| slice_relative_index + (FIRST_UNUSED_SID as usize));
-        let index = existing.unwrap_or_else(|| {
+        let index = if let Some(index) = existing {
+            *index
+        } else {
+            self.policy.validate_security_context(&security_context)?;
             let index = self.entries.len();
             self.entries.push(Entry::Valid { security_context: security_context.clone() });
             index
-        });
-        SecurityId(NonZeroU32::new(index as u32).unwrap())
+        };
+        Ok(SecurityId(NonZeroU32::new(index as u32).unwrap()))
     }
 
     /// Returns the `SecurityContext` associated with `sid`.
@@ -139,7 +149,7 @@ mod tests {
             .parse_security_context(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .unwrap();
         let mut sid_table = SidTable::new(policy);
-        let sid = sid_table.security_context_to_sid(&security_context);
+        let sid = sid_table.security_context_to_sid(&security_context).unwrap();
         assert_eq!(*sid_table.sid_to_security_context(sid), security_context);
     }
 
@@ -180,7 +190,7 @@ mod tests {
             .unwrap();
         let mut sid_table = SidTable::new(policy);
         let sid_count_before = sid_table.entries.len();
-        let sid = sid_table.security_context_to_sid(&security_context);
+        let sid = sid_table.security_context_to_sid(&security_context).unwrap();
         assert_eq!(sid_table.entries.len(), sid_count_before + 1);
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
     }
@@ -192,7 +202,7 @@ mod tests {
         let mut sid_table = SidTable::new(policy);
         let file_initial_security_context = sid_table.sid_to_security_context(file_initial_sid);
         let file_dynamic_sid =
-            sid_table.security_context_to_sid(&file_initial_security_context.clone());
+            sid_table.security_context_to_sid(&file_initial_security_context.clone()).unwrap();
         assert_ne!(file_initial_sid.0.get(), file_dynamic_sid.0.get());
         assert!(file_dynamic_sid.0.get() >= FIRST_UNUSED_SID);
     }

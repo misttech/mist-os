@@ -165,7 +165,7 @@ impl SecurityServer {
             .parsed
             .parse_security_context(security_context)
             .map_err(anyhow::Error::from)?;
-        Ok(active_policy.sid_table.security_context_to_sid(&context))
+        active_policy.sid_table.security_context_to_sid(&context).map_err(anyhow::Error::from)
     }
 
     /// Returns the Security Context string for the requested `sid`.
@@ -341,7 +341,8 @@ impl SecurityServer {
             active_policy.parsed.fs_use_label_and_type(fs_type)
         {
             // There is an `fs_use` statement for this file-system type in the policy.
-            let fs_sid_from_policy = active_policy.sid_table.security_context_to_sid(&context);
+            let fs_sid_from_policy =
+                active_policy.sid_table.security_context_to_sid(&context).unwrap();
             let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
             FileSystemLabel {
                 sid: fs_sid,
@@ -356,7 +357,7 @@ impl SecurityServer {
             active_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
-            let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context);
+            let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context).unwrap();
             let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
             FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
         } else {
@@ -394,7 +395,7 @@ impl SecurityServer {
             node_path.into(),
             class_id,
         )?;
-        Some(active_policy.sid_table.security_context_to_sid(&security_context))
+        Some(active_policy.sid_table.security_context_to_sid(&security_context).unwrap())
     }
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
@@ -462,10 +463,14 @@ impl SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         active_policy
-            .parsed
-            .new_file_security_context(source_context, target_context, &file_class)
-            // TODO(http://b/334968228): check that transitions are allowed.
-            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
+            .sid_table
+            .security_context_to_sid(
+                &active_policy.parsed.new_file_security_context(
+                    source_context,
+                    target_context,
+                    &file_class,
+                ), // TODO(http://b/334968228): check that transitions are allowed.
+            )
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
@@ -484,9 +489,12 @@ impl SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         active_policy
-            .parsed
-            .new_security_context(source_context, target_context, &target_class)
-            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
+            .sid_table
+            .security_context_to_sid(&active_policy.parsed.new_security_context(
+                source_context,
+                target_context,
+                &target_class,
+            ))
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -576,7 +584,7 @@ fn sid_from_mount_option(
     if let Some(label) = mount_option.as_ref() {
         Some(
             if let Some(context) = active_policy.parsed.parse_security_context(label.into()).ok() {
-                active_policy.sid_table.security_context_to_sid(&context)
+                active_policy.sid_table.security_context_to_sid(&context).unwrap()
             } else {
                 // The mount option is present-but-not-valid: we use `Unlabeled`.
                 SecurityId::initial(InitialSid::Unlabeled)

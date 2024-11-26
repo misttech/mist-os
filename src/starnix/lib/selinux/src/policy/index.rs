@@ -6,7 +6,7 @@ use super::arrays::{Context, FsContext, FsUseType};
 use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{CategorySpan, SecurityContext, SecurityContextError, SecurityLevel};
+use super::security_context::{CategorySpan, SecurityContext, SecurityLevel};
 use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
     Permission,
@@ -127,12 +127,12 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Verify that the initial Security Contexts are all defined, and valid.
         for id in crate::InitialSid::all_variants() {
-            index.resolve_initial_context(id)?;
+            index.resolve_initial_context(id);
         }
 
         // Validate the contexts used in fs_use statements.
         for fs_use in index.parsed_policy.fs_uses() {
-            index.security_context_from_policy_context(fs_use.context())?;
+            index.security_context_from_policy_context(fs_use.context());
         }
 
         Ok(index)
@@ -160,7 +160,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         source: &SecurityContext,
         target: &SecurityContext,
         class: &crate::FileClass,
-    ) -> Result<SecurityContext, SecurityContextError> {
+    ) -> SecurityContext {
         let object_class = crate::ObjectClass::from(class.clone());
         self.new_security_context(
             source,
@@ -206,7 +206,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         default_type: TypeId,
         default_low_level: &SecurityLevel,
         default_high_level: Option<&SecurityLevel>,
-    ) -> Result<SecurityContext, SecurityContextError> {
+    ) -> SecurityContext {
         let (user, role, type_, low_level, high_level) = if let Some(policy_class) =
             self.class(&class)
         {
@@ -277,7 +277,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         };
 
         // `new()` may fail if the resulting combination of user, role etc is not permitted by the policy.
-        SecurityContext::new(self, user, role, type_, low_level, high_level)
+        SecurityContext::new(user, role, type_, low_level, high_level)
 
         // TODO(http://b/334968228): Validate domain & role transitions are allowed?
     }
@@ -296,7 +296,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     /// well-known (or "initial") Id.
     pub(super) fn initial_context(&self, id: crate::InitialSid) -> SecurityContext {
         // All [`InitialSid`] have already been verified as resolvable, by `new()`.
-        self.resolve_initial_context(id).unwrap()
+        self.resolve_initial_context(id)
     }
 
     /// If there is an fs_use statement for the given filesystem type, returns the associated
@@ -310,7 +310,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             .iter()
             .find(|fs_use| fs_use.fs_type() == fs_type.as_bytes())
             .map(|fs_use| FsUseLabelAndType {
-                context: self.security_context_from_policy_context(fs_use.context()).unwrap(),
+                context: self.security_context_from_policy_context(fs_use.context()),
                 use_type: fs_use.behavior(),
             })
     }
@@ -362,30 +362,23 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // The returned SecurityContext must be valid with respect to the policy, since otherwise
         // we'd have rejected the policy load.
         result.and_then(|fs_context| {
-            Some(self.security_context_from_policy_context(fs_context.context()).unwrap())
+            Some(self.security_context_from_policy_context(fs_context.context()))
         })
     }
 
     /// Helper used to construct and validate well-known [`SecurityContext`] values.
-    fn resolve_initial_context(
-        &self,
-        id: crate::InitialSid,
-    ) -> Result<SecurityContext, SecurityContextError> {
+    fn resolve_initial_context(&self, id: crate::InitialSid) -> SecurityContext {
         self.security_context_from_policy_context(self.parsed_policy().initial_context(id))
     }
 
     /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
-    fn security_context_from_policy_context(
-        &self,
-        context: &Context<PS>,
-    ) -> Result<SecurityContext, SecurityContextError> {
+    fn security_context_from_policy_context(&self, context: &Context<PS>) -> SecurityContext {
         let low_level = self.security_level(context.low_level());
         let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
 
         // Creation of the new [`SecurityContext`] will fail if the fields are inconsistent
         // with the policy-defined constraints (e.g. on user roles, etc).
         SecurityContext::new(
-            &self,
             context.user_id(),
             context.role_id(),
             context.type_id(),
