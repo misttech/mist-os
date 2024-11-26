@@ -36,7 +36,7 @@ std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
 }
 
 zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
-    fdio_internal::LocalVnode::Intermediate* parent, fbl::String name,
+    std::optional<fdio_internal::LocalVnode::ParentAndId> parent_and_id,
     fidl::ClientEnd<fio::Directory> remote) {
   zxio_storage_t remote_storage;
   if (zx_status_t status = zxio::CreateDirectory(&remote_storage, std::move(remote));
@@ -44,8 +44,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
     return zx::error(status);
   }
   return zx::ok(fbl::MakeRefCounted<fdio_internal::LocalVnode>(
-      parent, std::move(name), std::in_place_type_t<fdio_internal::LocalVnode::Remote>(),
-      remote_storage));
+      parent_and_id, std::in_place_type_t<fdio_internal::LocalVnode::Remote>(), remote_storage));
 }
 
 }  // namespace
@@ -53,7 +52,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
 fdio_namespace::fdio_namespace() { ResetRoot(); }
 
 void fdio_namespace::ResetRoot() {
-  root_ = fbl::MakeRefCounted<LocalVnode>(nullptr, fbl::String{},
+  root_ = fbl::MakeRefCounted<LocalVnode>(std::nullopt,
                                           std::in_place_type_t<LocalVnode::Intermediate>());
 }
 
@@ -212,12 +211,11 @@ zx_status_t fdio_namespace::Readdir(const LocalVnode& vn, DirentIteratorState* s
     state->encountered_dot = true;
     return ZX_OK;
   }
-  fbl::RefPtr<LocalVnode> child_vnode;
-  vn.Readdir(&state->last_seen, &child_vnode);
-  if (!child_vnode) {
-    return ZX_ERR_NOT_FOUND;
+  zx::result name = vn.Readdir(&state->last_seen);
+  if (name.is_error()) {
+    return name.error_value();
   }
-  return populate_entry(inout_entry, child_vnode->Name());
+  return populate_entry(inout_entry, name.value());
 }
 
 zx::result<fdio_ptr> fdio_namespace::CreateConnection(fbl::RefPtr<LocalVnode> vn) const {
@@ -475,23 +473,23 @@ zx_status_t fdio_namespace::Bind(std::string_view path, fidl::ClientEnd<fio::Dir
   if (!remote.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return Bind(path, [remote = std::move(remote)](LocalVnode::Intermediate* parent,
-                                                 fbl::String name) mutable {
-    return CreateRemoteVnode(parent, std::move(name), std::move(remote));
+  return Bind(path, [remote = std::move(remote)](
+                        std::optional<LocalVnode::ParentAndId> parent_and_id) mutable {
+    return CreateRemoteVnode(parent_and_id, std::move(remote));
   });
 }
 
 zx_status_t fdio_namespace::Bind(std::string_view path, fdio_open_local_func_t on_open,
                                  void* context) {
-  return Bind(path, [on_open, context](LocalVnode::Intermediate* parent, fbl::String name) {
+  return Bind(path, [on_open, context](std::optional<LocalVnode::ParentAndId> parent_and_id) {
     return zx::ok(fbl::MakeRefCounted<LocalVnode>(
-        parent, std::move(name), std::in_place_type_t<LocalVnode::Local>(), on_open, context));
+        parent_and_id, std::in_place_type_t<LocalVnode::Local>(), on_open, context));
   });
 }
 
 zx_status_t fdio_namespace::Bind(
     std::string_view path,
-    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(LocalVnode::Intermediate*, fbl::String)>
+    fit::function<zx::result<fbl::RefPtr<LocalVnode>>(std::optional<LocalVnode::ParentAndId>)>
         builder) {
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_INVALID_ARGS;
@@ -526,7 +524,7 @@ zx_status_t fdio_namespace::Bind(
                             }
 
                             // The path was "/" so we're trying to bind to the root vnode.
-                            zx::result vn_res = builder({}, {});
+                            zx::result vn_res = builder({});
                             if (vn_res.is_error()) {
                               return vn_res.error_value();
                             }
@@ -560,13 +558,13 @@ zx_status_t fdio_namespace::Bind(
       return ZX_ERR_BAD_PATH;
     }
 
-    auto next_path_segment_builder = [&](LocalVnode::Intermediate& parent,
-                                         fbl::String name) -> zx::result<fbl::RefPtr<LocalVnode>> {
+    auto next_path_segment_builder =
+        [&](LocalVnode::ParentAndId parent_and_id) -> zx::result<fbl::RefPtr<LocalVnode>> {
       if (is_last_segment) {
-        return builder(&parent, std::move(name));
+        return builder(parent_and_id);
       }
       return zx::ok(fbl::MakeRefCounted<LocalVnode>(
-          &parent, std::move(name), std::in_place_type_t<LocalVnode::Intermediate>()));
+          parent_and_id, std::in_place_type_t<LocalVnode::Intermediate>()));
     };
 
     // The outcome of this visit is a ternary that either communicates a success/failure in
@@ -672,7 +670,7 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
       return status;
     }
 
-    zx::result vn_res = CreateRemoteVnode({}, {}, std::move(client_end));
+    zx::result vn_res = CreateRemoteVnode({}, std::move(client_end));
     if (vn_res.is_error()) {
       return vn_res.error_value();
     }
