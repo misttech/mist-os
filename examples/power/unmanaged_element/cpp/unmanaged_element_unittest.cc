@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "examples/power/cpp/unmanaged_element.h"
+#include "examples/power/unmanaged_element/cpp/unmanaged_element.h"
 
 #include <fidl/fuchsia.power.broker/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>

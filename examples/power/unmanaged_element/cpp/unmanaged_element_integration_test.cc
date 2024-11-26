@@ -14,7 +14,7 @@
 #include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
-#include "examples/power/cpp/unmanaged_element.h"
+#include "examples/power/unmanaged_element/cpp/unmanaged_element.h"
 
 namespace {
 

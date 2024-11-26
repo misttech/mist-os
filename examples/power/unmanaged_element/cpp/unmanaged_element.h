@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef EXAMPLES_POWER_CPP_UNMANAGED_ELEMENT_H_
-#define EXAMPLES_POWER_CPP_UNMANAGED_ELEMENT_H_
+#ifndef EXAMPLES_POWER_UNMANAGED_ELEMENT_CPP_UNMANAGED_ELEMENT_H_
+#define EXAMPLES_POWER_UNMANAGED_ELEMENT_CPP_UNMANAGED_ELEMENT_H_
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/power/cpp/power-support.h>
@@ -47,4 +47,4 @@ class UnmanagedElement {
 
 }  // namespace examples::power
 
-#endif  // EXAMPLES_POWER_CPP_UNMANAGED_ELEMENT_H_
+#endif  // EXAMPLES_POWER_UNMANAGED_ELEMENT_CPP_UNMANAGED_ELEMENT_H_

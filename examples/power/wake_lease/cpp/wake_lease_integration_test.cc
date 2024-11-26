@@ -20,7 +20,7 @@
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
-#include "examples/power/cpp/wake_lease.h"
+#include "examples/power/wake_lease/cpp/wake_lease.h"
 
 namespace {
 

@@ -2,20 +2,20 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("power") {
-  testonly = true
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("wake_lease") {
   deps = [
-    "suspend_config",
-    "unmanaged_element",
-    "wake_lease",
+    "cpp",
+    "rust",
   ]
 }
 
-group("hermetic_tests") {
+group("tests") {
   testonly = true
   deps = [
-    "suspend_config:tests",
-    "unmanaged_element:tests",
-    "wake_lease:tests",
+    "cpp:tests",
+    "rust:tests",
   ]
 }

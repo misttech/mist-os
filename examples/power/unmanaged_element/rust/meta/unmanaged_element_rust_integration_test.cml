@@ -8,7 +8,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/unmanaged_element_integration_test_rust",
+        binary: "bin/unmanaged_element_rust_integration_test",
     },
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },

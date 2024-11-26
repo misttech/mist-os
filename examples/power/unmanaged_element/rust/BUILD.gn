@@ -1,0 +1,73 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("rust") {
+  deps = [ ":unmanaged_element_rust" ]
+}
+
+rustc_library("unmanaged_element_rust") {
+  with_unit_tests = true  # Generates unmanaged_element_rust_test.
+  name = "unmanaged_element"
+  edition = "2021"
+  source_root = "src/unmanaged_element.rs"
+  sources = [ "src/unmanaged_element.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//src/power/broker/client",
+    "//third_party/rust_crates:anyhow",
+  ]
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
+rustc_test("unmanaged_element_rust_integration_test") {
+  edition = "2021"
+  source_root = "src/unmanaged_element_integration_test.rs"
+  sources = [ "src/unmanaged_element_integration_test.rs" ]
+  deps = [
+    ":unmanaged_element_rust",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component-test",
+    "//src/power/broker/client",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
+fuchsia_test_component("unmanaged-element-rust-integration-test") {
+  manifest = "meta/unmanaged_element_rust_integration_test.cml"
+  deps = [ ":unmanaged_element_rust_integration_test" ]
+}
+
+fuchsia_unittest_component("unmanaged-element-rust-unittest") {
+  deps = [ ":unmanaged_element_rust_test" ]
+}
+
+fuchsia_test_package("tests") {
+  package_name = "unmanaged-element-example-rust-tests"
+  test_components = [
+    ":unmanaged-element-rust-integration-test",
+    ":unmanaged-element-rust-unittest",
+  ]
+  deps = [
+    # Other components that we are injecting into integration tests.
+    "//src/power/broker:component",
+  ]
+  subpackages = [
+    "//src/power/system-activity-governor:package",
+    "//src/power/system-activity-governor:config-no-suspender",
+  ]
+}

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef EXAMPLES_POWER_CPP_WAKE_LEASE_H_
-#define EXAMPLES_POWER_CPP_WAKE_LEASE_H_
+#ifndef EXAMPLES_POWER_WAKE_LEASE_CPP_WAKE_LEASE_H_
+#define EXAMPLES_POWER_WAKE_LEASE_CPP_WAKE_LEASE_H_
 
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
@@ -39,4 +39,4 @@ class WakeLease {
 
 }  // namespace examples::power
 
-#endif  // EXAMPLES_POWER_CPP_WAKE_LEASE_H_
+#endif  // EXAMPLES_POWER_WAKE_LEASE_CPP_WAKE_LEASE_H_

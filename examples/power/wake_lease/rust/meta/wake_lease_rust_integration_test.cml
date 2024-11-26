@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/wake_lease_integration_test_rust",
+        binary: "bin/wake_lease_rust_integration_test",
     },
     children: [
         {

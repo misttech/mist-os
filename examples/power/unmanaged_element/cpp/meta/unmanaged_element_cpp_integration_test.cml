@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/unmanaged_element_integration_test_cpp",
+        binary: "bin/unmanaged_element_cpp_integration_test",
     },
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },

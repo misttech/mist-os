@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "examples/power/cpp/wake_lease.h"
+#include "examples/power/wake_lease/cpp/wake_lease.h"
 
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/driver/power/cpp/testing/fake_activity_governor.h>
