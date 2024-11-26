@@ -144,9 +144,9 @@ async fn test_selectors_with_succesful_component_search() {
     .unwrap();
 
     let expected = serde_json::to_string(&vec![
-        String::from("test/moniker1:name:hello_1"),
-        String::from("test/moniker1:name:hello_3"),
-        String::from("test/moniker1:name:hello_6"),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_1"#),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_3"#),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_6"#),
     ])
     .unwrap();
     let output = test_buffers.into_stdout_str();
@@ -188,9 +188,9 @@ async fn test_selectors_with_manifest_that_exists() {
     .unwrap();
 
     let expected = serde_json::to_string(&vec![
-        String::from("test/moniker1:name:hello_1"),
-        String::from("test/moniker1:name:hello_3"),
-        String::from("test/moniker1:name:hello_6"),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_1"#),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_3"#),
+        String::from(r#"test/moniker1:[name=fake-name]name:hello_6"#),
     ])
     .unwrap();
     let output = test_buffers.into_stdout_str();
@@ -228,7 +228,8 @@ async fn test_selectors_with_selectors() {
     .unwrap();
 
     let expected =
-        serde_json::to_string(&vec![String::from("test/moniker1:name:hello_3")]).unwrap();
+        serde_json::to_string(&vec![String::from(r#"test/moniker1:[name=fake-name]name:hello_3"#)])
+            .unwrap();
     let output = test_buffers.into_stdout_str();
     assert_eq!(output.trim_end(), expected);
 }
