@@ -381,18 +381,13 @@ mod tests {
     use crate::constants::*;
     use crate::events::router::{Dispatcher, EventProducer};
     use crate::logs::testing::*;
-    use diagnostics_data::LogsData;
     use fidl::endpoints::create_proxy;
-    use fidl_fuchsia_diagnostics::{
-        ClientSelectorConfiguration, DataType, Format, StreamParameters,
-    };
     use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkRequestStream};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::channel::oneshot;
     use std::marker::PhantomData;
-    use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {
@@ -557,46 +552,6 @@ mod tests {
             expected,
             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
         );
-    }
-
-    #[fuchsia::test]
-    async fn remote_log_test() {
-        let (directory, _proxy) = run_archivist().await;
-        let accessor =
-            connect_to_protocol_at_dir_svc::<fhost::ArchiveAccessorMarker>(&directory).unwrap();
-        loop {
-            let (local, remote) = zx::Socket::create_stream();
-            let mut reader = fuchsia_async::Socket::from_socket(local);
-            accessor
-                .stream_diagnostics(
-                    &StreamParameters {
-                        data_type: Some(DataType::Logs),
-                        stream_mode: Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot),
-                        format: Some(Format::Json),
-                        client_selector_configuration: Some(
-                            ClientSelectorConfiguration::SelectAll(true),
-                        ),
-                        ..Default::default()
-                    },
-                    remote,
-                )
-                .await
-                .unwrap();
-            let log_helper = LogSinkHelper::new(&directory);
-            let log_writer = log_helper.connect();
-            LogSinkHelper::write_log_at(&log_writer, "Test message");
-            let mut data = vec![];
-            reader.read_to_end(&mut data).await.unwrap();
-            if data.is_empty() {
-                continue;
-            }
-            let logs = serde_json::from_slice::<Vec<LogsData>>(&data).unwrap();
-            for log in logs {
-                if log.msg() == Some("Test message") {
-                    return;
-                }
-            }
-        }
     }
 
     /// Makes sure that implementation can handle multiple sockets from same

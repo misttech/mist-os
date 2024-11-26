@@ -14,6 +14,7 @@ rustc_test("bin") {
   deps = [
     "../realm_factory/fidl:fuchsia.archivist.test_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/rust/zx",
@@ -48,6 +49,7 @@ rustc_test("bin") {
     "src/logs/basic.rs",
     "src/logs/budget.rs",
     "src/logs/crash.rs",
+    "src/logs/host.rs",
     "src/logs/interest.rs",
     "src/logs/lifecycle.rs",
     "src/logs/lifecycle_stop.rs",

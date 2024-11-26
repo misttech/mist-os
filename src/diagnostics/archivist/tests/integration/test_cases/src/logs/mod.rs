@@ -6,6 +6,7 @@ mod attribution;
 mod basic;
 mod budget;
 mod crash;
+mod host;
 mod interest;
 mod lifecycle;
 mod lifecycle_stop;
