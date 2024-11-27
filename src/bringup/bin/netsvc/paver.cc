@@ -278,9 +278,9 @@ zx_status_t Paver::WriteABImage(fidl::WireSyncClient<fuchsia_paver::DataSink> da
     }
   }
 
-  // TODO(https://fxbug.dev/42124259): The following two syncs are called everytime WriteAsset is called, which
-  // is not optimal for reducing NAND PE cycles. Ideally, we want to sync when all assets, A/B
-  // configuration have been written to buffer. Find a safe time and place for sync.
+  // TODO(https://fxbug.dev/42124259): The following two syncs are called everytime WriteAsset is
+  // called, which is not optimal for reducing NAND PE cycles. Ideally, we want to sync when all
+  // assets, A/B configuration have been written to buffer. Find a safe time and place for sync.
   {
     auto res = data_sink->Flush();
     auto status = res.ok() ? res.value().status : res.status();
@@ -343,49 +343,17 @@ zx_status_t Paver::ClearSysconfig() {
   return ZX_OK;
 }
 
-zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
-                                fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>* data_sink) {
-  netboot_block_device_t partition_info = {};
-  auto status = buffer.vmo.read(&partition_info, 0, sizeof(partition_info));
-  if (status != ZX_OK) {
-    fprintf(stderr, "netsvc: Unable to read from vmo\n");
-    return status;
-  }
-  if (partition_info.block_device_path[NETBOOT_PATH_MAX - 1] != '\0') {
-    fprintf(stderr, "netsvc: Invalid block device path specified\n");
-    return ZX_ERR_INVALID_ARGS;
-  }
-  const std::string_view block_device_path{partition_info.block_device_path};
-  constexpr std::string_view kDevfsPrefix = "/dev/";
-  if (!cpp20::starts_with(block_device_path, kDevfsPrefix)) {
-    fprintf(stderr, "netsvc: Invalid block device path specified %s\n",
-            partition_info.block_device_path);
-    return ZX_ERR_INVALID_ARGS;
-  }
-  zx::result client_end =
-      ConnectToDevfs<fuchsia_hardware_block::Block>(dev_root_, block_device_path);
-  if (client_end.is_error()) {
-    fprintf(stderr, "netsvc: Unable to open %s.\n", partition_info.block_device_path);
-    return client_end.status_value();
-  }
-
-  std::string controller_path = std::string(block_device_path) + "/device_controller";
-  zx::result controller = ConnectToDevfs<fuchsia_device::Controller>(dev_root_, controller_path);
-  if (client_end.is_error()) {
-    fprintf(stderr, "netsvc: Unable to open controller %s\n", controller_path.c_str());
-    return controller.status_value();
-  }
-
+zx_status_t Paver::OpenDataSink(fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>* data_sink) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
   if (endpoints.is_error()) {
     fprintf(stderr, "netsvc: unable to create channel.\n");
     return endpoints.status_value();
   }
 
-  fidl::Status res = paver_svc_->UseBlockDevice(
-      std::move(client_end.value()), std::move(controller.value()), std::move(endpoints->server));
+  printf("netsvc: Note: Ignoring specified block device; this is no longer supported.\n");
+  fidl::Status res = paver_svc_->FindPartitionTableManager(std::move(endpoints->server));
   if (!res.ok()) {
-    fprintf(stderr, "netsvc: unable to use block device.\n");
+    fprintf(stderr, "netsvc: unable to find block device.\n");
     return res.status();
   }
 
@@ -395,7 +363,7 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
 
 zx_status_t Paver::InitPartitionTables(fuchsia_mem::wire::Buffer buffer) {
   fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink;
-  if (zx_status_t status = OpenDataSink(std::move(buffer), &data_sink); status != ZX_OK) {
+  if (zx_status_t status = OpenDataSink(&data_sink); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to open data sink.\n");
     return status;
   }
@@ -411,7 +379,7 @@ zx_status_t Paver::InitPartitionTables(fuchsia_mem::wire::Buffer buffer) {
 
 zx_status_t Paver::WipePartitionTables(fuchsia_mem::wire::Buffer buffer) {
   fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink;
-  if (zx_status_t status = OpenDataSink(std::move(buffer), &data_sink); status != ZX_OK) {
+  if (zx_status_t status = OpenDataSink(&data_sink); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to open data sink.\n");
     return status;
   }

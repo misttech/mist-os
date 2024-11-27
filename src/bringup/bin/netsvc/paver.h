@@ -88,8 +88,7 @@ class Paver final : public PaverInterface {
   zx_status_t WriteABImage(fidl::WireSyncClient<fuchsia_paver::DataSink> data_sink,
                            fuchsia_mem::wire::Buffer buffer);
 
-  zx_status_t OpenDataSink(fuchsia_mem::wire::Buffer buffer,
-                           fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>* data_sink);
+  zx_status_t OpenDataSink(fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>* data_sink);
   zx_status_t InitPartitionTables(fuchsia_mem::wire::Buffer buffer);
   zx_status_t WipePartitionTables(fuchsia_mem::wire::Buffer buffer);
 
