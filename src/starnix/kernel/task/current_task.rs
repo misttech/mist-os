@@ -30,7 +30,6 @@ use starnix_sync::{
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
-use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
 use starnix_types::ownership::{
     release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
@@ -141,10 +140,6 @@ pub struct ThreadState {
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
     pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
-
-    /// An architecture agnostic enum indicating the width (32 or 64 bits) of the execution
-    /// environment in use.
-    pub arch_width: ArchWidth,
 }
 
 impl ThreadState {
@@ -154,7 +149,6 @@ impl ThreadState {
             registers: self.registers,
             extended_pstate: Default::default(),
             syscall_restart_func: None,
-            arch_width: self.arch_width,
         }
     }
 
@@ -163,14 +157,12 @@ impl ThreadState {
             registers: self.registers.clone(),
             extended_pstate: self.extended_pstate.clone(),
             syscall_restart_func: None,
-            arch_width: self.arch_width,
         }
     }
 
     pub fn replace_registers(&mut self, other: &ThreadState) {
         self.registers = other.registers;
         self.extended_pstate = other.extended_pstate;
-        self.arch_width = other.arch_width;
     }
 
     pub fn get_user_register(&mut self, offset: usize) -> Result<usize, Errno> {
@@ -929,10 +921,8 @@ impl CurrentTask {
         // update after process image is replaced.  See get_robust_list(2).
         self.notify_robust_list();
 
-        // Passing arch32 information here ensures the replacement memory
-        // layout matches the elf being executed.
         self.mm()
-            .exec(resolved_elf.file.name.to_passive(), resolved_elf.arch_width)
+            .exec(resolved_elf.file.name.to_passive())
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.
@@ -992,9 +982,6 @@ impl CurrentTask {
         }
 
         let start_info = load_executable(self, resolved_elf, &path)?;
-        // Before consuming start_info below, note if the task is 32-bit.
-        self.thread_state.arch_width = start_info.arch_width;
-
         let regs: zx_thread_state_general_regs_t = start_info.into();
         self.thread_state.registers = regs.into();
         self.thread_state.extended_pstate.reset();

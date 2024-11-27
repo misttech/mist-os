@@ -38,7 +38,6 @@ test("input_report_test") {
     ":input_report_reader",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//zircon/system/public",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

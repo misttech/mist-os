@@ -9,12 +9,6 @@ group("hello_debian") {
     "cpp",
     "rust",
   ]
-
-  # asm is only needed for compat testing
-  # and compat is only supported on arm64.
-  if (current_cpu == "arm64") {
-    deps += [ "asm" ]
-  }
 }
 
 group("tests") {
@@ -23,9 +17,6 @@ group("tests") {
     "cpp:tests",
     "rust:tests",
   ]
-  if (current_cpu == "arm64") {
-    deps += [ "asm:tests" ]
-  }
 }
 
 # This binary is used in the integration tests for both C++ and Rust examples.

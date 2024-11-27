@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/starnix/kernel/args.gni")
 
 rustc_library("starnix-types") {
   name = "starnix_types"
@@ -13,7 +12,6 @@ rustc_library("starnix-types") {
   with_unit_tests = true
 
   sources = [
-    "src/arch.rs",
     "src/convert.rs",
     "src/errors.rs",
     "src/futex_address.rs",
@@ -33,7 +31,6 @@ rustc_library("starnix-types") {
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
-    "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:smallvec",
@@ -42,11 +39,6 @@ rustc_library("starnix-types") {
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
-
-  features = []
-  if (starnix_enable_arch32) {
-    features += [ "arch32" ]
-  }
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

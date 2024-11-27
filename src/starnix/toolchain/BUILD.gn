@@ -7,7 +7,6 @@ import("//build/toolchain/clang_toolchain_suite.gni")
 foreach(arch,
         [
           "x64",
-          "arm",
           "arm64",
           "riscv64",
         ]) {
