@@ -24,10 +24,6 @@
             };
           };
         };
-        execution-resume-latency-element {
-          power-levels {
-          };
-        };
         application-activity-element {
           power-levels {
             inactive-level {
