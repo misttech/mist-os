@@ -99,7 +99,7 @@ class F2fs final {
   void WriteOrphanInodes(block_t start_blk);
   zx_status_t GetValidCheckpoint();
   zx_status_t ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out);
-  uint32_t GetFreeSectionsForDirtyPages();
+  uint32_t GetFreeSectionsForCheckpoint();
 
   void PutSuper();
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
@@ -165,8 +165,8 @@ class F2fs final {
   zx_status_t MakeTrimOperation(block_t blk_addr, block_t nblocks) const;
   void ScheduleWritebackAndReclaimPages();
 
-  zx::result<uint32_t> StartGc() __TA_REQUIRES(f2fs::GetGlobalLock());
-  void BalanceFs(uint32_t num_blocks = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
+  zx::result<uint32_t> StartGc(uint32_t needed = 0) __TA_REQUIRES(f2fs::GetGlobalLock());
+  void BalanceFs(uint32_t needed = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
   bool GetMemoryStatus(MemoryStatus action);
   void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_);
 

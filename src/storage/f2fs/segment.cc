@@ -244,10 +244,6 @@ block_t SegmentManager::DirtySegments() {
          dirty_info_->nr_dirty[static_cast<int>(DirtyType::kDirtyColdNode)];
 }
 
-block_t SegmentManager::OverprovisionSections() {
-  return ovp_segments_ / superblock_info_.GetSegsPerSec();
-}
-
 block_t SegmentManager::ReservedSections() {
   return reserved_segments_ / superblock_info_.GetSegsPerSec();
 }
@@ -415,17 +411,16 @@ bool SegmentManager::SecUsageCheck(unsigned int secno) const {
   return IsCurSec(secno) || cur_victim_sec_ == secno;
 }
 
-bool SegmentManager::HasNotEnoughFreeSecs(size_t freed, size_t needed) {
+bool SegmentManager::HasNotEnoughFreeSecs(size_t freed_sections, size_t needed_blocks) {
   if (fs_->IsOnRecovery())
     return false;
 
-  size_t blocks_per_sec = safemath::CheckMul<uint32_t>(superblock_info_.GetBlocksPerSeg(),
-                                                       superblock_info_.GetSegsPerSec())
-                              .ValueOrDie();
-  size_t freed_sec = CheckedDivRoundUp(freed, blocks_per_sec);
-  size_t needed_sec = CheckedDivRoundUp(needed, blocks_per_sec);
-  return FreeSections() + freed_sec <=
-         fs_->GetFreeSectionsForDirtyPages() + ReservedSections() + needed_sec;
+  size_t blocks_per_section = safemath::CheckMul<uint32_t>(superblock_info_.GetBlocksPerSeg(),
+                                                           superblock_info_.GetSegsPerSec())
+                                  .ValueOrDie();
+  size_t needed_sections = CheckedDivRoundUp(needed_blocks, blocks_per_section) +
+                           fs_->GetFreeSectionsForCheckpoint() + ReservedSections();
+  return FreeSections() + freed_sections <= needed_sections;
 }
 
 void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
@@ -665,8 +660,8 @@ int SegmentManager::NpagesForSummaryFlush() {
 }
 
 // Caller should put this summary page
-void SegmentManager::GetSumPage(uint32_t segno, LockedPage *out) {
-  fs_->GetMetaPage(GetSumBlock(segno), out);
+zx_status_t SegmentManager::GetSumPage(uint32_t segno, LockedPage *out) {
+  return fs_->GetMetaPage(GetSumBlock(segno), out);
 }
 
 void SegmentManager::WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr) {
@@ -859,7 +854,7 @@ void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
 
   if (reuse) {
     LockedPage sum_page;
-    GetSumPage(new_segno, &sum_page);
+    ZX_ASSERT(GetSumPage(new_segno, &sum_page) == ZX_OK);
     sum_page->Read(curseg->sum_blk.get(), 0, kSumEntrySize);
   }
 }

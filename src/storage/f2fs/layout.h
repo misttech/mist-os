@@ -36,6 +36,12 @@ constexpr uint32_t kDefaultBlocksPerSegment = 1 << kDefaultLogBlocksPerSegment;
 constexpr uint32_t kDefaultSegmentsPerSection = 1;
 constexpr uint32_t kCpBlockSize = (kDefaultSectorSize * kDefaultSectorsPerBlock);
 constexpr uint32_t kVolumeLabelLength = 16;
+// At least, it requires six reserved sections to preallocate the next sections of all levels of
+// temperature as well as two reserved sections to which the valid blocks of a gc victim migrate.
+constexpr uint32_t kMinReservedSectionsForGc = 8;
+// It requires at least 8 segments (sb + ssa + (ckpt + sit + nat) * 2) for its metadata
+constexpr uint32_t kMinMetaSegments = 8;
+constexpr uint32_t kDefaultOpRatio = 4;
 
 // For further optimization on multi-head logs, on-disk layout supports maximum
 // 16 logs by default. The number, 16, is expected to cover all the cases
@@ -44,26 +50,6 @@ constexpr uint32_t kVolumeLabelLength = 16;
 constexpr int kMaxActiveLogs = 16;
 constexpr int kMaxActiveNodeLogs = 8;
 constexpr int kMaxActiveDataLogs = 8;
-
-struct GlobalParameters {
-  uint32_t sector_size = 0;
-  uint32_t reserved_segments = 0;
-  uint32_t overprovision = 0;
-  uint32_t cur_seg[6];
-  uint32_t segs_per_sec = 0;
-  uint32_t secs_per_zone = 0;
-  uint32_t start_sector = 0;
-  uint64_t total_sectors = 0;
-  uint32_t sectors_per_blk = 0;
-  uint32_t blks_per_seg = 0;
-  uint8_t vol_label[kVolumeLabelLength] = {
-      0,
-  };
-  int heap = 0;
-  int32_t fd = 0;
-  char *device_name = nullptr;
-  std::vector<std::string> extension_list;
-};
 
 struct Superblock {
   uint32_t magic = 0;                  // Magic Number

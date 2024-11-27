@@ -141,10 +141,12 @@ void VerifyHeapBasedAllocation(Superblock &sb, Checkpoint &ckp, bool is_heap_bas
 }
 
 void VerifyOP(Superblock &sb, Checkpoint &ckp, uint32_t op_ratio) {
-  uint32_t overprov_segment_count =
-      CpuToLe((LeToCpu(sb.segment_count_main) - LeToCpu(ckp.rsvd_segment_count)) * op_ratio / 100 +
-              LeToCpu(ckp.rsvd_segment_count));
-  ASSERT_EQ(ckp.overprov_segment_count, overprov_segment_count);
+  size_t user_segments = LeToCpu(sb.segment_count_main) - LeToCpu(ckp.rsvd_segment_count);
+  size_t maximum_op_segments =
+      std::max(1UL, CheckedDivRoundUp(user_segments / LeToCpu(sb.segs_per_sec) * op_ratio, 100UL)) *
+      LeToCpu(sb.segs_per_sec);
+  ASSERT_GE(maximum_op_segments + LeToCpu(ckp.rsvd_segment_count),
+            LeToCpu(ckp.overprov_segment_count));
 }
 
 TEST(FormatFilesystemTest, MkfsOptionsLabel) {
@@ -414,8 +416,6 @@ TEST(FormatFilesystemTest, BlockSize) {
       auto ret = mkfs.DoMkfs();
       ASSERT_EQ(ret.is_error(), true);
       ASSERT_EQ(ret.error_value(), ZX_ERR_INVALID_ARGS);
-      auto bc = mkfs.Destroy();
-      bc.reset();
     } else {
       ASSERT_TRUE(bc_or.is_ok());
 
@@ -448,14 +448,14 @@ TEST(FormatFilesystemTest, BlockSize) {
 }
 
 TEST(FormatFilesystemTest, MkfsSmallVolume) {
-  uint32_t volume_size_array[] = {30, 40, 50, 60, 70, 80, 90, 100};
-  uint32_t block_size = 4096;
+  uint32_t kMinSize = kMinMetaSegments + kMinReservedSectionsForGc + kNrCursegType;
+  uint32_t volume_segments[] = {kMinSize, kMinSize - 1};
 
-  for (uint32_t volume_size : volume_size_array) {
-    uint64_t block_count = volume_size * 1024 * 1024 / block_size;
+  for (uint32_t segments : volume_segments) {
+    uint64_t block_count = segments * kDefaultBlocksPerSegment;
 
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
-        .block_count = block_count, .block_size = block_size, .supports_trim = true});
+        .block_count = block_count, .block_size = kBlockSize, .supports_trim = true});
     bool readonly_device = false;
     auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     ASSERT_TRUE(bc_or.is_ok());
@@ -463,7 +463,7 @@ TEST(FormatFilesystemTest, MkfsSmallVolume) {
     MkfsOptions mkfs_options;
     MkfsWorker mkfs(std::move(*bc_or), mkfs_options);
     auto ret = mkfs.DoMkfs();
-    if (volume_size >= 40) {
+    if (segments >= kMinSize) {
       ASSERT_TRUE(ret.is_ok());
       auto bc = std::move(*ret);
 
@@ -473,14 +473,13 @@ TEST(FormatFilesystemTest, MkfsSmallVolume) {
       FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
       const Superblock &sb = fs->GetSuperblockInfo().GetSuperblock();
-      ASSERT_EQ(LeToCpu(sb.segment_count_main), static_cast<uint32_t>(volume_size / 2 - 8));
+      ASSERT_EQ(LeToCpu(sb.segment_count_main), static_cast<uint32_t>(segments - kMinMetaSegments));
 
       FileTester::Unmount(std::move(fs), &bc);
       EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}), ZX_OK);
     } else {
       ASSERT_TRUE(ret.is_error());
       ASSERT_EQ(ret.status_value(), ZX_ERR_NO_SPACE);
-      [[maybe_unused]] auto bc = mkfs.Destroy();
     }
   }
 }

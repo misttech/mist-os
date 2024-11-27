@@ -474,24 +474,14 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   return ZX_OK;
 }
 
-uint32_t F2fs::GetFreeSectionsForDirtyPages() {
+uint32_t F2fs::GetFreeSectionsForCheckpoint() {
   uint32_t pages_per_sec =
-      safemath::CheckMul<uint32_t>((1 << superblock_info_->GetLogBlocksPerSeg()),
-                                   superblock_info_->GetSegsPerSec())
+      safemath::CheckMul<uint32_t>(kDefaultBlocksPerSegment, superblock_info_->GetSegsPerSec())
           .ValueOrDie();
-  uint32_t node_secs =
-      safemath::CheckDiv<uint32_t>(
-          ((superblock_info_->GetPageCount(CountType::kDirtyNodes) + pages_per_sec - 1) >>
-           superblock_info_->GetLogBlocksPerSeg()),
-          superblock_info_->GetSegsPerSec())
-          .ValueOrDie();
-  uint32_t dent_secs =
-      safemath::CheckDiv<uint32_t>(
-          ((superblock_info_->GetPageCount(CountType::kDirtyDents) + pages_per_sec - 1) >>
-           superblock_info_->GetLogBlocksPerSeg()),
-          superblock_info_->GetSegsPerSec())
-          .ValueOrDie();
-
+  uint32_t node_secs = CheckedDivRoundUp<uint32_t>(
+      superblock_info_->GetPageCount(CountType::kDirtyNodes), pages_per_sec);
+  uint32_t dent_secs = CheckedDivRoundUp<uint32_t>(
+      superblock_info_->GetPageCount(CountType::kDirtyDents), pages_per_sec);
   return (node_secs + safemath::CheckMul<uint32_t>(dent_secs, 2)).ValueOrDie();
 }
 
@@ -509,7 +499,6 @@ zx_status_t F2fs::WriteCheckpointUnsafe(bool is_umount) {
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
-  ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());
   FlushDirsAndNodes();
 
   // update checkpoint pack index

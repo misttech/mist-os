@@ -52,9 +52,7 @@ zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
     total_block_count += block_count;
   }
 
-  // F2fs requires at least 8 segments (sb + (ckpt + sit + nat) * 2 + ssr) for its metadata, so the
-  // total_block_count must be greater than 8 segments to store data.
-  if (total_block_count <= kDefaultBlocksPerSegment * 8) {
+  if (total_block_count <= kMinMetaSegments * kDefaultBlocksPerSegment) {
     FX_LOGS(ERROR) << "block device is too small";
     return zx::error(ZX_ERR_NO_SPACE);
   }
