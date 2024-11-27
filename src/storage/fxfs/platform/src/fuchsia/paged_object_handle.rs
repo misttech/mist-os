@@ -148,8 +148,22 @@ fn reservation_needed(page_count: u64) -> u64 {
 fn page_count(range: Range<u64>) -> u64 {
     let page_size = zx::system_get_page_size() as u64;
     debug_assert!(range.start <= range.end);
-    debug_assert!(range.start % page_size == 0);
-    debug_assert!(range.end % page_size == 0);
+    debug_assert_eq!(
+        range.start % page_size,
+        0,
+        "range start not page aligned (page size: {}, range: {}..{})",
+        page_size,
+        range.start,
+        range.end
+    );
+    debug_assert_eq!(
+        range.end % page_size,
+        0,
+        "range end not page aligned (page size: {}, range: {}..{})",
+        page_size,
+        range.start,
+        range.end
+    );
     (range.end - range.start) / page_size
 }
 
@@ -2870,6 +2884,61 @@ mod tests {
         assert_eq!(
             file.read_at(50, 100).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
             vec![0; 50],
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_truncate_allocated_file_unaligned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size * 2, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        file.resize(page_size + 100).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
         );
 
         fixture.close().await;
