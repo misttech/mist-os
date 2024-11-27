@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef __arm__
 #include <lib/affine/ratio.h>
+#endif
 
 #include "src/starnix/kernel/vdso/vdso-calculate-time.h"
 #include "src/starnix/kernel/vdso/vdso-platform.h"
@@ -34,7 +36,17 @@ int64_t calculate_utc_time_nsec() {
     return kUtcInvalid;
   }
 
+#ifndef __arm__
   affine::Ratio boot_to_utc_ratio(boot_to_utc_synthetic_ticks, boot_to_utc_reference_ticks);
   return boot_to_utc_ratio.Scale(reference_time - boot_to_utc_reference_offset) +
          boot_to_utc_synthetic_offset;
+#else
+  // TODO(https://fxbug.dev/380431929) Implement affine::Ratio::Scale() equivalent
+  // with round down.
+  int64_t utc_time = reference_time - boot_to_utc_reference_offset;
+  utc_time /= boot_to_utc_reference_ticks;
+  utc_time *= boot_to_utc_synthetic_ticks;
+  utc_time += boot_to_utc_synthetic_offset;
+  return utc_time;
+#endif
 }

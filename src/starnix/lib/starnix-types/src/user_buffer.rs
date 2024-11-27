@@ -5,11 +5,12 @@
 use super::PAGE_SIZE;
 use smallvec::SmallVec;
 use starnix_uapi::errors::{errno, error, Errno};
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{UserAddress, UserAddress32, UserRef};
 use std::sync::LazyLock;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub type UserBuffers = SmallVec<[UserBuffer; 1]>;
+pub type UserBuffers32 = SmallVec<[UserBuffer32; 1]>;
 
 /// Matches iovec_t.
 #[derive(
@@ -22,6 +23,22 @@ pub struct UserBuffer {
 }
 
 pub static MAX_RW_COUNT: LazyLock<usize> = LazyLock::new(|| ((1 << 31) - *PAGE_SIZE) as usize);
+/// Matches compat_iovec_t.
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, IntoBytes, KnownLayout, FromBytes, Immutable,
+)]
+#[repr(C)]
+#[repr(packed)]
+pub struct UserBuffer32 {
+    pub address: UserAddress32,
+    pub length: u32,
+}
+
+impl From<UserBuffer32> for UserBuffer {
+    fn from(ub32: UserBuffer32) -> Self {
+        UserBuffer { address: ub32.address.into(), length: ub32.length as usize }
+    }
+}
 
 impl UserBuffer {
     pub fn cap_buffers_to_max_rw_count(

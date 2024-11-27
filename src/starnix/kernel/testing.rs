@@ -16,21 +16,20 @@ use crate::vfs::{
     FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr, Namespace,
 };
-
 use fidl_fuchsia_io as fio;
 use selinux::SecurityServer;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
-use std::ffi::CString;
-use std::mem::MaybeUninit;
-use std::sync::{mpsc, Arc};
-use zerocopy::{Immutable, IntoBytes};
-
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::arch::ArchWidth;
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::sync::{mpsc, Arc};
+use zerocopy::{Immutable, IntoBytes};
 
 /// Create a FileSystemHandle for use in testing.
 ///
@@ -196,7 +195,7 @@ fn create_test_init_task(
         &[],
     )
     .expect("failed to create first task");
-    init_task.mm().initialize_mmap_layout_for_test();
+    init_task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
     let system_task =
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
@@ -246,7 +245,7 @@ pub fn create_task(
         None,
     )
     .expect("failed to create second task");
-    task.mm().initialize_mmap_layout_for_test();
+    task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

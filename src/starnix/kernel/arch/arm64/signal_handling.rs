@@ -23,6 +23,8 @@ pub const RED_ZONE_SIZE: u64 = 0;
 /// The size of the syscall instruction in bytes.
 pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
 
+// TODO(https://fxbug.dev/380405833): Add in arm and thumb here to enable syscall_restart
+
 /// The size, in bytes, of the signal stack frame.
 pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 
@@ -45,6 +47,7 @@ impl SignalStackFrame {
         _stack_pointer: UserAddress,
     ) -> SignalStackFrame {
         let mut regs = registers.r.to_vec();
+        // TODO(https://fxbug.dev/380405833) Do we need to capture r[14] here?
         regs.push(registers.lr);
 
         let fault_address = 0;
@@ -106,15 +109,20 @@ pub fn restore_registers(
     registers.copy_from_slice(&uctx.regs[..NUM_REGS_WITHOUT_LINK_REGISTER]);
 
     // Restore the register state from before executing the signal handler.
-    current_task.thread_state.registers = zx::sys::zx_thread_state_general_regs_t {
+    let mut restored_regs = zx::sys::zx_thread_state_general_regs_t {
         r: registers,
         lr: uctx.regs[NUM_REGS_WITHOUT_LINK_REGISTER],
         sp: uctx.sp,
         pc: uctx.pc,
         cpsr: uctx.pstate,
         tpidr: current_task.thread_state.registers.tpidr,
+    };
+    // TODO(https://fxbug.dev/380405833) This feels very clunky
+    if current_task.thread_state.arch_width.is_arch32() {
+        restored_regs.r[13] = restored_regs.sp;
+        restored_regs.r[14] = restored_regs.lr;
     }
-    .into();
+    current_task.thread_state.registers = restored_regs.into();
 
     parse_sigcontext_data(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
 }

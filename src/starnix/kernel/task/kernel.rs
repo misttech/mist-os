@@ -198,6 +198,11 @@ pub struct Kernel {
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
     pub vdso: Vdso,
 
+    /// A struct containing a VMO with a arch32-vDSO implementation, if implemented for a given architecture.
+    // TODO(https://fxbug.dev/380431743) This could be made less clunky -- maybe a Vec<Vdso> above or
+    // something else
+    pub vdso_arch32: Option<Vdso>,
+
     /// The table of devices installed on the netstack and their associated
     /// state local to this `Kernel`.
     pub netstack_devices: Arc<NetstackDevices>,
@@ -385,6 +390,7 @@ impl Kernel {
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
+            vdso_arch32: Vdso::new_arch32(),
             netstack_devices: Arc::default(),
             swap_files: Default::default(),
             generic_netlink: OnceCell::new(),

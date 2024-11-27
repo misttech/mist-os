@@ -14,6 +14,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::{
     Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK,
 };
@@ -177,6 +178,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     prepare_to_restart_syscall(
         &mut thread_state.registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
+        thread_state.arch_width,
     );
 
     if let Some(ref siginfo) = siginfo {
@@ -414,7 +416,11 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
 /// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-pub fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Option<sigaction_t>) {
+pub fn prepare_to_restart_syscall(
+    registers: &mut RegisterState,
+    sigaction: Option<sigaction_t>,
+    arch_width: ArchWidth,
+) {
     let err = ErrnoCode::from_return_value(registers.return_register());
     // If sigaction is None, the syscall must be restarted if it is restartable. The default
     // sigaction will not have a sighandler, which will guarantee a restart.
@@ -438,6 +444,10 @@ pub fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Opti
 
     update_register_state_for_restart(registers, err);
 
+    if arch_width.is_arch32() {
+        // TODO(https://fxbug.dev/380405833): Fix pc post syscall for restart.
+        panic!("pc is being changed incorrectly post syscall for restart!");
+    }
     registers.set_instruction_pointer_register(
         registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
     );

@@ -1134,6 +1134,7 @@ mod tests {
     use fidl::HandleBased;
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
+    use starnix_types::arch::ArchWidth;
     use starnix_uapi::file_mode::mode;
     use starnix_uapi::mount_flags::MountFlags;
     use std::collections::BTreeMap;
@@ -1203,7 +1204,7 @@ mod tests {
                 )
                 .expect("Task")
                 .into();
-                task.mm().initialize_mmap_layout_for_test();
+                task.mm().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
                 let remote_binder_handle =
                     RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);
