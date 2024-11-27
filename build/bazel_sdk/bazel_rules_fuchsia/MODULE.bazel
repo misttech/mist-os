@@ -6,7 +6,7 @@
 # (eg: cipd, clang, fuchsia sdk).
 # Once @fuchsia_sdk is initialized, it should be used whenever possible.
 module(
-    name = "fuchsia_workspace",
+    name = "rules_fuchsia",
     version = "0.0.1",
     #TODO(https://fxbug.dev/42059530) add bazel_compatibility when it is ready
 )

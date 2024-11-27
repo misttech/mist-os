@@ -11,7 +11,7 @@ platform (in-tree) Bazel workspace.
 
 - They should not assume to be in any specific workspace
   (so no explicit reference to `@fuchsia_sdk` or
-  `@fuchsia_workspace` should exist in this directory).
+  `@rules_fuchsia` should exist in this directory).
 
   `load()` statements and target definitions that appear there
   should only use `//common:<path>` or `//common/<subpackage>:<path>`

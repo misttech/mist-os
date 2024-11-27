@@ -34,7 +34,7 @@ ignore_policy = struct(
     # Anything withing these workspaces will be ignored:
     # NOTE: with Bzlmod enabled, these check against canonical repo names, which might not be
     # intended. However, we can't just pass these through `Label()` as some of these repo names
-    # are not actually known to `fuchsia_workspace` (this module).
+    # are not actually known to `rules_fuchsia` (this module).
     workspaces = bool_dict([
         "bazel_tools",
         "fuchsia_clang",  # TODO(95670): clang bazel defs should provide licenses.

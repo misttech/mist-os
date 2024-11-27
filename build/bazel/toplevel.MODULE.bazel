@@ -87,11 +87,11 @@ local_path_override(
 # (eg: cipd, clang, fuchsia sdk).
 # Once @fuchsia_sdk is initialized, it should be used whenever possible.
 bazel_dep(
-    name = "fuchsia_workspace",
+    name = "rules_fuchsia",
     version = "",
 )
 local_path_override(
-    module_name = "fuchsia_workspace",
+    module_name = "rules_fuchsia",
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 

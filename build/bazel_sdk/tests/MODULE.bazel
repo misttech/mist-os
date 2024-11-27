@@ -12,9 +12,9 @@ bazel_dep(name = "bazel_skylib", version = "1.5.0")
 bazel_dep(name = "rules_python", version = "0.22.1")
 bazel_dep(name = "rules_license", version = "0.0.8")
 bazel_dep(name = "googletest", version = "1.12.1", repo_name = "com_google_googletest")
-bazel_dep(name = "fuchsia_workspace", version = "")
+bazel_dep(name = "rules_fuchsia", version = "")
 local_path_override(
-    module_name = "fuchsia_workspace",
+    module_name = "rules_fuchsia",
     path = "../bazel_rules_fuchsia",
 )
 
@@ -27,10 +27,10 @@ local_path_override(
 fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
 use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
-fuchsia_sdk_ext = use_extension("@fuchsia_workspace//fuchsia:deps.bzl", "fuchsia_sdk_ext")
+fuchsia_sdk_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_sdk_ext")
 use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
 
-fuchsia_clang_ext = use_extension("@fuchsia_workspace//fuchsia/workspace:fuchsia_clang_repository.bzl", "fuchsia_clang_ext")
+fuchsia_clang_ext = use_extension("@rules_fuchsia//fuchsia/workspace:fuchsia_clang_repository.bzl", "fuchsia_clang_ext")
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
 register_toolchains(

@@ -38,7 +38,7 @@ py_binary(
         "generate_sdk_build_rules.py",
 
         # The set of template files that are used by the script at runtime.
-        "@fuchsia_workspace//fuchsia/workspace/sdk_templates:templates",
+        "@rules_fuchsia//fuchsia/workspace/sdk_templates:templates",
     ],
     visibility = ["//visibility:public"],
 )

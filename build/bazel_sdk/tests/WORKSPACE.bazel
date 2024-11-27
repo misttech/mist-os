@@ -35,12 +35,12 @@ local_repository(
 )
 
 local_repository(
-    name = "fuchsia_workspace",
+    name = "rules_fuchsia",
     path = "../bazel_rules_fuchsia",
 )
 
 load(
-    "@fuchsia_workspace//fuchsia:deps.bzl",
+    "@rules_fuchsia//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",
 )
