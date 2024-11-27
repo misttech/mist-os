@@ -50,6 +50,7 @@ source_set("kernel") {
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/lib/power-management",
+    "//zircon/kernel/lib/stall",
     "//zircon/kernel/lib/thread_sampler",
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/lib/userabi",

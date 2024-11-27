@@ -1540,6 +1540,11 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     sqs.transient_state = TransientState::None;
   }
 
+  // Update stall contributions of the current and next thread.
+  if (thread_changed) {
+    StallAccumulator::ApplyContextSwitch(current_thread, next_thread);
+  }
+
   // Update the state of the current and next thread.
   const SchedulerQueueState& current_queue_state = current_thread->scheduler_queue_state();
   SchedulerState* const next_state = &next_thread->scheduler_state();

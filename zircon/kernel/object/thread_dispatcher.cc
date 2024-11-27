@@ -185,6 +185,14 @@ zx_status_t ThreadDispatcher::MakeRunnable(const EntryState& entry, bool suspend
   // SUSPENDED when it checks thread signals before executing any user code
   SetStateLocked(ThreadState::Lifecycle::RUNNING);
 
+  // Given this is no longer a kernel-only thread, start memory stall accounting
+  // by entering the Inactive state.
+  {
+    AnnotatedAutoPreemptDisabler preempt_disabler;
+    DEBUG_ASSERT(core_thread_->memory_stall_state() == ThreadStallState::IgnoredKernelOnly);
+    core_thread_->set_memory_stall_state(ThreadStallState::Inactive);
+  }
+
   if (suspend_count_ == 0) {
     core_thread_->Resume();
   } else {

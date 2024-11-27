@@ -7,6 +7,7 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_PERCPU_H_
 
 #include <lib/lazy_init/lazy_init.h>
+#include <lib/stall.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
@@ -105,6 +106,9 @@ struct percpu {
   // LockupDetectorState we can inline performance critical lockup_detector
   // functions.  See also gLockupDetectorPerCpuState.
   Timer lockup_detector_timer;
+
+  // The accumulated memory stall timers for this CPU.
+  StallAccumulator memory_stall_accumulator;
 
   // Returns a reference to the percpu instance for given CPU number.
   static percpu& Get(cpu_num_t cpu_num) {

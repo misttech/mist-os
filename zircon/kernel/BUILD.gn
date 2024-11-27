@@ -147,6 +147,9 @@ if (current_toolchain == default_toolchain) {
 
         # <kernel/scheduler.h> depends on <lib/power-management/power-state.h>
         "//zircon/kernel/lib/power-management:headers.config",
+
+        # <kernel/scheduler.h> depends on <lib/stall.h>
+        "//zircon/kernel/lib/stall:headers.config",
       ]
 
       configs = [ "//zircon/kernel:kernel_config" ]

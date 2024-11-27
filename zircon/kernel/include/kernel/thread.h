@@ -1127,6 +1127,26 @@ class MemoryAllocationState {
   volatile uint32_t disable_count_ = 0;
 };
 
+// Stall accounting state of a thread.
+//
+// Kernel-only threads are never considered for the purpose of memory stall
+// accounting (`IgnoredKernelOnly`).
+//
+// If a user thread is not signalling a stall, it will contribute to the current
+// CPU's memory stall accumulator as `Progressing` while running and do not
+// contribute (`Inactive`) in any other state.
+//
+// If a user thread signals that a stall is ongoing, it will contribute to the
+// current CPU's accumulator as `Stalling`. If preempted, the contribution will
+// persist on the last CPU's accumulator. Normal operation is resumed when the
+// thread signals that the stall is over.
+enum class ThreadStallState {
+  IgnoredKernelOnly,
+  Inactive,
+  Progressing,
+  Stalling,
+};
+
 struct Thread : public ChainLockable {
   // TODO(kulakowski) Are these needed?
   // Default constructor/destructor declared to be not-inline in order to
@@ -1709,6 +1729,13 @@ struct Thread : public ChainLockable {
   SchedulerState::BaseProfile SnapshotBaseProfile() const
       TA_EXCL(chainlock_transaction_token, get_lock());
 
+  ThreadStallState memory_stall_state() const TA_REQ(preempt_disabled_token) {
+    return memory_stall_state_;
+  }
+  void set_memory_stall_state(ThreadStallState value) TA_REQ(preempt_disabled_token) {
+    memory_stall_state_ = value;
+  }
+
  private:
   // The architecture-specific methods for getting and setting the
   // current thread may need to see Thread's arch_ member via offsetof.
@@ -1899,6 +1926,13 @@ struct Thread : public ChainLockable {
 
   // Node storage for existing on the save state list.
   fbl::SinglyLinkedListNodeState<Thread*> save_state_list_node_ TA_GUARDED(get_lock());
+
+  // State of the thread with respect to memory stalls.
+  //
+  // It can only be accessed by the thread's current CPU. Hence, preemption must
+  // be disabled while accessing it.
+  ThreadStallState memory_stall_state_ TA_GUARDED(preempt_disabled_token) =
+      ThreadStallState::IgnoredKernelOnly;
 };
 
 // For the moment, the arch-specific current thread implementations need to come here, after the
@@ -2153,6 +2187,19 @@ struct WaitQueueLockOps {
   static ktl::optional<Thread::UnblockList> LockForWakeOne(WaitQueue& queue,
                                                            zx_status_t wait_queue_error)
       TA_REQ(chainlock_transaction_token, queue.get_lock());
+};
+
+// RAII class to mark sections of code as memory stalls.
+class ScopedMemoryStall {
+ public:
+  ScopedMemoryStall();
+  ~ScopedMemoryStall();
+
+  // Disallow copying, assigning and moving.
+  ScopedMemoryStall(const ScopedMemoryStall&) = delete;
+  ScopedMemoryStall(ScopedMemoryStall&&) = delete;
+  ScopedMemoryStall& operator=(const ScopedMemoryStall&) = delete;
+  ScopedMemoryStall& operator=(ScopedMemoryStall&&) = delete;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_THREAD_H_
