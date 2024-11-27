@@ -245,7 +245,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .allocator()
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
-        self.txn_update_size(transaction, new_size).await?;
+        self.txn_update_size(transaction, new_size, None).await?;
         let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         transaction.add(
             self.store().store_object_id,
@@ -825,7 +825,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         )
         .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
-            self.txn_update_size(transaction, offset + buf.len() as u64).await?;
+            self.txn_update_size(transaction, offset + buf.len() as u64, None).await?;
         }
         Ok(())
     }
@@ -1092,6 +1092,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &'a self,
         transaction: &mut Transaction<'a>,
         new_size: u64,
+        // Allow callers to update the has_overwrite_extents metadata if they want. If this is
+        // Some it is set to the value, if None it is left unchanged.
+        update_has_overwrite_extents: Option<bool>,
     ) -> Result<(), Error> {
         let key =
             ObjectKey::attribute(self.object_id(), self.attribute_id(), AttributeKey::Attribute);
@@ -1105,8 +1108,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 op: Operation::ReplaceOrInsert,
             }
         };
-        if let ObjectValue::Attribute { size, .. } = &mut mutation.item.value {
+        if let ObjectValue::Attribute { size, has_overwrite_extents } = &mut mutation.item.value {
             *size = new_size;
+            if let Some(update_has_overwrite_extents) = update_has_overwrite_extents {
+                *has_overwrite_extents = update_has_overwrite_extents;
+            }
         } else {
             bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
         }
@@ -1133,8 +1139,17 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         size: u64,
     ) -> Result<NeedsTrim, Error> {
         let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
-        self.txn_update_size(transaction, size).await?;
-        self.overwrite_ranges.truncate(round_up(size, self.block_size()).ok_or(FxfsError::TooBig)?);
+        let update_has_overwrite_extents = if self
+            .overwrite_ranges
+            .truncate(round_up(size, self.block_size()).ok_or(FxfsError::TooBig)?)
+        {
+            // This returns true if there were ranges, but this truncate removed them all, which
+            // indicates that we need to flip the has_overwrite_extents metadata flag to false.
+            Some(false)
+        } else {
+            None
+        };
+        self.txn_update_size(transaction, size, update_has_overwrite_extents).await?;
         Ok(needs_trim)
     }
 
@@ -1213,7 +1228,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
             }
         }
-        self.txn_update_size(transaction, size).await?;
+        self.txn_update_size(transaction, size, None).await?;
         Ok(())
     }
 
@@ -1353,7 +1368,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
         // Update the file size if it changed.
         if file_range.start > round_up(self.txn_get_size(transaction), block_size).unwrap() {
-            self.txn_update_size(transaction, file_range.start).await?;
+            self.txn_update_size(transaction, file_range.start, None).await?;
         }
         self.update_allocated_size(transaction, allocated, 0).await?;
         Ok(ranges)
