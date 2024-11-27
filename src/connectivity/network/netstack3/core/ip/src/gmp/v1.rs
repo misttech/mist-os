@@ -140,10 +140,6 @@ impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
 // Used to write tests in the `igmp` and `mld` modules.
 #[cfg(test)]
 impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
-    pub(super) fn get_protocol_specific(&self) -> P {
-        self.protocol_specific
-    }
-
     fn get_state(&self) -> &S {
         &self.state
     }
@@ -522,26 +518,6 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
         a
     }
 
-    /// Update the state with a new protocol-specific value.
-    pub(super) fn update_with_protocol_specific(&mut self, ps: P) {
-        self.update(|s| {
-            (
-                match s {
-                    MemberState::NonMember(GmpHostState { state, cfg, protocol_specific: _ }) => {
-                        MemberState::NonMember(GmpHostState { state, cfg, protocol_specific: ps })
-                    }
-                    MemberState::Delaying(GmpHostState { state, cfg, protocol_specific: _ }) => {
-                        MemberState::Delaying(GmpHostState { state, cfg, protocol_specific: ps })
-                    }
-                    MemberState::Idle(GmpHostState { state, cfg, protocol_specific: _ }) => {
-                        MemberState::Idle(GmpHostState { state, cfg, protocol_specific: ps })
-                    }
-                },
-                (),
-            )
-        })
-    }
-
     #[cfg(test)]
     pub(super) fn get_inner(&self) -> &MemberState<I, P> {
         self.inner.as_ref().unwrap()
@@ -655,11 +631,13 @@ where
                     }
                 });
 
-                if let Some(msg) = send_msg {
-                    core_ctx.send_message(bindings_ctx, device, group_addr, msg);
-                }
+                // NB: Run actions before sending messages, which allows IGMP to
+                // understand it should be operating in v1 compatibility mode.
                 if let Some(ps_actions) = protocol_specific {
                     core_ctx.run_actions(bindings_ctx, device, ps_actions);
+                }
+                if let Some(msg) = send_msg {
+                    core_ctx.send_message(bindings_ctx, device, group_addr, msg);
                 }
             }
 

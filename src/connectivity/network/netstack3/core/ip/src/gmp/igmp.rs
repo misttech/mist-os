@@ -49,6 +49,7 @@ impl<BC> IgmpBindingsContext for BC where BC: GmpBindingsContext + 'static {}
 /// The IGMP state for a device.
 pub struct IgmpState<BT: IgmpBindingsTypes> {
     v1_router_present_timer: BT::Timer,
+    v1_router_present: bool,
 }
 
 impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
@@ -62,6 +63,7 @@ impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
                 bindings_ctx,
                 IgmpTimerId::V1RouterPresent { device },
             ),
+            v1_router_present: false,
         }
     }
 }
@@ -281,10 +283,10 @@ where
         group_addr: MulticastAddr<Ipv4Addr>,
         msg_type: GmpMessageType<Igmpv2ProtocolSpecific>,
     ) {
-        let Self { igmp_state: _, core_ctx } = self;
+        let Self { igmp_state: IgmpState { v1_router_present, .. }, core_ctx } = self;
         let result = match msg_type {
-            GmpMessageType::Report(Igmpv2ProtocolSpecific { v1_router_present }) => {
-                if v1_router_present {
+            GmpMessageType::Report(Igmpv2ProtocolSpecific) => {
+                if *v1_router_present {
                     send_igmp_message::<_, _, IgmpMembershipReportV1>(
                         core_ctx,
                         bindings_ctx,
@@ -329,9 +331,13 @@ where
         _device: &Self::DeviceId,
         actions: Igmpv2Actions,
     ) {
-        let Self { igmp_state: IgmpState { v1_router_present_timer }, core_ctx: _ } = self;
+        let Self {
+            igmp_state: IgmpState { v1_router_present_timer, v1_router_present, .. },
+            core_ctx: _,
+        } = self;
         match actions {
             Igmpv2Actions::ScheduleV1RouterPresentTimer(duration) => {
+                *v1_router_present = true;
                 let _: Option<BC::Instant> =
                     bindings_ctx.schedule_timer(duration, v1_router_present_timer);
             }
@@ -396,10 +402,8 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> HandleableTimer<CC, BC>
                 IgmpContext::with_igmp_state_mut(
                     core_ctx,
                     &device,
-                    |_core_ctx, GmpStateRef { groups, .. }, IgmpState { .. }| {
-                        for (_, IgmpGroupState(state)) in groups.iter_mut() {
-                            state.v1_router_present_timer_expired();
-                        }
+                    |_core_ctx, GmpStateRef { .. }, IgmpState { v1_router_present, .. }| {
+                        *v1_router_present = false;
                     },
                 )
             }
@@ -448,16 +452,8 @@ where
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Igmpv2ProtocolSpecific {
-    v1_router_present: bool,
-}
-
-impl Default for Igmpv2ProtocolSpecific {
-    fn default() -> Self {
-        Igmpv2ProtocolSpecific { v1_router_present: false }
-    }
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Igmpv2ProtocolSpecific;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Igmpv2Actions {
@@ -544,7 +540,7 @@ impl gmp::v1::ProtocolSpecific for Igmpv2ProtocolSpecific {
         // https://tools.ietf.org/html/rfc2236#section-4 for details.
         let v1_router_present = max_resp_time.as_micros() == 0;
         (
-            Igmpv2ProtocolSpecific { v1_router_present },
+            Igmpv2ProtocolSpecific,
             v1_router_present.then(|| {
                 Igmpv2Actions::ScheduleV1RouterPresentTimer(cfg.v1_router_present_timeout)
             }),
@@ -574,12 +570,6 @@ impl<I: Instant> AsMut<gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific>> for 
     fn as_mut(&mut self) -> &mut gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific> {
         let Self(s) = self;
         s
-    }
-}
-
-impl<I: Instant> gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific> {
-    fn v1_router_present_timer_expired(&mut self) {
-        self.update_with_protocol_specific(Igmpv2ProtocolSpecific { v1_router_present: false });
     }
 }
 
@@ -644,6 +634,10 @@ mod tests {
 
         fn groups(&mut self) -> &mut MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
+        }
+
+        fn igmp_state(&mut self) -> &mut IgmpState<FakeBindingsCtx> {
+            &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().igmp_state
         }
     }
 
@@ -763,9 +757,7 @@ mod tests {
             );
             assert_eq!(
                 s.report_timer_expired(),
-                gmp::v1::ReportTimerExpiredActions {
-                    send_report: Igmpv2ProtocolSpecific { v1_router_present: true }
-                }
+                gmp::v1::ReportTimerExpiredActions { send_report: Igmpv2ProtocolSpecific }
             );
         });
     }
@@ -789,19 +781,6 @@ mod tests {
                     ))
                 }
             );
-            match s.get_inner() {
-                gmp::v1::MemberState::Delaying(state) => {
-                    assert!(state.get_protocol_specific().v1_router_present);
-                }
-                _ => panic!("Wrong State!"),
-            }
-            s.v1_router_present_timer_expired();
-            match s.get_inner() {
-                gmp::v1::MemberState::Delaying(state) => {
-                    assert!(!state.get_protocol_specific().v1_router_present);
-                }
-                _ => panic!("Wrong State!"),
-            }
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
                 gmp::v1::QueryReceivedActions {
@@ -812,13 +791,6 @@ mod tests {
                 }
             );
             assert_eq!(s.report_received(), gmp::v1::ReportReceivedActions { stop_timer: true });
-            s.v1_router_present_timer_expired();
-            match s.get_inner() {
-                gmp::v1::MemberState::Idle(state) => {
-                    assert!(!state.get_protocol_specific().v1_router_present);
-                }
-                _ => panic!("Wrong State!"),
-            }
         });
     }
 
@@ -990,6 +962,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
 
+            assert_eq!(core_ctx.state.igmp_state().v1_router_present, false);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1006,13 +979,7 @@ mod tests {
 
             // Since we have heard from the v1 router, we should have set our
             // flag.
-            let IgmpGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
-            match group_state.get_inner() {
-                gmp::v1::MemberState::Delaying(state) => {
-                    assert!(state.get_protocol_specific().v1_router_present)
-                }
-                _ => panic!("Wrong State!"),
-            }
+            assert_eq!(core_ctx.state.igmp_state().v1_router_present, true);
 
             assert_eq!(core_ctx.frames().len(), 1);
             // Two timers: one for the delayed report, one for the v1 router
@@ -1044,13 +1011,7 @@ mod tests {
                 Some(V1_ROUTER_PRESENT_TIMER_ID)
             );
             // After the second timer, we should reset our flag for v1 routers.
-            let IgmpGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
-            match group_state.get_inner() {
-                gmp::v1::MemberState::Idle(state) => {
-                    assert!(!state.get_protocol_specific().v1_router_present)
-                }
-                _ => panic!("Wrong State!"),
-            }
+            assert_eq!(core_ctx.state.igmp_state().v1_router_present, false);
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
             core_ctx.state.gmp_state().timers.assert_top(&GROUP_ADDR, &());
