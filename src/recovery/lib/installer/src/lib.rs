@@ -11,7 +11,7 @@
 pub mod partition;
 
 use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
+use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fidl_fuchsia_paver::{
     BootManagerMarker, Configuration, DynamicDataSinkProxy, PaverMarker, PaverProxy,
@@ -72,22 +72,11 @@ pub async fn find_install_source(
     candidate
 }
 
-fn paver_connect(path: &str) -> Result<(PaverProxy, DynamicDataSinkProxy), Error> {
-    let (block_device_chan, block_remote) = zx::Channel::create();
-    fdio::service_connect(&path, block_remote)?;
-
-    let (controller, controller_remote) = zx::Channel::create();
-    fdio::service_connect(&format!("{path}/device_controller"), controller_remote)?;
-
+fn paver_connect() -> Result<(PaverProxy, DynamicDataSinkProxy), Error> {
     let (data_sink_chan, data_remote) = zx::Channel::create();
-
     let paver: PaverProxy =
         client::connect_to_protocol::<PaverMarker>().context("Could not connect to paver")?;
-    paver.use_block_device(
-        ClientEnd::from(block_device_chan),
-        ClientEnd::from(controller),
-        ServerEnd::from(data_remote),
-    )?;
+    paver.find_partition_table_manager(ServerEnd::from(data_remote))?;
 
     let data_sink =
         DynamicDataSinkProxy::from_channel(fidl::AsyncChannel::from_channel(data_sink_chan));
@@ -154,18 +143,14 @@ pub async fn do_install<F>(
 where
     F: Send + Sync + Fn(String),
 {
-    let install_target =
-        installation_paths.install_target.ok_or_else(|| anyhow!("No installation target?"))?;
+    if installation_paths.install_target.is_some() {
+        tracing::warn!("Ignoring install target; this will be removed in the future.");
+    }
     let install_source =
         installation_paths.install_source.ok_or_else(|| anyhow!("No installation source?"))?;
     let bootloader_type = installation_paths.bootloader_type.unwrap();
 
-    let (paver, data_sink) =
-        paver_connect(&install_target.class_path).context("Could not contact paver")?;
-
-    tracing::info!("Wiping old partition tables...");
-    progress_callback(String::from("Wiping old partition tables..."));
-    data_sink.wipe_partition_tables().await?;
+    let (paver, data_sink) = paver_connect().context("Could not contact paver")?;
 
     tracing::info!("Initializing Fuchsia partition tables...");
     progress_callback(String::from("Initializing Fuchsia partition tables..."));
