@@ -548,13 +548,12 @@ mod test {
                 .expect("failed to create TouchSource channel");
 
         let (keyboard_proxy, keyboard_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
-                .expect("failed to create Keyboard channel");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
         let (device_registry_proxy, device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
 
         let relay = InputEventsRelay::new();
         relay.start_relays(

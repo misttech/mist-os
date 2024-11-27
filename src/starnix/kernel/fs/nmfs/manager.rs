@@ -956,8 +956,7 @@ mod tests {
         let manager = create_test_network_manager_handle(inspect_node);
         let (proxy, mut stream) = fidl::endpoints::create_sync_proxy_and_stream::<
             fnp_socketproxy::StarnixNetworksMarker,
-        >()
-        .unwrap();
+        >();
         let _ = manager.0.starnix_networks.lock().replace(proxy);
         if let Some(sender) = initiate_reconnect_sender {
             manager

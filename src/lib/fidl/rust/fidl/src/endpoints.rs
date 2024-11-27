@@ -641,12 +641,11 @@ pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
 #[cfg(target_os = "fuchsia")]
-pub fn create_sync_proxy_and_stream<T: ProtocolMarker>(
-) -> Result<(T::SynchronousProxy, T::RequestStream), Error> {
+pub fn create_sync_proxy_and_stream<T: ProtocolMarker>() -> (T::SynchronousProxy, T::RequestStream)
+{
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_sync_proxy(), server.into_stream()))
+    (client.into_sync_proxy(), server.into_stream())
 }
 
 /// The type of a client-initiated method.

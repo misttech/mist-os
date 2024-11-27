@@ -263,14 +263,13 @@ mod test {
                 .expect("failed to create TouchSource channel");
 
         let (keyboard_proxy, _keyboard_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
-                .expect("failed to create Keyboard channel");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 
         let (device_registry_proxy, _device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
 
         let relay = input_event_relay::InputEventsRelay::new();
         relay.start_relays(
@@ -296,14 +295,13 @@ mod test {
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");
         let (keyboard_proxy, keyboard_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
-                .expect("failed to create Keyboard channel");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 
         let (device_registry_proxy, _device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
 
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
@@ -341,15 +339,14 @@ mod test {
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");
         let (device_registry_proxy, device_listener_stream) =
-        fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-            .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
 
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
         let (keyboard_proxy, _keyboard_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
-                .expect("failed to create Keyboard channel");
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 

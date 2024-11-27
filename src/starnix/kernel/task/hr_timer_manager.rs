@@ -681,7 +681,7 @@ mod tests {
     /// It should never happen outside of test code.
     fn mock_hrtimer_connection() -> fhrtimer::DeviceSynchronousProxy {
         let (hrtimer, mut stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fhrtimer::DeviceMarker>().unwrap();
+            fidl::endpoints::create_sync_proxy_and_stream::<fhrtimer::DeviceMarker>();
         let fut = async move {
             while let Some(Ok(event)) = stream.next().await {
                 match event {
