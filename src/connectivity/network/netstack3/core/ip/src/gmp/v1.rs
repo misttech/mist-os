@@ -18,16 +18,16 @@ use rand::Rng;
 
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpContext, GmpContextInner, GmpDelayedReportTimerId, GmpMessageType,
-    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, ProtocolSpecificTypes,
+    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
 };
 
 /// Actions to take as a consequence of joining a group.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) struct JoinGroupActions<P> {
-    send_report_and_schedule_timer: Option<(P, Duration)>,
+pub(super) struct JoinGroupActions {
+    send_report_and_schedule_timer: Option<Duration>,
 }
 
-impl<P> JoinGroupActions<P> {
+impl JoinGroupActions {
     const NOOP: Self = Self { send_report_and_schedule_timer: None };
 }
 
@@ -53,91 +53,60 @@ impl ReportReceivedActions {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) enum QueryReceivedGenericAction<P> {
+pub(super) enum QueryReceivedGenericAction {
     ScheduleTimer(Duration),
-    StopTimerAndSendReport(P),
+    StopTimerAndSendReport,
 }
 
 /// Actions to take as a consequence of receiving a query message.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) struct QueryReceivedActions<P: ProtocolSpecific> {
-    pub(super) generic: Option<QueryReceivedGenericAction<P>>,
-    pub(super) protocol_specific: Option<P::Actions>,
+pub(super) struct QueryReceivedActions<A> {
+    pub(super) generic: Option<QueryReceivedGenericAction>,
+    pub(super) protocol_specific: Option<A>,
 }
 
-impl<P: ProtocolSpecific> QueryReceivedActions<P> {
+impl<A> QueryReceivedActions<A> {
     const NOOP: Self = Self { generic: None, protocol_specific: None };
 }
 
 /// Actions to take as a consequence of a report timer expiring.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) struct ReportTimerExpiredActions<P> {
-    pub(super) send_report: P,
-}
+pub(super) struct ReportTimerExpiredActions;
 
-/// This trait is used to model the different parts of MLDv1 and IGMPv1/v2.
-pub trait ProtocolSpecific: ProtocolSpecificTypes {
+/// This trait is used to model configuration values used by GMP and abstracting
+/// the different parts of MLDv1 and IGMPv1/v2.
+pub trait ProtocolConfig {
     /// The maximum delay to wait to send an unsolicited report.
-    fn cfg_unsolicited_report_interval(cfg: &Self::Config) -> Duration;
+    fn unsolicited_report_interval(&self) -> Duration;
 
     /// Whether the host should send a leave message even if it is not the last
     /// host in the group.
-    fn cfg_send_leave_anyway(cfg: &Self::Config) -> bool;
+    fn send_leave_anyway(&self) -> bool;
 
     /// Get the _real_ `MAX_RESP_TIME`
     ///
     /// `None` indicates that the maximum response time is zero and thus a
     /// response should be sent immediately.
-    fn get_max_resp_time(resp_time: Duration) -> Option<NonZeroDuration>;
+    fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration>;
 
+    /// The protocol specific action returned by `do_query_received_specific`.
+    type QuerySpecificActions;
     /// Respond to a query in a protocol-specific way.
     ///
     /// When receiving a query, IGMPv2 needs to check whether the query is an
     /// IGMPv1 message and, if so, set a local "IGMPv1 Router Present" flag and
     /// set a timer. For MLD, this function is a no-op.
     fn do_query_received_specific(
-        cfg: &Self::Config,
+        &self,
         max_resp_time: Duration,
-        old: Self,
-    ) -> (Self, Option<Self::Actions>);
+    ) -> Option<Self::QuerySpecificActions>;
 }
 
 /// The transition between one state and the next.
 ///
 /// A `Transition` includes the next state to enter and any actions to take
 /// while executing the transition.
-struct Transition<S, P: ProtocolSpecific, Actions>(GmpHostState<S, P>, Actions);
-
-/// This is used to represent the states that are common in both MLD and IGMPv2.
-/// The state machine should behave as described on [RFC 2236 page 10] and [RFC
-/// 2710 page 10].
-///
-/// [RFC 2236 page 10]: https://tools.ietf.org/html/rfc2236#page-10
-/// [RFC 2710 page 10]: https://tools.ietf.org/html/rfc2710#page-10
-#[cfg_attr(test, derive(Debug))]
-pub(super) struct GmpHostState<State, P: ProtocolSpecific> {
-    state: State,
-    /// `protocol_specific` are the value(s) you don't want the users to have a
-    /// chance to modify. It is supposed to be only modified by the protocol
-    /// itself.
-    protocol_specific: P,
-}
-
-impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
-    /// Construct a `Transition` from this state into the new state `T` with the
-    /// given actions.
-    fn transition<T, A>(self, t: T, actions: A) -> Transition<T, P, A> {
-        Transition(GmpHostState { state: t, protocol_specific: self.protocol_specific }, actions)
-    }
-}
-
-// Used to write tests in the `igmp` and `mld` modules.
-#[cfg(test)]
-impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
-    fn get_state(&self) -> &S {
-        &self.state
-    }
-}
+struct Transition<S, Actions>(S, Actions);
 
 /// Represents Non Member-specific state variables.
 ///
@@ -178,36 +147,34 @@ pub(super) struct IdleMember {
 /// [IGMPv2]: https://tools.ietf.org/html/rfc2236
 /// [MLD]: https://tools.ietf.org/html/rfc2710
 #[cfg_attr(test, derive(Debug))]
-pub(super) enum MemberState<I: Instant, P: ProtocolSpecific> {
-    NonMember(GmpHostState<NonMember, P>),
-    Delaying(GmpHostState<DelayingMember<I>, P>),
-    Idle(GmpHostState<IdleMember, P>),
+pub(super) enum MemberState<I: Instant> {
+    NonMember(NonMember),
+    Delaying(DelayingMember<I>),
+    Idle(IdleMember),
 }
 
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<NonMember, P>> for MemberState<I, P> {
-    fn from(s: GmpHostState<NonMember, P>) -> Self {
+impl<I: Instant> From<NonMember> for MemberState<I> {
+    fn from(s: NonMember) -> Self {
         MemberState::NonMember(s)
     }
 }
 
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<DelayingMember<I>, P>>
-    for MemberState<I, P>
-{
-    fn from(s: GmpHostState<DelayingMember<I>, P>) -> Self {
+impl<I: Instant> From<DelayingMember<I>> for MemberState<I> {
+    fn from(s: DelayingMember<I>) -> Self {
         MemberState::Delaying(s)
     }
 }
 
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<IdleMember, P>> for MemberState<I, P> {
-    fn from(s: GmpHostState<IdleMember, P>) -> Self {
+impl<I: Instant> From<IdleMember> for MemberState<I> {
+    fn from(s: IdleMember) -> Self {
         MemberState::Idle(s)
     }
 }
 
-impl<S, P: ProtocolSpecific, A> Transition<S, P, A> {
-    fn into_state_actions<I: Instant>(self) -> (MemberState<I, P>, A)
+impl<S, A> Transition<S, A> {
+    fn into_state_actions<I: Instant>(self) -> (MemberState<I>, A)
     where
-        MemberState<I, P>: From<GmpHostState<S, P>>,
+        MemberState<I>: From<S>,
     {
         (self.0.into(), self.1)
     }
@@ -223,21 +190,20 @@ impl<S, P: ProtocolSpecific, A> Transition<S, P, A> {
 ///   should fire. That is, `None` if an Idle member and `Some` if a Delaying
 ///   member.
 /// * `max_resp_time` is the maximum response time required by Query message.
-fn member_query_received<P: ProtocolSpecific, R: Rng, I: Instant>(
+fn member_query_received<R: Rng, I: Instant, C: ProtocolConfig>(
     rng: &mut R,
     last_reporter: bool,
     timer_expiration: Option<I>,
     max_resp_time: Duration,
     now: I,
-    cfg: &P::Config,
-    ps: P,
-) -> (MemberState<I, P>, QueryReceivedActions<P>) {
-    let (protocol_specific, ps_actions) = P::do_query_received_specific(cfg, max_resp_time, ps);
+    cfg: &C,
+) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+    let ps_actions = cfg.do_query_received_specific(max_resp_time);
 
-    let (transition, generic_actions) = match P::get_max_resp_time(max_resp_time) {
+    let (transition, generic_actions) = match cfg.get_max_resp_time(max_resp_time) {
         None => (
-            GmpHostState { state: IdleMember { last_reporter }, protocol_specific }.into(),
-            Some(QueryReceivedGenericAction::StopTimerAndSendReport(protocol_specific)),
+            IdleMember { last_reporter }.into(),
+            Some(QueryReceivedGenericAction::StopTimerAndSendReport),
         ),
         Some(max_resp_time) => {
             let max_resp_time = max_resp_time.get();
@@ -254,33 +220,24 @@ fn member_query_received<P: ProtocolSpecific, R: Rng, I: Instant>(
                 }
             };
 
-            (
-                GmpHostState {
-                    state: DelayingMember { last_reporter, timer_expiration },
-                    protocol_specific,
-                }
-                .into(),
-                action,
-            )
+            (DelayingMember { last_reporter, timer_expiration }.into(), action)
         }
     };
 
     (transition, QueryReceivedActions { generic: generic_actions, protocol_specific: ps_actions })
 }
 
-impl<P: ProtocolSpecific> GmpHostState<NonMember, P> {
-    fn join_group<I: Instant, R: Rng>(
+impl NonMember {
+    fn join_group<I: Instant, R: Rng, C: ProtocolConfig>(
         self,
         rng: &mut R,
         now: I,
-        cfg: &P::Config,
-    ) -> Transition<DelayingMember<I>, P, JoinGroupActions<P>> {
-        let duration = P::cfg_unsolicited_report_interval(&cfg);
+        cfg: &C,
+    ) -> Transition<DelayingMember<I>, JoinGroupActions> {
+        let duration = cfg.unsolicited_report_interval();
         let delay = gmp::random_report_timeout(rng, duration);
-        let actions = JoinGroupActions {
-            send_report_and_schedule_timer: Some((self.protocol_specific, delay)),
-        };
-        self.transition(
+        let actions = JoinGroupActions { send_report_and_schedule_timer: Some(delay) };
+        Transition(
             DelayingMember {
                 last_reporter: true,
                 timer_expiration: now.checked_add(delay).expect("timer expiration overflowed"),
@@ -289,87 +246,71 @@ impl<P: ProtocolSpecific> GmpHostState<NonMember, P> {
         )
     }
 
-    fn leave_group(self) -> Transition<NonMember, P, LeaveGroupActions> {
-        self.transition(NonMember, LeaveGroupActions::NOOP)
+    fn leave_group(self) -> Transition<NonMember, LeaveGroupActions> {
+        Transition(NonMember, LeaveGroupActions::NOOP)
     }
 }
 
-impl<I: Instant, P: ProtocolSpecific> GmpHostState<DelayingMember<I>, P> {
-    fn query_received<R: Rng>(
+impl<I: Instant> DelayingMember<I> {
+    fn query_received<R: Rng, C: ProtocolConfig>(
         self,
         rng: &mut R,
         max_resp_time: Duration,
         now: I,
-        cfg: &P::Config,
-    ) -> (MemberState<I, P>, QueryReceivedActions<P>) {
-        let GmpHostState {
-            state: DelayingMember { last_reporter, timer_expiration },
-            protocol_specific,
-        } = self;
-        member_query_received(
-            rng,
-            last_reporter,
-            Some(timer_expiration),
-            max_resp_time,
-            now,
-            cfg,
-            protocol_specific,
-        )
+        cfg: &C,
+    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+        let DelayingMember { last_reporter, timer_expiration } = self;
+        member_query_received(rng, last_reporter, Some(timer_expiration), max_resp_time, now, cfg)
     }
 
-    fn leave_group(self, cfg: &P::Config) -> Transition<NonMember, P, LeaveGroupActions> {
+    fn leave_group<C: ProtocolConfig>(self, cfg: &C) -> Transition<NonMember, LeaveGroupActions> {
         let actions = LeaveGroupActions {
-            send_leave: self.state.last_reporter || P::cfg_send_leave_anyway(cfg),
+            send_leave: self.last_reporter || cfg.send_leave_anyway(),
             stop_timer: true,
         };
-        self.transition(NonMember, actions)
+        Transition(NonMember, actions)
     }
 
-    fn report_received(self) -> Transition<IdleMember, P, ReportReceivedActions> {
-        self.transition(
-            IdleMember { last_reporter: false },
-            ReportReceivedActions { stop_timer: true },
-        )
+    fn report_received(self) -> Transition<IdleMember, ReportReceivedActions> {
+        Transition(IdleMember { last_reporter: false }, ReportReceivedActions { stop_timer: true })
     }
 
-    fn report_timer_expired(self) -> Transition<IdleMember, P, ReportTimerExpiredActions<P>> {
-        let actions = ReportTimerExpiredActions { send_report: self.protocol_specific };
-        self.transition(IdleMember { last_reporter: true }, actions)
+    fn report_timer_expired(self) -> Transition<IdleMember, ReportTimerExpiredActions> {
+        Transition(IdleMember { last_reporter: true }, ReportTimerExpiredActions)
     }
 }
 
-impl<P: ProtocolSpecific> GmpHostState<IdleMember, P> {
-    fn query_received<I: Instant, R: Rng>(
+impl IdleMember {
+    fn query_received<I: Instant, R: Rng, C: ProtocolConfig>(
         self,
         rng: &mut R,
         max_resp_time: Duration,
         now: I,
-        cfg: &P::Config,
-    ) -> (MemberState<I, P>, QueryReceivedActions<P>) {
-        let GmpHostState { state: IdleMember { last_reporter }, protocol_specific } = self;
-        member_query_received(rng, last_reporter, None, max_resp_time, now, cfg, protocol_specific)
+        cfg: &C,
+    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
+        let IdleMember { last_reporter } = self;
+        member_query_received(rng, last_reporter, None, max_resp_time, now, cfg)
     }
 
-    fn leave_group(self, cfg: &P::Config) -> Transition<NonMember, P, LeaveGroupActions> {
+    fn leave_group<C: ProtocolConfig>(self, cfg: &C) -> Transition<NonMember, LeaveGroupActions> {
         let actions = LeaveGroupActions {
-            send_leave: self.state.last_reporter || P::cfg_send_leave_anyway(cfg),
+            send_leave: self.last_reporter || cfg.send_leave_anyway(),
             stop_timer: false,
         };
-        self.transition(NonMember, actions)
+        Transition(NonMember, actions)
     }
 }
 
-impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
+impl<I: Instant> MemberState<I> {
     /// Performs the "join group" transition, producing a new `MemberState` and
     /// set of actions to execute.
-    fn join_group<R: Rng>(
-        protocol_specific: P,
-        cfg: &P::Config,
+    fn join_group<R: Rng, C: ProtocolConfig>(
+        cfg: &C,
         rng: &mut R,
         now: I,
         gmp_disabled: bool,
-    ) -> (MemberState<I, P>, JoinGroupActions<P>) {
-        let non_member = GmpHostState { protocol_specific, state: NonMember };
+    ) -> (MemberState<I>, JoinGroupActions) {
+        let non_member = NonMember;
         if gmp_disabled {
             (non_member.into(), JoinGroupActions::NOOP)
         } else {
@@ -379,7 +320,7 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
 
     /// Performs the "leave group" transition, consuming the state by value, and
     /// returning the next state and a set of actions to execute.
-    fn leave_group(self, cfg: &P::Config) -> (MemberState<I, P>, LeaveGroupActions) {
+    fn leave_group<C: ProtocolConfig>(self, cfg: &C) -> (MemberState<I>, LeaveGroupActions) {
         // Rust can infer these types, but since we're just discarding `_state`,
         // we explicitly make sure it's the state we expect in case we introduce
         // a bug.
@@ -391,13 +332,13 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
         .into_state_actions()
     }
 
-    fn query_received<R: Rng>(
+    fn query_received<R: Rng, C: ProtocolConfig>(
         self,
         rng: &mut R,
         max_resp_time: Duration,
         now: I,
-        cfg: &P::Config,
-    ) -> (MemberState<I, P>, QueryReceivedActions<P>) {
+        cfg: &C,
+    ) -> (MemberState<I>, QueryReceivedActions<C::QuerySpecificActions>) {
         match self {
             state @ MemberState::NonMember(_) => (state, QueryReceivedActions::NOOP),
             MemberState::Delaying(state) => state.query_received(rng, max_resp_time, now, cfg),
@@ -405,7 +346,7 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
         }
     }
 
-    fn report_received(self) -> (MemberState<I, P>, ReportReceivedActions) {
+    fn report_received(self) -> (MemberState<I>, ReportReceivedActions) {
         match self {
             state @ MemberState::Idle(_) | state @ MemberState::NonMember(_) => {
                 (state, ReportReceivedActions::NOOP)
@@ -414,7 +355,7 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
         }
     }
 
-    fn report_timer_expired(self) -> (MemberState<I, P>, ReportTimerExpiredActions<P>) {
+    fn report_timer_expired(self) -> (MemberState<I>, ReportTimerExpiredActions) {
         match self {
             MemberState::Idle(_) | MemberState::NonMember(_) => {
                 unreachable!("got report timer in non-delaying state")
@@ -425,28 +366,28 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
 }
 
 #[cfg_attr(test, derive(Debug))]
-pub struct GmpStateMachine<I: Instant, P: ProtocolSpecific> {
+pub struct GmpStateMachine<I: Instant> {
     // Invariant: `inner` is always `Some`. It is stored as an `Option` so that
     // methods can `.take()` the `MemberState` in order to perform transitions
     // that consume `MemberState` by value. However, a new `MemberState` is
     // always put back in its place so that `inner` is `Some` by the time the
     // methods return.
-    pub(super) inner: Option<MemberState<I, P>>,
+    pub(super) inner: Option<MemberState<I>>,
 }
 
-impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
+impl<I: Instant> GmpStateMachine<I> {
     /// When a "join group" command is received.
     ///
     /// `join_group` initializes a new state machine in the Non-Member state and
     /// then immediately executes the "join group" transition. The new state
     /// machine is returned along with any actions to take.
-    pub(super) fn join_group<R: Rng>(
+    pub(super) fn join_group<R: Rng, C: ProtocolConfig>(
         rng: &mut R,
         now: I,
         gmp_disabled: bool,
-        cfg: &P::Config,
-    ) -> (GmpStateMachine<I, P>, JoinGroupActions<P>) {
-        let (state, actions) = MemberState::join_group(P::default(), cfg, rng, now, gmp_disabled);
+        cfg: &C,
+    ) -> (GmpStateMachine<I>, JoinGroupActions) {
+        let (state, actions) = MemberState::join_group(cfg, rng, now, gmp_disabled);
         (GmpStateMachine { inner: Some(state) }, actions)
     }
 
@@ -455,12 +396,12 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
     ///
     /// If the group is in a member state (delaying/idle), this method does
     /// nothing.
-    fn join_if_non_member<R: Rng>(
+    fn join_if_non_member<R: Rng, C: ProtocolConfig>(
         &mut self,
         rng: &mut R,
         now: I,
-        cfg: &P::Config,
-    ) -> JoinGroupActions<P> {
+        cfg: &C,
+    ) -> JoinGroupActions {
         self.update(|s| match s {
             MemberState::NonMember(s) => s.join_group(rng, now, cfg).into_state_actions(),
             state @ MemberState::Delaying(_) | state @ MemberState::Idle(_) => {
@@ -472,7 +413,7 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
     /// Leaves the group if the group is in a member state.
     ///
     /// Does nothing if the group is in a non-member state.
-    fn leave_if_member(&mut self, cfg: &P::Config) -> LeaveGroupActions {
+    fn leave_if_member<C: ProtocolConfig>(&mut self, cfg: &C) -> LeaveGroupActions {
         self.update(|s| s.leave_group(cfg))
     }
 
@@ -480,7 +421,7 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
     ///
     /// `leave_group` consumes the state machine by value since we don't allow
     /// storing a state machine in the Non-Member state.
-    pub(super) fn leave_group(self, cfg: &P::Config) -> LeaveGroupActions {
+    pub(super) fn leave_group<C: ProtocolConfig>(self, cfg: &C) -> LeaveGroupActions {
         // This `unwrap` is safe because we maintain the invariant that `inner`
         // is always `Some`.
         let (_state, actions) = self.inner.unwrap().leave_group(cfg);
@@ -488,13 +429,13 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
     }
 
     /// When a query is received, and we have to respond within max_resp_time.
-    pub(super) fn query_received<R: Rng>(
+    pub(super) fn query_received<R: Rng, C: ProtocolConfig>(
         &mut self,
         rng: &mut R,
         max_resp_time: Duration,
         now: I,
-        cfg: &P::Config,
-    ) -> QueryReceivedActions<P> {
+        cfg: &C,
+    ) -> QueryReceivedActions<C::QuerySpecificActions> {
         self.update(|s| s.query_received(rng, max_resp_time, now, cfg))
     }
 
@@ -504,19 +445,19 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
     }
 
     /// The timer installed has expired.
-    pub(super) fn report_timer_expired(&mut self) -> ReportTimerExpiredActions<P> {
+    pub(super) fn report_timer_expired(&mut self) -> ReportTimerExpiredActions {
         self.update(MemberState::report_timer_expired)
     }
 
     /// Update the state with no argument.
-    fn update<A, F: FnOnce(MemberState<I, P>) -> (MemberState<I, P>, A)>(&mut self, f: F) -> A {
+    fn update<A, F: FnOnce(MemberState<I>) -> (MemberState<I>, A)>(&mut self, f: F) -> A {
         let (s, a) = f(self.inner.take().unwrap());
         self.inner = Some(s);
         a
     }
 
     #[cfg(test)]
-    pub(super) fn get_inner(&self) -> &MemberState<I, P> {
+    pub(super) fn get_inner(&self) -> &MemberState<I> {
         self.inner.as_ref().unwrap()
     }
 }
@@ -540,18 +481,12 @@ pub(super) fn handle_timer<I, BC, CC>(
             let Some((group_addr, ())) = gmp.timers.pop(bindings_ctx) else {
                 return;
             };
-            let ReportTimerExpiredActions { send_report } = groups
+            let ReportTimerExpiredActions {} = groups
                 .get_mut(&group_addr)
                 .expect("get state for group with expired report timer")
-                .as_mut()
                 .report_timer_expired();
 
-            core_ctx.send_message(
-                bindings_ctx,
-                &device,
-                group_addr,
-                GmpMessageType::Report(send_report),
-            );
+            core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report);
         },
     );
 }
@@ -571,7 +506,7 @@ where
         let ReportReceivedActions { stop_timer } = groups
             .get_mut(&group_addr)
             .ok_or_else(|| CC::not_a_member_err(*group_addr))
-            .map(|a| a.as_mut().report_received())?;
+            .map(|a| a.report_received())?;
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
         }
@@ -613,19 +548,18 @@ where
             };
 
             for (group_addr, state) in iter {
-                let QueryReceivedActions { generic, protocol_specific } = state
-                    .as_mut()
-                    .query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
+                let QueryReceivedActions { generic, protocol_specific } =
+                    state.query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
                 let send_msg = generic.and_then(|generic| match generic {
                     QueryReceivedGenericAction::ScheduleTimer(delay) => {
                         let _: Option<(BC::Instant, ())> =
                             gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay);
                         None
                     }
-                    QueryReceivedGenericAction::StopTimerAndSendReport(protocol_specific) => {
+                    QueryReceivedGenericAction::StopTimerAndSendReport => {
                         let _: Option<(BC::Instant, ())> =
                             gmp.timers.cancel(bindings_ctx, &group_addr);
-                        Some(GmpMessageType::Report(protocol_specific))
+                        Some(GmpMessageType::Report)
                     }
                 });
 
@@ -651,7 +585,7 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
     state: GmpStateRef<'_, I, T, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC, ProtocolSpecific = T::ProtocolSpecific>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
     T: GmpTypeLayout<I, BC>,
 {
@@ -666,17 +600,12 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
         }
 
         let JoinGroupActions { send_report_and_schedule_timer } =
-            state.as_mut().join_if_non_member(&mut bindings_ctx.rng(), now, config);
-        let Some((protocol_specific, delay)) = send_report_and_schedule_timer else {
+            state.join_if_non_member(&mut bindings_ctx.rng(), now, config);
+        let Some(delay) = send_report_and_schedule_timer else {
             continue;
         };
         assert_matches!(gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay), None);
-        core_ctx.send_message(
-            bindings_ctx,
-            device,
-            group_addr,
-            GmpMessageType::Report(protocol_specific),
-        );
+        core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
     }
 }
 
@@ -694,7 +623,7 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
 
     for (group_addr, state) in groups.groups_mut() {
-        let LeaveGroupActions { send_leave, stop_timer } = state.as_mut().leave_if_member(config);
+        let LeaveGroupActions { send_leave, stop_timer } = state.leave_if_member(config);
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, group_addr), Some(_));
         }
@@ -713,30 +642,24 @@ pub(super) fn join_group<I, CC, BC, T>(
 ) -> GroupJoinResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContextInner<I, BC, ProtocolSpecific = T::ProtocolSpecific>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
     T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled, groups, gmp, config } = state;
     let now = bindings_ctx.now();
 
-    let result = groups.join_group_gmp(
-        !enabled || !I::should_perform_gmp(group_addr),
-        group_addr,
-        &mut bindings_ctx.rng(),
-        now,
-        config,
-    );
+    let gmp_disabled = !enabled || !I::should_perform_gmp(group_addr);
+    let result = groups.join_group_with(group_addr, || {
+        let (state, actions) =
+            GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, gmp_disabled, config);
+        (state, actions)
+    });
     result.map(|JoinGroupActions { send_report_and_schedule_timer }| {
-        if let Some((protocol_specific, delay)) = send_report_and_schedule_timer {
+        if let Some(delay) = send_report_and_schedule_timer {
             assert_matches!(gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay), None);
 
-            core_ctx.send_message(
-                bindings_ctx,
-                device,
-                group_addr,
-                GmpMessageType::Report(protocol_specific),
-            );
+            core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Report);
         }
     })
 }
@@ -755,16 +678,16 @@ where
     T: GmpTypeLayout<I, BC>,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
-    groups.leave_group_gmp(group_addr, config).map(
-        |LeaveGroupActions { send_leave, stop_timer }| {
-            if stop_timer {
-                assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
-            }
-            if send_leave {
-                core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
-            }
-        },
-    )
+
+    groups.leave_group(group_addr).map(|state| {
+        let LeaveGroupActions { send_leave, stop_timer } = state.leave_group(config);
+        if stop_timer {
+            assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
+        }
+        if send_leave {
+            core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
+        }
+    })
 }
 
 #[cfg(test)]
@@ -778,44 +701,31 @@ mod test {
 
     const DEFAULT_UNSOLICITED_REPORT_INTERVAL: Duration = Duration::from_secs(10);
 
-    /// Fake `ProtocolSpecific` for test purposes.
-    #[derive(PartialEq, Eq, Copy, Clone, Debug, Default)]
-    struct FakeProtocolSpecific;
-
-    impl ProtocolSpecificTypes for FakeProtocolSpecific {
-        /// Tests for generic state machine should not know anything about
-        /// protocol specific actions.
-        type Actions = Never;
-        type Config = FakeConfig;
-    }
-
     /// Whether to send leave group message if our flag is not set.
     #[derive(Debug, Default)]
     struct FakeConfig(bool);
 
-    impl ProtocolSpecific for FakeProtocolSpecific {
-        fn cfg_unsolicited_report_interval(_cfg: &Self::Config) -> Duration {
+    impl ProtocolConfig for FakeConfig {
+        fn unsolicited_report_interval(&self) -> Duration {
             DEFAULT_UNSOLICITED_REPORT_INTERVAL
         }
 
-        fn cfg_send_leave_anyway(FakeConfig(cfg): &Self::Config) -> bool {
+        fn send_leave_anyway(&self) -> bool {
+            let Self(cfg) = self;
             *cfg
         }
 
-        fn get_max_resp_time(resp_time: Duration) -> Option<NonZeroDuration> {
+        fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
             NonZeroDuration::new(resp_time)
         }
 
-        fn do_query_received_specific(
-            _cfg: &Self::Config,
-            _max_resp_time: Duration,
-            old: Self,
-        ) -> (Self, Option<Never>) {
-            (old, None)
+        type QuerySpecificActions = Never;
+        fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
+            None
         }
     }
 
-    type FakeGmpStateMachine = GmpStateMachine<FakeInstant, FakeProtocolSpecific>;
+    type FakeGmpStateMachine = GmpStateMachine<FakeInstant>;
 
     #[test]
     fn test_gmp_state_non_member_to_delay_should_set_flag() {
@@ -826,7 +736,7 @@ mod test {
             &FakeConfig::default(),
         );
         match s.get_inner() {
-            MemberState::Delaying(s) => assert!(s.get_state().last_reporter),
+            MemberState::Delaying(s) => assert!(s.last_reporter),
             _ => panic!("Wrong State!"),
         }
     }
@@ -841,7 +751,7 @@ mod test {
         );
         assert_matches!(
             actions,
-            JoinGroupActions { send_report_and_schedule_timer: Some((FakeProtocolSpecific, d)) } if d <= DEFAULT_UNSOLICITED_REPORT_INTERVAL
+            JoinGroupActions { send_report_and_schedule_timer: Some(d) } if d <= DEFAULT_UNSOLICITED_REPORT_INTERVAL
         );
     }
 
@@ -888,7 +798,7 @@ mod test {
         assert_eq!(s.report_received(), ReportReceivedActions { stop_timer: true });
         match s.get_inner() {
             MemberState::Idle(s) => {
-                assert!(!s.get_state().last_reporter);
+                assert!(!s.last_reporter);
             }
             _ => panic!("Wrong State!"),
         }
@@ -902,13 +812,10 @@ mod test {
             false,
             &FakeConfig::default(),
         );
-        assert_eq!(
-            s.report_timer_expired(),
-            ReportTimerExpiredActions { send_report: FakeProtocolSpecific }
-        );
+        assert_eq!(s.report_timer_expired(), ReportTimerExpiredActions,);
         match s.get_inner() {
             MemberState::Idle(s) => {
-                assert!(s.get_state().last_reporter);
+                assert!(s.last_reporter);
             }
             _ => panic!("Wrong State!"),
         }
@@ -923,10 +830,7 @@ mod test {
         assert_eq!(s.leave_group(&cfg), LeaveGroupActions { send_leave: true, stop_timer: true });
         let (mut s, _actions) =
             FakeGmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
-        assert_eq!(
-            s.report_timer_expired(),
-            ReportTimerExpiredActions { send_report: FakeProtocolSpecific }
-        );
+        assert_eq!(s.report_timer_expired(), ReportTimerExpiredActions,);
         assert_eq!(s.leave_group(&cfg), LeaveGroupActions { send_leave: true, stop_timer: false });
     }
 
@@ -950,7 +854,7 @@ mod test {
             FakeGmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
         assert_matches!(
             actions,
-            JoinGroupActions { send_report_and_schedule_timer: Some((FakeProtocolSpecific, d)) } if d <= DEFAULT_UNSOLICITED_REPORT_INTERVAL
+            JoinGroupActions { send_report_and_schedule_timer: Some(d) } if d <= DEFAULT_UNSOLICITED_REPORT_INTERVAL
         );
         assert_eq!(s.report_received(), ReportReceivedActions { stop_timer: true });
         assert_eq!(
@@ -970,7 +874,7 @@ mod test {
         cfg = FakeConfig(true);
         assert_eq!(s.report_received(), ReportReceivedActions { stop_timer: true });
         match s.get_inner() {
-            MemberState::Idle(s) => assert!(!s.get_state().last_reporter),
+            MemberState::Idle(s) => assert!(!s.last_reporter),
             _ => panic!("Wrong State!"),
         }
         assert_eq!(s.leave_group(&cfg), LeaveGroupActions { send_leave: true, stop_timer: false });

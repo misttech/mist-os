@@ -14,8 +14,8 @@ use log::{debug, error};
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Instant, Ipv4DeviceAddr,
-    TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Ipv4DeviceAddr, TimerContext,
+    WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
@@ -34,8 +34,8 @@ use zerocopy::SplitByteSlice;
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner,
-    GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef,
-    GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecificTypes,
+    GmpDelayedReportTimerId, GmpGroupState, GmpMessage, GmpMessageType, GmpStateContext,
+    GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 /// The bindings types for IGMP.
@@ -72,10 +72,7 @@ impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
 pub trait IgmpStateContext<BT: IgmpBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// Calls the function with an immutable reference to the device's IGMP
     /// state.
-    fn with_igmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>) -> O,
-    >(
+    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -217,15 +214,12 @@ impl IpExt for Ipv4 {
 }
 
 impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv4, BT> for CC {
-    type ProtocolSpecific = Igmpv2ProtocolSpecific;
-    type GroupState = IgmpGroupState<BT::Instant>;
+    type Actions = Igmpv2Actions;
+    type Config = IgmpConfig;
 }
 
 impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> for CC {
-    fn with_gmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>) -> O,
-    >(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -281,11 +275,11 @@ where
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv4Addr>,
-        msg_type: GmpMessageType<Igmpv2ProtocolSpecific>,
+        msg_type: GmpMessageType,
     ) {
         let Self { igmp_state: IgmpState { v1_router_present, .. }, core_ctx } = self;
         let result = match msg_type {
-            GmpMessageType::Report(Igmpv2ProtocolSpecific) => {
+            GmpMessageType::Report => {
                 if *v1_router_present {
                     send_igmp_message::<_, _, IgmpMembershipReportV1>(
                         core_ctx,
@@ -452,9 +446,6 @@ where
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Igmpv2ProtocolSpecific;
-
 #[derive(PartialEq, Eq, Debug)]
 pub enum Igmpv2Actions {
     ScheduleV1RouterPresentTimer(Duration),
@@ -499,21 +490,16 @@ impl Default for IgmpConfig {
     }
 }
 
-impl ProtocolSpecificTypes for Igmpv2ProtocolSpecific {
-    type Actions = Igmpv2Actions;
-    type Config = IgmpConfig;
-}
-
-impl gmp::v1::ProtocolSpecific for Igmpv2ProtocolSpecific {
-    fn cfg_unsolicited_report_interval(cfg: &Self::Config) -> Duration {
-        cfg.unsolicited_report_interval
+impl gmp::v1::ProtocolConfig for IgmpConfig {
+    fn unsolicited_report_interval(&self) -> Duration {
+        self.unsolicited_report_interval
     }
 
-    fn cfg_send_leave_anyway(cfg: &Self::Config) -> bool {
-        cfg.send_leave_anyway
+    fn send_leave_anyway(&self) -> bool {
+        self.send_leave_anyway
     }
 
-    fn get_max_resp_time(resp_time: Duration) -> Option<NonZeroDuration> {
+    fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         // As per RFC 2236 section 4,
         //
         //   An IGMPv2 host may be placed on a subnet where the Querier router
@@ -528,48 +514,16 @@ impl gmp::v1::ProtocolSpecific for Igmpv2ProtocolSpecific {
         }))
     }
 
-    fn do_query_received_specific(
-        cfg: &Self::Config,
-        max_resp_time: Duration,
-        _old: Igmpv2ProtocolSpecific,
-    ) -> (Igmpv2ProtocolSpecific, Option<Igmpv2Actions>) {
+    type QuerySpecificActions = Igmpv2Actions;
+    fn do_query_received_specific(&self, max_resp_time: Duration) -> Option<Igmpv2Actions> {
         // IGMPv2 hosts should be compatible with routers that only speak
         // IGMPv1. When an IGMPv2 host receives an IGMPv1 query (whose
         // `MaxRespCode` is 0), it should set up a timer and only respond with
         // IGMPv1 responses before the timer expires. Please refer to
         // https://tools.ietf.org/html/rfc2236#section-4 for details.
         let v1_router_present = max_resp_time.as_micros() == 0;
-        (
-            Igmpv2ProtocolSpecific,
-            v1_router_present.then(|| {
-                Igmpv2Actions::ScheduleV1RouterPresentTimer(cfg.v1_router_present_timeout)
-            }),
-        )
-    }
-}
-
-/// The state of an IGMP group.
-#[cfg_attr(test, derive(Debug))]
-pub struct IgmpGroupState<I: Instant>(gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific>);
-
-impl<I: Instant> From<gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific>> for IgmpGroupState<I> {
-    fn from(state: gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific>) -> IgmpGroupState<I> {
-        IgmpGroupState(state)
-    }
-}
-
-impl<I: Instant> From<IgmpGroupState<I>> for gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific> {
-    fn from(
-        IgmpGroupState(state): IgmpGroupState<I>,
-    ) -> gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific> {
-        state
-    }
-}
-
-impl<I: Instant> AsMut<gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific>> for IgmpGroupState<I> {
-    fn as_mut(&mut self) -> &mut gmp::v1::GmpStateMachine<I, Igmpv2ProtocolSpecific> {
-        let Self(s) = self;
-        s
+        v1_router_present
+            .then(|| Igmpv2Actions::ScheduleV1RouterPresentTimer(self.v1_router_present_timeout))
     }
 }
 
@@ -622,7 +576,7 @@ mod tests {
 
     /// The parts of `FakeIgmpCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
-        groups: MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>,
+        groups: MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>>,
         igmp_state: IgmpState<FakeBindingsCtx>,
         gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
         config: IgmpConfig,
@@ -633,7 +587,7 @@ mod tests {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
-        fn groups(&mut self) -> &mut MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>> {
+        fn groups(&mut self) -> &mut MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
         }
 
@@ -660,7 +614,7 @@ mod tests {
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>) -> O,
+            F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<FakeBindingsCtx>>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -757,10 +711,7 @@ mod tests {
                     ))
                 }
             );
-            assert_eq!(
-                s.report_timer_expired(),
-                gmp::v1::ReportTimerExpiredActions { send_report: Igmpv2ProtocolSpecific }
-            );
+            assert_eq!(s.report_timer_expired(), gmp::v1::ReportTimerExpiredActions);
         });
     }
 
@@ -770,12 +721,7 @@ mod tests {
             let mut rng = new_rng(seed);
             let cfg = IgmpConfig::default();
             let (mut s, _actions) =
-                gmp::v1::GmpStateMachine::<_, Igmpv2ProtocolSpecific>::join_group(
-                    &mut rng,
-                    FakeInstant::default(),
-                    false,
-                    &cfg,
-                );
+                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
@@ -949,7 +895,7 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let IgmpGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),

@@ -30,7 +30,7 @@ macro_rules! assert_gmp_state {
         assert_gmp_state!(@inner $ctx, $group, crate::internal::gmp::v1::MemberState::Delaying(_));
     };
     (@inner $ctx:expr, $group:expr, $pattern:pat) => {
-        assert!(matches!($ctx.state.groups().get($group).unwrap().0.inner.as_ref().unwrap(), $pattern))
+        assert!(matches!($ctx.state.groups().get($group).unwrap().inner.as_ref().unwrap(), $pattern))
     };
 }
 
@@ -45,8 +45,8 @@ use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use net_types::MulticastAddr;
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, Instant, InstantBindingsTypes, LocalTimerHeap,
-    RngContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, InstantBindingsTypes, LocalTimerHeap, RngContext,
+    TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use rand::Rng;
 
@@ -153,50 +153,8 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
         self.inner.insert_with(group, f).into()
     }
 
-    /// Joins a multicast group and initializes it with a GMP state machine.
-    ///
-    /// `join_group_gmp` joins the multicast group `group`. If the group was not
-    /// already joined, then a new instance of [`GmpStateMachine`] is generated
-    /// using [`GmpStateMachine::join_group`], it is inserted with a reference
-    /// count of 1, and the list of actions returned by `join_group` is
-    /// returned. Otherwise, if the group was already joined, its reference
-    /// count is incremented.
-    fn join_group_gmp<I: Instant, P: ProtocolSpecific + Default, R: Rng>(
-        &mut self,
-        gmp_disabled: bool,
-        group: MulticastAddr<A>,
-        rng: &mut R,
-        now: I,
-        cfg: &P::Config,
-    ) -> GroupJoinResult<v1::JoinGroupActions<P>>
-    where
-        T: From<v1::GmpStateMachine<I, P>>,
-    {
-        self.join_group_with(group, || {
-            let (state, actions) = v1::GmpStateMachine::join_group(rng, now, gmp_disabled, cfg);
-            (T::from(state), actions)
-        })
-    }
-
     fn leave_group(&mut self, group: MulticastAddr<A>) -> GroupLeaveResult<T> {
         self.inner.remove(group).into()
-    }
-
-    /// Leaves a multicast group.
-    ///
-    /// `leave_group_gmp` leaves the multicast group `group` by decrementing the
-    /// reference count on the group. If the reference count reaches 0, the
-    /// group is left using [`GmpStateMachine::leave_group`] and the list of
-    /// actions returned by `leave_group` is returned.
-    fn leave_group_gmp<I: Instant, P: ProtocolSpecific>(
-        &mut self,
-        group: MulticastAddr<A>,
-        cfg: &P::Config,
-    ) -> GroupLeaveResult<v1::LeaveGroupActions>
-    where
-        T: Into<v1::GmpStateMachine<I, P>>,
-    {
-        self.leave_group(group).map(|state| state.into().leave_group(cfg))
     }
 
     /// Does the set contain the given group?
@@ -312,21 +270,6 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
     }
 }
 
-/// This trait is used to model the different parts of the two protocols.
-///
-/// Though MLD and IGMPv2 share the most part of their state machines there are
-/// some subtle differences between each other.
-pub trait ProtocolSpecific: v1::ProtocolSpecific {}
-
-impl<P> ProtocolSpecific for P where P: v1::ProtocolSpecific {}
-
-pub trait ProtocolSpecificTypes: Copy + Default {
-    /// The type for protocol-specific actions.
-    type Actions;
-    /// The type for protocol-specific configs.
-    type Config: Debug;
-}
-
 /// Randomly generates a timeout in (0, period].
 ///
 /// # Panics
@@ -356,8 +299,8 @@ impl<I: Ip, D: WeakDeviceIdentifier> GmpDelayedReportTimerId<I, D> {
 
 /// A type of GMP message.
 #[derive(Debug)]
-enum GmpMessageType<P> {
-    Report(P),
+enum GmpMessageType {
+    Report,
     Leave,
 }
 
@@ -402,25 +345,29 @@ pub struct GmpStateRef<'a, I: IpExt, CC: GmpTypeLayout<I, BT>, BT: GmpBindingsTy
     /// True if GMP is enabled for the device.
     pub enabled: bool,
     /// Mutable reference to the multicast groups on a device.
-    pub groups: &'a mut MulticastGroupSet<I::Addr, CC::GroupState>,
+    pub groups: &'a mut MulticastGroupSet<I::Addr, GmpGroupState<BT>>,
     /// Mutable reference to the device's GMP state.
     pub gmp: &'a mut GmpState<I, BT>,
     /// Protocol specific configuration.
-    pub config: &'a <CC::ProtocolSpecific as ProtocolSpecificTypes>::Config,
+    pub config: &'a CC::Config,
 }
 
 /// Provides IP-specific associated types for GMP.
 pub trait GmpTypeLayout<I: IpExt, BT: GmpBindingsTypes>: DeviceIdContext<AnyDevice> {
-    type ProtocolSpecific: ProtocolSpecific;
-    type GroupState: From<v1::GmpStateMachine<BT::Instant, Self::ProtocolSpecific>>
-        + Into<v1::GmpStateMachine<BT::Instant, Self::ProtocolSpecific>>
-        + AsMut<v1::GmpStateMachine<BT::Instant, Self::ProtocolSpecific>>;
+    /// The type for protocol-specific actions.
+    type Actions;
+    /// The type for protocol-specific configs.
+    type Config: Debug + v1::ProtocolConfig<QuerySpecificActions = Self::Actions>;
 }
+
+/// The state kept by each muitlcast group the host is a member of.
+// TODO(https://fxbug.dev/42071006): Update to also carry v2 state.
+pub type GmpGroupState<BT> = v1::GmpStateMachine<<BT as InstantBindingsTypes>::Instant>;
 
 /// Provides immutable access to GMP state.
 trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: GmpTypeLayout<I, BT> {
     /// Calls the function with immutable access to the [`MulticastGroupSet`].
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, Self::GroupState>) -> O>(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -437,8 +384,8 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized
     type Inner<'a>: GmpContextInner<
             I,
             BC,
-            ProtocolSpecific = Self::ProtocolSpecific,
-            GroupState = Self::GroupState,
+            Config = Self::Config,
+            Actions = Self::Actions,
             DeviceId = Self::DeviceId,
         > + 'a;
 
@@ -476,7 +423,7 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
-        msg_type: GmpMessageType<Self::ProtocolSpecific>,
+        msg_type: GmpMessageType,
     );
 
     /// Runs protocol-specific actions.
@@ -484,7 +431,7 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        actions: <Self::ProtocolSpecific as ProtocolSpecificTypes>::Actions,
+        actions: Self::Actions,
     );
 }
 

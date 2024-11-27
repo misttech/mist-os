@@ -14,7 +14,7 @@ use core::time::Duration;
 use log::{debug, error};
 use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
-use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, Instant, WeakDeviceIdentifier};
+use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, WeakDeviceIdentifier};
 use netstack3_filter as filter;
 use packet::serialize::Serializer;
 use packet::InnerPacketBuilder;
@@ -35,8 +35,8 @@ use zerocopy::SplitByteSlice;
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
     self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner,
-    GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef,
-    GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecificTypes,
+    GmpDelayedReportTimerId, GmpGroupState, GmpMessage, GmpMessageType, GmpStateContext,
+    GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 /// The bindings types for MLD.
@@ -51,7 +51,7 @@ impl<BC> MldBindingsContext for BC where BC: GmpBindingsContext {}
 pub trait MldStateContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O>(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -182,15 +182,12 @@ impl IpExt for Ipv6 {
 }
 
 impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice>> GmpTypeLayout<Ipv6, BT> for CC {
-    type ProtocolSpecific = MldProtocolSpecific;
-    type GroupState = MldGroupState<BT::Instant>;
+    type Actions = Never;
+    type Config = MldConfig;
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
-    fn with_gmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>) -> O,
-    >(
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BT>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -225,10 +222,10 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         group_addr: MulticastAddr<Ipv6Addr>,
-        msg_type: GmpMessageType<MldProtocolSpecific>,
+        msg_type: GmpMessageType,
     ) {
         let result = match msg_type {
-            GmpMessageType::Report(MldProtocolSpecific) => send_mld_packet::<_, _, _>(
+            GmpMessageType::Report => send_mld_packet::<_, _, _>(
                 self,
                 bindings_ctx,
                 device,
@@ -275,9 +272,6 @@ pub(crate) enum MldError {
 
 pub(crate) type MldResult<T> = Result<T, MldError>;
 
-#[derive(PartialEq, Eq, Clone, Copy, Default, Debug)]
-pub struct MldProtocolSpecific;
-
 #[derive(Debug)]
 pub struct MldConfig {
     unsolicited_report_interval: Duration,
@@ -298,55 +292,22 @@ impl Default for MldConfig {
     }
 }
 
-impl ProtocolSpecificTypes for MldProtocolSpecific {
-    type Actions = Never;
-    type Config = MldConfig;
-}
-
-impl gmp::v1::ProtocolSpecific for MldProtocolSpecific {
-    fn cfg_unsolicited_report_interval(cfg: &Self::Config) -> Duration {
-        cfg.unsolicited_report_interval
+impl gmp::v1::ProtocolConfig for MldConfig {
+    fn unsolicited_report_interval(&self) -> Duration {
+        self.unsolicited_report_interval
     }
 
-    fn cfg_send_leave_anyway(cfg: &Self::Config) -> bool {
-        cfg.send_leave_anyway
+    fn send_leave_anyway(&self) -> bool {
+        self.send_leave_anyway
     }
 
-    fn get_max_resp_time(resp_time: Duration) -> Option<NonZeroDuration> {
+    fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         NonZeroDuration::new(resp_time)
     }
 
-    fn do_query_received_specific(
-        _cfg: &Self::Config,
-        _max_resp_time: Duration,
-        old: Self,
-    ) -> (Self, Option<Never>) {
-        (old, None)
-    }
-}
-
-/// The state on a multicast address.
-#[cfg_attr(test, derive(Debug))]
-pub struct MldGroupState<I: Instant>(gmp::v1::GmpStateMachine<I, MldProtocolSpecific>);
-
-impl<I: Instant> From<gmp::v1::GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn from(state: gmp::v1::GmpStateMachine<I, MldProtocolSpecific>) -> MldGroupState<I> {
-        MldGroupState(state)
-    }
-}
-
-impl<I: Instant> From<MldGroupState<I>> for gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
-    fn from(
-        MldGroupState(state): MldGroupState<I>,
-    ) -> gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
-        state
-    }
-}
-
-impl<I: Instant> AsMut<gmp::v1::GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn as_mut(&mut self) -> &mut gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
-        let Self(s) = self;
-        s
+    type QuerySpecificActions = Never;
+    fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
+        None
     }
 }
 
@@ -479,14 +440,16 @@ mod tests {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
-        fn groups(&mut self) -> &mut MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>> {
+        fn groups(
+            &mut self,
+        ) -> &mut MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
         }
     }
 
     /// The parts of `FakeMldCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
-        groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
+        groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>,
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         config: MldConfig,
     }
@@ -524,7 +487,7 @@ mod tests {
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
+            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<FakeBindingsCtxImpl>>) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -611,18 +574,12 @@ mod tests {
             // timer.
             let mut rng = new_rng(seed);
             let cfg = MldConfig::default();
-            let (mut s, _actions) = gmp::v1::GmpStateMachine::<_, MldProtocolSpecific>::join_group(
-                &mut rng,
-                FakeInstant::default(),
-                false,
-                &cfg,
-            );
+            let (mut s, _actions) =
+                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
-                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport(
-                        MldProtocolSpecific
-                    )),
+                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport),
                     protocol_specific: None
                 }
             );
@@ -834,7 +791,7 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let MldGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
@@ -871,7 +828,7 @@ mod tests {
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
-            let MldGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 gmp::v1::MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),

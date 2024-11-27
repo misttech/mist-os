@@ -40,8 +40,8 @@ use netstack3_ip::device::{
     SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
-    GmpStateRef, IgmpContext, IgmpGroupState, IgmpSendContext, IgmpState, IgmpStateContext,
-    MldContext, MldGroupState, MldSendContext, MldStateContext, MulticastGroupSet,
+    GmpGroupState, GmpStateRef, IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext,
+    MldContext, MldSendContext, MldStateContext, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -215,10 +215,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_igmp_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<BC::Instant>>) -> O,
-    >(
+    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -233,10 +230,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_mld_state<
-        O,
-        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<BC::Instant>>) -> O,
-    >(
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<BC>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,

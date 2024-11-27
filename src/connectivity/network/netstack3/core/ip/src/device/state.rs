@@ -35,9 +35,9 @@ use crate::internal::device::{
     IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpConfig, IgmpGroupState, IgmpState, IgmpTimerId};
-use crate::internal::gmp::mld::{MldConfig, MldGroupState, MldTimerId};
-use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
+use crate::internal::gmp::mld::{MldConfig, MldTimerId};
+use crate::internal::gmp::{GmpDelayedReportTimerId, GmpGroupState, GmpState, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -56,14 +56,6 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
-    /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce
-    /// membership in an IP multicast group for this version of IP.
-    ///
-    /// Note that a GMP is only used when membership must be explicitly
-    /// announced. For example, a GMP is not used in the context of a loopback
-    /// device (because there are no remote hosts) or in the context of an IPsec
-    /// device (because multicast is not supported).
-    type GmpGroupState<I: Instant>;
     /// The GMP protocol-specific state.
     type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
     /// The GMP protocol-specific configuration.
@@ -85,7 +77,6 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
-    type GmpGroupState<I: Instant> = IgmpGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
 
@@ -150,7 +141,6 @@ impl<BT: IpDeviceStateBindingsTypes> WeakIpAddressId<Ipv6Addr> for WeakRc<Ipv6Ad
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
-    type GmpGroupState<I: Instant> = MldGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
 
@@ -194,7 +184,7 @@ pub struct IpDeviceFlags {
 /// The state kept for each device to handle multicast group membership.
 pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// Multicast groups this device has joined.
-    pub groups: MulticastGroupSet<I::Addr, I::GmpGroupState<BT::Instant>>,
+    pub groups: MulticastGroupSet<I::Addr, GmpGroupState<BT>>,
     /// Protocol-specific GMP state.
     pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.

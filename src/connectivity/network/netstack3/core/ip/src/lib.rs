@@ -101,15 +101,16 @@ pub mod device {
 /// Group management protocols.
 pub mod gmp {
     pub use crate::internal::gmp::igmp::{
-        IgmpContext, IgmpGroupState, IgmpSendContext, IgmpState, IgmpStateContext, IgmpTimerId,
+        IgmpContext, IgmpSendContext, IgmpState, IgmpStateContext, IgmpTimerId,
         IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
-        MldContext, MldGroupState, MldSendContext, MldStateContext, MldTimerId,
+        MldContext, MldSendContext, MldStateContext, MldTimerId,
         MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
-        GmpDelayedReportTimerId, GmpHandler, GmpQueryHandler, GmpStateRef, IpExt, MulticastGroupSet,
+        GmpDelayedReportTimerId, GmpGroupState, GmpHandler, GmpQueryHandler, GmpStateRef, IpExt,
+        MulticastGroupSet,
     };
 }
 
