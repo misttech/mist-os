@@ -258,7 +258,7 @@ mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use zx::sys::{zx_cpu_set_t, zx_processor_power_domain_t};
+    use zx::sys::zx_processor_power_domain_t;
 
     // Tests that errors are logged to Inspect as expected.
     #[fasync::run_singlethreaded(test)]
@@ -309,11 +309,7 @@ mod tests {
         match handler
             .handle_message(&&Message::SetProcessorPowerDomain(
                 PowerLevelDomain {
-                    power_domain: zx_processor_power_domain_t {
-                        cpus: zx_cpu_set_t { mask: [0; 8] },
-                        domain_id: 0,
-                        padding1: Default::default(),
-                    },
+                    power_domain: zx_processor_power_domain_t::default(),
                     power_levels: Vec::new(),
                     power_level_transitions: Vec::new(),
                 },

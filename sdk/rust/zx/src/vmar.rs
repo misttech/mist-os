@@ -65,7 +65,6 @@ impl MapInfo {
                 // type corresponds to this layout.
                 let &sys::zx_info_maps_mapping_t {
                     mmu_flags,
-                    padding1: _,
                     vmo_koid,
                     vmo_offset,
                     committed_bytes,
@@ -76,6 +75,7 @@ impl MapInfo {
                     populated_scaled_bytes,
                     committed_fractional_scaled_bytes,
                     populated_fractional_scaled_bytes,
+                    ..
                 } = unsafe { &u.mapping };
                 MapDetails::Mapping(MappingDetails {
                     mmu_flags: VmarFlagsExtended::from_bits_retain(mmu_flags),

@@ -372,7 +372,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use zx::sys::{
-        zx_cpu_set_t, zx_processor_power_domain_t, zx_processor_power_level_t,
+        zx_processor_power_domain_t, zx_processor_power_level_t,
         zx_processor_power_level_transition_t,
     };
 
@@ -409,37 +409,30 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let futures_out = FuturesUnordered::new();
         let energy_model = EnergyModel(vec![PowerLevelDomain {
-            power_domain: zx_processor_power_domain_t {
-                cpus: zx_cpu_set_t { mask: [0; 8] },
-                domain_id: 0,
-                padding1: Default::default(),
-            },
+            power_domain: zx_processor_power_domain_t::default(),
             power_levels: vec![
-                zx_processor_power_level_t {
-                    options: 0,
-                    processing_rate: 100,
-                    power_coefficient_nw: 200,
-                    control_interface: 2,
-                    control_argument: 1,
-                    diagnostic_name: [0; 32],
-                    padding: [0; 32],
+                {
+                    let mut ret = zx_processor_power_level_t::default();
+                    ret.processing_rate = 100;
+                    ret.power_coefficient_nw = 200;
+                    ret.control_interface = 2;
+                    ret.control_argument = 1;
+                    ret
                 },
-                zx_processor_power_level_t {
-                    options: 1,
-                    processing_rate: 200,
-                    power_coefficient_nw: 300,
-                    control_interface: 0,
-                    control_argument: 0,
-                    diagnostic_name: [0; 32],
-                    padding: [0; 32],
+                {
+                    let mut ret = zx_processor_power_level_t::default();
+                    ret.options = 1;
+                    ret.processing_rate = 200;
+                    ret.power_coefficient_nw = 300;
+                    ret
                 },
             ],
-            power_level_transitions: vec![zx_processor_power_level_transition_t {
-                from: 0,
-                to: 1,
-                energy: 200,
-                latency: 100,
-                padding: [0; 6],
+            power_level_transitions: vec![{
+                let mut ret = zx_processor_power_level_transition_t::default();
+                ret.to = 1;
+                ret.energy = 200;
+                ret.latency = 100;
+                ret
             }],
         }]);
 

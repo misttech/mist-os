@@ -539,29 +539,27 @@ mod tests {
     const SQRT_COVARIANCE: i64 = 5454545454;
 
     lazy_static! {
-        static ref VALID_DETAILS: zx::sys::zx_clock_details_v1_t = zx::sys::zx_clock_details_v1_t {
-            options: 0,
-            backstop_time: BACKSTOP_TIME,
-            reference_ticks_to_synthetic: zx::sys::zx_clock_transformation_t {
-                reference_offset: 777777777777,
-                synthetic_offset: 787878787878,
+        static ref VALID_DETAILS: UtcClockDetails = zx::ClockDetails {
+            backstop: zx::Instant::from_nanos(BACKSTOP_TIME),
+            ticks_to_synthetic: zx::ClockTransformation {
+                reference_offset: zx::Instant::from_nanos(777777777777),
+                synthetic_offset: zx::Instant::from_nanos(787878787878),
                 rate: zx::sys::zx_clock_rate_t { reference_ticks: 1_000, synthetic_ticks: 1_000 },
             },
-            reference_to_synthetic: zx::sys::zx_clock_transformation_t {
-                reference_offset: 888888888888,
-                synthetic_offset: 898989898989,
+            reference_to_synthetic: zx::ClockTransformation {
+                reference_offset: zx::Instant::from_nanos(888888888888),
+                synthetic_offset: zx::Instant::from_nanos(898989898989),
                 rate: zx::sys::zx_clock_rate_t {
                     reference_ticks: ONE_MILLION as u32,
                     synthetic_ticks: (RATE_ADJUST + ONE_MILLION) as u32,
                 },
             },
-            error_bound: ERROR_BOUNDS,
+            error_bounds: ERROR_BOUNDS,
             query_ticks: 12345789,
             last_value_update_ticks: 36363636,
             last_rate_adjust_update_ticks: 37373737,
             last_error_bounds_update_ticks: 38383838,
             generation_counter: GENERATION_COUNTER,
-            padding1: Default::default()
         };
     }
 
@@ -596,23 +594,35 @@ mod tests {
 
     #[fuchsia::test]
     fn valid_clock_details_conversion() {
-        let details = ClockDetails::from(zx::ClockDetails::from(VALID_DETAILS.clone()));
+        let details = ClockDetails::from(VALID_DETAILS.clone());
         assert_eq!(details.generation_counter, GENERATION_COUNTER);
-        assert_eq!(details.utc_offset, VALID_DETAILS.reference_to_synthetic.synthetic_offset);
-        assert_eq!(details.reference_offset, VALID_DETAILS.reference_to_synthetic.reference_offset);
+        assert_eq!(
+            details.utc_offset,
+            VALID_DETAILS.reference_to_synthetic.synthetic_offset.into_nanos()
+        );
+        assert_eq!(
+            details.reference_offset,
+            VALID_DETAILS.reference_to_synthetic.reference_offset.into_nanos()
+        );
         assert_eq!(details.rate_ppm, RATE_ADJUST);
         assert_eq!(details.error_bounds, ERROR_BOUNDS);
     }
 
     #[fuchsia::test]
     fn invalid_clock_details_conversion() {
-        let mut zx_details = zx::ClockDetails::from(VALID_DETAILS.clone());
+        let mut zx_details = VALID_DETAILS.clone();
         zx_details.reference_to_synthetic.rate.synthetic_ticks = 1000;
         zx_details.reference_to_synthetic.rate.reference_ticks = 0;
-        let details = ClockDetails::from(zx::ClockDetails::from(zx_details));
+        let details = ClockDetails::from(zx_details);
         assert_eq!(details.generation_counter, GENERATION_COUNTER);
-        assert_eq!(details.utc_offset, VALID_DETAILS.reference_to_synthetic.synthetic_offset);
-        assert_eq!(details.reference_offset, VALID_DETAILS.reference_to_synthetic.reference_offset);
+        assert_eq!(
+            details.utc_offset,
+            VALID_DETAILS.reference_to_synthetic.synthetic_offset.into_nanos()
+        );
+        assert_eq!(
+            details.reference_offset,
+            VALID_DETAILS.reference_to_synthetic.reference_offset.into_nanos()
+        );
         assert_eq!(details.rate_ppm, std::i32::MAX);
         assert_eq!(details.error_bounds, ERROR_BOUNDS);
     }

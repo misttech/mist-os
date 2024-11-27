@@ -121,7 +121,7 @@ impl<Reference: Timeline, Output: Timeline> Clock<Reference, Output> {
     pub fn update(&self, update: impl Into<ClockUpdate<Reference, Output>>) -> Result<(), Status> {
         let update = update.into();
         let options = update.options();
-        let args = sys::zx_clock_update_args_v2_t::from(update);
+        let args = update.args();
         let status = unsafe {
             sys::zx_clock_update(self.raw_handle(), options, std::ptr::from_ref(&args).cast::<u8>())
         };
@@ -187,7 +187,6 @@ bitflags! {
 }
 
 /// Fine grained details of a [`Clock`] object.
-#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClockDetails<Reference = MonotonicTimeline, Output = SyntheticTimeline> {
     /// The minimum time the clock can ever be set to.

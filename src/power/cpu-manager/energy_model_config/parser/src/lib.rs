@@ -215,20 +215,21 @@ impl TryFrom<PowerLevelDomainJson> for PowerLevelDomain {
 impl TryFrom<PowerDomain> for zx_processor_power_domain_t {
     type Error = anyhow::Error;
     fn try_from(p: PowerDomain) -> Result<Self, Error> {
-        let cpus = get_cpu_mask(p.cpu_set)?;
-        Ok(Self { cpus, domain_id: p.domain_id, padding1: Default::default() })
+        let mut ret = Self::default();
+        ret.cpus = get_cpu_mask(p.cpu_set)?;
+        ret.domain_id = p.domain_id;
+        Ok(ret)
     }
 }
 
 impl From<PowerLevelTransition> for zx_processor_power_level_transition_t {
     fn from(p: PowerLevelTransition) -> Self {
-        Self {
-            from: p.from,
-            to: p.to,
-            latency: p.duration_ns,
-            energy: p.energy_nj,
-            padding: [0; 6],
-        }
+        let mut ret = Self::default();
+        ret.from = p.from;
+        ret.to = p.to;
+        ret.latency = p.duration_ns;
+        ret.energy = p.energy_nj;
+        ret
     }
 }
 
@@ -259,15 +260,15 @@ impl TryFrom<PowerLevel> for zx_processor_power_level_t {
         );
         let mut diagnostic_name = [0u8; ZX_MAX_NAME_LEN];
         diagnostic_name[..bytes.len()].copy_from_slice(bytes);
-        Ok(Self {
-            options,
-            processing_rate: p.processing_rate,
-            power_coefficient_nw: p.power_coefficient_nw,
-            control_interface,
-            control_argument: p.control_argument,
-            diagnostic_name,
-            padding: [0; 32],
-        })
+
+        let mut ret = Self::default();
+        ret.options = options;
+        ret.processing_rate = p.processing_rate;
+        ret.power_coefficient_nw = p.power_coefficient_nw;
+        ret.control_interface = control_interface;
+        ret.control_argument = p.control_argument;
+        ret.diagnostic_name = diagnostic_name;
+        Ok(ret)
     }
 }
 
@@ -341,15 +342,8 @@ mod tests {
         };
         assert_matches!(zx_processor_power_level_t::try_from(power_level), Err(_));
 
-        let zx_power_level = zx_processor_power_level_t {
-            options: 0,
-            processing_rate: 0,
-            power_coefficient_nw: 0,
-            control_interface: ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
-            control_argument: 0,
-            diagnostic_name: [0; ZX_MAX_NAME_LEN],
-            padding: [0; 32],
-        };
+        let mut zx_power_level = zx_processor_power_level_t::default();
+        zx_power_level.control_interface = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER;
         let power_level = PowerLevel {
             option: None,
             processing_rate: 0,

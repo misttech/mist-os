@@ -462,7 +462,6 @@ pub struct HandleBasicInfo {
     pub rights: Rights,
     pub object_type: ObjectType,
     pub related_koid: Koid,
-    pub reserved: u32,
 }
 
 impl Default for HandleBasicInfo {
@@ -473,7 +472,7 @@ impl Default for HandleBasicInfo {
 
 impl From<sys::zx_info_handle_basic_t> for HandleBasicInfo {
     fn from(info: sys::zx_info_handle_basic_t) -> Self {
-        let sys::zx_info_handle_basic_t { koid, rights, type_, related_koid, reserved } = info;
+        let sys::zx_info_handle_basic_t { koid, rights, type_, related_koid, .. } = info;
 
         // Note lossy conversion of Rights and HandleProperty here if either of those types are out
         // of date or incomplete.
@@ -482,7 +481,6 @@ impl From<sys::zx_info_handle_basic_t> for HandleBasicInfo {
             rights: Rights::from_bits_truncate(rights),
             object_type: ObjectType(type_),
             related_koid: Koid(related_koid),
-            reserved: reserved,
         }
     }
 }

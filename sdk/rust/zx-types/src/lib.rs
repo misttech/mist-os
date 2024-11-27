@@ -8,7 +8,7 @@ use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicI32;
 #[cfg(feature = "zerocopy")]
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, FromZeros, Immutable, IntoBytes, KnownLayout};
 
 pub type zx_addr_t = usize;
 pub type zx_stream_seek_origin_t = u32;
@@ -557,10 +557,13 @@ multiconst!(u32, [
 /// padding is added. This is important for security since implicit padding bytes are not always
 /// safely initialized. These explicit padding fields are mirrored in the Rust struct definitions
 /// to minimize the opportunities for mistakes and inconsistencies.
-#[repr(C)]
+///
+/// This type is private to ensure that users of "raw" types don't inspect untyped padding bytes
+/// on their own.
+#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Default)]
 #[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable, IntoBytes))]
-pub struct PadByte(u8);
+struct PadByte(u8);
 
 impl PartialEq for PadByte {
     fn eq(&self, _other: &Self) -> bool {
@@ -587,14 +590,14 @@ pub struct zx_clock_create_args_v1_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct zx_clock_rate_t {
     pub synthetic_ticks: u32,
     pub reference_ticks: u32,
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct zx_clock_transformation_t {
     pub reference_offset: i64,
     pub synthetic_offset: i64,
@@ -602,7 +605,7 @@ pub struct zx_clock_transformation_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct zx_clock_details_v1_t {
     pub options: u64,
     pub backstop_time: zx_time_t,
@@ -614,14 +617,14 @@ pub struct zx_clock_details_v1_t {
     pub last_rate_adjust_update_ticks: zx_ticks_t,
     pub last_error_bounds_update_ticks: zx_ticks_t,
     pub generation_counter: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct zx_clock_update_args_v1_t {
     pub rate_adjust: i32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub value: i64,
     pub error_bound: u64,
 }
@@ -630,7 +633,7 @@ pub struct zx_clock_update_args_v1_t {
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct zx_clock_update_args_v2_t {
     pub rate_adjust: i32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub synthetic_value: i64,
     pub reference_value: i64,
     pub error_bound: u64,
@@ -777,7 +780,17 @@ pub struct zx_channel_call_etc_args_t {
 pub struct zx_channel_iovec_t {
     pub buffer: *const u8,
     pub capacity: u32,
-    pub reserved: u32,
+    padding1: [PadByte; 4],
+}
+
+impl Default for zx_channel_iovec_t {
+    fn default() -> Self {
+        Self {
+            buffer: std::ptr::null(),
+            capacity: Default::default(),
+            padding1: Default::default(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -878,8 +891,9 @@ impl Default for zx_packet_type_t {
 }
 
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub enum zx_packet_guest_vcpu_type_t {
+    #[default]
     ZX_PKT_GUEST_VCPU_INTERRUPT = 0,
     ZX_PKT_GUEST_VCPU_STARTUP = 1,
     ZX_PKT_GUEST_VCPU_EXIT = 2,
@@ -926,42 +940,53 @@ pub struct zx_packet_guest_io_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
 pub struct zx_packet_guest_vcpu_interrupt_t {
     pub mask: u64,
     pub vector: u8,
-    pub padding1: [PadByte; 7],
+    padding1: [PadByte; 7],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
 pub struct zx_packet_guest_vcpu_startup_t {
     pub id: u64,
     pub entry: zx_gpaddr_t,
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
 pub struct zx_packet_guest_vcpu_exit_t {
     pub retcode: i64,
-    pub reserved: u64,
+    padding1: [PadByte; 8],
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
 pub union zx_packet_guest_vcpu_union_t {
     pub interrupt: zx_packet_guest_vcpu_interrupt_t,
     pub startup: zx_packet_guest_vcpu_startup_t,
     pub exit: zx_packet_guest_vcpu_exit_t,
 }
 
+#[cfg(feature = "zerocopy")]
+impl Default for zx_packet_guest_vcpu_union_t {
+    fn default() -> Self {
+        Self::new_zeroed()
+    }
+}
+
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct zx_packet_guest_vcpu_t {
     pub r#type: zx_packet_guest_vcpu_type_t,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub union: zx_packet_guest_vcpu_union_t,
-    pub reserved: u64,
+    padding2: [PadByte; 8],
 }
 
 impl PartialEq for zx_packet_guest_vcpu_t {
@@ -1005,19 +1030,20 @@ impl Debug for zx_packet_guest_vcpu_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct zx_packet_page_request_t {
     pub command: zx_page_request_command_t,
     pub flags: u16,
-    pub reserved0: u32,
+    padding1: [PadByte; 4],
     pub offset: u64,
     pub length: u64,
-    pub reserved1: u64,
+    padding2: [PadByte; 8],
 }
 
 #[repr(u16)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub enum zx_page_request_command_t {
+    #[default]
     ZX_PAGER_VMO_READ = 0x0000,
     ZX_PAGER_VMO_COMPLETE = 0x0001,
     ZX_PAGER_VMO_DIRTY = 0x0002,
@@ -1066,7 +1092,7 @@ pub struct zx_exception_info_t {
     pub pid: zx_koid_t,
     pub tid: zx_koid_t,
     pub type_: zx_excp_type_t,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
 }
 
 #[repr(C)]
@@ -1078,20 +1104,20 @@ pub struct zx_x86_64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, Immutable)]
 pub struct zx_arm64_exc_data_t {
     pub esr: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub far: u64,
-    pub padding2: [PadByte; 8],
+    padding2: [PadByte; 8],
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, Immutable)]
 pub struct zx_riscv64_exc_data_t {
     pub cause: u64,
     pub tval: u64,
-    pub padding2: [PadByte; 8],
+    padding1: [PadByte; 8],
 }
 
 #[repr(C)]
@@ -1442,7 +1468,7 @@ pub struct zx_restricted_state_t {
     pub tpidr_el0: u64,
     // Contains only the user-controllable upper 4-bits (NZCV).
     pub cpsr: u32,
-    pub padding1: [u8; 4],
+    padding1: [PadByte; 4],
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -1486,7 +1512,7 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
             tpidr_el0: registers.tpidr,
             sp: registers.sp,
             cpsr: registers.cpsr as u32,
-            padding1: [0, 0, 0, 0],
+            padding1: Default::default(),
         }
     }
 }
@@ -1548,7 +1574,7 @@ pub struct zx_vcpu_state_t {
     pub sp: u64,
     // Contains only the user-controllable upper 4-bits (NZCV).
     pub cpsr: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
 }
 
 #[cfg(target_arch = "riscv64")]
@@ -1562,13 +1588,13 @@ pub struct zx_vcpu_state_t {
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_vcpu_io_t {
     pub access_size: u8,
-    pub padding1: [PadByte; 3],
+    padding1: [PadByte; 3],
     pub data: [u8; 4],
 }
 
 #[cfg(target_arch = "aarch64")]
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_guest_mem_t {
     pub addr: zx_gpaddr_t,
     pub access_size: u8,
@@ -1580,10 +1606,10 @@ pub struct zx_packet_guest_mem_t {
 
 #[cfg(target_arch = "riscv64")]
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_guest_mem_t {
     pub addr: zx_gpaddr_t,
-    pub reserved: [u64; 3],
+    padding1: [PadByte; 24],
 }
 
 pub const X86_MAX_INST_LEN: usize = 15;
@@ -1600,10 +1626,10 @@ pub struct zx_packet_guest_mem_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_interrupt_t {
     pub timestamp: zx_time_t,
-    pub reserved: [u64; 3],
+    padding1: [PadByte; 24],
 }
 
 // Helper for constructing topics that have been versioned.
@@ -1667,13 +1693,13 @@ macro_rules! struct_decl_macro {
 
 // Don't need struct_decl_macro for this, the wrapper is different.
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Eq, KnownLayout, FromBytes, Immutable, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, FromBytes, Immutable, PartialEq)]
 pub struct zx_info_handle_basic_t {
     pub koid: zx_koid_t,
     pub rights: zx_rights_t,
     pub type_: zx_obj_type_t,
     pub related_koid: zx_koid_t,
-    pub reserved: u32,
+    padding1: [PadByte; 4],
 }
 
 struct_decl_macro! {
@@ -1803,7 +1829,7 @@ pub struct zx_info_vmo_t {
     pub num_mappings: usize,
     pub share_count: usize,
     pub flags: u32,
-    _padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub committed_bytes: u64,
     pub handle_rights: zx_rights_t,
     pub cache_policy: u32,
@@ -2031,7 +2057,7 @@ struct_decl_macro! {
     #[derive(zerocopy::FromBytes, zerocopy::Immutable)]
     pub struct <zx_info_maps_mapping_t> {
         pub mmu_flags: zx_vm_option_t,
-        pub padding1: [PadByte; 4],
+        padding1: [PadByte; 4],
         pub vmo_koid: zx_koid_t,
         pub vmo_offset: u64,
         pub committed_bytes: usize,
@@ -2113,7 +2139,7 @@ struct_decl_macro! {
     #[derive(zerocopy::FromBytes, zerocopy::Immutable)]
     pub struct <zx_log_record_t> {
         pub sequence: u64,
-        pub padding1: [PadByte; 4],
+        padding1: [PadByte; 4],
         pub datalen: u16,
         pub severity: u8,
         pub flags: u8,
@@ -2131,7 +2157,7 @@ impl Default for zx_log_record_t {
     fn default() -> zx_log_record_t {
         zx_log_record_t {
             sequence: 0,
-            padding1: [PadByte(0); 4],
+            padding1: Default::default(),
             datalen: 0,
             severity: 0,
             flags: 0,
@@ -2175,7 +2201,7 @@ pub struct acpi_transition_s_state {
     target_s_state: u8, // Value between 1 and 5 indicating which S-state
     sleep_type_a: u8,   // Value from ACPI VM (SLP_TYPa)
     sleep_type_b: u8,   // Value from ACPI VM (SLP_TYPb)
-    _padding1: [PadByte; 9],
+    padding1: [PadByte; 9],
 }
 
 #[repr(C)]
@@ -2185,7 +2211,7 @@ pub struct x86_power_limit {
     time_window: u32, // PL1 time window in microseconds
     clamp: u8,        // PL1 clamping enable
     enable: u8,       // PL1 enable
-    _padding2: [PadByte; 2],
+    padding1: [PadByte; 2],
 }
 
 // source: zircon/system/public/zircon/syscalls/pci.h
@@ -2218,15 +2244,15 @@ pub union zx_pci_bar_union {
 #[derive(Default, Debug, PartialEq, Copy, Clone)]
 pub struct zx_pci_bar_union_struct {
     handle: zx_handle_t,
-    _padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
 }
 
 // source: zircon/system/public/zircon/syscalls/smc.h
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct zx_smc_parameters_t {
     pub func_id: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub arg1: u64,
     pub arg2: u64,
     pub arg3: u64,
@@ -2235,7 +2261,7 @@ pub struct zx_smc_parameters_t {
     pub arg6: u64,
     pub client_id: u16,
     pub secure_os_id: u16,
-    pub padding2: [PadByte; 4],
+    padding2: [PadByte; 4],
 }
 
 #[repr(C)]
@@ -2262,20 +2288,34 @@ pub struct zx_cpu_set_t {
 #[derive(Copy, Clone)]
 pub struct zx_profile_info_t {
     pub flags: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub zx_profile_info_union: zx_profile_info_union,
     pub cpu_affinity_mask: zx_cpu_set_t,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct priority_params {
-    priority: i32,
-    _padding2: [PadByte; 20],
+#[cfg(feature = "zerocopy")]
+impl Default for zx_profile_info_t {
+    fn default() -> Self {
+        Self {
+            flags: Default::default(),
+            padding1: Default::default(),
+            zx_profile_info_union: FromZeros::new_zeroed(),
+            cpu_affinity_mask: Default::default(),
+        }
+    }
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
+pub struct priority_params {
+    pub priority: i32,
+    padding1: [PadByte; 20],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable))]
 pub union zx_profile_info_union {
     pub priority_params: priority_params,
     pub deadline_params: zx_sched_deadline_params_t,
@@ -2283,6 +2323,7 @@ pub union zx_profile_info_union {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "zerocopy", derive(FromBytes, Immutable, KnownLayout))]
 pub struct zx_sched_deadline_params_t {
     pub capacity: zx_duration_t,
     pub relative_deadline: zx_duration_t,
@@ -2307,14 +2348,14 @@ pub struct zx_cpu_performance_info_t {
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_cpu_power_limit_t {
     pub logical_cpu_number: u32,
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
     pub max_power_nw: u64,
 }
 
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_iommu_desc_dummy_t {
-    pub reserved: u8,
+    padding1: PadByte,
 }
 
 multiconst!(u32, [
@@ -2351,7 +2392,7 @@ pub struct zx_processor_power_level_t {
     pub control_interface: zx_processor_power_control_t,
     pub control_argument: u64,
     pub diagnostic_name: [u8; ZX_MAX_NAME_LEN],
-    pub padding: [u8; 32],
+    padding1: [PadByte; 32],
 }
 
 #[repr(C)]
@@ -2361,17 +2402,17 @@ pub struct zx_processor_power_level_transition_t {
     pub energy: u64,
     pub from: u8,
     pub to: u8,
-    pub padding: [u8; 6],
+    padding1: [PadByte; 6],
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct zx_packet_processor_power_level_transition_request_t {
     pub domain_id: u32,
     pub options: u32,
     pub control_interface: u64,
     pub control_argument: u64,
-    pub reserved: u64,
+    padding1: [PadByte; 8],
 }
 
 #[repr(C)]
@@ -2384,12 +2425,11 @@ pub struct zx_processor_power_state_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct zx_processor_power_domain_t {
     pub cpus: zx_cpu_set_t,
     pub domain_id: u32,
-    // Padding.
-    pub padding1: [PadByte; 4],
+    padding1: [PadByte; 4],
 }
 
 #[repr(C)]
@@ -2399,8 +2439,7 @@ pub struct zx_power_domain_info_t {
     pub domain_id: u32,
     pub idle_power_levels: u8,
     pub active_power_levels: u8,
-    // Padding.
-    pub padding1: [PadByte; 2],
+    padding1: [PadByte; 2],
 }
 
 multiconst!(u32, [
@@ -2430,7 +2469,7 @@ mod test {
     fn padded_struct_equality() {
         let test_struct = zx_clock_update_args_v1_t {
             rate_adjust: 222,
-            padding1: [PadByte(0), PadByte(0), PadByte(0), PadByte(0)],
+            padding1: Default::default(),
             value: 333,
             error_bound: 444,
         };
@@ -2452,7 +2491,7 @@ mod test {
     fn padded_struct_debug() {
         let test_struct = zx_clock_update_args_v1_t {
             rate_adjust: 222,
-            padding1: [PadByte(0), PadByte(0), PadByte(0), PadByte(0)],
+            padding1: Default::default(),
             value: 333,
             error_bound: 444,
         };

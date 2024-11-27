@@ -17,10 +17,10 @@ impl<'a> ChannelIoSlice<'a> {
     /// referenced by a `zx_channel_iovec_t` the length will be truncated, although this is
     /// significantly longer than `ZX_CHANNEL_MAX_MSG_BYTES` in practice.
     pub fn new(buf: &'a [u8]) -> Self {
-        Self(
-            zx_channel_iovec_t { buffer: buf.as_ptr(), capacity: buf.len() as u32, reserved: 0 },
-            std::marker::PhantomData,
-        )
+        let mut inner = zx_channel_iovec_t::default();
+        inner.buffer = buf.as_ptr();
+        inner.capacity = buf.len() as u32;
+        Self(inner, std::marker::PhantomData)
     }
 }
 

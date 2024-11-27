@@ -316,6 +316,15 @@ impl<R: Timeline, O: Timeline> ClockUpdate<R, O> {
     pub fn options(&self) -> u64 {
         self.options
     }
+
+    pub(crate) fn args(self) -> sys::zx_clock_update_args_v2_t {
+        let mut ret = sys::zx_clock_update_args_v2_t::default();
+        ret.rate_adjust = self.rate_adjust;
+        ret.synthetic_value = self.synthetic_value.into_nanos();
+        ret.reference_value = self.reference_value.into_nanos();
+        ret.error_bound = self.error_bound;
+        ret
+    }
 }
 
 impl<
@@ -342,20 +351,6 @@ impl<
     }
 }
 
-impl<Reference: Timeline, Output: Timeline> From<ClockUpdate<Reference, Output>>
-    for sys::zx_clock_update_args_v2_t
-{
-    fn from(clock_update: ClockUpdate<Reference, Output>) -> Self {
-        sys::zx_clock_update_args_v2_t {
-            rate_adjust: clock_update.rate_adjust,
-            padding1: Default::default(),
-            synthetic_value: clock_update.synthetic_value.into_nanos(),
-            reference_value: clock_update.reference_value.into_nanos(),
-            error_bound: clock_update.error_bound,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,16 +361,7 @@ mod tests {
         let update =
             ClockUpdateBuilder::<_, _, _, MonotonicTimeline, SyntheticTimeline>::new().build();
         assert_eq!(update.options(), sys::ZX_CLOCK_ARGS_VERSION_2);
-        assert_eq!(
-            sys::zx_clock_update_args_v2_t::from(update),
-            sys::zx_clock_update_args_v2_t {
-                rate_adjust: 0,
-                padding1: Default::default(),
-                reference_value: 0,
-                synthetic_value: 0,
-                error_bound: 0,
-            }
-        );
+        assert_eq!(update.args(), sys::zx_clock_update_args_v2_t::default(),);
     }
 
     #[test]
@@ -387,16 +373,11 @@ mod tests {
             update.options(),
             sys::ZX_CLOCK_ARGS_VERSION_2 | sys::ZX_CLOCK_UPDATE_OPTION_RATE_ADJUST_VALID
         );
-        assert_eq!(
-            sys::zx_clock_update_args_v2_t::from(update),
-            sys::zx_clock_update_args_v2_t {
-                rate_adjust: 52,
-                padding1: Default::default(),
-                reference_value: 0,
-                synthetic_value: 0,
-                error_bound: 0,
-            }
-        );
+        let args = update.args();
+        assert_eq!(args.rate_adjust, 52);
+        assert_eq!(args.reference_value, 0);
+        assert_eq!(args.synthetic_value, 0);
+        assert_eq!(args.error_bound, 0);
     }
 
     #[test]
@@ -411,16 +392,11 @@ mod tests {
                 | sys::ZX_CLOCK_UPDATE_OPTION_SYNTHETIC_VALUE_VALID
                 | sys::ZX_CLOCK_UPDATE_OPTION_ERROR_BOUND_VALID
         );
-        assert_eq!(
-            sys::zx_clock_update_args_v2_t::from(update),
-            sys::zx_clock_update_args_v2_t {
-                rate_adjust: 0,
-                padding1: Default::default(),
-                reference_value: 0,
-                synthetic_value: 42,
-                error_bound: 62,
-            }
-        );
+        let args = update.args();
+        assert_eq!(args.rate_adjust, 0);
+        assert_eq!(args.reference_value, 0);
+        assert_eq!(args.synthetic_value, 42);
+        assert_eq!(args.error_bound, 62);
     }
 
     #[test]
@@ -438,15 +414,11 @@ mod tests {
                 | sys::ZX_CLOCK_UPDATE_OPTION_RATE_ADJUST_VALID
                 | sys::ZX_CLOCK_UPDATE_OPTION_ERROR_BOUND_VALID
         );
-        assert_eq!(
-            sys::zx_clock_update_args_v2_t::from(update),
-            sys::zx_clock_update_args_v2_t {
-                rate_adjust: 52,
-                padding1: Default::default(),
-                reference_value: 1000,
-                synthetic_value: 42,
-                error_bound: 62,
-            }
-        );
+
+        let args = update.args();
+        assert_eq!(args.rate_adjust, 52);
+        assert_eq!(args.reference_value, 1000);
+        assert_eq!(args.synthetic_value, 42);
+        assert_eq!(args.error_bound, 62);
     }
 }

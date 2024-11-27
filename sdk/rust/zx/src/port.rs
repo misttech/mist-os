@@ -480,10 +480,6 @@ impl PowerTransitionPacket {
         self.0.control_interface
     }
 
-    pub fn reserved(&self) -> u64 {
-        self.0.reserved
-    }
-
     pub fn control_argument(&self) -> u64 {
         self.0.control_argument
     }
@@ -657,7 +653,7 @@ mod tests {
     #[test]
     fn guest_mem_packet() {
         #[cfg(target_arch = "x86_64")]
-        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t = sys::zx_packet_guest_mem_t {
+        let guest_mem_packet = sys::zx_packet_guest_mem_t {
             addr: 0xaaaabbbbccccdddd,
             cr3: 0x0123456789abcdef,
             rip: 0xffffffff00000000,
@@ -665,7 +661,7 @@ mod tests {
             default_operand_size: 2,
         };
         #[cfg(target_arch = "aarch64")]
-        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t = sys::zx_packet_guest_mem_t {
+        let guest_mem_packet = sys::zx_packet_guest_mem_t {
             addr: 0x8877665544332211,
             access_size: 8,
             sign_extend: true,
@@ -674,15 +670,18 @@ mod tests {
             data: 0x1122334455667788,
         };
         #[cfg(target_arch = "riscv64")]
-        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t =
-            sys::zx_packet_guest_mem_t { addr: 0x8877665544332211, reserved: [0; 3] };
+        let guest_mem_packet = {
+            let mut ret = sys::zx_packet_guest_mem_t::default();
+            ret.addr = 0x8877665544332211;
+            ret
+        };
         const KEY: u64 = 0x5555555555555555;
         const STATUS: i32 = sys::ZX_ERR_INTERNAL;
 
         let packet =
-            Packet::from_guest_mem_packet(KEY, STATUS, GuestMemPacket::from_raw(GUEST_MEM_PACKET));
+            Packet::from_guest_mem_packet(KEY, STATUS, GuestMemPacket::from_raw(guest_mem_packet));
 
-        assert_matches!(packet.contents(), PacketContents::GuestMem(GuestMemPacket(packet)) if packet == GUEST_MEM_PACKET);
+        assert_matches!(packet.contents(), PacketContents::GuestMem(GuestMemPacket(packet)) if packet == guest_mem_packet);
         assert_eq!(packet.key(), KEY);
         assert_eq!(packet.status(), STATUS);
     }
@@ -709,17 +708,15 @@ mod tests {
     #[test]
     fn guest_vcpu_interrupt_packet() {
         // Unable to use 'const' here because we need Default::default to initialize the PadBytes.
-        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
-            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_INTERRUPT,
-            union: sys::zx_packet_guest_vcpu_union_t {
-                interrupt: sys::zx_packet_guest_vcpu_interrupt_t {
-                    mask: 0xaaaaaaaaaaaaaaaa,
-                    vector: 0x12,
-                    padding1: Default::default(),
-                },
+        let mut guest_vcpu_packet = sys::zx_packet_guest_vcpu_t::default();
+        guest_vcpu_packet.r#type = sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_INTERRUPT;
+        guest_vcpu_packet.union = sys::zx_packet_guest_vcpu_union_t {
+            interrupt: {
+                let mut interrupt = sys::zx_packet_guest_vcpu_interrupt_t::default();
+                interrupt.mask = 0xaaaaaaaaaaaaaaaa;
+                interrupt.vector = 0x12;
+                interrupt
             },
-            padding1: Default::default(),
-            reserved: 0,
         };
         const KEY: u64 = 0x0123456789abcdef;
         const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
@@ -737,13 +734,10 @@ mod tests {
 
     #[test]
     fn guest_vcpu_startup_packet() {
-        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
-            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_STARTUP,
-            union: sys::zx_packet_guest_vcpu_union_t {
-                startup: sys::zx_packet_guest_vcpu_startup_t { id: 16, entry: 0xffffffff11111111 },
-            },
-            padding1: Default::default(),
-            reserved: 0,
+        let mut guest_vcpu_packet = sys::zx_packet_guest_vcpu_t::default();
+        guest_vcpu_packet.r#type = sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_STARTUP;
+        guest_vcpu_packet.union = sys::zx_packet_guest_vcpu_union_t {
+            startup: sys::zx_packet_guest_vcpu_startup_t { id: 16, entry: 0xffffffff11111111 },
         };
         const KEY: u64 = 0x0123456789abcdef;
         const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
@@ -761,14 +755,11 @@ mod tests {
 
     #[test]
     fn guest_vcpu_exit_packet() {
-        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
-            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_EXIT,
-            union: sys::zx_packet_guest_vcpu_union_t {
-                exit: sys::zx_packet_guest_vcpu_exit_t { retcode: 12345678, reserved: 0 },
-            },
-            padding1: Default::default(),
-            reserved: 0,
-        };
+        let mut guest_vcpu_packet = sys::zx_packet_guest_vcpu_t::default();
+        guest_vcpu_packet.r#type = sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_EXIT;
+        let mut exit = sys::zx_packet_guest_vcpu_exit_t::default();
+        exit.retcode = 12345678;
+        guest_vcpu_packet.union = sys::zx_packet_guest_vcpu_union_t { exit };
         const KEY: u64 = 0x0123456789abcdef;
         const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
 
@@ -785,26 +776,20 @@ mod tests {
 
     #[test]
     fn power_transition_packet() {
-        const POWER_TRANSITION_PACKET: sys::zx_packet_processor_power_level_transition_request_t =
-            sys::zx_packet_processor_power_level_transition_request_t {
-                domain_id: 0,
-                options: 0,
-                control_argument: 0,
-                control_interface: 0,
-                reserved: 0,
-            };
+        let power_transition_packet =
+            sys::zx_packet_processor_power_level_transition_request_t::default();
         const KEY: u64 = 0x0123456789abcdef;
         const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
 
         let packet = Packet::from_power_transition_packet(
             KEY,
             STATUS,
-            PowerTransitionPacket::from_raw(POWER_TRANSITION_PACKET),
+            PowerTransitionPacket::from_raw(power_transition_packet),
         );
 
         assert_matches!(
             packet.contents(),
-            PacketContents::PowerTransition(PowerTransitionPacket(packet)) if packet == POWER_TRANSITION_PACKET
+            PacketContents::PowerTransition(PowerTransitionPacket(packet)) if packet == power_transition_packet
         );
         assert_eq!(packet.key(), KEY);
         assert_eq!(packet.status(), STATUS);
