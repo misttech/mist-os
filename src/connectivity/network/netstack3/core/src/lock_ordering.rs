@@ -292,7 +292,11 @@ impl_lock_after!(IpDeviceConfiguration<Ipv6> => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
 impl_lock_after!(Ipv6DeviceSlaac => Ipv6DeviceAddressDad);
-impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);
+impl_lock_after!(Ipv6DeviceAddressDad => IpDeviceGmp<Ipv4>);
+
+impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceGmp<Ipv6>);
+impl_lock_after!(IpDeviceGmp<Ipv6> => FilterState<Ipv4>);
+
 impl_lock_after!(FilterState<Ipv4> => FilterState<Ipv6>);
 impl_lock_after!(FilterState<Ipv6> => IpState<Ipv4>);
 impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
@@ -310,10 +314,8 @@ impl_lock_after!(EthernetIpv6Nud => AllDeviceSockets);
 
 impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => EthernetDeviceIpState<Ipv4>);
-impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
-impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
-impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceGmp<Ipv6>);
-impl_lock_after!(IpDeviceGmp<Ipv6> => IpDeviceAddresses<Ipv6>);
+impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceAddresses<Ipv4>);
+impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceAddresses<Ipv6>);
 impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceFlags<Ipv4>);
 impl_lock_after!(IpDeviceFlags<Ipv4> => IpDeviceFlags<Ipv6>);
 impl_lock_after!(IpDeviceFlags<Ipv6> => Ipv4DeviceAddressState);

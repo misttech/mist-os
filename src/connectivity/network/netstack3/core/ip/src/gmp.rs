@@ -30,14 +30,13 @@ macro_rules! assert_gmp_state {
         assert_gmp_state!(@inner $ctx, $group, MemberState::Delaying(_));
     };
     (@inner $ctx:expr, $group:expr, $pattern:pat) => {
-        assert!(matches!($ctx.state.groups.get($group).unwrap().0.inner.as_ref().unwrap(), $pattern))
+        assert!(matches!($ctx.state.groups().get($group).unwrap().0.inner.as_ref().unwrap(), $pattern))
     };
 }
 
 pub(crate) mod igmp;
 pub(crate) mod mld;
 
-use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::time::Duration;
 
@@ -938,22 +937,47 @@ trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: GmpTypeLayout<I, BT> {
 /// Provides common functionality for GMP context implementations.
 ///
 /// This trait implements portions of a group management protocol.
-trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
+trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> + Sized {
+    /// The context-specific error type.
     type Err;
+    /// The inner context given to `with_gmp_state_mut_and_ctx`.
+    type Inner<'a>: GmpContextInner<
+            I,
+            BC,
+            ProtocolSpecific = Self::ProtocolSpecific,
+            GroupState = Self::GroupState,
+            DeviceId = Self::DeviceId,
+        > + 'a;
 
-    /// Calls the function with a boolean indicating whether GMP is disabled and
-    /// an mutable reference to GMP state.
-    fn with_gmp_state_mut<O, F: FnOnce(GmpStateRef<'_, I, Self, BC>) -> O>(
+    /// Calls the function with mutable access to GMP state in [`GmpStateRef`]
+    /// and access to a [`GmpContextInner`] context.
+    fn with_gmp_state_mut_and_ctx<
+        O,
+        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, I, Self, BC>) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O;
 
+    /// Calls the function with mutable access to GMP state in [`GmpStateRef`].
+    fn with_gmp_state_mut<O, F: FnOnce(GmpStateRef<'_, I, Self, BC>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_gmp_state_mut_and_ctx(device, |_core_ctx, state| cb(state))
+    }
+
+    /// Returns the context-specific error for not a member.
+    fn not_a_member_err(addr: I::Addr) -> Self::Err;
+}
+
+/// The inner GMP context.
+///
+/// Provides access to external actions while holding the GMP state lock.
+trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
     /// Sends a GMP message.
-    // TODO(https://fxbug.dev/336871374): We should consider changing the shape
-    // of this trait to force linearization of sent messages by requiring that
-    // the GMP state lock is held to send messages and running subprotocol
-    // actions.
     fn send_message(
         &mut self,
         bindings_ctx: &mut BC,
@@ -969,8 +993,6 @@ trait GmpContext<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
         device: &Self::DeviceId,
         actions: <Self::ProtocolSpecific as ProtocolSpecific>::Actions,
     );
-
-    fn not_a_member_err(addr: I::Addr) -> Self::Err;
 }
 
 fn gmp_handle_timer<I, BC, CC>(
@@ -986,25 +1008,26 @@ fn gmp_handle_timer<I, BC, CC>(
     let Some(device) = device.upgrade() else {
         return;
     };
-    let actions =
-        core_ctx.with_gmp_state_mut(&device, |GmpStateRef { enabled: _, groups, gmp }| {
-            let (group_addr, ()) = gmp.timers.pop(bindings_ctx)?;
-            let actions = groups
+    core_ctx.with_gmp_state_mut_and_ctx(
+        &device,
+        |mut core_ctx, GmpStateRef { enabled: _, groups, gmp }| {
+            let Some((group_addr, ())) = gmp.timers.pop(bindings_ctx) else {
+                return;
+            };
+            let ReportTimerExpiredActions { send_report } = groups
                 .get_mut(&group_addr)
                 .expect("get state for group with expired report timer")
                 .as_mut()
                 .report_timer_expired();
-            Some((group_addr, actions))
-        });
 
-    if let Some((group_addr, ReportTimerExpiredActions { send_report })) = actions {
-        core_ctx.send_message(
-            bindings_ctx,
-            &device,
-            group_addr,
-            GmpMessageType::Report(send_report),
-        );
-    }
+            core_ctx.send_message(
+                bindings_ctx,
+                &device,
+                group_addr,
+                GmpMessageType::Report(send_report),
+            );
+        },
+    );
 }
 
 trait GmpMessage<I: Ip> {
@@ -1052,8 +1075,9 @@ where
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    let addr_and_actions =
-        core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp }| {
+    core_ctx.with_gmp_state_mut_and_ctx(
+        device,
+        |mut core_ctx, GmpStateRef { enabled: _, groups, gmp }| {
             let now = bindings_ctx.now();
 
             let iter = match target {
@@ -1066,46 +1090,33 @@ where
                 ))),
             };
 
-            Ok(iter
-                .filter_map(|(group_addr, state)| {
-                    let QueryReceivedActions { generic, protocol_specific } = state
-                        .as_mut()
-                        .query_received(&mut bindings_ctx.rng(), max_response_time, now);
-                    let send_msg = generic.and_then(|generic| match generic {
-                        QueryReceivedGenericAction::ScheduleTimer(delay) => {
-                            let _: Option<(BC::Instant, ())> =
-                                gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay);
-                            None
-                        }
-                        QueryReceivedGenericAction::StopTimerAndSendReport(protocol_specific) => {
-                            let _: Option<(BC::Instant, ())> =
-                                gmp.timers.cancel(bindings_ctx, &group_addr);
-                            Some(GmpMessageType::Report(protocol_specific))
-                        }
-                    });
-                    match (send_msg, protocol_specific) {
-                        (None, None) => None,
-                        // If we have anything else to do, collect to perform
-                        // outside of locking.
-                        (send_msg, protocol_specific) => {
-                            Some((group_addr, send_msg, protocol_specific))
-                        }
+            for (group_addr, state) in iter {
+                let QueryReceivedActions { generic, protocol_specific } =
+                    state.as_mut().query_received(&mut bindings_ctx.rng(), max_response_time, now);
+                let send_msg = generic.and_then(|generic| match generic {
+                    QueryReceivedGenericAction::ScheduleTimer(delay) => {
+                        let _: Option<(BC::Instant, ())> =
+                            gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay);
+                        None
                     }
-                })
-                .collect::<Vec<_>>())
-        })?;
+                    QueryReceivedGenericAction::StopTimerAndSendReport(protocol_specific) => {
+                        let _: Option<(BC::Instant, ())> =
+                            gmp.timers.cancel(bindings_ctx, &group_addr);
+                        Some(GmpMessageType::Report(protocol_specific))
+                    }
+                });
 
-    for (group_addr, send_msg, ps_actions) in addr_and_actions {
-        if let Some(msg) = send_msg {
-            core_ctx.send_message(bindings_ctx, device, group_addr, msg);
-        };
+                if let Some(msg) = send_msg {
+                    core_ctx.send_message(bindings_ctx, device, group_addr, msg);
+                }
+                if let Some(ps_actions) = protocol_specific {
+                    core_ctx.run_actions(bindings_ctx, device, ps_actions);
+                }
+            }
 
-        if let Some(ps_actions) = ps_actions {
-            core_ctx.run_actions(bindings_ctx, device, ps_actions);
-        }
-    }
-
-    Ok(())
+            Ok(())
+        },
+    )
 }
 
 fn gmp_handle_maybe_enabled<BC, CC, I>(
@@ -1117,36 +1128,39 @@ fn gmp_handle_maybe_enabled<BC, CC, I>(
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    let messages = core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled, groups, gmp }| {
-        if !enabled {
-            return Vec::new();
-        }
+    core_ctx.with_gmp_state_mut_and_ctx(
+        device,
+        |mut core_ctx, GmpStateRef { enabled, groups, gmp }| {
+            if !enabled {
+                return;
+            }
 
-        let now = bindings_ctx.now();
+            let now = bindings_ctx.now();
 
-        groups
-            .iter_mut()
-            .filter_map(|(group_addr, state)| {
+            for (group_addr, state) in groups.iter_mut() {
                 let group_addr = *group_addr;
-                I::should_perform_gmp(group_addr)
-                    .then(|| {
-                        let JoinGroupActions { send_report_and_schedule_timer } =
-                            state.as_mut().join_if_non_member(&mut bindings_ctx.rng(), now);
-                        let (protocol_specific, delay) = send_report_and_schedule_timer?;
-                        assert_matches!(
-                            gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay),
-                            None
-                        );
-                        Some((group_addr, GmpMessageType::Report(protocol_specific)))
-                    })
-                    .flatten()
-            })
-            .collect::<Vec<_>>()
-    });
+                if !I::should_perform_gmp(group_addr) {
+                    continue;
+                }
 
-    for (group_addr, msg) in messages {
-        core_ctx.send_message(bindings_ctx, device, group_addr, msg);
-    }
+                let JoinGroupActions { send_report_and_schedule_timer } =
+                    state.as_mut().join_if_non_member(&mut bindings_ctx.rng(), now);
+                let Some((protocol_specific, delay)) = send_report_and_schedule_timer else {
+                    continue;
+                };
+                assert_matches!(
+                    gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay),
+                    None
+                );
+                core_ctx.send_message(
+                    bindings_ctx,
+                    device,
+                    group_addr,
+                    GmpMessageType::Report(protocol_specific),
+                );
+            }
+        },
+    )
 }
 
 fn gmp_handle_disabled<BC, CC, I>(core_ctx: &mut CC, bindings_ctx: &mut BC, device: &CC::DeviceId)
@@ -1155,24 +1169,20 @@ where
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    let leave_groups =
-        core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp }| {
-            groups
-                .groups_mut()
-                .filter_map(|(group_addr, state)| {
-                    let LeaveGroupActions { send_leave, stop_timer } =
-                        state.as_mut().leave_if_member();
-                    if stop_timer {
-                        assert_matches!(gmp.timers.cancel(bindings_ctx, group_addr), Some(_));
-                    }
-                    send_leave.then(|| *group_addr)
-                })
-                .collect::<Vec<_>>()
-        });
-
-    for group_addr in leave_groups {
-        core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
-    }
+    core_ctx.with_gmp_state_mut_and_ctx(
+        device,
+        |mut core_ctx, GmpStateRef { enabled: _, groups, gmp }| {
+            for (group_addr, state) in groups.groups_mut() {
+                let LeaveGroupActions { send_leave, stop_timer } = state.as_mut().leave_if_member();
+                if stop_timer {
+                    assert_matches!(gmp.timers.cancel(bindings_ctx, group_addr), Some(_));
+                }
+                if send_leave {
+                    core_ctx.send_message(bindings_ctx, device, *group_addr, GmpMessageType::Leave);
+                }
+            }
+        },
+    )
 }
 
 fn gmp_join_group<BC, CC, I>(
@@ -1186,8 +1196,9 @@ where
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    core_ctx
-        .with_gmp_state_mut(device, |GmpStateRef { enabled, groups, gmp }| {
+    core_ctx.with_gmp_state_mut_and_ctx(
+        device,
+        |mut core_ctx, GmpStateRef { enabled, groups, gmp }| {
             let now = bindings_ctx.now();
 
             let result = groups.join_group_gmp(
@@ -1197,20 +1208,22 @@ where
                 now,
             );
             result.map(|JoinGroupActions { send_report_and_schedule_timer }| {
-                send_report_and_schedule_timer.map(|(protocol_specific, delay)| {
+                if let Some((protocol_specific, delay)) = send_report_and_schedule_timer {
                     assert_matches!(
                         gmp.timers.schedule_after(bindings_ctx, group_addr, (), delay),
                         None
                     );
-                    GmpMessageType::Report(protocol_specific)
-                })
+
+                    core_ctx.send_message(
+                        bindings_ctx,
+                        device,
+                        group_addr,
+                        GmpMessageType::Report(protocol_specific),
+                    );
+                }
             })
-        })
-        .map(|msg| {
-            if let Some(msg) = msg {
-                core_ctx.send_message(bindings_ctx, device, group_addr, msg);
-            }
-        })
+        },
+    )
 }
 
 fn gmp_leave_group<BC, CC, I>(
@@ -1224,22 +1237,26 @@ where
     CC: GmpContext<I, BC>,
     I: IpExt,
 {
-    core_ctx
-        .with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp }| {
+    core_ctx.with_gmp_state_mut_and_ctx(
+        device,
+        |mut core_ctx, GmpStateRef { enabled: _, groups, gmp }| {
             groups.leave_group_gmp(group_addr).map(
                 |LeaveGroupActions { send_leave, stop_timer }| {
                     if stop_timer {
                         assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
                     }
-                    send_leave
+                    if send_leave {
+                        core_ctx.send_message(
+                            bindings_ctx,
+                            device,
+                            group_addr,
+                            GmpMessageType::Leave,
+                        );
+                    }
                 },
             )
-        })
-        .map(|send_leave| {
-            if send_leave {
-                core_ctx.send_message(bindings_ctx, device, group_addr, GmpMessageType::Leave);
-            }
-        })
+        },
+    )
 }
 #[cfg(test)]
 mod test {

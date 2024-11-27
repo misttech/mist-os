@@ -65,7 +65,7 @@ use crate::internal::device::state::{
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
-use crate::internal::gmp::{GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::gmp::{GmpHandler, GroupJoinResult, GroupLeaveResult};
 
 /// An IP device timer.
 ///
@@ -757,7 +757,6 @@ pub trait IpDeviceConfigurationContext<
         + 's;
     /// Provides access to device state.
     type DeviceAddressAndGroupsAccessor<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
-        + GmpQueryHandler<I, BC>
         + 's;
 
     /// Calls the function with an immutable reference to the IP device

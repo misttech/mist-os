@@ -40,8 +40,8 @@ use netstack3_ip::device::{
     SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
-    GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
-    MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
+    GmpStateRef, IgmpContext, IgmpGroupState, IgmpSendContext, IgmpState, IgmpStateContext,
+    MldContext, MldGroupState, MldSendContext, MldStateContext, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -296,7 +296,7 @@ impl<
         BT: IpDeviceStateBindingsTypes,
         I: Ip + IpLayerIpExt + IpDeviceIpExt,
         Devices: Iterator<Item = Accessor::DeviceId>,
-        Accessor: IpDeviceStateContext<I, BT> + GmpQueryHandler<I, BT>,
+        Accessor: IpDeviceStateContext<I, BT>,
     > Iterator for FilterPresentWithDevices<I, Devices, Accessor, BT>
 where
     <I as IpDeviceIpExt>::State<BT>: 's,
@@ -333,7 +333,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IpDeviceIngressStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn address_status_for_device(
@@ -404,7 +404,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     IpDeviceIngressStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
     fn address_status_for_device(
@@ -669,7 +669,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     DadAddressContext<BC>
     for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
 {
@@ -1168,11 +1168,17 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         BC,
     >
 {
+    type SendContext<'b> = CoreCtx<'b, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv4>>>;
+
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: FnOnce(GmpStateRef<'_, Ipv4, Self, BC>, &mut IgmpState<BC>) -> O,
+        F: for<'b> FnOnce(
+            Self::SendContext<'b>,
+            GmpStateRef<'b, Ipv4, Self, BC>,
+            &'b mut IgmpState<BC>,
+        ) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1182,25 +1188,31 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         let Ipv4DeviceConfiguration { ip_config: IpDeviceConfiguration { gmp_enabled, .. } } =
             Borrow::borrow(&*config);
 
-        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
+        let mut state = crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device);
         // Note that changes to `ip_enabled` is not possible in this context
         // since IP enabled changes are only performed while the IP device
         // configuration lock is held exclusively. Since we have access to
         // the IP device configuration here (`config`), we know changes to
         // IP enabled are not possible.
-        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
-        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+        let ip_enabled = state
+            .lock_with::<crate::lock_ordering::IpDeviceFlags<Ipv4>, _>(|x| x.right())
+            .ip_enabled;
+        let (mut state, mut locked) =
+            state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv4>, _>(|x| x.right());
         let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp }, gmp_proto)
     }
+}
 
+impl<'a, BC: BindingsContext> IgmpSendContext<BC>
+    for CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+{
     fn get_ip_addr_subnet(
         &mut self,
         device: &Self::DeviceId,
     ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
-        let Self { config: _, core_ctx } = self;
-        ip::device::get_ipv4_addr_subnet(core_ctx, device)
+        ip::device::get_ipv4_addr_subnet(self, device)
     }
 }
 
@@ -1208,10 +1220,15 @@ impl<
         'a,
         Config: Borrow<Ipv6DeviceConfiguration>,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>,
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>,
     > MldContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
-    fn with_mld_state_mut<O, F: FnOnce(GmpStateRef<'_, Ipv6, Self, BC>) -> O>(
+    type SendContext<'b> = CoreCtx<'b, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv6>>>;
+
+    fn with_mld_state_mut<
+        O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -1224,21 +1241,27 @@ impl<
             ip_config: IpDeviceConfiguration { gmp_enabled, .. },
         } = Borrow::borrow(&*config);
 
-        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
-        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
-        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+        let mut state = crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device);
+        let ip_enabled = state
+            .lock_with::<crate::lock_ordering::IpDeviceFlags<Ipv6>, _>(|x| x.right())
+            .ip_enabled;
+        let (mut state, mut locked) =
+            state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv6>, _>(|x| x.right());
         let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(GmpStateRef { enabled, groups, gmp })
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp })
     }
+}
 
+impl<'a, BC: BindingsContext> MldSendContext<BC>
+    for CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
+{
     fn get_ipv6_link_local_addr(
         &mut self,
         device: &Self::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-        let Self { config: _, core_ctx } = self;
         device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
-            core_ctx,
+            self,
             device,
             |mut addrs, core_ctx| {
                 addrs.find_map(|addr_id| {
@@ -1333,7 +1356,7 @@ impl<
         I: IpLayerIpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpState<I>>,
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<I>>,
     > IpDeviceEgressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn with_next_packet_id<O, F: FnOnce(&<I as IpLayerIpExt>::PacketIdState) -> O>(
@@ -1365,7 +1388,7 @@ impl<
         I: IpLayerIpExt,
         Config,
         BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpState<I>>,
+        L: LockBefore<crate::lock_ordering::IpDeviceGmp<I>>,
     > IpDeviceIngressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn address_status_for_device(
