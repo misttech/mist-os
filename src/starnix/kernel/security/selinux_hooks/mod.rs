@@ -773,12 +773,22 @@ where
         let old_sid = fs_node_effective_sid(fs_node);
         let file_class = file_class_from_file_mode(fs_node.info().mode)?;
         let permission_check = security_server.as_permission_check();
-        check_permission(
-            &permission_check,
-            task_sid,
-            old_sid,
-            CommonFilePermission::RelabelFrom.for_class(file_class),
-        )?;
+        if old_sid == SecurityId::initial(InitialSid::File) {
+            todo_check_permission!(
+                TODO("https://fxbug.dev/381275592", "relabelfrom unlabeled file"),
+                &permission_check,
+                task_sid,
+                old_sid,
+                CommonFilePermission::RelabelFrom.for_class(file_class),
+            )?;
+        } else {
+            check_permission(
+                &permission_check,
+                task_sid,
+                old_sid,
+                CommonFilePermission::RelabelFrom.for_class(file_class),
+            )?;
+        }
         check_permission(
             &permission_check,
             task_sid,
@@ -821,7 +831,6 @@ fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
     }
 
     // We should never reach here, but for now enforce it (see above) in debug builds.
-    let info = fs_node.info();
     let fs_name = fs_node.fs().name();
     if fs_name == "anon" {
         track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
@@ -830,12 +839,15 @@ fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
     } else if fs_name == "pipefs" {
         track_stub!(TODO("https://fxbug.dev/380448690"), "Label fifo nodes properly");
     } else {
+        #[cfg(is_debug)]
         panic!(
             "Unlabeled FsNode@{} of class {:?} in {}",
-            info.ino,
-            file_class_from_file_mode(info.mode),
+            fs_node.info().ino,
+            file_class_from_file_mode(fs_node.info().mode),
             fs_node.fs().name()
         );
+        #[cfg(not(is_debug))]
+        track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
     }
 
     SecurityId::initial(InitialSid::Unlabeled)
