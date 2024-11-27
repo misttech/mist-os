@@ -505,7 +505,7 @@ impl<
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceStateContext::<I>::get_hop_limit(self, device),
+                unicast: IpDeviceEgressStateContext::<I>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
@@ -743,7 +743,6 @@ pub trait IpRouteTablesContext<I: IpLayerIpExt>: IpDeviceContext<I> {
     /// The inner device id context.
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpRoutingDeviceContext<I>
-        + IpDeviceStateContext<I>
         + IpDeviceContext<I>;
 
     /// Gets the main table ID.
@@ -812,8 +811,8 @@ pub trait IpRouteTablesContext<I: IpLayerIpExt>: IpDeviceContext<I> {
     ) -> O;
 }
 
-/// Provides access to an IP device's state for the IP layer.
-pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+/// Provides access to an IP device's state for IP layer egress.
+pub trait IpDeviceEgressStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
 
@@ -826,7 +825,10 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
 
     /// Returns the hop limit.
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
+}
 
+/// Provides access to an IP device's state for IP layer ingress.
+pub trait IpDeviceIngressStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// Gets the status of an address.
     ///
     /// Only the specified device will be checked for the address. Returns
@@ -840,7 +842,9 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
 }
 
 /// The IP device context provided to the IP layer.
-pub trait IpDeviceContext<I: IpLayerIpExt>: IpDeviceStateContext<I> {
+pub trait IpDeviceContext<I: IpLayerIpExt>:
+    IpDeviceEgressStateContext<I> + IpDeviceIngressStateContext<I>
+{
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -1004,7 +1008,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     )
 }
 
-fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
+fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceIngressStateContext<I>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
     addr: IpDeviceAddr<I::Addr>,
@@ -1021,7 +1025,7 @@ fn get_device_with_assigned_address<I, CC>(
 ) -> Option<(CC::DeviceId, I::AddressStatus)>
 where
     I: IpLayerIpExt,
-    CC: IpDeviceStateContext<I> + IpDeviceContext<I>,
+    CC: IpDeviceContext<I>,
 {
     core_ctx.with_address_statuses(addr.into(), |mut it| {
         it.find_map(|(device, status)| {
@@ -1033,7 +1037,7 @@ where
 // Returns the local IP address to use for sending packets from the
 // given device to `addr`, restricting to `local_ip` if it is not
 // `None`.
-fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
+fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceContext<I>>(
     core_ctx: &mut CC,
     local_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     device: &CC::DeviceId,
@@ -1073,7 +1077,7 @@ fn get_local_addr_with_internal_forwarding<I, CC>(
 ) -> Result<(IpDeviceAddr<I::Addr>, InternalForwarding<CC::DeviceId>), ResolveRouteError>
 where
     I: IpLayerIpExt,
-    CC: IpDeviceContext<I> + IpDeviceStateContext<I>,
+    CC: IpDeviceContext<I>,
 {
     match get_local_addr(core_ctx, local_ip_and_policy, device, remote_addr) {
         Ok(src_addr) => Ok((src_addr, InternalForwarding::NotUsed)),
@@ -1187,10 +1191,7 @@ fn walk_rules<
 pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpStateContext<I>
-        + IpDeviceContext<I>
-        + IpDeviceStateContext<I>
-        + device::IpDeviceConfigurationContext<I, BC>,
+    CC: IpStateContext<I> + IpDeviceContext<I> + device::IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
@@ -1411,7 +1412,6 @@ impl<
             + IpStateContext<I>
             + IpDeviceContext<I>
             + IpDeviceConfirmReachableContext<I, BC>
-            + IpDeviceStateContext<I>
             + IpDeviceMtuContext<I>
             + device::IpDeviceConfigurationContext<I, BC>
             + UseIpSocketContextBlanket,
@@ -1521,7 +1521,7 @@ pub trait IpTransportDispatchContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDe
 /// A marker trait for all the contexts required for IP ingress.
 pub trait IpLayerIngressContext<I: IpLayerIpExt, BC: IpLayerBindingsContext<I, Self::DeviceId>>:
     IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
-    + IpDeviceStateContext<I>
+    + IpDeviceIngressStateContext<I>
     + IpDeviceMtuContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
@@ -1539,7 +1539,7 @@ impl<
                 I,
                 BC,
                 DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
-            > + IpDeviceStateContext<I>
+            > + IpDeviceIngressStateContext<I>
             + IpDeviceMtuContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
@@ -1666,7 +1666,7 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 /// Generates an IP packet ID.
 ///
 /// This is only meaningful for IPv4, see [`IpLayerIpExt`].
-pub fn gen_ip_packet_id<I: IpLayerIpExt, CC: IpDeviceStateContext<I>>(
+pub fn gen_ip_packet_id<I: IpLayerIpExt, CC: IpDeviceEgressStateContext<I>>(
     core_ctx: &mut CC,
 ) -> I::PacketId {
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
@@ -4283,7 +4283,7 @@ pub trait IpLayerHandler<I: IpExt + FragmentationIpExt, BC>: DeviceIdContext<Any
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I> + IpDeviceMtuContext<I>,
+        CC: IpLayerEgressContext<I, BC> + IpDeviceEgressStateContext<I> + IpDeviceMtuContext<I>,
     > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
@@ -4341,7 +4341,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
-    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I> + IpDeviceMtuContext<I>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceEgressStateContext<I> + IpDeviceMtuContext<I>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {

@@ -130,7 +130,7 @@ impl<I: IpLayerIpExt> IpRoutingDeviceContext<I> for FakeCoreCtx<I> {
     }
 }
 
-impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
+impl<I: IpLayerIpExt> IpDeviceEgressStateContext<I> for FakeCoreCtx<I> {
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -155,7 +155,9 @@ impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
     }
+}
 
+impl<I: IpLayerIpExt> IpDeviceIngressStateContext<I> for FakeCoreCtx<I> {
     fn address_status_for_device(
         &mut self,
         _addr: SpecifiedAddr<I::Addr>,

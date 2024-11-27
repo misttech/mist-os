@@ -68,7 +68,7 @@ use netstack3_ip::multicast_forwarding::{
 use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
-    FragmentTimerId, InternalForwarding, IpDeviceStateContext, IpLayerTimerId,
+    FragmentTimerId, InternalForwarding, IpDeviceIngressStateContext, IpLayerTimerId,
     Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, Marks, NextHop, RawMetric,
     ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
@@ -2228,7 +2228,7 @@ fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus
 
     let addr = SpecifiedAddr::new(addr).expect("test cases should provide specified addrs");
     assert_eq!(
-        IpDeviceStateContext::<Ipv4>::address_status_for_device(
+        IpDeviceIngressStateContext::<Ipv4>::address_status_for_device(
             &mut ctx.core_ctx(),
             addr,
             &loopback_id

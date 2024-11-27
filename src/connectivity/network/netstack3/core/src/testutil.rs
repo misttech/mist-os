@@ -231,12 +231,12 @@ where
         A::Version: IpExt,
     {
         use ip::{
-            AddressStatus, IpDeviceStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
+            AddressStatus, IpDeviceIngressStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
             Ipv6PresentAddressStatus,
         };
 
         let (core_ctx, _) = self.contexts();
-        let addr_status = IpDeviceStateContext::<A::Version>::address_status_for_device(
+        let addr_status = IpDeviceIngressStateContext::<A::Version>::address_status_for_device(
             core_ctx,
             addr.into_specified(),
             device,

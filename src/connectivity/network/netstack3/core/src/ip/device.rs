@@ -11,7 +11,6 @@ use core::num::NonZeroU8;
 use core::ops::{Deref as _, DerefMut as _};
 use core::sync::atomic::AtomicU16;
 
-use ip::device::RsTimerId;
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
 use log::debug;
@@ -37,8 +36,8 @@ use netstack3_ip::device::{
     Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
     Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
     Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
-    RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-    SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+    SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
     GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
@@ -46,7 +45,8 @@ use netstack3_ip::gmp::{
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
-    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
+    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpDeviceContext,
+    IpDeviceEgressStateContext, IpDeviceIngressStateContext, IpLayerIpExt, IpSasHandler,
     IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
@@ -314,7 +314,7 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ip::IpDeviceStateContext<Ipv4> for CoreCtx<'_, BC, L>
+    IpDeviceEgressStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
@@ -325,13 +325,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<IpDeviceAddr<Ipv4Addr>> {
-        ip::IpSasHandler::<Ipv4, _>::get_local_addr_for_remote(self, device_id, remote)
+        IpSasHandler::<Ipv4, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
     }
+}
 
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    IpDeviceIngressStateContext<Ipv4> for CoreCtx<'_, BC, L>
+{
     fn address_status_for_device(
         &mut self,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
@@ -342,7 +346,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
-    ip::IpDeviceContext<Ipv4> for CoreCtx<'_, BC, L>
+    IpDeviceContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_device_enabled::<Ipv4, _, _>(self, device_id)
@@ -381,7 +385,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    ip::IpDeviceStateContext<Ipv6> for CoreCtx<'_, BC, L>
+    IpDeviceEgressStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
         cb(&())
@@ -398,7 +402,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
     }
+}
 
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    IpDeviceIngressStateContext<Ipv6> for CoreCtx<'_, BC, L>
+{
     fn address_status_for_device(
         &mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
@@ -1326,14 +1334,14 @@ impl<
         Config,
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
-    > ip::IpDeviceStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+    > IpDeviceEgressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn with_next_packet_id<O, F: FnOnce(&<I as IpLayerIpExt>::PacketIdState) -> O>(
         &self,
         cb: F,
     ) -> O {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::with_next_packet_id(core_ctx, cb)
+        IpDeviceEgressStateContext::<I>::with_next_packet_id(core_ctx, cb)
     }
 
     fn get_local_addr_for_remote(
@@ -1342,21 +1350,31 @@ impl<
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
     ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::get_local_addr_for_remote(core_ctx, device_id, remote)
+        IpDeviceEgressStateContext::<I>::get_local_addr_for_remote(core_ctx, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::get_hop_limit(core_ctx, device_id)
+        IpDeviceEgressStateContext::<I>::get_hop_limit(core_ctx, device_id)
     }
+}
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        'a,
+        I: IpLayerIpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpState<I>>,
+    > IpDeviceIngressStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
     fn address_status_for_device(
         &mut self,
         dst_ip: SpecifiedAddr<<I as Ip>::Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<I as IpLayerIpExt>::AddressStatus> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I>::address_status_for_device(core_ctx, dst_ip, device_id)
+        IpDeviceIngressStateContext::<I>::address_status_for_device(core_ctx, dst_ip, device_id)
     }
 }
 
