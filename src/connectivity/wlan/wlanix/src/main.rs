@@ -154,6 +154,10 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                 }
             }
         }
+        fidl_wlanix::WifiChipRequest::SetCountryCode { payload: _, responder } => {
+            info!("fidl_wlanix::WifiChipRequest::SetCountryCode");
+            responder.send(Ok(())).context("send SetCountryCode response")?;
+        }
         // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetAvailableModes");
@@ -843,6 +847,10 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
             if let Err(e) = responder.send() {
                 warn!("Failed to send disconnect response: {}", e);
             }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode { payload: _, responder } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::SetStaCountryCode");
+            responder.send(Ok(())).context("send SetStaCountryCode response")?;
         }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
