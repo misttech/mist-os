@@ -80,6 +80,7 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   static_assert(std::is_move_constructible_v<Base>);
   static_assert(std::is_move_assignable_v<Base>);
 
+  using typename Base::Addr;
   using typename Base::LoadInfo;
   using typename Base::Phdr;
   using typename Base::size_type;

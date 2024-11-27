@@ -645,9 +645,9 @@ class RemoteDynamicLinker {
   }
 
   // Shorthand for the two-argument Relocate method below.
-  template <class Diagnostics>
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics>
   bool Relocate(Diagnostics& diag) {
-    return Relocate(diag, tls_desc_resolver());
+    return Relocate<Machine>(diag, tls_desc_resolver());
   }
 
   // Perform relocations on all modules.  The modules() list gives the set and
@@ -669,22 +669,23 @@ class RemoteDynamicLinker {
   // missing dependency modules is an obvious recipe for undefined symbol
   // errors that aren't going to be more enlightening to the user.  But this
   // class supports any policy.
-  template <class Diagnostics, typename TlsDescResolverType>
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics,
+            typename TlsDescResolverType>
   bool Relocate(Diagnostics& diag, TlsDescResolverType&& tls_desc_resolver) {
     // If any module wasn't decoded successfully, just skip it.
     auto valid_modules = ValidModules();
     auto relocate = [&](auto& module) -> bool {
-      // Resolve against the successfully decoded modules, ignoring the others.
-      return module.Relocate(diag, valid_modules, tls_desc_resolver);
+      return module.template Relocate<Machine>(
+          // Resolve against successfully decoded modules, ignoring the others.
+          diag, valid_modules, tls_desc_resolver);
     };
 
     // After the segments are complete, make sure all the VMO handles are
     // read-only so they don't accidentally get mutated.  This isn't necessary
     // in non-zygote mode since the object won't usually be saved long anyway.
     auto protect_segments = [&diag](auto& module) -> bool {
-      return module.load_info().VisitSegments([&diag](auto& segment) -> bool {
-        using SegmentType = std::decay_t<decltype(segment)>;
-        if constexpr (elfldltl::kSegmentHasFilesz<SegmentType>) {
+      auto protect_segment = [&diag]<class Segment>(Segment& segment) -> bool {
+        if constexpr (elfldltl::kSegmentHasFilesz<Segment>) {
           zx::result<> result = segment.MakeImmutable();
           if (result.is_error()) [[unlikely]] {
             return diag.SystemError(  //
@@ -693,7 +694,8 @@ class RemoteDynamicLinker {
           }
         }
         return true;
-      });
+      };
+      return module.load_info().VisitSegments(protect_segment);
     };
 
     return std::ranges::all_of(valid_modules, relocate) && FinishAbi(diag) &&

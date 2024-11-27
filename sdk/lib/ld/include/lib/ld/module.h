@@ -9,7 +9,6 @@
 #include <lib/elfldltl/link-map-list.h>
 #include <lib/elfldltl/symbol.h>
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -148,8 +147,7 @@ struct Abi<Elf, AbiTraits>::Module {
   // It can be reduced to introduce new flags or small integers without risk of
   // backward ABI incompatibility if zero is the safe default for new consumers
   // of old passive ABI data from an older producer.
-  std::array<typename Elf::Byte,
-             sizeof(Addr) - std::min(sizeof(Addr), (sizeof(Word) + sizeof(bool)))>
+  std::array<typename Elf::Byte, sizeof(Addr) - ((sizeof(Word) + sizeof(bool)) % sizeof(Addr))>
       reserved_zero{};
 
   // <lib/ld/remote-abi-transcriber.h> introspection API.

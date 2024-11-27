@@ -74,15 +74,16 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   // the this pointer; when called it uses LoadObject on the MockLoaderService
   // to find files (or not) according to the Needed calls priming the expected
   // sequence of names.
-  template <class Diagnostics>
-  auto GetDepFunction(Diagnostics& diag) {
-    return [this, &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
-      RemoteModule::Decoded::Ptr decoded;
+  template <class Linker = RemoteDynamicLinker<>, class Diagnostics>
+  auto GetDepFunction(Diagnostics& diag, Linker::size_type page_size = kPageSize) {
+    using Module = Linker::Module;
+    return [this, page_size, &diag](const Module::Soname& soname) -> Linker::GetDepResult {
+      typename Module::Decoded::Ptr decoded;
       auto vmo = mock().LoadObject(soname.str());
       if (vmo.is_ok()) [[likely]] {
         // If it returned fit::ok(zx::vmo{}), keep going without this module.
         if (*vmo) [[likely]] {
-          decoded = RemoteModule::Decoded::Create(diag, *std::move(vmo), kPageSize);
+          decoded = Module::Decoded::Create(diag, *std::move(vmo), page_size);
         }
       } else if (vmo.error_value() == ZX_ERR_NOT_FOUND
                      ? !diag.MissingDependency(soname.str())

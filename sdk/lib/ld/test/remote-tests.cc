@@ -885,4 +885,80 @@ TEST_F(LdRemoteTests, PerfectSymbolFilterElf32) {
   ASSERT_NO_FATAL_FAILURE(PerfectSymbolFilterTest<elfldltl::Elf32<>>(*this, "symbol-filter-elf32"));
 }
 
+TEST_F(LdRemoteTests, ForeignMachine) {
+  using ForeignElf = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
+  using ForeignLinker = ld::RemoteDynamicLinker<ForeignElf>;
+  constexpr elfldltl::ElfMachine kForeignMachine = elfldltl::ElfMachine::kArm;
+  constexpr uint32_t kForeignPageSize = 0x1000;
+
+  // Init() creates the process where the test modules will be loaded, and
+  // provides its root VMAR.  The modules understand only a 32-bit address
+  // space, so they must go into the low 4GiB of the test process.
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  // The kernel reserves the lowest part of the address space, so the root VMAR
+  // doesn't start at zero.  The VMAR for the 32-bit address space will not be
+  // quite 4GiB in size, so adjust to make sure it ends at exactly 4GiB.  In
+  // fact, no 32-bit userland ever expects to have a segment in the very last
+  // page, where the page-rounded vaddr+memsz wraps around to 0.  So make the
+  // VMAR one page smaller to ensure nothing gets placed all the way up there.
+  const size_t kAddressLimit = (size_t{1} << 32) - zx_system_get_page_size();
+  zx_info_vmar_t root_vmar_info;
+  zx_status_t status =
+      root_vmar().get_info(ZX_INFO_VMAR, &root_vmar_info, sizeof(root_vmar_info), nullptr, nullptr);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_LT(root_vmar_info.base, kAddressLimit);
+
+  constexpr zx_vm_option_t kVmarOptions =
+      // Require the specific offset of 0 and allow exact placement within.
+      ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_SPECIFIC |
+      // Allow all kinds of mappings.
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE;
+  const size_t vmar_size = kAddressLimit - root_vmar_info.base;
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  status = root_vmar().allocate(kVmarOptions, 0, vmar_size, &vmar, &vmar_addr);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  EXPECT_EQ(vmar_addr, root_vmar_info.base);
+
+  LdsvcPathPrefix("symbol-filter-elf32");
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  ForeignLinker linker;
+  linker.set_abi_stub(
+      ld::RemoteAbiStub<ForeignElf>::Create(diag, GetLibVmo("ld-stub.so"), kForeignPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  // The non-Fuchsia executable gets packaged under lib/ in the test data.
+  ForeignLinker::Module::DecodedPtr executable;
+  ASSERT_TRUE(executable = ForeignLinker::Module::Decoded::Create(
+                  diag, GetLibVmo("symbol-filter-elf32"), kForeignPageSize));
+
+  auto get_dep = GetDepFunction<ForeignLinker>(diag, kForeignPageSize);
+  ASSERT_NO_FATAL_FAILURE(Needed({
+      "libsymbol-filter-dep17.so",
+      "libsymbol-filter-dep23.so",
+      "libsymbol-filter-dep42.so",
+  }));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
+
+  auto init_result = linker.Init(diag, {ForeignLinker::Executable(std::move(executable))}, get_dep,
+                                 kForeignMachine);
+  ASSERT_TRUE(init_result);
+
+  EXPECT_TRUE(linker.Allocate(diag, vmar.borrow()));
+
+  // These won't really be used, but they can be extracted.
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+
+  // Now it can be relocated for the foreign machine.
+  EXPECT_TRUE(linker.Relocate<kForeignMachine>(diag));
+
+  // It can even be loaded.  But it can't be run.
+  ASSERT_TRUE(linker.Load(diag));
+
+  ExpectLog("");
+}
+
 }  // namespace

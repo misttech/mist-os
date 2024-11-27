@@ -142,7 +142,7 @@ class LoadModule {
   // This returns the offset from the thread pointer to this module's static
   // TLS block if it has one.  The value is assigned by AssignStaticTls, below.
   // This method should not be called unless AssignStaticTls has been called.
-  constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+  constexpr size_type static_tls_bias() const { return static_tls_bias_; }
 
   // Use ths TlsLayout object to assign a static TLS offset for this module's
   // PT_TLS segment, if it has one.  SetTls() has already been called if it

@@ -11,6 +11,7 @@
 #include <lib/fit/result.h>
 
 #include <algorithm>
+#include <bit>
 #include <type_traits>
 #include <vector>
 
@@ -45,6 +46,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   static_assert(std::is_move_constructible_v<Base>);
 
   // Alias useful types from Decoded and LoadModule.
+  using typename Base::Addr;
   using typename Base::Decoded;
   using typename Base::LookupResult;
   using typename Base::Module;
@@ -228,7 +230,20 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       if (!loader_->Allocate(diag, this->decoded().load_info(), vmar_offset)) {
         return false;
       }
-      SetModuleVaddrBounds(module_, this->decoded().load_info(), loader_->load_bias());
+
+      // The bias can actually be negative and wrap around, which is fine.
+      const zx_vaddr_t bias = loader_->load_bias();
+      zx_vaddr_t start = this->decoded().load_info().vaddr_start() + bias;
+      zx_vaddr_t end = start + this->decoded().load_info().vaddr_size();
+      module_.vaddr_start = static_cast<size_type>(start);
+      module_.vaddr_end = static_cast<size_type>(end);
+      if (module_.vaddr_start != start || module_.vaddr_end != end) [[unlikely]] {
+        // However, for Elf32 the result must fit into 32 bits.
+        return diag.SystemError("load address [", start, ", ", end,
+                                ") does not fit into address space");
+      }
+      // Recompute the load bias with the correct bit-width for wraparound.
+      module_.link_map.addr = module_.vaddr_start - this->decoded().load_info().vaddr_start();
     }
     return true;
   }
@@ -237,7 +252,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   // RemoteDynamicLinker can fetch back to compute the vmar_offset to pass to
   // Allocate().
   void Preplaced(size_type load_bias) {
-    SetModuleVaddrBounds(module_, this->decoded().load_info(), load_bias);
+    SetModuleVaddrBounds<Elf>(module_, this->decoded().load_info(), load_bias);
     assert(preplaced());
   }
 
@@ -285,7 +300,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
            load_info_.CopyFrom(diag, this->decoded().load_info());
   }
 
-  template <class Diagnostics, class ModuleList, typename TlsDescResolver>
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, class Diagnostics,
+            class ModuleList, typename TlsDescResolver>
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     if (!PrepareLoadInfo(diag)) [[unlikely]] {
       return false;
@@ -306,8 +322,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       return false;
     }
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver);
-    return elfldltl::RelocateSymbolic(mutable_memory, diag, this->reloc_info(), this->symbol_info(),
-                                      this->load_bias(), resolver);
+    return elfldltl::RelocateSymbolic<Machine>(mutable_memory, diag, this->reloc_info(),
+                                               this->symbol_info(), this->load_bias(), resolver);
   }
 
   // Load the module into its allocated vaddr region.

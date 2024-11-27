@@ -1610,5 +1610,8 @@ config("standalone") {
     # instrumentation works fine to collect data, and //src/lib/llvm-profdata
     # can be used to wire up a custom runtime if possible in context.
     ldflags += [ "-noprofilelib" ]
+
+    # Make sure the unwinder isn't implicitly brought in for any reason.
+    ldflags += [ "-unwindlib=none" ]
   }
 }

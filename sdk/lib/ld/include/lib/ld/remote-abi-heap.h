@@ -228,7 +228,7 @@ class RemoteAbiHeap {
     // Now that everything else is allocated, allocate space for the strings.
     RemoteAbiSpan<char> strtab = layout.Allocate<char>(std::max<size_t>(layout.strtab_size_, 1));
 
-    const size_type memsz = layout.size_;
+    const size_type memsz = static_cast<size_type>(layout.size_);
     auto replace = [stub_data_size, memsz, &diagnostics,
                     &file_vmo = stub_module.decoded().vmo()](auto old_segment) {
       assert(old_segment.memsz() >= stub_data_size);
@@ -247,7 +247,7 @@ class RemoteAbiHeap {
 
     // Build the RemoteAbiHeap.
     RemoteAbiHeap heap;
-    heap.strtab_ = strtab.offset_;
+    heap.strtab_ = static_cast<size_type>(strtab.offset_);
     heap.size_bytes_ = memsz;
 
     // Map the data (or allocate a buffer for it).
@@ -336,14 +336,17 @@ class RemoteAbiHeap {
     } else {
       vaddr += static_cast<size_type>(strtab_ + str.offset_);
     }
-    return AbiSpan<char>{Ptr::FromAddress(vaddr), str.size_ + 1};
+    return AbiSpan<char>{
+        Ptr::FromAddress(vaddr),
+        static_cast<size_type>(str.size_ + 1),
+    };
   }
 
   template <typename T>
   AbiSpan<T> Remote(size_type vaddr, RemoteAbiSpan<T> span) const {
     return AbiSpan<T>{
-        AbiSpan<T>::Ptr::FromAddress(vaddr + span.offset_),
-        span.count_,
+        AbiSpan<T>::Ptr::FromAddress(vaddr + static_cast<size_type>(span.offset_)),
+        static_cast<size_type>(span.count_),
     };
   }
 
@@ -395,10 +398,10 @@ class RemoteAbiHeap {
   static zx::result<StubConstantSegment> ReplaceSegment(Diagnostics& diagnostics,
                                                         Segment&& old_segment,
                                                         const zx::vmo& file_vmo,
-                                                        size_t segment_size) {
+                                                        size_type segment_size) {
     assert(file_vmo);
 
-    const size_type page_size = RemoteModule::Loader::page_size();
+    const size_type page_size = static_cast<size_type>(RemoteModule::Loader::page_size());
     const size_type filesz = old_segment.filesz();
     const size_type memsz = (segment_size + page_size - 1) & -page_size;
 

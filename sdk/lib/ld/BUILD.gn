@@ -237,12 +237,17 @@ template("ld_abi_user") {
 # the stub ld.so is really just a data ABI image, there's no meaningful sense
 # in which it could be in the same variant as its users.
 loadable_module("ld-stub") {
-  visibility = [ ":*" ]
+  visibility = [ "./*" ]
   configs += [
     "//build/config/fuchsia:no_cpp_standard_library",
     "//build/config/zircon:nolibc",
     ":abi-soname",
   ]
+
+  # This should in fact have no dependencies of any kind, since it contains
+  # only data and leaf assembly code.  Make sure no implicit ones sneak in.
+  ldflags = [ "-nostdlib" ]
+
   deps = [
     ":abi",
     ":tlsdesc.no-gc",
@@ -253,6 +258,22 @@ loadable_module("ld-stub") {
   # linker must.  But we don't want it to have any instrumentation hair that
   # might be generated even with no C++ functions.
   exclude_toolchain_tags = [ "instrumented" ]
+
+  metadata = {
+    distribution_entries = [
+      {
+        # This is further prefixed by test packaging.  In the non-Fuchsia case,
+        # that expects a flat name and will insert the "lib/".
+        if (is_fuchsia) {
+          destination = "lib/${toolchain_variant.libprefix}$target_name.so"
+        } else {
+          destination = "$target_name.so"
+        }
+        source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
+        label = get_label_info(":$target_name", "label_with_toolchain")
+      },
+    ]
+  }
 }
 
 ld_abi_user("ld-stub.user") {

@@ -286,6 +286,7 @@ template("_test_data") {
   } else {
     manifest_target = "$main_target.manifest"
   }
+
   _test_prefix_manifest(manifest_target) {
     # This will collect the files from deps that would go into /pkg/... and
     # rewrite their manifest entries to use /pkg/lib/test/$name/... instead.
@@ -447,6 +448,9 @@ template("_test_link") {
 
     _test_data(main_target) {
       deps = [ ":$link_target" ]
+      if (defined(invoker.data_deps)) {
+        deps += invoker.data_deps
+      }
     }
   }
 }
@@ -1562,6 +1566,11 @@ foreach(suffix,
     deps = []
     foreach(value, symbol_filter_values) {
       deps += [ ":symbol-filter-dep$value" ]
+    }
+    if (suffix != "") {
+      # symbol-filter-elf32 is also used in a remote loading test.  For
+      # convenience that test expects the stub packaged with the test modules.
+      data_deps = [ "//sdk/lib/ld:ld-stub" ]
     }
   }
 }

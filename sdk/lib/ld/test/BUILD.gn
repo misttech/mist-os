@@ -112,6 +112,7 @@ source_set("load-tests") {
     # LdRemoteTests.RemotePerfectSymbolFilterTestElf32 needs an Elf32 object,
     # but it doesn't really matter what machine or OS it's for.  The Elf32
     # target that conveniently works out of the box is armv7-linux-gnu.
+    # LdRemoteTests.ForeignMachine expects it to be ET_ARM in particular.
     elf32_tc = "//build/toolchain:linux_arm"
     data_deps += [ "modules:symbol-filter-elf32.fuchsia-test-data($elf32_tc)" ]
   } else {

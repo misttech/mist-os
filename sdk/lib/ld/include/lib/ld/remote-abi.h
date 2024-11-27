@@ -436,7 +436,7 @@ class RemoteAbi {
       const RemoteModule& module = vaddr_map->module();
 
       auto transcribe_name = [&remote_name](auto& ctx, const auto& soname) {
-        const elfldltl::AbiPtr<const char> local_name{soname.c_str()};
+        const elfldltl::AbiPtr<const char, Elf> local_name{soname.c_str()};
         return RemoteAbiTranscriber<AbiStringPtr>::FromLocal(  //
             ctx, remote_name, local_name);
       };
