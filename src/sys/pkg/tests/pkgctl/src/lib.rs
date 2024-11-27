@@ -118,7 +118,7 @@ impl TestEnv {
         let repo_config_arg_path = _test_dir.path().join("repo_config");
         create_dir(&repo_config_arg_path).expect("create repo_config_arg dir");
 
-        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy().expect("create channel");
+        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy();
 
         let _env = fs.serve_connection(svc_server_end).expect("serve connection");
 

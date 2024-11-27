@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(rfcomm.available_server_channels().await, expected_free_channels);
 
         // Allocating a server channel should be OK.
-        let (c, _s) = create_proxy::<ConnectionReceiverMarker>().unwrap();
+        let (c, _s) = create_proxy::<ConnectionReceiverMarker>();
         let first_channel =
             rfcomm.allocate_server_channel(c.clone()).await.expect("should allocate");
 
@@ -337,7 +337,7 @@ mod tests {
         rfcomm.free_server_channels(&single_channel).await;
 
         // We should be able to allocate another now that space has freed.
-        let (c, _s) = create_proxy::<ConnectionReceiverMarker>().unwrap();
+        let (c, _s) = create_proxy::<ConnectionReceiverMarker>();
         assert!(rfcomm.allocate_server_channel(c).await.is_some());
     }
 

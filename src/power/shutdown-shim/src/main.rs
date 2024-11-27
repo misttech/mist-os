@@ -13,7 +13,7 @@ async fn main() {
         eprintln!("[shutdown-shim]: could not obtain directory request handle");
         std::process::exit(1);
     };
-    let (svc, server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (svc, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
     let Ok(()) = fdio::open("/svc", fio::PERM_READABLE, server.into()) else {
         eprintln!("[shutdown-shim]: could not obtain namespace");
         std::process::exit(1);

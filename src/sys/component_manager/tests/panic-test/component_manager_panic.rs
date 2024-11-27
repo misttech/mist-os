@@ -20,8 +20,7 @@ async fn test() {
     // Create endpoints for the fuchsia.io.Directory protocol.
     // Component manager will connect us to the exposed directory of the component we bound to.
     // This isn't needed for this test, but we must do it anyway.
-    let (exposed_dir, exposed_dir_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, exposed_dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_svc
         .open_exposed_dir(&child, exposed_dir_server)
         .await

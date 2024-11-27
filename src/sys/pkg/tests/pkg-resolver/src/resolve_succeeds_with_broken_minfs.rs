@@ -149,7 +149,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             }
         } else {
             let (tempdir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             fdio::open(
                 self.tempdir.path().to_str().unwrap(),
                 fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -188,8 +188,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             Ok(())
         } else {
             let (tempdir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .map_err(|_e| Status::INTERNAL)?;
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             fuchsia_fs::directory::open_channel_in_namespace(
                 self.tempdir.path().to_str().unwrap(),
                 fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -224,8 +223,7 @@ impl WriteFailOrTempFs {
     fn new_failing(files_to_fail_writes: Vec<String>) -> Arc<Self> {
         let tempdir = tempfile::tempdir().expect("/tmp to exist");
 
-        let (tempdir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         fdio::open(
             tempdir.path().to_str().unwrap(),
@@ -287,7 +285,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
             .open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
@@ -350,7 +348,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(|_| Status::INTERNAL)?;
+            fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
             .open3(&path, flags, &object_request.options(), backing_node_server_end.into_channel())
@@ -513,8 +511,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) {
         // Set up proxy to tmpdir and delegate to it on success.
-        let (tempdir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fdio::open(
             self.tempdir.path().to_str().unwrap(),
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -607,8 +604,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) -> Result<(), Status> {
         // Set up proxy to tmpdir and delegate to it on success.
-        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .map_err(|_e| Status::INTERNAL)?;
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fuchsia_fs::directory::open_channel_in_namespace(
             self.tempdir.path().to_str().unwrap(),
             fio::PERM_READABLE | fio::PERM_WRITABLE,
@@ -798,7 +794,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
 
     // Add repo config and rewrite rules
     let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let rule = Rule::new("should-be-rewritten", "example.com", "/", "/").unwrap();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
@@ -819,7 +815,7 @@ async fn verify_pkg_resolution_succeeds_during_minfs_repo_config_and_rewrite_rul
     // the failure count doesn't change.
     make_succeed_fn();
     let () = env.proxies.repo_manager.add(&config.clone().into()).await.unwrap().unwrap();
-    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy().unwrap();
+    let (edit_transaction, edit_transaction_server) = fidl::endpoints::create_proxy();
     env.proxies.rewrite_engine.start_edit_transaction(edit_transaction_server).unwrap();
     let () = edit_transaction.add(&rule.clone().into()).await.unwrap().unwrap();
     let () = edit_transaction.commit().await.unwrap().unwrap();

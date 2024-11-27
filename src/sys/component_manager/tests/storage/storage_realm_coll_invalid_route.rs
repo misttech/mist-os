@@ -39,7 +39,7 @@ async fn main() {
         name: "storage_user".to_string(),
         collection: Some("coll_bad_route".to_string()),
     };
-    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     realm.open_exposed_dir(&child_ref, server_end).await.unwrap().unwrap();
     let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(

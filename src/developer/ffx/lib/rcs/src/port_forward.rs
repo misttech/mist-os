@@ -22,7 +22,7 @@ async fn socket_provider(
     rcs_proxy: &RemoteControlProxy,
     timeout: Duration,
 ) -> Result<fsock::ProviderProxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>()?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>();
     let start_time = Instant::now();
     let res = crate::open_with_timeout_at(
         timeout,
@@ -37,7 +37,7 @@ async fn socket_provider(
         proxy
     } else {
         // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>();
         let timeout = timeout.saturating_sub(Instant::now() - start_time);
         crate::open_with_timeout_at(
             timeout,

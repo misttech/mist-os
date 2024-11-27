@@ -352,7 +352,7 @@ mod tests {
                 valid_bits_per_sample: pcm_formats.valid_bits_per_sample.as_ref().unwrap()[0],
                 frame_rate: pcm_formats.frame_rates.as_ref().unwrap()[0],
             });
-            let (proxy, server_end) = fidl::endpoints::create_proxy()?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy();
             self.client.create_ring_buffer(
                 &audio::Format { pcm_format, ..Default::default() },
                 server_end,

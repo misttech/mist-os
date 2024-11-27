@@ -107,8 +107,7 @@ async fn start_runner(
                     if !test_started {
                         // Report a failure if we didn't start a test.
                         let (case_listener, case_listener_server) =
-                            fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>()
-                                .context("creating case listener for synthetic test failure")?;
+                            fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>();
                         case_listener.finished(&ftest::Result_ {
                             status: Some(ftest::Status::Failed),
                             ..Default::default()
@@ -180,8 +179,7 @@ async fn run_test_case_in_child(
         ..Default::default()
     };
     // Create a child in the collection specified in launch_config
-    let (child_controller, child_controller_server) =
-        fidl::endpoints::create_proxy().context("creating child controller channel")?;
+    let (child_controller, child_controller_server) = fidl::endpoints::create_proxy();
     let create_child_args = fidl_fuchsia_component::CreateChildArgs {
         controller: Some(child_controller_server),
         ..Default::default()
@@ -202,8 +200,7 @@ async fn run_test_case_in_child(
         );
     }
     // Open fuchsia.test.Suite protocol via realm.open_exposed_dir on the child
-    let (child_exposed_dir, child_exposed_dir_server) =
-        fidl::endpoints::create_proxy().context("creating exposed directory channel")?;
+    let (child_exposed_dir, child_exposed_dir_server) = fidl::endpoints::create_proxy();
     if let Err(e) = realm
         .open_exposed_dir(
             &fidl_fuchsia_component_decl::ChildRef {

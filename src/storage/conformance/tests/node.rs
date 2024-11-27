@@ -123,7 +123,7 @@ async fn test_node_clone() {
         .await
         .unwrap();
 
-    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
 
     assert_matches!(

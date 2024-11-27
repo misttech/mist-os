@@ -100,7 +100,7 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
     // Get to the Trigger protocol exposed by the root component in this nested component manager
     let realm_query =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
         .open(

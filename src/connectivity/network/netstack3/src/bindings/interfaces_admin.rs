@@ -331,8 +331,7 @@ async fn create_interface(
                 netdevice_worker::Error::DuplicateName(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::DuplicateName)
                 }
-                netdevice_worker::Error::SystemResource(_)
-                | netdevice_worker::Error::InvalidPortInfo(_) => None,
+                netdevice_worker::Error::InvalidPortInfo(_) => None,
             };
             if let Some(removed_reason) = removed_reason {
                 // Retrieve the original control handle from the receiver.
@@ -2096,8 +2095,7 @@ mod tests {
         ));
 
         let (interface_control, control_server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create interface control proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
 
         device_control_proxy
             .create_interface(
@@ -2128,8 +2126,7 @@ mod tests {
 
         // Add an address.
         let (asp_client_end, asp_server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .expect("create ASP proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         let addr = fidl_subnet!("1.1.1.1/32");
         interface_control
             .add_address(

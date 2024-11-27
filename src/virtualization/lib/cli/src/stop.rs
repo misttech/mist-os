@@ -124,8 +124,7 @@ async fn graceful_stop_guest<P: PlatformServices>(
     guest: arguments::GuestType,
     manager: GuestManagerProxy,
 ) -> Result<StopResult, Error> {
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await

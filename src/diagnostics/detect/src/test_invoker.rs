@@ -105,7 +105,7 @@ mod test {
         let controller_proxy = get_controller_proxy(&scope, detection_runner);
         // Create the tearoff for a test-mode session
         let (test_case_proxy, first_test_case_server_end) =
-            fidl::endpoints::create_proxy::<TestCaseControllerMarker>().expect("Creating proxy");
+            fidl::endpoints::create_proxy::<TestCaseControllerMarker>();
         controller_proxy.enter_test_mode(first_test_case_server_end).await.unwrap();
         run_receiver.expect_n_messages(0).await;
         test_case_proxy.run_default_cycle().await.unwrap();
@@ -127,14 +127,13 @@ mod test {
         // Create the tearoff for a test-mode session. This test should demonstrate correct behavior
         // even though we don't run a cycle on this proxy.
         let (first_test_case_proxy, first_test_case_server_end) =
-            fidl::endpoints::create_proxy::<TestCaseControllerMarker>().expect("Creating proxy");
+            fidl::endpoints::create_proxy::<TestCaseControllerMarker>();
         controller_proxy.enter_test_mode(first_test_case_server_end).await.unwrap();
         let controller_proxy_clone = controller_proxy.clone();
         // The second test-mode session should run, but only after the first is done.
         scope.spawn(async move {
             let (second_test_case_proxy, second_test_case_server_end) =
-                fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
-                    .expect("Creating proxy");
+                fidl::endpoints::create_proxy::<TestCaseControllerMarker>();
             controller_proxy_clone.enter_test_mode(second_test_case_server_end).await.unwrap();
             second_test_case_proxy.run_default_cycle().await.unwrap();
         });
@@ -160,7 +159,7 @@ mod test {
         // Create the tearoff for a test-mode session. This test should demonstrate correct behavior
         // even though we don't run a cycle on this proxy.
         let (first_test_case_proxy, first_test_case_server_end) =
-            fidl::endpoints::create_proxy::<TestCaseControllerMarker>().expect("Creating proxy");
+            fidl::endpoints::create_proxy::<TestCaseControllerMarker>();
         // We've had controller proxy. What about second controller proxy?
         let second_controller_proxy = get_controller_proxy(&scope, detection_runner);
         // Second controller connected, but it's not in test mode, so first controller should work
@@ -173,8 +172,7 @@ mod test {
         // in test mode.
         scope.spawn(async move {
             let (second_test_case_proxy, second_test_case_server_end) =
-                fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
-                    .expect("Creating proxy");
+                fidl::endpoints::create_proxy::<TestCaseControllerMarker>();
             second_controller_proxy.enter_test_mode(second_test_case_server_end).await.unwrap();
             second_test_case_proxy.run_default_cycle().await.unwrap();
         });

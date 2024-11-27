@@ -341,7 +341,7 @@ impl Package {
 }
 
 async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, VerificationError> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION | fio::PERM_READABLE;
     dir.open3(path, flags, &fio::Options::default(), server_end.into_channel())

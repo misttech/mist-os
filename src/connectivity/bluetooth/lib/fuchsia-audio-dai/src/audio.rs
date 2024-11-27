@@ -378,8 +378,7 @@ mod tests {
     async fn ringbuffer_starts_dai_without_error(mut dai: DaiAudioDevice) {
         let stream_proxy = setup_audio_stream_proxy(&mut dai).await;
 
-        let (rb_proxy, server_end) =
-            fidl::endpoints::create_proxy::<RingBufferMarker>().expect("proxy creation");
+        let (rb_proxy, server_end) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         let format = fidl_fuchsia_hardware_audio::Format {
             pcm_format: Some(SUPPORTED_PCM_FORMAT.clone()),

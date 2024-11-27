@@ -151,7 +151,7 @@ pub async fn start_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     moniker: &Moniker,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance(&moniker.to_string(), server)
         .await
@@ -186,7 +186,7 @@ pub async fn start_instance_with_args(
     moniker: &Moniker,
     arguments: fcomponent::StartChildArgs,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance_with_args(&moniker.to_string(), server, arguments)
         .await

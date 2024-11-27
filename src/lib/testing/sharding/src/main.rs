@@ -128,7 +128,7 @@ async fn handle_suite_get_tests(
     shard_config: &ShardConfig,
 ) -> Result<(), anyhow::Error> {
     let (proxy, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseIteratorMarker>();
     let proxy = &proxy;
     original_suite.get_tests(server_end)?;
     let (iterator_requests, handle) = iterator.into_stream_and_control_handle();

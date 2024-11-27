@@ -921,8 +921,7 @@ pub fn get_watcher<I: FidlRouteIpExt>(
     state_proxy: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
     options: WatcherOptions,
 ) -> Result<<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError> {
-    let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy::<I::WatcherMarker>()
-        .map_err(WatcherCreationError::CreateProxy)?;
+    let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy::<I::WatcherMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -1800,8 +1799,7 @@ mod tests {
         }
 
         // Instantiate the fake Watcher implementation.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
         let (mut state_request_stream, _control_handle) =
             state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
@@ -1862,8 +1860,7 @@ mod tests {
         ];
 
         // Instantiate the fake Watcher implementations.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
         let (state_request_stream, _control_handle) =
             state_server_end.into_stream_and_control_handle();
         let watchers_fut = state_request_stream
@@ -1954,8 +1951,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Instantiate the fake Watcher implementation.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
         let (mut state_request_stream, _control_handle) =
             state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
@@ -1991,8 +1987,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Instantiate the fake Watcher implementation.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
         let (mut state_request_stream, _control_handle) =
             state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream

@@ -40,7 +40,7 @@ async fn collections() {
     // Start the children.
     for name in vec!["a", "b"] {
         let child_ref = new_child_ref(name, "coll");
-        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         realm
             .open_exposed_dir(&child_ref, server_end)
             .await
@@ -66,7 +66,7 @@ async fn collections() {
 
     // Binding to destroyed child should fail.
     {
-        let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let child_ref = new_child_ref("a", "coll");
         let res = realm
             .open_exposed_dir(&child_ref, server_end)
@@ -96,7 +96,7 @@ async fn collections() {
             .expect("failed to create second child a");
     }
     {
-        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let child_ref = new_child_ref("a", "coll");
         realm
             .open_exposed_dir(&child_ref, server_end)
@@ -243,8 +243,7 @@ async fn eager() {
         startup: Some(fdecl::StartupMode::Eager),
         ..Default::default()
     };
-    let (controller_proxy, server_end) =
-        endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (controller_proxy, server_end) = endpoints::create_proxy::<fcomponent::ControllerMarker>();
     let child_args =
         fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() };
     realm.create_child(&collection_ref, &child_decl, child_args).await.unwrap().unwrap();
@@ -261,7 +260,7 @@ fn new_child_ref(name: &str, collection: &str) -> fdecl::ChildRef {
 }
 
 async fn list_children(realm: &fcomponent::RealmProxy) -> Result<String, Error> {
-    let (iterator_proxy, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator_proxy, server_end) = endpoints::create_proxy();
     let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
     realm
         .list_children(&collection_ref, server_end)

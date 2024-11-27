@@ -41,7 +41,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                 .context("Failed to connect to resolver service")?;
             println!("resolving {pkg_url}");
 
-            let (dir, dir_server_end) = fidl::endpoints::create_proxy()?;
+            let (dir, dir_server_end) = fidl::endpoints::create_proxy();
 
             let _: fpkg::ResolutionContext = resolver
                 .resolve(&pkg_url, dir_server_end)
@@ -231,7 +231,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
 
             match subcommand {
                 RuleSubCommand::List(RuleListCommand {}) => {
-                    let (iter, iter_server_end) = fidl::endpoints::create_proxy()?;
+                    let (iter, iter_server_end) = fidl::endpoints::create_proxy();
                     engine.list(iter_server_end)?;
 
                     let mut rules = Vec::new();
@@ -260,9 +260,9 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                     .await?;
                 }
                 RuleSubCommand::DumpDynamic(RuleDumpDynamicCommand {}) => {
-                    let (transaction, transaction_server_end) = fidl::endpoints::create_proxy()?;
+                    let (transaction, transaction_server_end) = fidl::endpoints::create_proxy();
                     let () = engine.start_edit_transaction(transaction_server_end)?;
-                    let (iter, iter_server_end) = fidl::endpoints::create_proxy()?;
+                    let (iter, iter_server_end) = fidl::endpoints::create_proxy();
                     transaction.list_dynamic(iter_server_end)?;
                     let mut rules = Vec::new();
                     loop {
@@ -321,7 +321,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
 async fn fetch_repos(
     repo_manager: fpkg::RepositoryManagerProxy,
 ) -> Result<Vec<pkg::RepositoryConfig>, anyhow::Error> {
-    let (iter, server_end) = fidl::endpoints::create_proxy()?;
+    let (iter, server_end) = fidl::endpoints::create_proxy();
     repo_manager.list(server_end)?;
     let mut repos = vec![];
 

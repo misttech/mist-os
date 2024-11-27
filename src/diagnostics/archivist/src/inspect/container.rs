@@ -606,10 +606,10 @@ mod test {
     #[fuchsia::test]
     fn only_one_directory_proxy_is_populated() {
         let _executor = fuchsia_async::LocalExecutor::new();
-        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let mut container = InspectArtifactsContainer::default();
         let _rx = container.push_handle(InspectHandle::directory(directory), |_| {});
-        let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         assert!(container.push_handle(InspectHandle::directory(directory2), |_| {}).is_none());
     }
 
@@ -706,7 +706,7 @@ mod test {
     ) -> InspectArtifactsContainer {
         let mut container = InspectArtifactsContainer::default();
         for name in tree_names {
-            let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
+            let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
             let handle = InspectHandle::tree(proxy, Some(name));
             container.push_handle(handle, |_| {});
         }

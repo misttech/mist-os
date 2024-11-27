@@ -71,7 +71,7 @@ async fn frame_pointers_connect_from_fuchsia_to_linux() {
 
     info!("finding uname-blocked thread handle using job handle in runtime dir");
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
-    let (runtime_dir, runtime_dir_server) = fidl::endpoints::create_proxy().unwrap();
+    let (runtime_dir, runtime_dir_server) = fidl::endpoints::create_proxy();
     realm_query
         .open_directory(
             "realm_builder:fp_stack_glue_test/container",

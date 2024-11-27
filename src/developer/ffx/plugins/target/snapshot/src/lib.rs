@@ -231,8 +231,7 @@ pub async fn snapshot_impl(
     };
 
     // Make file proxy and channel for snapshot
-    let (file_proxy, file_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(|e| bug!(e))?;
+    let (file_proxy, file_server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     // Build parameters
     let params = GetSnapshotParameters {

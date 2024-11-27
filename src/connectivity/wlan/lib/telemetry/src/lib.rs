@@ -49,8 +49,7 @@ pub async fn setup_cobalt_proxy(
     .context("failed to connect to metrics service")?;
 
     let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .context("failed to create MetricEventLoggerMarker endponts")?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: Some(metrics::CUSTOMER_ID),
@@ -69,9 +68,7 @@ pub async fn setup_cobalt_proxy(
 pub fn setup_disconnected_cobalt_proxy(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error> {
     // Create a disconnected proxy
-    fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-        .context("failed to create MetricEventLoggerMarker endpoints")
-        .map(|(proxy, _)| proxy)
+    Ok(fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>().0)
 }
 
 pub fn setup_persistence_req_sender(

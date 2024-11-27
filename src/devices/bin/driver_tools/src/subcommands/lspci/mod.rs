@@ -12,7 +12,7 @@ use lspci::Args;
 use {fidl_fuchsia_hardware_pci as fhpci, fidl_fuchsia_io as fio};
 
 pub async fn lspci(cmd: LspciCommand, dev: &fio::DirectoryProxy) -> Result<()> {
-    let (bus, server) = fidl::endpoints::create_proxy::<fhpci::BusMarker>()?;
+    let (bus, server) = fidl::endpoints::create_proxy::<fhpci::BusMarker>();
     let () = dev.open(
         fio::OpenFlags::empty(),
         fio::ModeType::empty(),

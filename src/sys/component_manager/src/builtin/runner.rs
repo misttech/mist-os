@@ -140,7 +140,7 @@ mod tests {
         let provider = Box::new(RunnerCapabilityProvider { factory: mock_runner, checker });
 
         // Open a connection to the provider.
-        let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;
+        let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let server = server.into_channel();
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();

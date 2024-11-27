@@ -162,8 +162,7 @@ impl TraceTask {
         let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client);
         let f = File::create(&output_file).await.context("opening file")?;
-        let (client_end, server_end) =
-            fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
+        let (client_end, server_end) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         provisioner.initialize_tracing(server_end, &config, server)?;
         client_end
             .start_tracing(&trace::StartOptions::default())
@@ -819,7 +818,7 @@ mod tests {
     }
 
     fn spawn_fake_alert_watcher(alert: &'static str) -> trace::SessionProxy {
-        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         let mut stream = server.into_stream();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -853,7 +852,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_triggers_server_dropped() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
         let (_sender, receiver) = async_channel::bounded::<()>(1);
         drop(server);
         let triggers = Some(vec![

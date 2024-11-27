@@ -374,7 +374,7 @@ async fn do_client_connect(
             return Ok(());
         }
     };
-    let (local, remote) = endpoints::create_proxy()?;
+    let (local, remote) = endpoints::create_proxy();
     let req = fidl_sme::ConnectRequest {
         ssid: ssid.to_vec(),
         bss_description,
@@ -704,7 +704,7 @@ async fn get_client_sme(
     monitor_proxy: DeviceMonitor,
     iface_id: u16,
 ) -> Result<fidl_sme::ClientSmeProxy, Error> {
-    let (proxy, remote) = endpoints::create_proxy()?;
+    let (proxy, remote) = endpoints::create_proxy();
     monitor_proxy
         .get_client_sme(iface_id, remote)
         .await
@@ -717,7 +717,7 @@ async fn get_ap_sme(
     monitor_proxy: DeviceMonitor,
     iface_id: u16,
 ) -> Result<fidl_sme::ApSmeProxy, Error> {
-    let (proxy, remote) = endpoints::create_proxy()?;
+    let (proxy, remote) = endpoints::create_proxy();
     monitor_proxy
         .get_ap_sme(iface_id, remote)
         .await
@@ -823,8 +823,7 @@ mod tests {
     #[fuchsia::test]
     fn destroy_iface() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let del_fut = do_iface(IfaceCmd::Delete { iface_id: 5 }, monitor_svc_local);
         let mut del_fut = pin!(del_fut);
@@ -856,8 +855,7 @@ mod tests {
     #[fuchsia::test]
     fn test_get_country() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut = do_phy(PhyCmd::GetCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
@@ -882,8 +880,7 @@ mod tests {
     #[fuchsia::test]
     fn test_set_country() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut =
             do_phy(PhyCmd::SetCountry { phy_id: 45, country: "RS".to_string() }, monitor_svc_local);
@@ -905,8 +902,7 @@ mod tests {
     #[fuchsia::test]
     fn test_clear_country() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_svc_local, monitor_svc_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut = do_phy(PhyCmd::ClearCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
@@ -974,8 +970,7 @@ mod tests {
     #[fuchsia::test]
     fn reject_connect_ssid_too_long() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_local, monitor_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_local, monitor_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_stream = monitor_remote.into_stream();
         // SSID is one byte too long.
         let cmd = opts::ClientConnectCmd {
@@ -999,8 +994,7 @@ mod tests {
     #[fuchsia::test]
     fn test_wmm_status() {
         let mut exec = fasync::TestExecutor::new();
-        let (monitor_local, monitor_remote) =
-            create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
+        let (monitor_local, monitor_remote) = create_proxy::<DeviceMonitorMarker>();
         let mut monitor_stream = monitor_remote.into_stream();
         let mut stdout = Vec::new();
         {

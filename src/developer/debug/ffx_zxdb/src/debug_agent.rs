@@ -58,7 +58,7 @@ impl DebugAgentSocket {
             DebuggerProxy::LauncherProxy(launcher) => {
                 // No choice given, launch a new DebugAgent.
                 let (client_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>()?;
+                    fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>();
                 launcher.launch(server_end).await?.map_err(Status::from_raw)?;
                 client_proxy
             }

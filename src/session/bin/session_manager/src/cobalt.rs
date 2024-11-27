@@ -17,8 +17,7 @@ use tracing::warn;
 /// # Returns
 /// `LoggerProxy` for log messages to be sent to.
 pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
-    let (logger_proxy, server_end) =
-        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+    let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
     let logger_factory = connect_to_protocol::<MetricEventLoggerFactoryMarker>()
         .context("Failed to connect to the Cobalt MetricEventLoggerFactory")?;
 

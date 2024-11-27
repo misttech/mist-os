@@ -210,7 +210,7 @@ pub(crate) async fn serve_iterator(
         let debug_data = next_files
             .into_iter()
             .map(|file_name| {
-                let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+                let (file, server) = create_proxy::<fio::NodeMarker>();
                 let file = fio::FileProxy::new(file.into_channel().unwrap());
                 directory.open(
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,

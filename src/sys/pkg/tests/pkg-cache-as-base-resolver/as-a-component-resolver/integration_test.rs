@@ -13,7 +13,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_
 async fn base_resolver_test() {
     let realm =
         connect_to_protocol::<RealmMarker>().expect("failed to connect to fuchsia.component.Realm");
-    let (exposed_dir, server_end) = create_proxy().expect("failed to create proxy");
+    let (exposed_dir, server_end) = create_proxy();
     realm
         .open_exposed_dir(&ChildRef { name: "base-component".into(), collection: None }, server_end)
         .await
@@ -28,7 +28,7 @@ async fn base_resolver_test() {
 async fn base_resolver_resolves_subpackages() {
     let realm =
         connect_to_protocol::<RealmMarker>().expect("failed to connect to fuchsia.component.Realm");
-    let (exposed_dir, server_end) = create_proxy().expect("failed to create proxy");
+    let (exposed_dir, server_end) = create_proxy();
     realm
         .open_exposed_dir(
             &ChildRef { name: "base-superpackage-component".into(), collection: None },

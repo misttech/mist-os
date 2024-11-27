@@ -1022,8 +1022,7 @@ mod tests {
         )
         .expect("is valid");
         let (session_proxy, _session_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::SessionMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::SessionMarker>();
 
         let (rx, _rx_sender) = make_fifos();
         let (tx, _tx_receiver) = make_fifos();

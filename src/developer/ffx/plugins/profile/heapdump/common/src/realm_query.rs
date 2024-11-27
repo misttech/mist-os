@@ -60,7 +60,7 @@ pub async fn connect_to_collector(
     };
 
     let (collector_proxy, collector_server) =
-        fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>()?;
+        fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>();
     remote_control
         .deprecated_open_capability(
             &moniker,

@@ -760,7 +760,7 @@ mod tests {
     /// Tests a set_volume command with no input args does not result in error.
     /// Instead, a help message should be returned.
     async fn test_set_volume_no_args() {
-        let (proxy, _stream) = create_proxy::<ControllerMarker>().expect("Creation should work");
+        let (proxy, _stream) = create_proxy::<ControllerMarker>();
         let args = [];
 
         let res = set_volume(&args, &proxy).await;

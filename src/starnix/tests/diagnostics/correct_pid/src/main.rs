@@ -24,8 +24,7 @@ async fn main() {
     let trace_provisioner = connect_to_protocol::<ProvisionerMarker>().unwrap();
     let (tracing_socket, tracing_socket_write) = Socket::create_stream();
     let mut tracing_socket = AsyncSocket::from_socket(tracing_socket);
-    let (tracing_session, server_end) =
-        fidl::endpoints::create_proxy::<TracingSessionMarker>().unwrap();
+    let (tracing_session, server_end) = fidl::endpoints::create_proxy::<TracingSessionMarker>();
     trace_provisioner
         .initialize_tracing(
             server_end,

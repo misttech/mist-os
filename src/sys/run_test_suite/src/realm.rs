@@ -185,7 +185,7 @@ pub async fn parse_provided_realm(
 
     let offers = validate_and_get_offers(manifest, test_collection)?;
 
-    let (exposed_dir, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy();
     realm_query
         .open_directory(&moniker.to_string(), fsys::OpenDirType::ExposedDir, server_end)
         .await?

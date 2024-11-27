@@ -125,8 +125,7 @@ impl FfxMain for DeviceTool {
             SubCommand::Record(record_command) => {
                 let mut stdout = Unblock::new(std::io::stdout());
 
-                let (cancel_proxy, cancel_server) =
-                    create_proxy::<fac::RecordCancelerMarker>().bug()?;
+                let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
                 let keypress_waiter = ffx_audio_common::cancel_on_keypress(
                     cancel_proxy,
@@ -501,7 +500,7 @@ mod tests {
             device_type: fadevice::DeviceType::Input,
         });
 
-        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
         let test_stdout = TestBuffer::default();
 
@@ -552,7 +551,7 @@ mod tests {
             device_type: fadevice::DeviceType::Input,
         });
 
-        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
 
         let test_stdout = TestBuffer::default();
 

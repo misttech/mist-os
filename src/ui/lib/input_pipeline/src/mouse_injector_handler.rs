@@ -306,8 +306,7 @@ impl MouseInjectorHandler {
         }
 
         // Create a new injector.
-        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>()
-            .context("Failed to create DeviceProxy.")?;
+        let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>();
         let context = fuchsia_scenic::duplicate_view_ref(&self.context_view_ref)
             .context("Failed to duplicate context view ref.")?;
         let target = fuchsia_scenic::duplicate_view_ref(&self.target_view_ref)

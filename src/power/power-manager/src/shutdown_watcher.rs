@@ -334,7 +334,7 @@ mod tests {
         );
 
         let (watcher_proxy, _) =
-            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy.clone());
 
         assert_data_tree!(
@@ -361,7 +361,7 @@ mod tests {
         );
 
         let (watcher_proxy, _) =
-            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy.clone());
 
         assert_data_tree!(

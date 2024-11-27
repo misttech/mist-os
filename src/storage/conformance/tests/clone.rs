@@ -21,7 +21,7 @@ async fn clone_file_with_same_or_fewer_rights() {
 
         // Clone using every subset of flags.
         for clone_flags in file_rights.combinations_deprecated() {
-            let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+            let (proxy, server) = create_proxy::<fio::NodeMarker>();
             file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::OK);
@@ -45,7 +45,7 @@ async fn clone_file_with_same_rights_flag() {
         let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
-        let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+        let (proxy, server) = create_proxy::<fio::NodeMarker>();
         file.clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
             .expect("clone failed");
         let status = get_open_status(&proxy).await;
@@ -76,7 +76,7 @@ async fn clone_file_with_additional_rights() {
             if clone_flags == file_rights.all_flags_deprecated() {
                 continue;
             }
-            let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+            let (proxy, server) = create_proxy::<fio::NodeMarker>();
             file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::ACCESS_DENIED);
@@ -96,7 +96,7 @@ async fn clone_directory_with_same_or_fewer_rights() {
 
         // Clone using every subset of flags.
         for clone_flags in Rights::new(dir_rights.all_rights()).combinations_deprecated() {
-            let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+            let (proxy, server) = create_proxy::<fio::NodeMarker>();
             dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::OK);
@@ -119,7 +119,7 @@ async fn clone_directory_with_same_rights_flag() {
         let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
-        let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+        let (proxy, server) = create_proxy::<fio::NodeMarker>();
         dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE, server)
             .expect("clone failed");
         let status = get_open_status(&proxy).await;
@@ -150,7 +150,7 @@ async fn clone_directory_with_additional_rights() {
             if clone_flags == dir_rights.all_flags_deprecated() {
                 continue;
             }
-            let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
+            let (proxy, server) = create_proxy::<fio::NodeMarker>();
             dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
             assert_eq!(status, zx::Status::ACCESS_DENIED);
@@ -173,7 +173,7 @@ async fn clone2_file() {
         .await
         .unwrap();
 
-    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
     file.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
@@ -207,7 +207,7 @@ async fn clone2_file_node_reference() {
         .unwrap();
 
     // fuchsia.unknown/Cloneable.Clone2
-    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
@@ -237,8 +237,7 @@ async fn clone2_directory() {
         .await
         .unwrap();
 
-    let (clone_proxy, clone_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     dir.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
@@ -267,7 +266,7 @@ async fn clone2_directory_node_reference() {
         .unwrap();
 
     // fuchsia.unknown/Cloneable.Clone2
-    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),

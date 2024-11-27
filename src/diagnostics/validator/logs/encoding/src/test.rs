@@ -13,7 +13,7 @@ use tracing::info;
 async fn validate_rust_log_encoding() {
     let validator =
         client::connect_to_protocol::<EncodingValidatorMarker>().expect("connect to validator");
-    let (result_iterator, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (result_iterator, server_end) = fidl::endpoints::create_proxy();
     validator.validate(server_end).expect("call validate");
 
     let mut failed_results = vec![];

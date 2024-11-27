@@ -39,7 +39,7 @@ async fn no_fvm_device() {
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     let result = admin
         .wipe_storage(Some(blobfs_server), None)
         .await
@@ -87,7 +87,7 @@ async fn write_blob() {
     }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         (Some(proxy), Some(server_end))
     } else {
         (None, None)
@@ -96,7 +96,7 @@ async fn write_blob() {
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await
@@ -154,7 +154,7 @@ async fn write_blob_no_existing_data_partition() {
     }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         (Some(proxy), Some(server_end))
     } else {
         (None, None)
@@ -163,7 +163,7 @@ async fn write_blob_no_existing_data_partition() {
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await
@@ -227,7 +227,7 @@ async fn blobfs_formatted() {
     }
 
     let blob_creator = if cfg!(feature = "fxblob") {
-        let (_, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (_, server_end) = fidl::endpoints::create_proxy();
         Some(server_end)
     } else {
         None
@@ -236,7 +236,7 @@ async fn blobfs_formatted() {
     // Invoke the WipeStorage API.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await
@@ -310,7 +310,7 @@ async fn data_unformatted() {
                 .await
                 .unwrap();
         let (data_partition, partition_server_end) =
-            fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<PartitionMarker>();
         data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();
 
         let (status, guid) = data_partition.get_instance_guid().await.unwrap();
@@ -331,7 +331,7 @@ async fn data_unformatted() {
     // Invoke WipeStorage.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), None)
         .await
@@ -341,8 +341,7 @@ async fn data_unformatted() {
     // Ensure the data partition was assigned a new instance GUID.
     let data_controller =
         find_partition_in(&dev_class, matcher, zx::MonotonicDuration::INFINITE).await.unwrap();
-    let (data_partition, partition_server_end) =
-        fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
+    let (data_partition, partition_server_end) = fidl::endpoints::create_proxy::<PartitionMarker>();
     data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();
     let (status, guid) = data_partition.get_instance_guid().await.unwrap();
     assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
@@ -393,7 +392,7 @@ async fn handles_corrupt_fvm() {
     }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         (Some(proxy), Some(server_end))
     } else {
         (None, None)
@@ -402,7 +401,7 @@ async fn handles_corrupt_fvm() {
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
         .await

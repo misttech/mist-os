@@ -15,7 +15,7 @@ async fn open_dir_without_describe_flag() {
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         assert_eq!(dir_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (client, server) = create_proxy::<fio::NodeMarker>();
 
         dir.open(dir_flags | fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), ".", server)
             .expect("Cannot open directory");
@@ -32,7 +32,7 @@ async fn open_file_without_describe_flag() {
         assert_eq!(file_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (client, server) = create_proxy::<fio::NodeMarker>();
 
         dir.open(
             file_flags | fio::OpenFlags::NOT_DIRECTORY,
@@ -51,7 +51,7 @@ async fn open1_epitaph_no_describe() {
     let harness = TestHarness::new().await;
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
-    let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+    let (client, server) = create_proxy::<fio::NodeMarker>();
     dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "does_not_exist", server)
         .expect("Open should not fail!");
     // Since Open1 is asynchronous, we need to invoke another method on the channel to check that
@@ -181,7 +181,7 @@ async fn open_dir_with_sufficient_rights() {
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (client, server) = create_proxy::<fio::NodeMarker>();
         dir.open(
             dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
             fio::ModeType::empty(),
@@ -205,7 +205,7 @@ async fn open_dir_with_insufficient_rights() {
         if dir_flags.is_empty() {
             continue;
         }
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (client, server) = create_proxy::<fio::NodeMarker>();
         dir.open(
             dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
             fio::ModeType::empty(),
@@ -232,8 +232,7 @@ async fn open_child_dir_with_same_rights() {
                 .await;
 
         // Open child directory with same flags as parent.
-        let (child_dir_client, child_dir_server) =
-            create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
         parent_dir
             .open(
                 dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
@@ -264,8 +263,7 @@ async fn open_child_dir_with_extra_rights() {
     .await;
 
     // Opening child as writable should fail.
-    let (child_dir_client, child_dir_server) =
-        create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+    let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
     parent_dir
         .open(
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
@@ -292,8 +290,7 @@ async fn open_child_dir_with_posix_flags() {
             open_node::<fio::DirectoryMarker>(&dir, dir_flags | fio::OpenFlags::DIRECTORY, ".")
                 .await;
 
-        let (child_dir_client, child_dir_server) =
-            create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
         parent_dir
             .open(
                 readable
@@ -363,7 +360,7 @@ async fn open_file_with_extra_rights() {
                 *file_flags
             );
 
-            let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+            let (client, server) = create_proxy::<fio::NodeMarker>();
 
             dir_proxy
                 .open(

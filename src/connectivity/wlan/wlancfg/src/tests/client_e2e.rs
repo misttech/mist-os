@@ -165,8 +165,7 @@ fn test_setup(
     recovery_enabled: bool,
 ) -> TestValues {
     let (monitor_service_proxy, monitor_service_requests) =
-        create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-            .expect("failed to create SeviceService proxy");
+        create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
     let monitor_service_stream = monitor_service_requests.into_stream();
 
     let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
@@ -221,8 +220,7 @@ fn test_setup(
     let roam_manager = RoamManager::new(roam_service_request_sender);
 
     let (client_provider_proxy, client_provider_requests) =
-        create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
+        create_proxy::<fidl_policy::ClientProviderMarker>();
     let client_provider_requests = client_provider_requests.into_stream();
 
     let (client_update_sender, client_update_receiver) = mpsc::unbounded();
@@ -568,8 +566,7 @@ fn prepare_client_interface(
 fn request_controller(
     provider: &fidl_policy::ClientProviderProxy,
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
-    let (controller, requests) = create_proxy::<fidl_policy::ClientControllerMarker>()
-        .expect("failed to create ClientController proxy");
+    let (controller, requests) = create_proxy::<fidl_policy::ClientControllerMarker>();
     let (update_sink, update_stream) =
         create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()
             .expect("failed to create ClientStateUpdates proxy");
@@ -1809,7 +1806,7 @@ fn request_scan_and_reply(
     reply: Result<Vec<fidl_sme::ScanResult>, fidl_sme::ScanErrorCode>,
 ) {
     // Make a scan request.
-    let (_iter, server) = create_proxy().expect("failed to create iterator");
+    let (_iter, server) = create_proxy();
     assert_variant!(
         test_values.external_interfaces.client_controller.scan_for_networks(server),
         Ok(())

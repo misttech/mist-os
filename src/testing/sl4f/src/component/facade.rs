@@ -111,7 +111,7 @@ impl ComponentFacade {
             collection: Some(collection_name.to_string()),
         };
 
-        let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+        let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         if let Err(err) = realm.open_exposed_dir(&child_ref, server_end).await? {
             fx_err_and_bail!(
                 &with_line!(tag),

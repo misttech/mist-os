@@ -34,8 +34,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         startup: Some(fidl_fuchsia_component_decl::StartupMode::Eager),
         ..Default::default()
     };
-    let (child_controller, child_controller_server) =
-        fidl::endpoints::create_proxy().expect("creating child controller channel");
+    let (child_controller, child_controller_server) = fidl::endpoints::create_proxy();
     let create_child_args = fidl_fuchsia_component::CreateChildArgs {
         controller: Some(child_controller_server),
         ..Default::default()
@@ -52,8 +51,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         return;
     }
 
-    let (ta_exposed_dir, ta_exposed_dir_server) =
-        fidl::endpoints::create_proxy().expect("creating exposed directory channel");
+    let (ta_exposed_dir, ta_exposed_dir_server) = fidl::endpoints::create_proxy();
     if let Err(e) = realm
         .open_exposed_dir(
             &fidl_fuchsia_component_decl::ChildRef {

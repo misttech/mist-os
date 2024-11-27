@@ -92,8 +92,7 @@ async fn resolve_component_without_context(
     package_resolver: &fpkg::PackageResolverProxy,
 ) -> Result<fresolution::Component, ResolverError> {
     let component_url = fuchsia_url::ComponentUrl::parse(component_url)?;
-    let (dir, dir_server_end) =
-        create_proxy::<fio::DirectoryMarker>().map_err(ResolverError::IoError)?;
+    let (dir, dir_server_end) = create_proxy::<fio::DirectoryMarker>();
     let outgoing_context = package_resolver
         .resolve(&component_url.package_url().to_string(), dir_server_end)
         .await
@@ -108,8 +107,7 @@ async fn resolve_component_with_context(
     package_resolver: &fpkg::PackageResolverProxy,
 ) -> Result<fresolution::Component, ResolverError> {
     let component_url = fuchsia_url::ComponentUrl::parse(component_url)?;
-    let (dir, dir_server_end) =
-        create_proxy::<fio::DirectoryMarker>().map_err(ResolverError::IoError)?;
+    let (dir, dir_server_end) = create_proxy::<fio::DirectoryMarker>();
     let outgoing_context = package_resolver
         .resolve_with_context(
             &component_url.package_url().to_string(),
@@ -575,7 +573,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_fails_with_component_not_found() {
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         pseudo_directory! {}.clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
@@ -614,7 +612,7 @@ mod tests {
             ..Default::default()
         };
         let cvf_bytes = fidl::persist(&expected_config.clone()).unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
@@ -663,7 +661,7 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
@@ -696,7 +694,7 @@ mod tests {
         })
         .unwrap();
         let cvf_bytes = fidl::persist(&fdecl::ConfigValuesData::default().clone()).unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
@@ -724,7 +722,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn resolve_component_sets_pkg_abi_revision() {
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let cm_bytes = fidl::persist(&fdecl::Component::default().clone())
             .expect("failed to encode ComponentDecl FIDL");
         pseudo_directory! {

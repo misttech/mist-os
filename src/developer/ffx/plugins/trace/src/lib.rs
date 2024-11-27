@@ -602,7 +602,7 @@ pub async fn trace(
 }
 
 async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
-    let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>()?;
+    let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>();
     proxy.status(server).await?;
     let mut res = Vec::new();
     loop {

@@ -58,7 +58,7 @@ impl BackboneNetworkInterface {
             futures::stream::try_unfold(None, move |_state: Option<()>| {
                 async move {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
-                    let (watcher_client, req) = create_proxy::<WatcherMarker>()?;
+                    let (watcher_client, req) = create_proxy::<WatcherMarker>();
                     fnif_state.get_watcher(&WatcherOptions::default(), req)?;
                     let watcher = Some(watcher_client);
                     let mut wlan_nicid_set = HashSet::new();
@@ -152,7 +152,7 @@ impl BackboneNetworkInterface {
             async move {
                 if state.watcher.is_none() {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
-                    let (watcher, req) = create_proxy::<WatcherMarker>()?;
+                    let (watcher, req) = create_proxy::<WatcherMarker>();
                     fnif_state.get_watcher(&WatcherOptions::default(), req)?;
                     state.watcher = Some(watcher);
                 }
@@ -225,7 +225,7 @@ impl BackboneInterface for BackboneNetworkInterface {
 
     async fn is_backbone_if_running(&self) -> bool {
         let fnif_state = connect_to_protocol::<StateMarker>().expect("connect to StateMarker");
-        let (watcher, req) = create_proxy::<WatcherMarker>().expect("creating WatcherMarker proxy");
+        let (watcher, req) = create_proxy::<WatcherMarker>();
         fnif_state.get_watcher(&WatcherOptions::default(), req).expect("getting watcher");
 
         loop {

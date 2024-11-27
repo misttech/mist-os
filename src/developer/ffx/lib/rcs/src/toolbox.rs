@@ -27,7 +27,7 @@ pub const MONIKER: &str = "toolbox";
 /// Open the service directory of the toolbox.
 #[cfg(not(feature = "fdomain"))]
 pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
-    let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>()?;
+    let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
     let e = rcs
         .deprecated_open_capability(
             MONIKER,
@@ -39,7 +39,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
         .await?;
 
     let (query, moniker) = if let Err(_) = e {
-        let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>()?;
+        let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
         rcs.deprecated_open_capability(
             LEGACY_MONIKER,
             sys2::OpenDirType::NamespaceDir,
@@ -64,7 +64,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
     )
     .await?;
 
-    let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     namespace_dir.open3(
         "svc",
         fio::Flags::PROTOCOL_DIRECTORY,

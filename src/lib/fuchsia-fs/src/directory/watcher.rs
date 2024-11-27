@@ -430,7 +430,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_error() {
         let test_dir = MockDirectory::new();
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         test_dir.open(
             scope.clone(),

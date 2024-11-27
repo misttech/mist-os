@@ -528,7 +528,7 @@ mod tests {
         // requests using the ProfileTest interface.
         let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>().unwrap();
 
-        let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>().unwrap();
+        let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>();
         let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>().unwrap();
         let reg_fut = client.register_peer(&id.into(), mock_peer_server, observer);
         let mut reg_fut = pin!(reg_fut);
@@ -601,9 +601,9 @@ mod tests {
         assert!(mps.contains_peer(&id2));
 
         // Both piconet members can wire up the `bredr.Profile` proxy.
-        let (_c1, s1) = create_proxy::<ProfileMarker>().unwrap();
+        let (_c1, s1) = create_proxy::<ProfileMarker>();
         let mut connect_fut1 = Box::pin(mock_peer1.connect_proxy_(s1));
-        let (_c2, s2) = create_proxy::<ProfileMarker>().unwrap();
+        let (_c2, s2) = create_proxy::<ProfileMarker>();
         let mut connect_fut2 = Box::pin(mock_peer2.connect_proxy_(s2));
 
         assert!(exec.run_until_stalled(&mut connect_fut1).is_pending());
@@ -638,7 +638,7 @@ mod tests {
         assert!(mps.contains_peer(&id));
 
         // Connect the ProfileProxy.
-        let (c, s) = create_proxy::<ProfileMarker>().unwrap();
+        let (c, s) = create_proxy::<ProfileMarker>();
         let connect_fut = mock_peer.connect_proxy_(s);
         let mut connect_fut = pin!(connect_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");

@@ -1456,8 +1456,7 @@ impl Routable<Dict> for ProgramDictionaryRouter {
         })?;
         let dir_entry = component.get_outgoing();
 
-        let (inner_router, server_end) =
-            create_proxy::<fsandbox::DictionaryRouterMarker>().unwrap();
+        let (inner_router, server_end) = create_proxy::<fsandbox::DictionaryRouterMarker>();
         dir_entry.open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),

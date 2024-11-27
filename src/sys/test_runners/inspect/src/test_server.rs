@@ -224,8 +224,7 @@ impl TestServer {
 
                                     let (case_listener_proxy, case_listener) =
                                         fidl::endpoints::create_proxy::<ftest::CaseListenerMarker>(
-                                        )
-                                        .expect("cannot create proxy");
+                                        );
 
                                     proxy
                                         .on_test_case_started(

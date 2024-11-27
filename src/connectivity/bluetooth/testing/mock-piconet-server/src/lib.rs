@@ -84,7 +84,7 @@ impl PiconetMemberSpec {
         topology: &RealmInstance,
     ) -> Result<bredr::ProfileProxy, anyhow::Error> {
         info!("Received request to get `bredr.Profile` for piconet member: {:?}", self.id);
-        let (client, server) = f_end::create_proxy::<bredr::ProfileMarker>()?;
+        let (client, server) = f_end::create_proxy::<bredr::ProfileMarker>();
         topology.root.connect_request_to_named_protocol_at_exposed_dir(
             &capability_path_for_mock::<bredr::ProfileMarker>(self),
             server.into_channel(),
@@ -242,7 +242,7 @@ impl BtProfileComponent {
         &self,
         topology: &RealmInstance,
     ) -> Result<S::Proxy, Error> {
-        let (client, server) = f_end::create_proxy::<S>()?;
+        let (client, server) = f_end::create_proxy::<S>();
         topology.root.connect_request_to_named_protocol_at_exposed_dir(
             &capability_path_for_peer_id(self.profile_id, S::PROTOCOL_NAME),
             server.into_channel(),
@@ -569,7 +569,7 @@ async fn register_piconet_member(
     id: bt_types::PeerId,
 ) -> Result<(bredr_test::MockPeerProxy, bredr_test::PeerObserverRequestStream), Error> {
     info!("Sending RegisterPeer request for peer {:?} to the Mock Piconet Server.", id);
-    let (client, server) = f_end::create_proxy::<bredr_test::MockPeerMarker>()?;
+    let (client, server) = f_end::create_proxy::<bredr_test::MockPeerMarker>();
     let (observer_client, observer_server) =
         f_end::create_request_stream::<bredr_test::PeerObserverMarker>()?;
 

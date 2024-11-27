@@ -99,7 +99,7 @@ impl Stash {
         .map_err(StashError::StashConnect)?;
         let () = store_client.identify(id)?;
         let (proxy, accessor_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::StoreAccessorMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::StoreAccessorMarker>();
         let () = store_client.create_accessor(false, accessor_server)?;
         let prefix = prefix.to_string();
         Ok(Stash { prefix, proxy })
@@ -128,7 +128,7 @@ impl Stash {
         use futures::TryStreamExt as _;
 
         let (iter, server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::GetIteratorMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::GetIteratorMarker>();
         let () = self.proxy.get_prefix(&self.prefix, server)?;
         futures::stream::try_unfold(iter, |iter| async move {
             let kvs = iter.get_next().await?;
@@ -586,8 +586,7 @@ mod tests {
 
         // Verify that the stash is actually empty.
         let (iter, server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::GetIteratorMarker>()
-                .expect("failed to create iterator for stash");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_stash::GetIteratorMarker>();
         let () = accessor.get_prefix(&stash.prefix, server).expect("failed to get prefix iterator");
         let stash_contents = iter.get_next().await.expect("failed to get next item for iterator");
         assert_eq!(stash_contents.len(), 0);

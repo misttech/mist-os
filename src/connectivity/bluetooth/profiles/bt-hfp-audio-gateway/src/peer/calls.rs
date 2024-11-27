@@ -746,7 +746,7 @@ mod tests {
     fn call_is_active() {
         // executor must be created before fidl endpoints can be created
         let _exec = fasync::TestExecutor::new();
-        let (proxy, _) = fidl::endpoints::create_proxy::<CallMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy::<CallMarker>();
 
         let mut call = CallEntry::new(
             proxy,

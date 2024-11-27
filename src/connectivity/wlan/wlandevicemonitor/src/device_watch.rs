@@ -36,8 +36,7 @@ pub fn watch_phy_devices<'a>(
                 if filename == "." {
                     return Ok(None);
                 }
-                let (proxy, server_end) =
-                    fidl::endpoints::create_proxy().context("create proxy")?;
+                let (proxy, server_end) = fidl::endpoints::create_proxy();
                 let connector = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
                     fidl_fuchsia_wlan_device::ConnectorMarker,
                 >(&directory, filename)

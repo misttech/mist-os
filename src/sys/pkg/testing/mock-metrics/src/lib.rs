@@ -115,7 +115,7 @@ mod tests {
 
         let task = fasync::Task::spawn(Arc::clone(&mock).run_logger_factory(stream));
 
-        let (logger, server_end) = ::fidl::endpoints::create_proxy().unwrap();
+        let (logger, server_end) = ::fidl::endpoints::create_proxy();
         factory
             .create_metric_event_logger(
                 &ProjectSpec {

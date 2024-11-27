@@ -30,8 +30,7 @@ fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {
         }
     };
 
-    let (remote_proxy, remote_server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (remote_proxy, remote_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     r.open(
         scope,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
@@ -61,13 +60,13 @@ fn remote_dir_construction_open_node_ref() {
 
     run_client(exec, || async move {
         // Test open1.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::OpenFlags::NODE_REFERENCE;
         server.clone().open(scope.clone(), flags, Path::dot(), server_end.into_channel().into());
         assert_close!(proxy);
 
         // Test open3.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_NODE;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
@@ -87,13 +86,13 @@ fn remote_dir_node_ref_with_path() {
 
     run_client(exec, || async move {
         // Test open1.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::OpenFlags::NODE_REFERENCE;
         server.clone().open(scope.clone(), flags, path.clone(), server_end.into_channel().into());
         assert_close!(proxy);
 
         // Test open3.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_NODE;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
@@ -112,7 +111,7 @@ fn remote_dir_direct_connection() {
 
     run_client(exec, || async move {
         // Test open1.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
         server.clone().open(scope.clone(), flags, Path::dot(), server_end.into_channel().into());
         let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
@@ -125,7 +124,7 @@ fn remote_dir_direct_connection() {
         assert_close!(proxy);
 
         // Test open3.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
@@ -150,7 +149,7 @@ fn remote_dir_direct_connection_dir_contents() {
 
     run_client(exec, || async move {
         // Test open1.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY;
         let path = Path::validate_and_split("a").unwrap();
         server.clone().open(scope.clone(), flags, path.clone(), server_end.into_channel().into());
@@ -158,7 +157,7 @@ fn remote_dir_direct_connection_dir_contents() {
         assert_close!(proxy);
 
         // Test open3.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, path, flags, request));
@@ -214,7 +213,7 @@ async fn lazy_remote() {
 
     let scope = ExecutionScope::new();
 
-    let (client, server_end) = create_proxy().unwrap();
+    let (client, server_end) = create_proxy();
     root.open(
         scope.clone(),
         fio::OpenFlags::empty(),

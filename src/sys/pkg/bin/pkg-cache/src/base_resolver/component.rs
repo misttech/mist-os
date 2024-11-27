@@ -102,8 +102,7 @@ async fn resolve(
     upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
-    let (package, server_end) =
-        fidl::endpoints::create_proxy().map_err(ResolverError::CreateEndpoints)?;
+    let (package, server_end) = fidl::endpoints::create_proxy();
     let context = super::package::resolve_impl(
         match url.package_url() {
             fuchsia_url::PackageUrl::Absolute(url) => url,
@@ -131,8 +130,7 @@ async fn resolve_with_context(
     upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
-    let (package, server_end) =
-        fidl::endpoints::create_proxy().map_err(ResolverError::CreateEndpoints)?;
+    let (package, server_end) = fidl::endpoints::create_proxy();
     let context = super::package::resolve_with_context_impl(
         url.package_url(),
         fpkg::ResolutionContext { bytes: context.bytes },

@@ -73,8 +73,7 @@ async fn main_inner_async() -> Result<(), Error> {
     let reboot_deadline = Instant::now() + MINIMUM_REBOOT_WAIT;
 
     let paver = connect_to_protocol::<PaverMarker>().context("while connecting to paver")?;
-    let (boot_manager, boot_manager_server_end) =
-        ::fidl::endpoints::create_proxy().context("while creating BootManager endpoints")?;
+    let (boot_manager, boot_manager_server_end) = ::fidl::endpoints::create_proxy();
 
     paver
         .find_boot_manager(boot_manager_server_end)

@@ -811,7 +811,7 @@ mod tests {
             let env = test.builtin_environment.lock().await;
             env.realm_query.clone().unwrap()
         };
-        let (proxy, server) = endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fsys::RealmQueryMarker>();
         capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
         (proxy, host)
     }
@@ -1056,7 +1056,7 @@ mod tests {
         // should just be closed.
         assert!(is_closed(runtime_dir));
 
-        let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1071,7 +1071,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1086,7 +1086,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1212,12 +1212,11 @@ mod tests {
 
         test.model.start().await;
 
-        let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
+        let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>();
 
         query.connect_to_storage_admin("./", "data", server_end).await.unwrap().unwrap();
 
-        let (it_proxy, it_server) =
-            create_proxy::<fsys::StorageIteratorMarker>().expect("create iterator");
+        let (it_proxy, it_server) = create_proxy::<fsys::StorageIteratorMarker>();
 
         storage_admin.list_storage_in_realm("./", it_server).await.unwrap().unwrap();
 

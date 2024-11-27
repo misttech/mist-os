@@ -26,7 +26,7 @@ mod fuchsia {
     /// filesystem server doesn't exist, this will still return success. Instead, the returned
     /// NodeProxy channel pair will be closed with an epitaph.
     pub fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::NodeProxy, OpenError> {
-        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        let (node, request) = fidl::endpoints::create_proxy();
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }

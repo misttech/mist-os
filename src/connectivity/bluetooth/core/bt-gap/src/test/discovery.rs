@@ -129,8 +129,7 @@ proptest! {
                             access_sessions.push(access::run(hd.clone(), access_stream));
 
                             let (discovery_session, discovery_session_server) =
-                                fidl::endpoints::create_proxy()
-                                    .expect("failure creating fidl proxy");
+                                fidl::endpoints::create_proxy();
 
                             let _ = executor.run_until_stalled(
                                 &mut access_proxy.start_discovery(discovery_session_server),

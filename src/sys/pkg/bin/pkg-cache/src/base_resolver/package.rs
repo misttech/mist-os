@@ -332,7 +332,7 @@ mod tests {
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         pkg.write_to_blobfs(&blobfs).await;
         let open_packages = crate::root_dir::new_test(blobfs.client()).await.1;
-        let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy();
 
         let _: fpkg::ResolutionContext = resolve(
             "fuchsia-pkg://fuchsia.test/name/0",
@@ -360,7 +360,7 @@ mod tests {
         assert_matches!(
             resolve(
                 "fuchsia-pkg://fuchsia.test/name/1",
-                fidl::endpoints::create_proxy().unwrap().1,
+                fidl::endpoints::create_proxy().1,
                 &HashMap::from_iter([(
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0u8; 32].into()

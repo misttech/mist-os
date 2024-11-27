@@ -223,7 +223,7 @@ async fn set_discovery(
         return Ok(String::new());
     }
 
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     match access_svc.start_discovery(token_server).await? {
         Ok(_) => {
             state.lock().discovery_token = Some(token);
@@ -471,7 +471,7 @@ async fn set_discoverable(
         if state.lock().discoverable_token.is_some() {
             return Ok(String::new());
         }
-        let (token, token_server) = fidl::endpoints::create_proxy()?;
+        let (token, token_server) = fidl::endpoints::create_proxy();
         match access_svc.make_discoverable(token_server).await? {
             Ok(_) => {
                 state.lock().discoverable_token = Some(token);

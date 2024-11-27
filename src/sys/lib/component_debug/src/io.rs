@@ -201,7 +201,7 @@ impl RemoteDirectory {
     }
 
     pub fn clone_proxy(&self) -> Result<fio::DirectoryProxy> {
-        let (cloned_proxy, clone_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (cloned_proxy, clone_server) = create_proxy::<fio::DirectoryMarker>();
         self.proxy.clone2(clone_server.into_channel().into())?;
         Ok(cloned_proxy)
     }

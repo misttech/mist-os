@@ -354,7 +354,7 @@ mod test {
         let dummy_control_handle =
             create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle().1;
 
-        let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>()?;
+        let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>();
         let under_test = Discovery::new(player_stream, usage_reporter_proxy);
         spawn_log_error(under_test.serve(discovery_request_stream, observer_request_stream));
 

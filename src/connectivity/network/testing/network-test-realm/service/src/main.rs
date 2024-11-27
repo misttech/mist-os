@@ -75,13 +75,8 @@ async fn install_netdevice(
     connector: &HermeticNetworkConnector,
 ) -> Result<(), fntr::Error> {
     let installer = connector.connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()?;
-    let (device_control, device_control_server_end) = fidl::endpoints::create_proxy::<
-        fnet_interfaces_admin::DeviceControlMarker,
-    >()
-    .map_err(|e| {
-        error!("create_proxy failed: {:?}", e);
-        fntr::Error::Internal
-    })?;
+    let (device_control, device_control_server_end) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
 
     let channel = fidl::endpoints::ClientEnd::<fhwnet::DeviceMarker>::new(
         device_proxy
@@ -185,20 +180,12 @@ async fn install_interface(
 ) -> Result<(), fntr::Error> {
     let debug_interfaces_proxy =
         SystemConnector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
-    let (port_proxy, port_server_end) = fidl::endpoints::create_proxy::<fhwnet::PortMarker>()
-        .map_err(|e| {
-            error!("create_proxy failure: {:?}", e);
-            fntr::Error::Internal
-        })?;
+    let (port_proxy, port_server_end) = fidl::endpoints::create_proxy::<fhwnet::PortMarker>();
     debug_interfaces_proxy.get_port(interface_id, port_server_end).map_err(|e| {
         error!("get_port failure: {:?}", e);
         fntr::Error::Internal
     })?;
-    let (device_proxy, device_server_end) = fidl::endpoints::create_proxy::<fhwnet::DeviceMarker>()
-        .map_err(|e| {
-            error!("create_proxy failure: {:?}", e);
-            fntr::Error::Internal
-        })?;
+    let (device_proxy, device_server_end) = fidl::endpoints::create_proxy::<fhwnet::DeviceMarker>();
     let fhwnet::PortInfo { id, .. } = port_proxy
         .get_info()
         .and_then(|port_info| {
@@ -956,8 +943,7 @@ impl Controller {
         let route_set_provider = hermetic_network_connector
             .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()?;
         let (route_set, server_end) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
-                .expect("creating route set proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>();
         route_set_provider.new_route_set(server_end).expect("calling new_route_set should succeed");
         let poll_task =
             fnet_dhcp_ext::testutil::DhcpClientTask::new(client, id, route_set, control);
@@ -1106,10 +1092,7 @@ impl Controller {
         let client_provider = hermetic_network_connector
             .connect_to_protocol::<fnet_dhcpv6::ClientProviderMarker>()?;
         let (client_proxy, client_server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>().map_err(|e| {
-                error!("failed to create DHCPv6 Client proxy and server end: {}", e);
-                fntr::Error::Internal
-            })?;
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>();
         client_provider.new_client(&params, client_server_end).map_err(|e| {
             error!("failed to start DHCPv6 client: {}", e);
             fntr::Error::Internal

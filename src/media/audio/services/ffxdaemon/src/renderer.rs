@@ -34,7 +34,7 @@ impl Renderer {
         format: Format,
         gain_settings: Option<fac::GainSettings>,
     ) -> Result<Self, Error> {
-        let (proxy, renderer_server_end) = create_proxy::<fmedia::AudioRendererMarker>().unwrap();
+        let (proxy, renderer_server_end) = create_proxy::<fmedia::AudioRendererMarker>();
 
         let packet_count = match config {
             fac::RendererConfig::StandardRenderer(ref cfg) => cfg.packet_count.clone(),
@@ -62,7 +62,7 @@ impl Renderer {
 
                 if let Some(gain_settings) = gain_settings {
                     let (gain_control_proxy, gain_control_server_end) =
-                        create_proxy::<fmedia_audio::GainControlMarker>().unwrap();
+                        create_proxy::<fmedia_audio::GainControlMarker>();
 
                     proxy.bind_gain_control(gain_control_server_end)?;
 

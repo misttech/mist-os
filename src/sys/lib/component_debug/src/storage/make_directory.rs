@@ -17,7 +17,7 @@ use fidl_fuchsia_sys2::StorageAdminProxy;
 pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> Result<()> {
     let remote_path = RemoteComponentStoragePath::parse(&path)?;
 
-    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 

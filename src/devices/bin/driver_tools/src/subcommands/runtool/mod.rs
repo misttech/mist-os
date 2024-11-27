@@ -18,7 +18,7 @@ pub async fn run_tool(
     writer: &mut dyn Write,
     tool_runner_proxy: fdp::ToolRunnerProxy,
 ) -> Result<()> {
-    let (controller_proxy, controller_server_end) = create_proxy::<fdp::CloseControllerMarker>()?;
+    let (controller_proxy, controller_server_end) = create_proxy::<fdp::CloseControllerMarker>();
     let (sin, cin) = fidl::Socket::create_stream();
     let (sout, cout) = fidl::Socket::create_stream();
     let (serr, cerr) = fidl::Socket::create_stream();

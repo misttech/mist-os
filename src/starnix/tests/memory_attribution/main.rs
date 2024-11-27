@@ -222,7 +222,7 @@ async fn init_attribution_test() -> AttributionTest {
 
     // Start the container and obtain its execution controller.
     let (container_controller, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
     let realm_proxy =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
     realm_proxy
@@ -234,7 +234,7 @@ async fn init_attribution_test() -> AttributionTest {
         .unwrap()
         .expect("open_controller");
     let (container_execution, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>();
     container_controller
         .start(fcomponent::StartChildArgs::default(), server_end)
         .await
@@ -343,10 +343,9 @@ async fn connect_to_service_in_exposed_dir<T: DiscoverableProtocolMarker>(
     realm: &fsys2::RealmQueryProxy,
     moniker: &str,
 ) -> Result<T::Proxy, OpenError> {
-    let (exposed_dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm.open_directory(moniker, fsys2::OpenDirType::ExposedDir, server_end).await.unwrap()?;
-    let (service, server_end) = fidl::endpoints::create_proxy::<T>().unwrap();
+    let (service, server_end) = fidl::endpoints::create_proxy::<T>();
     exposed_dir
         .open3(
             T::PROTOCOL_NAME,

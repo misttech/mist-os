@@ -43,7 +43,7 @@ pub async fn get_device_info(
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>();
 
     service
         .get_node_info(device_filter, iterator_server, exact_match)
@@ -67,7 +67,7 @@ pub async fn get_driver_info(
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
 
     service
         .get_driver_info(driver_filter, iterator_server)
@@ -91,7 +91,7 @@ pub async fn get_composite_node_specs(
     name_filter: Option<String>,
 ) -> Result<Vec<fdf::CompositeInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>();
 
     service
         .get_composite_node_specs(name_filter.as_deref(), iterator_server)

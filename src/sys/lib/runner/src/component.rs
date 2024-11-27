@@ -779,7 +779,7 @@ mod tests {
         fn start_launcher(
         ) -> Result<(fproc::LauncherProxy, oneshot::Receiver<FakeLauncherServiceResults>), Error>
         {
-            let (launcher_proxy, server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, server_end) = create_proxy::<fproc::LauncherMarker>();
             let (sender, receiver) = oneshot::channel();
             fasync::Task::local(async move {
                 let stream = server_end.into_stream();
@@ -830,7 +830,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn missing_pkg() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_empty_namespace()?;
 
             assert_eq!(
@@ -858,7 +858,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn invalid_executable() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_namespace(true, vec![])?;
 
             match configure_launcher(LauncherConfigArgs {
@@ -886,7 +886,7 @@ mod tests {
 
         #[fuchsia::test]
         async fn invalid_pkg() -> Result<(), Error> {
-            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
+            let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>();
             let ns = setup_namespace(false, vec!["/pkg"])?;
 
             match configure_launcher(LauncherConfigArgs {

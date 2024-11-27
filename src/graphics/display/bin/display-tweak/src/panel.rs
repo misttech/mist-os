@@ -23,8 +23,7 @@ async fn get_display_coordinator_path() -> anyhow::Result<String> {
 async fn open_display_provider() -> Result<display::ProviderProxy, Error> {
     tracing::trace!("Opening display coordinator");
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>()
-        .context("Failed to create fuchsia.hardware.display.Provider proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>();
     let display_coordinator_path: String =
         get_display_coordinator_path().await.context("Failed to get display coordinator path")?;
     println!("Display coordinator path: {}", display_coordinator_path);
@@ -74,8 +73,7 @@ impl DisplayProviderClient {
     // hard-coded path.
     async fn open_display_coordinator(self) -> Result<DisplayCoordinatorClient, Error> {
         let (display_coordinator, coordinator_server) =
-            fidl::endpoints::create_proxy::<display::CoordinatorMarker>()
-                .context("Failed to create fuchsia.hardware.display.Coordinator proxy")?;
+            fidl::endpoints::create_proxy::<display::CoordinatorMarker>();
         let (listener_client, listener_requests) = fidl::endpoints::create_request_stream::<
             display::CoordinatorListenerMarker,
         >()

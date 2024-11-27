@@ -110,7 +110,7 @@ mod tests {
             "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;

@@ -158,7 +158,7 @@ impl ZirconClient {
 
     /// Equivalent to the module level [`create_proxy`]
     pub async fn create_proxy<T: ProtocolMarker>(&self) -> Result<(T::Proxy, ServerEnd<T>), Error> {
-        create_proxy::<T>()
+        Ok(create_proxy::<T>())
     }
 }
 
@@ -567,16 +567,15 @@ pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
+pub fn create_proxy<T: ProtocolMarker>() -> (T::Proxy, ServerEnd<T>) {
     let (client, server) = create_endpoints();
-    Ok((client.into_proxy(), server))
+    (client.into_proxy(), server)
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
 // TODO(https://fxbug.dev/319159026) delete this function
 pub fn try_create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
-    create_proxy::<T>()
+    Ok(create_proxy::<T>())
 }
 
 /// Create a synchronous client proxy and a server endpoint connected to it by a channel.

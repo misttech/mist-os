@@ -46,7 +46,7 @@ async fn main() -> Result<(), Error> {
     system_image_package.write_to_blobfs(&blobfs).await;
 
     let blobfs_client = blobfs.client();
-    let (client, server) = endpoints::create_proxy()?;
+    let (client, server) = endpoints::create_proxy();
 
     package_directory::serve(
         vfs::execution_scope::ExecutionScope::new(),

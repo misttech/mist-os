@@ -27,7 +27,7 @@ impl HostPlatformServices {
 #[async_trait(?Send)]
 impl PlatformServices for HostPlatformServices {
     async fn connect_to_manager(&self, guest_type: GuestType) -> Result<GuestManagerProxy> {
-        let (guest_manager, server_end) = create_proxy::<GuestManagerMarker>()?;
+        let (guest_manager, server_end) = create_proxy::<GuestManagerMarker>();
         // This may fail, but we report the error when we later try to use the GuestManagerProxy.
         let _ = self
             .remote_control
@@ -42,7 +42,7 @@ impl PlatformServices for HostPlatformServices {
     }
 
     async fn connect_to_linux_manager(&self) -> Result<LinuxManagerProxy> {
-        let (linux_manager, server_end) = create_proxy::<LinuxManagerMarker>()?;
+        let (linux_manager, server_end) = create_proxy::<LinuxManagerMarker>();
         // This may fail, but we report the error when we later try to use the LinuxManagerProxy.
         let _ = self
             .remote_control

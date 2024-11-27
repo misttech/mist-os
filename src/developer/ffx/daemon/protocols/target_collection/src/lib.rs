@@ -481,7 +481,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 match rcs {
                     Ok(mut rcs) => {
                         let (rcs_proxy, server) =
-                            fidl::endpoints::create_proxy::<RemoteControlMarker>()?;
+                            fidl::endpoints::create_proxy::<RemoteControlMarker>();
                         rcs.copy_to_channel(server.into_channel())?;
                         match rcs::knock_rcs(&rcs_proxy).await {
                             Ok(_) => {

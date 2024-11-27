@@ -55,8 +55,8 @@ where
                 requires_level_by_preference: vec![REQUIRED_LEVEL],
             }];
 
-            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>()?;
-            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>()?;
+            let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>();
+            let (required, required_level_channel) = create_proxy::<fpb::RequiredLevelMarker>();
             let result = topology_proxy
                 .add_element(fpb::ElementSchema {
                     element_name: Some(ELEMENT_NAME.into()),

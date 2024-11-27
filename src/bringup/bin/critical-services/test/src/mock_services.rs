@@ -180,7 +180,7 @@ async fn main() -> Result<(), Error> {
             ).detach()
         }),
     };
-    let (proxy, server_end) = create_proxy()?;
+    let (proxy, server_end) = create_proxy();
     input_dir.clone().open(
         ExecutionScope::new(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

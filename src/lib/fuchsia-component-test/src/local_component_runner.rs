@@ -423,7 +423,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (_, outgoing_dir) = create_proxy().unwrap();
+        let (_, outgoing_dir) = create_proxy();
         let handles = LocalComponentHandles {
             namespace: HashMap::new(),
             numbered_handles: HashMap::new(),
@@ -461,9 +461,9 @@ mod tests {
         let (component_runner_client_end, runner_task) = runner_builder.build().await.unwrap();
         let component_runner_proxy = component_runner_client_end.into_proxy();
 
-        let (runtime_dir_proxy, runtime_dir_server_end) = create_proxy().unwrap();
-        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy().unwrap();
-        let (controller_proxy, controller_server_end) = create_proxy().unwrap();
+        let (runtime_dir_proxy, runtime_dir_server_end) = create_proxy();
+        let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy();
+        let (controller_proxy, controller_server_end) = create_proxy();
         component_runner_proxy
             .start(
                 fcrunner::ComponentStartInfo {

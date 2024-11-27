@@ -33,7 +33,7 @@ fn mock_boot_handles(
         },
     };
 
-    let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
 
     let scope = ExecutionScope::new();

@@ -79,8 +79,7 @@ pub async fn handle_fullmac_startup(
     config: &config::FullmacDriverConfig,
 ) -> (fidl_fullmac::WlanFullmacImplIfcProxy, fidl_sme::GenericSmeProxy) {
     let (usme_bootstrap_proxy, usme_bootstrap_server) =
-        create_proxy::<fidl_sme::UsmeBootstrapMarker>()
-            .expect("Could not create usme_bootstrap proxy");
+        create_proxy::<fidl_sme::UsmeBootstrapMarker>();
 
     let fullmac_ifc_proxy = assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Init { payload, responder })) => {
@@ -95,8 +94,7 @@ pub async fn handle_fullmac_startup(
         }
     );
 
-    let (generic_sme_proxy, generic_sme_server) =
-        create_proxy::<fidl_sme::GenericSmeMarker>().expect("Failed to create generic_sme_proxy");
+    let (generic_sme_proxy, generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>();
 
     let _bootstrap_result = usme_bootstrap_proxy
         .start(generic_sme_server, &config.sme_legacy_privacy_support)

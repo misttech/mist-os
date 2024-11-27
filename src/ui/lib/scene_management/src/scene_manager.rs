@@ -90,9 +90,9 @@ impl FlatlandInstance {
         id_generator: &mut scenic::flatland::IdGenerator,
     ) -> Result<FlatlandInstance, Error> {
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ui_comp::ParentViewportWatcherMarker>()?;
+            create_proxy::<ui_comp::ParentViewportWatcherMarker>();
 
-        let (focuser, focuser_request) = create_proxy::<ui_views::FocuserMarker>()?;
+        let (focuser, focuser_request) = create_proxy::<ui_views::FocuserMarker>();
 
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(focuser_request),
@@ -515,8 +515,7 @@ impl SceneManager {
         {
             // We don't need to watch the child view, since we also own it. So, we discard the
             // client end of the the channel pair.
-            let (_, child_view_watcher_request) =
-                create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+            let (_, child_view_watcher_request) = create_proxy::<ui_comp::ChildViewWatcherMarker>();
 
             display.set_content(
                 root_view_creation_pair.viewport_creation_token,
@@ -592,8 +591,7 @@ impl SceneManager {
                 ..Default::default()
             };
 
-            let (_, child_view_watcher_request) =
-                create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+            let (_, child_view_watcher_request) = create_proxy::<ui_comp::ChildViewWatcherMarker>();
 
             flatland.create_viewport(
                 &pointerinjector_viewport_content_id,
@@ -611,7 +609,7 @@ impl SceneManager {
 
         // Bridge the pointerinjector and a11y Flatland instances.
         let (a11y_view_watcher, a11y_view_watcher_request) =
-            create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+            create_proxy::<ui_comp::ChildViewWatcherMarker>();
         {
             let flatland = pointerinjector_flatland.flatland.lock();
             flatland.create_transform(&a11y_viewport_transform_id)?;
@@ -739,8 +737,7 @@ impl SceneManager {
             content_id: self.id_generator.next_content_id(),
         };
         let (child_view_watcher, child_view_watcher_request) =
-            create_proxy::<ui_comp::ChildViewWatcherMarker>()
-                .context("could not connect to ChildViewWatcher")?;
+            create_proxy::<ui_comp::ChildViewWatcherMarker>();
         {
             let locked = self.scene_flatland.flatland.lock();
             let viewport_properties = ui_comp::ViewportProperties {

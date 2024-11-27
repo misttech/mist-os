@@ -32,8 +32,7 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<()>
 
 // Connects a controller to the fuzzer using the fuzz-manager.
 async fn connect(fuzz_manager: &fuzz::ManagerProxy) -> (fuzz::ControllerProxy, fasync::Task<()>) {
-    let (controller, server_end) =
-        create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+    let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
     let status = fuzz_manager
         .connect(FUZZER_URL, server_end)
         .await

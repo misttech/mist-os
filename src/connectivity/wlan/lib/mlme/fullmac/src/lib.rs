@@ -335,8 +335,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
     //                         in *.cml files
     let (persistence_proxy, _persistence_server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>()
-            .map_err(FullmacMlmeError::FailedToCreatePersistenceProxy)?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>();
 
     let (persistence_req_sender, _persistence_req_forwarder_fut) =
         auto_persist::create_persistence_req_sender(persistence_proxy);
@@ -388,8 +387,7 @@ mod tests {
         assert_variant!(startup_result, Ok(()));
 
         let (client_sme_proxy, client_sme_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>()
-                .expect("creating ClientSme proxy should succeed");
+            fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let mut client_sme_response_fut =
             h.generic_sme_proxy.as_ref().unwrap().get_client_sme(client_sme_server);
@@ -616,8 +614,7 @@ mod tests {
                 fake_device.usme_bootstrap_client_end.take().unwrap().into_proxy();
 
             let (generic_sme_proxy, generic_sme_server_end) =
-                fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()
-                    .expect("creating GenericSmeProxy should succeed");
+                fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>();
             let usme_bootstrap_result = if bootstrap {
                 Some(usme_bootstrap_proxy.start(
                     generic_sme_server_end,

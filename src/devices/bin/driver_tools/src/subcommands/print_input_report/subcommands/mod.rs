@@ -18,7 +18,7 @@ fn connect_to_input_device(
     dev: &fio::DirectoryProxy,
     device_path: impl AsRef<Path> + Debug,
 ) -> Result<fir::InputDeviceProxy> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     let device_path = device_path
         .as_ref()
         .as_os_str()

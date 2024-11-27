@@ -403,8 +403,7 @@ impl InterpreterInner {
         path: &String,
         flags: fio::OpenFlags,
     ) -> Result<fio::NodeProxy> {
-        let (node, server) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().expect("create_proxy failed!");
+        let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         let request = FidlValue::Object(vec![
             ("flags".to_owned(), FidlValue::U32(flags.bits())),
@@ -890,7 +889,7 @@ impl Interpreter {
                         };
 
                         for entry in entries.into_iter().filter(|x| x.name.starts_with(filter)) {
-                            let (node, server) = fidl::endpoints::create_proxy().unwrap();
+                            let (node, server) = fidl::endpoints::create_proxy();
                             let is_dir = if let Ok(_) = dir.open(
                                 fio::OpenFlags::NODE_REFERENCE,
                                 fio::ModeType::empty(),

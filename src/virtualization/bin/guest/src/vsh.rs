@@ -251,7 +251,7 @@ pub async fn handle_vsh<P: PlatformServices>(
         break;
     }
 
-    let (guest, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()?;
+    let (guest, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
     termina_manager
         .connect(guest_server_end)
         .await
@@ -259,7 +259,7 @@ pub async fn handle_vsh<P: PlatformServices>(
         .map_err(|e| anyhow!("GuestManager.ConnectToGuest returned an error: {e:?}"))?;
 
     let (vsock_endpoint, vsock_server_end) =
-        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>()?;
+        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>();
     guest
         .get_host_vsock_endpoint(vsock_server_end)
         .await?

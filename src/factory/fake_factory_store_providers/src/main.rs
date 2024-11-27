@@ -61,7 +61,7 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
     let test_dir = tree.build();
 
     let (test_dir_proxy, test_dir_service) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     test_dir.open(
         ExecutionScope::new(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

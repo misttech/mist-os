@@ -333,7 +333,7 @@ async fn open_sensor(
     let controller = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
         ControllerMarker,
     >(directory, filename)?;
-    let (device, server_end) = fidl::endpoints::create_proxy::<DeviceMarker>()?;
+    let (device, server_end) = fidl::endpoints::create_proxy::<DeviceMarker>();
     let () = controller.open_session(server_end)?;
     check_sensor(device).await
 }

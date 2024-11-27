@@ -505,7 +505,7 @@ impl StreamProcessor {
         let codec_svc = fuchsia_component::client::connect_to_protocol::<CodecFactoryMarker>()
             .context("Failed to connect to Codec Factory")?;
 
-        let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy()?;
+        let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy();
 
         codec_svc.create_encoder(&encoder_params, stream_processor_serverend)?;
 
@@ -542,7 +542,7 @@ impl StreamProcessor {
         let codec_svc = fuchsia_component::client::connect_to_protocol::<CodecFactoryMarker>()
             .context("Failed to connect to Codec Factory")?;
 
-        let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy()?;
+        let (processor, stream_processor_serverend) = fidl::endpoints::create_proxy();
 
         codec_svc.create_decoder(&decoder_params, stream_processor_serverend)?;
 

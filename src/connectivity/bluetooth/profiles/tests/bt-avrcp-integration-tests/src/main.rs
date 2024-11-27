@@ -407,7 +407,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
     let _avh_task = fasync::Task::spawn(avh_fut);
 
     // Get controller for mock peer
-    let (c_proxy, c_server) = create_proxy::<ControllerMarker>().unwrap();
+    let (c_proxy, c_server) = create_proxy::<ControllerMarker>();
     avrcp_svc
         .get_controller_for_target(&tf.mock_peer.peer_id().into(), c_server)
         .await

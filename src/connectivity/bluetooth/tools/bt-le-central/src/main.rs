@@ -101,8 +101,7 @@ async fn do_scan(appname: &String, args: &[String], state: CentralStatePtr) -> R
     let scan_options = ScanOptions { filters: Some(filters), ..Default::default() };
 
     let (result_watcher_client, result_watcher_server) =
-        endpoints::create_proxy::<ScanResultWatcherMarker>()
-            .context("failed to create ScanResultWatcher endpoints")?;
+        endpoints::create_proxy::<ScanResultWatcherMarker>();
 
     let scan_fut = state
         .write()

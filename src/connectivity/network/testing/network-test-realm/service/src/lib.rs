@@ -66,7 +66,7 @@ async fn has_running_child(
     expected_child_ref: &fdecl::ChildRef,
     realm_proxy: &fcomponent::RealmProxy,
 ) -> Result<bool> {
-    let (iterator_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (iterator_proxy, server_end) = fidl::endpoints::create_proxy();
     let list_children_result = realm_proxy
         .list_children(&collection_ref, server_end)
         .await

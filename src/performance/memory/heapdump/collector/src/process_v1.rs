@@ -323,7 +323,7 @@ mod tests {
         let (registry_proxy, registry_stream) =
             create_proxy_and_stream::<fheapdump_process::RegistryMarker>().unwrap();
         let (snapshot_proxy, snapshot_server) =
-            create_proxy::<fheapdump_process::SnapshotSinkV1Marker>().unwrap();
+            create_proxy::<fheapdump_process::SnapshotSinkV1Marker>();
         registry_proxy
             .register_v1(
                 process,

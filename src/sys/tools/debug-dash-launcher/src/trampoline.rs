@@ -243,8 +243,7 @@ fn make_executable_vmo_file(
 
 // Return a proxy to the given directory, first opening it as executable.
 fn directory_to_proxy(dir: Arc<PseudoDirectory>) -> Result<fio::DirectoryProxy, LauncherError> {
-    let (client, server) =
-        create_proxy::<fio::DirectoryMarker>().map_err(|_| LauncherError::Internal)?;
+    let (client, server) = create_proxy::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
     vfs::ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel())
@@ -389,8 +388,7 @@ mod tests {
 
     async fn make_pkg(url: &str, name: &str, root: &Arc<PseudoDirectory>) -> PkgDir {
         let (url, resource) = parse_url(url).unwrap();
-        let (dir, server) =
-            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
+        let (dir, server) = create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let path = vfs::path::Path::validate_and_split(name).unwrap();

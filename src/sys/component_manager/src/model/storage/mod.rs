@@ -77,8 +77,7 @@ impl PartialEq for BackingDirectoryInfo {
 async fn open_storage_root(
     storage_source_info: &BackingDirectoryInfo,
 ) -> Result<fio::DirectoryProxy, ModelError> {
-    let (mut dir_proxy, local_server_end) =
-        create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+    let (mut dir_proxy, local_server_end) = create_proxy::<fio::DirectoryMarker>();
     let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
     full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
     let path = full_backing_directory_path.to_string();

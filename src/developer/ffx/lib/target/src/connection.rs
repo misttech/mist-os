@@ -85,8 +85,7 @@ impl Connection {
             *rcs_info = Some(RcsInfo { _rcs_proxy: proxy, node_id });
         }
         let (remote_proxy, remote_server_end) =
-            fidl::endpoints::create_proxy::<RemoteControlMarker>()
-                .map_err(|e| ConnectionError::InternalError(e.into()))?;
+            fidl::endpoints::create_proxy::<RemoteControlMarker>();
         let node_id = rcs_info.as_ref().unwrap().node_id;
         overnet
             .node

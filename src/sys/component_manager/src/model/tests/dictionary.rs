@@ -1236,7 +1236,7 @@ async fn dictionary_from_program() {
     let test = RoutingTestBuilder::new("root", components).build().await;
 
     let host = CapabilityStore::new();
-    let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>();
     capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
 
     // Create a dictionary with a Sender at "A" for the Echo protocol.

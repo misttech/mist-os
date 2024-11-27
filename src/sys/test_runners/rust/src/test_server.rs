@@ -17,8 +17,8 @@ use std::collections::HashSet;
 use std::sync::{Arc, Weak};
 use test_runners_lib::cases::TestCaseInfo;
 use test_runners_lib::elf::{
-    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+    Component, ComponentError, EnumeratedTestCases, KernelError, MemoizedFutureContainer,
+    PinnedFuture, SuiteServer,
 };
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
@@ -94,9 +94,7 @@ impl SuiteServer for TestServer {
                 let (test_stdout, stdout_client) = zx::Socket::create_stream();
                 let (test_stderr, stderr_client) = zx::Socket::create_stream();
                 let (case_listener_proxy, listener) =
-                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                        .map_err(FidlError::CreateProxy)
-                        .unwrap();
+                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
                 let test_stdout = fasync::Socket::from_socket(test_stdout);
                 let test_stderr = fasync::Socket::from_socket(test_stderr);
 

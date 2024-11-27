@@ -117,7 +117,7 @@ async fn unmanaged_element_state_propagates_to_status_channel() -> Result<()> {
     .await?;
 
     // Use the unmanaged element's ElementControl client to open a Status channel.
-    let (status, status_server) = create_proxy::<fbroker::StatusMarker>()?;
+    let (status, status_server) = create_proxy::<fbroker::StatusMarker>();
     element.context.element_control.open_status_channel(status_server)?;
 
     // Listen for updates on the Status channel.

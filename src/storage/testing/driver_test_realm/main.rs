@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     let mut fs = ServiceFs::new();
 
-    let (dir_client, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_client, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     instance
         .root
         .get_exposed_dir()

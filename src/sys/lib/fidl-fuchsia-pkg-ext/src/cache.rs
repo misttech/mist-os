@@ -42,7 +42,7 @@ impl Client {
         gc_protection: fpkg::GcProtection,
     ) -> Result<Get, fidl::Error> {
         let (needed_blobs, needed_blobs_server_end) =
-            fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>()?;
+            fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
         let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
 
         let get_fut = self.proxy.get(
@@ -312,7 +312,7 @@ impl Get {
         }
 
         let (blob_iterator, blob_iterator_server_end) =
-            fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>()?;
+            fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
 
         self.needed_blobs.get_missing_blobs(blob_iterator_server_end)?;
         Ok(Some(blob_iterator))

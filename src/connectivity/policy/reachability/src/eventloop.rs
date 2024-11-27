@@ -71,10 +71,10 @@ impl watchdog::SystemDispatcher for SystemDispatcher {
                     error!(e = ?e, "failed to connect to protocol");
                     watchdog::Error::NotSupported
                 })?;
-        let (port, server_end) = fidl::endpoints::create_proxy()?;
+        let (port, server_end) = fidl::endpoints::create_proxy();
         interfaces_debug.get_port(interface, server_end)?;
 
-        let (diagnostics, server_end) = fidl::endpoints::create_proxy()?;
+        let (diagnostics, server_end) = fidl::endpoints::create_proxy();
         port.get_diagnostics(server_end)?;
 
         Ok(DeviceDiagnosticsProvider { interface, diagnostics, port })
@@ -220,9 +220,7 @@ impl EventLoop {
                 // proxy and attempt to serve the policy API with metrics disabled.
                 let (proxy, _) = fidl::endpoints::create_proxy::<
                     fidl_fuchsia_metrics::MetricEventLoggerMarker,
-                >()
-                .context("failed to create MetricEventLoggerMarker endponts")
-                .unwrap_or_else(|err| exit_with_anyhow_error(err));
+                >();
                 proxy
             }
         };
@@ -252,9 +250,7 @@ impl EventLoop {
                 .context("failed to connect to neighbor view")
                 .unwrap_or_else(|err| exit_with_anyhow_error(err));
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fnet_neighbor::EntryIteratorMarker>()
-                    .context("failed to create EntryIterator proxy")
-                    .unwrap_or_else(|err| exit_with_anyhow_error(err));
+                fidl::endpoints::create_proxy::<fnet_neighbor::EntryIteratorMarker>();
             let () = view
                 .open_entry_iterator(server_end, &fnet_neighbor::EntryIteratorOptions::default())
                 .context("failed to open EntryIterator")

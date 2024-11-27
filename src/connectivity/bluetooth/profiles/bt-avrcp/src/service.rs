@@ -306,8 +306,8 @@ mod tests {
         let (profile_proxy, _profile_requests) =
             create_proxy_and_stream::<ProfileMarker>().unwrap();
 
-        let (_c_proxy, controller_server) = create_proxy().expect("Controller proxy creation");
-        let (_bc_proxy, bcontroller_server) = create_proxy().expect("Controller proxy creation");
+        let (_c_proxy, controller_server) = create_proxy();
+        let (_bc_proxy, bcontroller_server) = create_proxy();
 
         let handler_fut = handle_peer_manager_requests(
             peer_manager_requests,
@@ -391,8 +391,8 @@ mod tests {
         let (profile_proxy, _profile_requests) =
             create_proxy_and_stream::<ProfileMarker>().unwrap();
 
-        let (_c_proxy, controller_server) = create_proxy().unwrap();
-        let (_bc_proxy, bcontroller_server) = create_proxy().unwrap();
+        let (_c_proxy, controller_server) = create_proxy();
+        let (_bc_proxy, bcontroller_server) = create_proxy();
 
         let handler_fut = handle_peer_manager_ext_requests(
             peer_manager_ext_requests,
@@ -675,7 +675,7 @@ mod tests {
 
         let (local, remote) = Channel::create();
         let remote_peer = AvcPeer::new(remote);
-        let (profile_proxy, _requests) = create_proxy::<ProfileMarker>().unwrap();
+        let (profile_proxy, _requests) = create_proxy::<ProfileMarker>();
 
         let mut peer_manager = PeerManager::new(profile_proxy);
 
@@ -708,13 +708,13 @@ mod tests {
         .fuse();
         let mut test_handler_fut = pin!(test_handler_fut);
 
-        let (controller_proxy, controller_server) = create_proxy().unwrap();
+        let (controller_proxy, controller_server) = create_proxy();
         let get_controller_fut = peer_manager_proxy
             .get_controller_for_target(&fake_peer_id.into(), controller_server)
             .fuse();
         let mut get_controller_fut = pin!(get_controller_fut);
 
-        let (controller_ext_proxy, controller_ext_server) = create_proxy().unwrap();
+        let (controller_ext_proxy, controller_ext_server) = create_proxy();
         let get_test_controller_fut =
             ext_proxy.get_controller_for_target(&fake_peer_id.into(), controller_ext_server).fuse();
         let mut get_test_controller_fut = pin!(get_test_controller_fut);

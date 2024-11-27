@@ -90,7 +90,7 @@ impl StarnixKernel {
             .duplicate_handle(zx::Rights::SAME_RIGHTS)?;
 
         // Create the `starnix_kernel`.
-        let (controller_proxy, controller_server_end) = fidl::endpoints::create_proxy()?;
+        let (controller_proxy, controller_server_end) = fidl::endpoints::create_proxy();
         realm
             .create_child(
                 &fdecl::CollectionRef { name: KERNEL_COLLECTION.into() },
@@ -110,7 +110,7 @@ impl StarnixKernel {
 
         // Start the kernel to obtain an `ExecutionController`.
         let (execution_controller_proxy, execution_controller_server_end) =
-            fidl::endpoints::create_proxy()?;
+            fidl::endpoints::create_proxy();
         controller_proxy
             .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
             .await?
@@ -214,7 +214,7 @@ async fn open_exposed_directory(
     child_name: &str,
     collection_name: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm
         .open_exposed_dir(
             &fdecl::ChildRef { name: child_name.into(), collection: Some(collection_name.into()) },

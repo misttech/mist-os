@@ -278,7 +278,7 @@ impl Container {
                 .add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
-            let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
+            let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy();
             fs.add_remote("fs_root", fs_root);
             expose_root(
                 self.kernel.kthreads.unlocked_for_async().deref_mut(),

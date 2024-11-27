@@ -255,8 +255,7 @@ mod tests {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
 
         helper.phys.insert(20, 2000);
@@ -290,8 +289,7 @@ mod tests {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
         let mut future = pin!(future);
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
 
         helper.ifaces.insert(50, 5000);
@@ -326,8 +324,7 @@ mod tests {
         helper.phys.remove(&20);
 
         // Now add the watcher and pump the events
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
         if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
             panic!("server future returned an error: {:?}", e);
@@ -354,8 +351,7 @@ mod tests {
         helper.ifaces.remove(&20);
 
         // Now add the watcher and pump the events
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
         if let Poll::Ready(Err(e)) = exec.run_until_stalled(&mut future) {
             panic!("server future returned an error: {:?}", e);
@@ -379,13 +375,11 @@ mod tests {
         helper.ifaces.insert(20, 2000);
 
         // Add first watcher
-        let (proxy_one, server_end_one) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy_one, server_end_one) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
 
         // Add second watcher
-        let (proxy_two, server_end_two) =
-            fidl::endpoints::create_proxy().expect("Failed to create endpoints");
+        let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
 
         // Deliver events

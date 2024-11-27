@@ -107,7 +107,7 @@ async fn create_client_state_machine(
     // Create a new client SME proxy.  This is required because each new client state machine will
     // take the event stream from the SME proxy.  A subsequent attempt to take the event stream
     // would cause wlancfg to panic.
-    let (sme_proxy, remote) = create_proxy()?;
+    let (sme_proxy, remote) = create_proxy();
     dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
     let event_stream = sme_proxy.take_event_stream();
     let sme_proxy = SmeForClientStateMachine::new(sme_proxy, iface_id, defect_sender.clone());
@@ -271,12 +271,12 @@ impl IfaceManagerService {
 
         // If the iface ID is not among configured clients, create a new ClientIfaceContainer for
         // the iface ID.
-        let (sme_proxy, sme_server) = create_proxy()?;
+        let (sme_proxy, sme_server) = create_proxy();
         self.dev_monitor_proxy
             .get_client_sme(iface_id, sme_server)
             .await?
             .map_err(zx::Status::from_raw)?;
-        let (features_proxy, features_server) = create_proxy()?;
+        let (features_proxy, features_server) = create_proxy();
         self.dev_monitor_proxy.get_feature_support(iface_id, features_server).await?.map_err(
             |e| format_err!("Error occurred getting iface's features support proxy: {}", e),
         )?;
@@ -333,7 +333,7 @@ impl IfaceManagerService {
         }
 
         // If this iface ID is not yet accounted for, create a new ApIfaceContainer.
-        let (sme_proxy, sme_server) = create_proxy()?;
+        let (sme_proxy, sme_server) = create_proxy();
         self.dev_monitor_proxy
             .get_ap_sme(iface_id, sme_server)
             .await?
@@ -1585,8 +1585,7 @@ mod tests {
     /// Create a TestValues for a unit test.
     pub fn test_setup(exec: &mut TestExecutor) -> TestValues {
         let (monitor_service_proxy, monitor_service_requests) =
-            create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-                .expect("failed to create SeviceService proxy");
+            create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
         let monitor_service_stream = monitor_service_requests.into_stream();
 
         let (client_sender, client_receiver) = mpsc::unbounded();
@@ -1855,8 +1854,7 @@ mod tests {
         test_values: &TestValues,
         configured: bool,
     ) -> (IfaceManagerService, StreamFuture<fidl_fuchsia_wlan_sme::ClientSmeRequestStream>) {
-        let (sme_proxy, server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create an sme channel");
+        let (sme_proxy, server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let sme_proxy = SmeForClientStateMachine::new(
             sme_proxy,
             TEST_CLIENT_IFACE_ID,
@@ -6263,8 +6261,7 @@ mod tests {
         );
 
         // Set up a fake client and fake AP and write some fake statuses for them.
-        let (sme_proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create an sme channel");
+        let (sme_proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>();
         let sme_proxy = SmeForClientStateMachine::new(
             sme_proxy,
             TEST_CLIENT_IFACE_ID,

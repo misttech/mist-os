@@ -429,8 +429,7 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
     {
         let (address_state_provider, server) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .expect("create proxy");
+        >();
         address_state_provider.detach().expect("detach address lifetime");
         iface
             .control()
@@ -938,8 +937,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
                 .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
                 .expect("connect to protocol");
             let (control, server) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
-                    .expect("create Control");
+                fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>();
             root_interfaces.get_admin(iface_id, server).expect("send get_admin");
             futures::stream::iter(std::iter::repeat(()).take(ITERATIONS)).fold(
                 0,
@@ -1021,8 +1019,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
         .expect("connect to protocol");
     for _ in 0..100 {
         let (watcher, server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
-                .expect("create watcher");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         let () = interface_state
             .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server)
             .expect("initialize interface watcher");
@@ -1778,8 +1775,7 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
     const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("1.2.3.4/24");
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create proxy");
+    >();
     let () = interface
         .control()
         .add_address(

@@ -756,7 +756,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -848,7 +848,7 @@ mod tests {
         .fuse());
 
         let mut client = std::pin::pin!(async {
-            let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+            let (session_proxy, server) = fidl::endpoints::create_proxy();
 
             proxy.open_session(server).unwrap();
 
@@ -969,7 +969,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1072,7 +1072,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1169,7 +1169,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1302,7 +1302,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1393,7 +1393,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1466,7 +1466,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1575,7 +1575,7 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
                 proxy.open_session(server).unwrap();
 
@@ -1676,7 +1676,7 @@ mod tests {
         .detach();
 
         let mut fut = pin!(async {
-            let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+            let (session_proxy, server) = fidl::endpoints::create_proxy();
 
             proxy.open_session(server).unwrap();
 

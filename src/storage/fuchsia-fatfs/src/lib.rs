@@ -227,7 +227,7 @@ mod tests {
                     return async move {
                         for (name, value) in map.iter() {
                             let (proxy, server_end) =
-                                fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+                                fidl::endpoints::create_proxy::<fio::NodeMarker>();
                             remote
                                 .open(
                                     fio::OpenFlags::RIGHT_READABLE,
@@ -305,7 +305,7 @@ mod tests {
 
         let fatfs = disk.into_fatfs();
         let scope = ExecutionScope::new();
-        let (proxy, remote) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, remote) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let root = fatfs.get_root().expect("get_root OK");
         root.clone().open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), remote);
         root.close();

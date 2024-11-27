@@ -172,8 +172,7 @@ mod tests {
             Some(fidl_fuchsia_settings::ConfigurationInterfaces::ETHERNET);
         const SHOULD_REBOOT: bool = true;
 
-        let (proxy, server) =
-            fidl::endpoints::create_proxy::<SetupMarker>().expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<SetupMarker>();
         let _fut = proxy.set(
             &SetupSettings {
                 enabled_configuration_interfaces: CONFIGURATION_INTERFACES,
@@ -195,8 +194,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
-        let (proxy, server) =
-            fidl::endpoints::create_proxy::<SetupMarker>().expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<SetupMarker>();
         let _fut = proxy.watch();
         let mut request_stream: SetupRequestStream = server.into_stream();
         let request = request_stream

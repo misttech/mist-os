@@ -168,9 +168,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                     .map_err(errors::Error::NonFatal)?;
 
                 let (device_control, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                        .context("create proxy")
-                        .map_err(errors::Error::NonFatal)?;
+                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
                 installer
                     .install_device(device, server_end)
                     .unwrap_or_else(|err| exit_with_fidl_error(err));

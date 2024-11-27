@@ -89,8 +89,7 @@ fn describe() {
 
     run_client(exec, || async move {
         let scope = ExecutionScope::new();
-        let (proxy, server_end) =
-            create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
         let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
         flags

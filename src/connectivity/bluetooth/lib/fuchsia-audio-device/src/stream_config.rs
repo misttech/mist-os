@@ -630,8 +630,7 @@ pub(crate) mod tests {
         assert_eq!(0, frames_ready(&mut exec, &mut frame_stream));
         let _stream_config_properties = exec.run_until_stalled(&mut stream_config.get_properties());
         let _formats = exec.run_until_stalled(&mut stream_config.get_supported_formats());
-        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
-            .expect("creating ring buffer endpoint error");
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         #[rustfmt::skip]
         let format = Format {
@@ -729,8 +728,7 @@ pub(crate) mod tests {
         exec.run_until_stalled(&mut frame_fut).expect_pending("no frames at the start");
         let _stream_config_properties = exec.run_until_stalled(&mut stream_config.get_properties());
         let _formats = exec.run_until_stalled(&mut stream_config.get_supported_formats());
-        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
-            .expect("creating ring buffer endpoint error");
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>();
 
         #[rustfmt::skip]
         let format = Format {

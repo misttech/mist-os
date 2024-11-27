@@ -122,7 +122,7 @@ impl GattClientFacade {
         };
 
         let (watcher_proxy, watcher_server) =
-            fidl::endpoints::create_proxy::<ScanResultWatcherMarker>()?;
+            fidl::endpoints::create_proxy::<ScanResultWatcherMarker>();
 
         // Scan doesn't return until scanning has stopped. We don't care when scanning stops, so we
         // can detach a task to run the scan future.
@@ -219,7 +219,7 @@ impl GattClientFacade {
             );
             format_err!("Not connected to peer")
         })?;
-        let (proxy, server) = endpoints::create_proxy()?;
+        let (proxy, server) = endpoints::create_proxy();
         client_proxy.connect_to_service(&ServiceHandle { value: service_id }, server)?;
         let event_stream = proxy.take_event_stream();
         let event_task = fasync::Task::spawn(GattClientFacade::active_remote_service_event_task(
@@ -612,7 +612,7 @@ impl GattClientFacade {
 
         GattClientFacade::set_central_proxy(self.inner.clone());
 
-        let (conn_proxy, conn_server_end) = fidl::endpoints::create_proxy()?;
+        let (conn_proxy, conn_server_end) = fidl::endpoints::create_proxy();
         let options = ConnectionOptions { bondable_mode: Some(true), ..Default::default() };
         self.inner
             .read()
@@ -623,7 +623,7 @@ impl GattClientFacade {
             .connect(&peer_id.clone().into(), &options, conn_server_end)
             .map_err(|_| format_err!("FIDL error when trying to connect()"))?;
 
-        let (client_proxy, client_server_end) = fidl::endpoints::create_proxy()?;
+        let (client_proxy, client_server_end) = fidl::endpoints::create_proxy();
         conn_proxy.request_gatt_client(client_server_end)?;
 
         let events_task = fasync::Task::spawn(GattClientFacade::connection_event_task(

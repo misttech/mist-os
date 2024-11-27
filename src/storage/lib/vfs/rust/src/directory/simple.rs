@@ -437,8 +437,7 @@ mod tests {
             ("dir", None),
             ("dir/does-not-exist", Some("dir/does-not-exist".to_string())),
         ] {
-            let (proxy, server_end) =
-                create_proxy::<fio::NodeMarker>().expect("Failed to create connection endpoints");
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
             let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
             let path = Path::validate_and_split(path).unwrap();
             dir.clone().open(scope.clone(), flags, path, server_end.into_channel().into());

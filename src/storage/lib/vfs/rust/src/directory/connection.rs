@@ -472,8 +472,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -483,8 +482,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -510,8 +508,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -521,8 +518,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -550,8 +546,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_with_describe_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -561,8 +556,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(
@@ -590,8 +584,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_describe_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
         dir.open(
@@ -601,8 +594,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (node_proxy, node_server_end) =
-            fidl::endpoints::create_proxy().expect("Create proxy to succeed");
+        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
 
         // Try to open a file that doesn't exist.
         assert_matches!(

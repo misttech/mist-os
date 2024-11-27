@@ -195,8 +195,7 @@ impl StorageFactory for StashDeviceStorageFactory {
                 let device_storage = Rc::new(DeviceStorage::with_stash_proxy(
                     initial_keys.drain(),
                     || {
-                        let (accessor_proxy, server_end) =
-                            create_proxy().expect("failed to create proxy for stash");
+                        let (accessor_proxy, server_end) = create_proxy();
                         self.store
                             .create_accessor(false, server_end)
                             .expect("failed to create accessor for stash");

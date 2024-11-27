@@ -43,7 +43,7 @@ mod fuchsia {
         path: &str,
         flags: fio::Flags,
     ) -> Result<fio::DirectoryProxy, OpenError> {
-        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        let (node, request) = fidl::endpoints::create_proxy();
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }
@@ -141,8 +141,7 @@ pub fn open_directory_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
@@ -160,8 +159,7 @@ pub async fn open_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -179,8 +177,7 @@ pub async fn create_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags
         | fio::Flags::FLAG_MAYBE_CREATE
@@ -223,8 +220,7 @@ pub fn open_file_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE;
 
@@ -242,8 +238,7 @@ pub async fn open_file(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -262,8 +257,7 @@ pub async fn open_node(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::NodeProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(OpenError::CreateProxy)?;
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -293,8 +287,7 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
 
 /// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
 pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
-    let (client_end, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(CloneError::CreateProxy)?;
+    let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     dir.clone2(ServerEnd::new(server_end.into_channel())).map_err(CloneError::SendCloneRequest)?;
     Ok(client_end)
 }
@@ -657,8 +650,7 @@ pub async fn remove_dir_recursive(
     root_dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<(), EnumerateError> {
-    let (dir, dir_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+    let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     root_dir
         .open3(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
@@ -683,8 +675,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
             match dirent.kind {
                 DirentKind::Directory => {
                     let (subdir, subdir_server) =
-                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                            .expect("failed to create proxy");
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                     dir.open3(
                         &dirent.name,
                         DIR_FLAGS,
@@ -940,7 +931,7 @@ mod tests {
             "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
@@ -1209,8 +1200,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir() {
-        let (dir_client, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1245,8 +1235,7 @@ mod tests {
     // TODO(https://fxbug.dev/324111518): Transition test to open3.
     #[fasync::run_singlethreaded(test)]
     async fn test_dir_contains() {
-        let (dir_client, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1325,8 +1314,7 @@ mod tests {
         // This test must use a forever-pending server in order to ensure that the timeout
         // triggers before the function under test finishes, even if the timeout is
         // in the past.
-        let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("could not create proxy");
+        let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let result = readdir_recursive(&dir, Some(zx::MonotonicDuration::from_nanos(0)))
             .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await

@@ -346,7 +346,7 @@ impl StashInner {
         inspect: &'a fuchsia_inspect::Node,
     ) -> Result<HashMap<Address, HashMap<PeerId, Inspectable<BondingData>>>, Error> {
         // Obtain a list iterator for all cached bonding data.
-        let (iter, server_end) = create_proxy::<GetIteratorMarker>()?;
+        let (iter, server_end) = create_proxy::<GetIteratorMarker>();
         accessor.get_prefix(BONDING_DATA_PREFIX, server_end)?;
 
         let mut bonding_map = HashMap::new();
@@ -388,7 +388,7 @@ impl StashInner {
         accessor: &StoreAccessorProxy,
     ) -> Result<HashMap<Address, HostData>, Error> {
         // Obtain a list iterator for all cached host data.
-        let (iter, server_end) = create_proxy::<GetIteratorMarker>()?;
+        let (iter, server_end) = create_proxy::<GetIteratorMarker>();
         accessor.get_prefix(HOST_DATA_PREFIX, server_end)?;
 
         let mut host_data_map = HashMap::new();
@@ -424,7 +424,7 @@ pub async fn init_stash(
     let stash_svc = fuchsia_component::client::connect_to_protocol::<SecureStoreMarker>()?;
     stash_svc.identify(component_id)?;
 
-    let (proxy, server_end) = create_proxy::<StoreAccessorMarker>()?;
+    let (proxy, server_end) = create_proxy::<StoreAccessorMarker>();
     stash_svc.create_accessor(false, server_end)?;
 
     let inner = StashInner::new(proxy, inspect).await?;
@@ -466,7 +466,7 @@ mod tests {
         stashserver.identify(&(BONDING_DATA_PREFIX.to_owned() + test_name))?;
 
         // Create an accessor
-        let (acc, server_end) = create_proxy()?;
+        let (acc, server_end) = create_proxy();
         stashserver.create_accessor(false, server_end)?;
 
         // Clear all data in stash under our identity
@@ -831,7 +831,7 @@ mod tests {
 
         // The duplicate should also be removed from the store so that the store matches what's in
         // memory, leaving only one entry.
-        let (iter, server_end) = create_proxy::<GetIteratorMarker>().unwrap();
+        let (iter, server_end) = create_proxy::<GetIteratorMarker>();
         accessor.get_prefix(BONDING_DATA_PREFIX, server_end).expect("failed to fetch bond data");
         let res = iter.get_next().await.unwrap();
         assert_eq!(1, res.len());

@@ -1816,8 +1816,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let mut get_sta_iface_fut =
             test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
                 iface_name: Some("FOO".to_string()),
@@ -1846,8 +1845,7 @@ mod tests {
         let _ = test_helper.iface_manager.client_iface.lock().take();
 
         let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let mut get_sta_iface_fut =
             test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
                 iface_name: Some("FOO".to_string()),
@@ -1893,16 +1891,14 @@ mod tests {
 
         let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("create Wlanix proxy should succeed");
-        let (wifi_proxy, wifi_server_end) =
-            create_proxy::<fidl_wlanix::WifiMarker>().expect("create Wifi proxy should succeed");
+        let (wifi_proxy, wifi_server_end) = create_proxy::<fidl_wlanix::WifiMarker>();
         let result = wlanix_proxy.get_wifi(fidl_wlanix::WlanixGetWifiRequest {
             wifi: Some(wifi_server_end),
             ..Default::default()
         });
         assert_variant!(result, Ok(()));
 
-        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>()
-            .expect("create WifiChip proxy should succeed");
+        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
         let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
             chip_id: Some(CHIP_ID),
             chip: Some(wifi_chip_server_end),
@@ -1912,8 +1908,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
-                .expect("create WifiStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
         let create_sta_iface_fut =
             wifi_chip_proxy.create_sta_iface(fidl_wlanix::WifiChipCreateStaIfaceRequest {
                 iface: Some(wifi_sta_iface_server_end),
@@ -2535,16 +2530,14 @@ mod tests {
         let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("create Wlanix proxy should succeed");
         let (supplicant_proxy, supplicant_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantMarker>()
-                .expect("create Supplicant proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantMarker>();
         let result = wlanix_proxy.get_supplicant(fidl_wlanix::WlanixGetSupplicantRequest {
             supplicant: Some(supplicant_server_end),
             ..Default::default()
         });
         assert_variant!(result, Ok(()));
 
-        let (nl80211_proxy, nl80211_server_end) = create_proxy::<fidl_wlanix::Nl80211Marker>()
-            .expect("create Nl80211 proxy should succeed");
+        let (nl80211_proxy, nl80211_server_end) = create_proxy::<fidl_wlanix::Nl80211Marker>();
         let result = wlanix_proxy.get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
             nl80211: Some(nl80211_server_end),
             ..Default::default()
@@ -2552,8 +2545,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_iface_proxy, supplicant_sta_iface_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>()
-                .expect("create SupplicantStaIface proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>();
         let result =
             supplicant_proxy.add_sta_interface(fidl_wlanix::SupplicantAddStaInterfaceRequest {
                 iface: Some(supplicant_sta_iface_server_end),
@@ -2574,8 +2566,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_network_proxy, supplicant_sta_network_server_end) =
-            create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>()
-                .expect("create SupplicantStaNetwork proxy should succeed");
+            create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>();
         let result = supplicant_sta_iface_proxy.add_network(
             fidl_wlanix::SupplicantStaIfaceAddNetworkRequest {
                 network: Some(supplicant_sta_network_server_end),
@@ -2651,8 +2642,7 @@ mod tests {
         let wlanix_fut =
             serve_wlanix(stream, state, iface_manager, TelemetrySender::new(telemetry_sender));
         let mut wlanix_fut = pin!(wlanix_fut);
-        let (nl_proxy, nl_server) =
-            create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (nl_proxy, nl_server) = create_proxy::<fidl_wlanix::Nl80211Marker>();
         proxy
             .get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
                 nl80211: Some(nl_server),

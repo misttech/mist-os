@@ -26,7 +26,7 @@ impl EditTransaction {
     /// vector will reflect any changes made to the rewrite rules so far in
     /// this transaction.
     pub async fn list_dynamic(&self) -> Result<Vec<Rule>, EditTransactionError> {
-        let (iter, iter_server_end) = fidl::endpoints::create_proxy()?;
+        let (iter, iter_server_end) = fidl::endpoints::create_proxy();
         self.transaction.list_dynamic(iter_server_end)?;
 
         let mut rules = Vec::new();
@@ -67,8 +67,7 @@ where
 {
     // Make a reasonable effort to retry the edit after a concurrent edit, but don't retry forever.
     for _ in 0..RETRY_ATTEMPTS {
-        let (transaction, transaction_server_end) =
-            fidl::endpoints::create_proxy().map_err(EditTransactionError::Fidl)?;
+        let (transaction, transaction_server_end) = fidl::endpoints::create_proxy();
 
         let () = engine
             .start_edit_transaction(transaction_server_end)

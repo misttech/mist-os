@@ -56,7 +56,7 @@ impl AudioConsumerSink {
         compression: Option<Compression>,
         flags_receiver: mpsc::Receiver<u32>,
     ) -> Result<AudioConsumerSink, Error> {
-        let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy()?;
+        let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy();
 
         let audio_stream_type = AudioStreamType {
             sample_format: AudioSampleFormat::Signed16,
@@ -333,7 +333,7 @@ impl Player {
             decoder = Some(dec);
         }
 
-        let (mut audio_consumer, audio_consumer_server) = fidl::endpoints::create_proxy()?;
+        let (mut audio_consumer, audio_consumer_server) = fidl::endpoints::create_proxy();
 
         audio_consumer_factory.create_audio_consumer(session_id, audio_consumer_server)?;
 

@@ -945,8 +945,7 @@ async fn query_security_support(
     proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<fidl_common::SecuritySupport, PhyManagerError> {
-    let (feature_support_proxy, feature_support_server) =
-        fidl::endpoints::create_proxy().map_err(|_| PhyManagerError::IfaceQueryFailure)?;
+    let (feature_support_proxy, feature_support_server) = fidl::endpoints::create_proxy();
     proxy
         .get_feature_support(iface_id, feature_support_server)
         .await
@@ -1007,7 +1006,7 @@ async fn disconnect(
     dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<(), Error> {
-    let (sme_proxy, remote) = create_proxy()?;
+    let (sme_proxy, remote) = create_proxy();
     dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     sme_proxy
@@ -1020,7 +1019,7 @@ async fn stop_ap(
     dev_monitor_proxy: &fidl_service::DeviceMonitorProxy,
     iface_id: u16,
 ) -> Result<(), Error> {
-    let (sme_proxy, remote) = create_proxy()?;
+    let (sme_proxy, remote) = create_proxy();
     dev_monitor_proxy.get_ap_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     match sme_proxy.stop().await {
@@ -1068,8 +1067,7 @@ mod tests {
     /// Create a TestValues for a unit test.
     fn test_setup() -> TestValues {
         let (monitor_proxy, monitor_requests) =
-            endpoints::create_proxy::<fidl_service::DeviceMonitorMarker>()
-                .expect("failed to create DeviceMonitor proxy");
+            endpoints::create_proxy::<fidl_service::DeviceMonitorMarker>();
         let monitor_stream = monitor_requests.into_stream();
 
         let inspector = inspect::Inspector::default();

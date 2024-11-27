@@ -101,8 +101,7 @@ fn open_empty_directory_with_describe() {
     let server = Simple::new();
 
     run_client(exec, || async move {
-        let (root, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
+        let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         server.open(scope, flags, Path::dot(), server_end.into_channel().into());
@@ -1102,8 +1101,7 @@ fn in_tree_open() {
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
-        let (proxy, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         ssh.open(scope, flags, Path::dot(), server_end.into_channel().into());
@@ -1130,8 +1128,7 @@ fn in_tree_open_path_one_component() {
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
-        let (proxy, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh").unwrap();
@@ -1159,8 +1156,7 @@ fn in_tree_open_path_two_components() {
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
-        let (proxy, server_end) =
-            create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
+        let (proxy, server_end) = create_proxy::<fio::FileMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh/sshd_config").unwrap();
@@ -1503,8 +1499,7 @@ fn watch_addition_with_two_scopes() {
                 server: Arc<dyn Directory>,
                 scope: ExecutionScope,
             ) -> fio::DirectoryProxy {
-                let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>()
-                    .expect("Failed to create connection endpoints");
+                let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
                 let flags = fio::OpenFlags::RIGHT_READABLE;
                 server.open(scope, flags, Path::dot(), server_end.into_channel().into());

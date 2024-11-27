@@ -1516,7 +1516,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -1545,7 +1545,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -1570,7 +1570,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()

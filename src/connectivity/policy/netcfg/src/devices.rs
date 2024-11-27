@@ -99,9 +99,7 @@ impl NetworkDeviceInstance {
         let device = get_device()?.into_proxy();
 
         let (port_watcher, port_watcher_server_end) =
-            fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>()
-                .context("create port watcher endpoints")
-                .map_err(errors::Error::NonFatal)?;
+            fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>();
         device
             .get_port_watcher(port_watcher_server_end)
             .context("calling Device get_port_watcher")
@@ -109,9 +107,7 @@ impl NetworkDeviceInstance {
 
         let (device_control, device_control_server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
-        >()
-        .context("create device control endpoints")
-        .map_err(errors::Error::NonFatal)?;
+        >();
 
         let device_for_netstack = get_device()?;
         installer
@@ -143,9 +139,7 @@ impl NetworkDeviceInstance {
                         fhwnet::DevicePortEvent::Added(port_id)
                         | fhwnet::DevicePortEvent::Existing(port_id) => {
                             let (port, port_server_end) =
-                                fidl::endpoints::create_proxy::<fhwnet::PortMarker>()
-                                    .context("create port endpoints")
-                                    .map_err(errors::Error::NonFatal)?;
+                                fidl::endpoints::create_proxy::<fhwnet::PortMarker>();
                             device
                                 .get_port(&port_id, port_server_end)
                                 .context("calling Device get_port")
@@ -181,9 +175,7 @@ impl NetworkDeviceInstance {
             })?;
 
         let (mac_addressing, mac_addressing_server_end) =
-            fidl::endpoints::create_proxy::<fhwnet::MacAddressingMarker>()
-                .context("create MacAddressing proxy")
-                .map_err(errors::Error::NonFatal)?;
+            fidl::endpoints::create_proxy::<fhwnet::MacAddressingMarker>();
         port.get_mac(mac_addressing_server_end)
             .context("calling Port get_mac")
             .map_err(errors::Error::NonFatal)?;
@@ -269,9 +261,7 @@ async fn get_topo_path_and_device<S: fidl::endpoints::ProtocolMarker>(
         .map_err(errors::Error::NonFatal)?;
 
     // Get the topological path using `fuchsia.device/Controller`.
-    let (controller, req) = fidl::endpoints::create_proxy::<fdev::ControllerMarker>()
-        .context("error creating fuchsia.device.Controller proxy")
-        .map_err(errors::Error::Fatal)?;
+    let (controller, req) = fidl::endpoints::create_proxy::<fdev::ControllerMarker>();
     let controller_path = format!("{filepath}/device_controller");
     fdio::service_connect(&controller_path, req.into_channel().into())
         .with_context(|| format!("error calling fdio::service_connect({})", controller_path))
@@ -286,9 +276,7 @@ async fn get_topo_path_and_device<S: fidl::endpoints::ProtocolMarker>(
         .map_err(errors::Error::NonFatal)?;
 
     // Now connect to the device channel.
-    let (device, req) = fidl::endpoints::create_proxy::<S>()
-        .context("error creating fuchsia.device.Controller proxy")
-        .map_err(errors::Error::Fatal)?;
+    let (device, req) = fidl::endpoints::create_proxy::<S>();
     fdio::service_connect(filepath, req.into_channel().into())
         .with_context(|| format!("error calling fdio::service_connect({})", filepath))
         .map_err(errors::Error::NonFatal)?;

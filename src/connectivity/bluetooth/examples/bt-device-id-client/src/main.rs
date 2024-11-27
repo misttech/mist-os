@@ -29,7 +29,7 @@ fn set_device_identification(
     di_svc: di::DeviceIdentificationProxy,
 ) -> Result<(impl Future<Output = ()>, di::DeviceIdentificationHandleProxy), Error> {
     let records = vec![example_di_record()];
-    let (client, server) = fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()?;
+    let (client, server) = fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>();
 
     let request_fut = di_svc.set_device_identification(&records, server);
 

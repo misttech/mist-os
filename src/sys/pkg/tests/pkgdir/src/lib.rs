@@ -23,8 +23,7 @@ async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
     let _ = connect_to_protocol::<fcomponent::BinderMarker>().unwrap();
     let realm_factory =
         connect_to_protocol::<RealmFactoryMarker>().expect("connect to realm_factory");
-    let (directory, server_end) =
-        fidl::endpoints::create_proxy::<DirectoryMarker>().expect("create proxy");
+    let (directory, server_end) = fidl::endpoints::create_proxy::<DirectoryMarker>();
     realm_factory
         .create_realm(RealmOptions { pkg_directory_server: Some(server_end), ..Default::default() })
         .await

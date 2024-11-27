@@ -3207,8 +3207,7 @@ mod tests {
         socket: &fposix_socket::SynchronousDatagramSocketProxy,
     ) -> fposix_socket::SynchronousDatagramSocketProxy {
         let (client, server) =
-            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>();
         let server = ServerEnd::new(server.into_channel());
         let () = socket.clone2(server).expect("socket clone");
         client

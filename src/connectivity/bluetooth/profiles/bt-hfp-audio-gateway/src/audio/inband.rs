@@ -527,8 +527,7 @@ mod tests {
             }
         }
 
-        let (ring_buffer, server) =
-            fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<audio::RingBufferMarker>();
         audio_input_stream_config
             .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .expect("create ring buffer");
@@ -624,8 +623,7 @@ mod tests {
             }
         }
 
-        let (ring_buffer, server) =
-            fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<audio::RingBufferMarker>();
         audio_output_stream_config
             .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .unwrap();
@@ -705,8 +703,7 @@ mod tests {
             }
         }
 
-        let (ring_buffer, server) =
-            fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<audio::RingBufferMarker>();
         audio_output_stream_config
             .create_ring_buffer(&CodecId::CVSD.try_into().unwrap(), server)
             .unwrap();
@@ -776,8 +773,7 @@ mod tests {
             }
         }
 
-        let (ring_buffer, server) =
-            fidl::endpoints::create_proxy::<audio::RingBufferMarker>().unwrap();
+        let (ring_buffer, server) = fidl::endpoints::create_proxy::<audio::RingBufferMarker>();
         audio_output_stream_config
             .create_ring_buffer(&CodecId::MSBC.try_into().unwrap(), server)
             .expect("create ring buffer");

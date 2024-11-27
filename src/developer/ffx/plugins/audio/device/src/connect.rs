@@ -19,7 +19,7 @@ fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
     directory: &fio::DirectoryProxy,
     path: &str,
 ) -> fho::Result<P::Proxy> {
-    let (proxy, server_end) = create_proxy::<P>().unwrap();
+    let (proxy, server_end) = create_proxy::<P>();
     directory
         .open(
             fio::OpenFlags::empty(),
@@ -41,7 +41,7 @@ pub fn connect_hw_codec(
         connect_to_named_protocol_at_dir_root::<fhaudio::CodecConnectorMarker>(dev_class, path)
             .bug_context("Failed to connect to CodecConnector")?;
 
-    let (proxy, server_end) = create_proxy::<fhaudio::CodecMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fhaudio::CodecMarker>();
     connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
 
     Ok(proxy)
@@ -57,7 +57,7 @@ pub fn connect_hw_dai(
         connect_to_named_protocol_at_dir_root::<fhaudio::DaiConnectorMarker>(dev_class, path)
             .bug_context("Failed to connect to DaiConnector")?;
 
-    let (proxy, server_end) = create_proxy::<fhaudio::DaiMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fhaudio::DaiMarker>();
     connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
 
     Ok(proxy)
@@ -85,7 +85,7 @@ pub fn connect_hw_streamconfig(
     >(dev_class, path)
     .bug_context("Failed to connect to StreamConfigConnector")?;
 
-    let (proxy, server_end) = create_proxy::<fhaudio::StreamConfigMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fhaudio::StreamConfigMarker>();
     connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
 
     Ok(proxy)
@@ -96,7 +96,7 @@ pub async fn connect_registry_control(
     control_creator: &fadevice::ControlCreatorProxy,
     token_id: fadevice::TokenId,
 ) -> fho::Result<fadevice::ControlProxy> {
-    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>().unwrap();
+    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>();
 
     control_creator
         .create(fadevice::ControlCreatorCreateRequest {

@@ -137,7 +137,7 @@ impl TestEnvBuilder {
             });
         }
 
-        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy().expect("create channel");
+        let (svc_proxy, svc_server_end) = fidl::endpoints::create_proxy();
 
         let _env = fs.serve_connection(svc_server_end).expect("serve connection");
 
@@ -234,7 +234,7 @@ impl MockUpdateManagerService {
                     let mut receiver = self.states_receiver.lock().await;
                     while let Some(states) = receiver.next().await {
                         let (monitor, server_end) =
-                            fidl::endpoints::create_proxy::<fidl_update::MonitorMarker>().unwrap();
+                            fidl::endpoints::create_proxy::<fidl_update::MonitorMarker>();
                         let options = fidl_update::AttemptOptions {
                             initiator: Some(fidl_update::Initiator::Service),
                             ..Default::default()

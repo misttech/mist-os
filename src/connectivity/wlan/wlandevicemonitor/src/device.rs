@@ -149,8 +149,7 @@ mod tests {
         let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
         let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
 
-        let (phy_proxy, phy_server) =
-            create_proxy::<fidl_wlan_dev::PhyMarker>().expect("failed to create PHY proxy");
+        let (phy_proxy, phy_server) = create_proxy::<fidl_wlan_dev::PhyMarker>();
         let new_phy = device_watch::NewPhyDevice {
             id: 0,
             proxy: phy_proxy,

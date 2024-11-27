@@ -16,8 +16,7 @@ async fn get_storage_admin(
         format_err!("Error: {} is not a valid moniker ({})", storage_provider_moniker, e)
     })?;
 
-    let (storage_admin, server_end) =
-        fidl::endpoints::create_proxy::<fsys::StorageAdminMarker>().unwrap();
+    let (storage_admin, server_end) = fidl::endpoints::create_proxy::<fsys::StorageAdminMarker>();
 
     realm_query
         .connect_to_storage_admin(

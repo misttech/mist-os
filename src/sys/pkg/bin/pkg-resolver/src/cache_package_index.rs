@@ -21,8 +21,7 @@ pub async fn from_proxy(
 async fn from_proxy_impl(
     pkg_cache: &fidl_fuchsia_pkg::PackageCacheProxy,
 ) -> Result<system_image::CachePackages, anyhow::Error> {
-    let (pkg_iterator, server_end) =
-        fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>().context("creating proxy")?;
+    let (pkg_iterator, server_end) = fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
     let () =
         pkg_cache.cache_package_index(server_end).context("calling cache_package_index fidl")?;
 
@@ -115,7 +114,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn error_yields_empty() {
-        let (client, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>().unwrap();
+        let (client, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>();
         let cache_packages = from_proxy(&client).await;
         assert_eq!(cache_packages, system_image::CachePackages::from_entries(vec![]));
     }

@@ -202,7 +202,7 @@ async fn realm_user(
         collection: Some("dynamic_children".to_string()),
     };
     let (exposed_proxy, exposed_server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_proxy
         .open_exposed_dir(&child_ref, exposed_server_end)
         .await

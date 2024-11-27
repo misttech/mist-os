@@ -254,7 +254,7 @@ async fn wipe_storage_fvm(
     fvm_controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
 
     tracing::info!(slice_size = config.fvm_slice_size, "Initializing FVM");
-    let (block_proxy, server_end) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+    let (block_proxy, server_end) = fidl::endpoints::create_proxy::<BlockMarker>();
     fvm_controller
         .connect_to_device_fidl(server_end.into_channel())
         .context("connecting to block protocol")?;

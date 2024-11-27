@@ -32,7 +32,7 @@ pub async fn wait_for_device_with<T>(
             let controller_filename = filename.to_owned() + "/device_controller";
 
             let (controller_proxy, server_end) =
-                fidl::endpoints::create_proxy::<ControllerMarker>()?;
+                fidl::endpoints::create_proxy::<ControllerMarker>();
             if dev_dir
                 .open3(
                     &controller_filename,
@@ -232,7 +232,7 @@ mod tests {
           },
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -256,7 +256,7 @@ mod tests {
           "b" => read_only(b"/b"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -292,7 +292,7 @@ mod tests {
           "3" => read_only("file 3"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
         let object_request =
@@ -311,7 +311,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_two_directories() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {
@@ -337,7 +337,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_directory_with_leading_slash() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {},

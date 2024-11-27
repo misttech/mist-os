@@ -34,14 +34,14 @@ impl DaiInterface {
     pub fn connect(&mut self) -> Result<(), Error> {
         let path = self.path.to_str().ok_or(format_err!("invalid DAI path"))?;
         let (dai_connect_proxy, dai_connect_server) =
-            fidl::endpoints::create_proxy::<DaiConnectorMarker>()?;
+            fidl::endpoints::create_proxy::<DaiConnectorMarker>();
         fdio::service_connect_at(
             self.dev_proxy.as_channel().as_ref(),
             path,
             dai_connect_server.into_channel(),
         )?;
 
-        let (ours, theirs) = fidl::endpoints::create_proxy::<DaiMarker>()?;
+        let (ours, theirs) = fidl::endpoints::create_proxy::<DaiMarker>();
         dai_connect_proxy.connect(theirs)?;
 
         self.proxy = Some(ours);
@@ -127,7 +127,7 @@ mod tests {
             // We test that we can make calls to the DAI driver, no checks on formats.
             let _ring_buffer_formats = device.get_ring_buffer_formats().await.unwrap().unwrap();
             let _dai_formats = device.get_dai_formats().await.unwrap().unwrap();
-            let (_ours, theirs) = fidl::endpoints::create_proxy::<RingBufferMarker>().unwrap();
+            let (_ours, theirs) = fidl::endpoints::create_proxy::<RingBufferMarker>();
             let ring_buffer_pcm_format = PcmFormat {
                 number_of_channels: 2,
                 sample_format: SampleFormat::PcmSigned,

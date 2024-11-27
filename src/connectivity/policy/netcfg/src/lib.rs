@@ -2507,9 +2507,7 @@ impl<'a> NetCfg<'a> {
     ) -> Result<(), errors::Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .context("address state provider: failed to create fidl endpoints")
-        .map_err(errors::Error::Fatal)?;
+        >();
 
         // Handle on-demand interface enabling by using either implementation of Filter.
         filter_enabled_state
@@ -3397,33 +3395,24 @@ mod tests {
     fn test_netcfg(
         with_dhcpv4_client_provider: bool,
     ) -> Result<(NetCfg<'static>, ServerEnds), anyhow::Error> {
-        let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>()
-            .context("error creating stack endpoints")?;
+        let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>();
         let (lookup_admin, lookup_admin_server) =
-            fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>()
-                .context("error creating lookup_admin endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>();
         let (filter, _filter_server) =
-            fidl::endpoints::create_proxy::<fnet_filter_deprecated::FilterMarker>()
-                .context("create filter endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_filter_deprecated::FilterMarker>();
         let filter_control = FilterControl::Deprecated(filter);
         let (interface_state, _interface_state_server) =
-            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
-                .context("create interface state endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>();
         let (dhcp_server, dhcp_server_server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcp::Server_Marker>()
-                .context("error creating dhcp_server endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcp::Server_Marker>();
         let (dhcpv4_client_provider, dhcpv4_client_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_dhcp::ClientProviderMarker>()
-                .context("error creating dhcpv4_client_provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcp::ClientProviderMarker>();
         let (dhcpv6_client_provider, dhcpv6_client_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientProviderMarker>()
-                .context("error creating dhcpv6_client_provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientProviderMarker>();
         let (installer, _installer_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
-                .context("error creating installer endpoints")?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>();
         let (route_set_v4_provider, route_set_v4_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>()
-                .context("error creating route set v4 provider endpoints")?;
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>();
 
         Ok((
             NetCfg {
@@ -4018,7 +4007,7 @@ mod tests {
             let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
             let routers = vec![fidl_ip_v4!("192.0.2.3"), fidl_ip_v4!("192.0.2.4")];
 
-            let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+            let (_asp_client, asp_server) = fidl::endpoints::create_proxy();
 
             responder
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
@@ -4257,7 +4246,7 @@ mod tests {
         };
 
         let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
-        let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+        let (_asp_client, asp_server) = fidl::endpoints::create_proxy();
         responder
             .send(fnet_dhcp::ClientWatchConfigurationResponse {
                 address: Some(fnet_dhcp::Address {
@@ -5045,8 +5034,7 @@ mod tests {
 
         // Making an AcquirePrefix call should trigger restarting DHCPv6 w/ PD.
         let (prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         let mut lookup_admin_fut = lookup_admin_request_stream
             .try_for_each(|req| {
                 let (_, responder): (Vec<fnet::SocketAddress>, _) =
@@ -5197,8 +5185,7 @@ mod tests {
         let mut dns_watchers = DnsServerWatchers::empty();
 
         let (_prefix_control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
-                .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
+            fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>();
         netcfg
             .handle_dhcpv6_acquire_prefix(
                 fnet_dhcpv6::AcquirePrefixConfig::default(),

@@ -847,9 +847,9 @@ mod tests {
     async fn open_blob_for_write_uses_fxblob_if_configured() {
         let (blob_creator, mut blob_creator_stream) =
             fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
-        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>().unwrap();
+        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>();
         let client = Client::new(
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().0,
             Some(blob_creator),
             Some(blob_reader),
             None,
@@ -877,10 +877,10 @@ mod tests {
     async fn open_blob_for_write_fxblob_maps_already_exists() {
         let (blob_creator, mut blob_creator_stream) =
             fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
-        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>().unwrap();
+        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>();
 
         let client = Client::new(
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().0,
             Some(blob_creator),
             Some(blob_reader),
             None,

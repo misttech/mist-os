@@ -283,7 +283,7 @@ mod tests {
             .into_iter(),
         );
         target.update_connection_state(|_| TargetConnectionState::Mdns(std::time::Instant::now()));
-        let (proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
         let result = proxy.get_ssh_address().await.unwrap();
         if let ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
@@ -427,10 +427,9 @@ mod tests {
         let target = Target::new();
         target.apply_update(update.build());
 
-        let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
-        let (rcs, rcs_server) =
-            fidl::endpoints::create_proxy::<fidl_rcs::RemoteControlMarker>().unwrap();
+        let (rcs, rcs_server) = fidl::endpoints::create_proxy::<fidl_rcs::RemoteControlMarker>();
         let res = target_proxy.open_remote_control(rcs_server).await.unwrap();
         assert!(res.is_ok());
         assert_eq!(TEST_NODE_NAME, rcs.identify_host().await.unwrap().unwrap().nodename.unwrap());

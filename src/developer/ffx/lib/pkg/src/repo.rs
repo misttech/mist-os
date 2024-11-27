@@ -461,10 +461,7 @@ pub async fn register_target_with_repo_instance(
 async fn read_alias_repos(
     engine_proxy: EngineProxy,
 ) -> Result<HashMap<String, Vec<String>>, ffx::RepositoryError> {
-    let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy().map_err(|e| {
-        tracing::error!("Failed creating endpoint to list rules: {e}");
-        ffx::RepositoryError::RewriteEngineError
-    })?;
+    let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
 
     engine_proxy.list(rule_iterator_server).map_err(|e| {
         tracing::error!("Failed to list rules: {e}");

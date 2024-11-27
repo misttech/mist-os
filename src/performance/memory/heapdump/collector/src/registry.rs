@@ -632,7 +632,7 @@ mod tests {
         }
 
         // Get the unfiltered list of snapshots.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),
@@ -669,7 +669,7 @@ mod tests {
         );
 
         // Verify filtering by koid.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),
@@ -685,7 +685,7 @@ mod tests {
         );
 
         // Verify filtering by name.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         proxy
             .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
                 iterator: Some(server_end),

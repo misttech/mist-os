@@ -381,8 +381,7 @@ mod tests {
     /// Error case: Invalid id, Error string + help message returned.
     async fn test_get_controller_from_args() {
         let mut peer_map = HashMap::new();
-        let (client_proxy, _server) =
-            create_proxy::<PeerControllerMarker>().expect("Failed to create peer endpoint");
+        let (client_proxy, _server) = create_proxy::<PeerControllerMarker>();
 
         let supported_id = "123";
         let _ = peer_map.insert(supported_id.to_string(), client_proxy.clone());

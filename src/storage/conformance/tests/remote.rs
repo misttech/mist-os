@@ -101,7 +101,7 @@ async fn open_remote_directory_right_escalation_test() {
     // Create a new proxy/server for opening the remote node through dir_proxy.
     // Here we pass the POSIX flag, which should only expand to the maximum set of
     // rights available along the open chain.
-    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
     root_proxy
         .open(
             fio::OpenFlags::RIGHT_READABLE

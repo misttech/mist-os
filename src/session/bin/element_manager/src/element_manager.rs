@@ -196,8 +196,7 @@ impl ElementManager {
             ElementManagerError::not_created(child_name, collection, child_url, err)
         })?;
 
-        let (exposed_directory, exposed_dir_server_end) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_directory, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>();
         match realm_management::open_child_component_exposed_dir(
             child_name,
             collection,
@@ -324,7 +323,7 @@ impl ElementManager {
         };
 
         let (view_controller_proxy, server_end) =
-            fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()?;
+            fidl::endpoints::create_proxy::<felement::ViewControllerMarker>();
 
         if let Some(graphical_presenter_connector) = &self.graphical_presenter_connector {
             graphical_presenter_connector

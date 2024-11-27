@@ -268,8 +268,7 @@ impl UpdateTool {
         };
 
         let (reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<finstaller::RebootControllerMarker>()
-                .bug_context("creating reboot controller")?;
+            fidl::endpoints::create_proxy::<finstaller::RebootControllerMarker>();
 
         let mut update_attempt = installer::start_update(
             &pkg_url,

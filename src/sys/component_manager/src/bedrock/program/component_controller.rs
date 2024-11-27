@@ -207,8 +207,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn handles_epitaph_for_dropped_controller() {
-        let (proxy, _) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();
         let controller = ComponentController::new(proxy, None);
         let epitaph_fut = controller.wait_for_termination();
         drop(controller);

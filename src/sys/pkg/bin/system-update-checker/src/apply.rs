@@ -123,8 +123,7 @@ async fn apply_system_update_impl(
             .unwrap_or_else(|| default_update_url.to_owned()),
     )?;
     let (reboot_controller, reboot_controller_server_end) =
-        fidl::endpoints::create_proxy::<RebootControllerMarker>()
-            .context("creating reboot controller")?;
+        fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
     let update_attempt = update_installer
         .start_update(update_url, options, Some(reboot_controller_server_end))

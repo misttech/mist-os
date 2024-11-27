@@ -29,7 +29,7 @@ async fn run_without_regulatory_manager() {
     let policy_provider =
         connect_to_protocol_at::<fidl_policy::ClientProviderMarker>(helper.test_ns_prefix())
             .expect("connecting to wlan policy");
-    let (client_controller, server_end) = create_proxy().expect("creating client controller");
+    let (client_controller, server_end) = create_proxy();
     let (update_client_end, _update_server_end) = create_endpoints();
     let () =
         policy_provider.get_controller(server_end, update_client_end).expect("getting controller");
@@ -38,7 +38,7 @@ async fn run_without_regulatory_manager() {
     // regulatory manager.
     let phy = helper.proxy();
     let fut = pin!(async move {
-        let (scan_proxy, server_end) = create_proxy().unwrap();
+        let (scan_proxy, server_end) = create_proxy();
         client_controller.scan_for_networks(server_end).expect("requesting scan");
         loop {
             let result = scan_proxy.get_next().await.expect("getting scan results");

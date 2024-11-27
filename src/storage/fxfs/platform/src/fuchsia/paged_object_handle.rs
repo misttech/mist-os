@@ -1248,8 +1248,7 @@ mod tests {
     }
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
-        let (root, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
         volume.root().clone().as_directory().open(
             volume.volume().scope().clone(),
             fio::OpenFlags::DIRECTORY

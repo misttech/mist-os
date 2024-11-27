@@ -41,7 +41,7 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     entry: &fuchsia_fs::directory::DirEntry,
 ) -> Result<Option<P::Proxy>, anyhow::Error> {
     if entry.name.ends_with(P::PROTOCOL_NAME) {
-        let (proxy, server) = fidl::endpoints::create_proxy::<P>()?;
+        let (proxy, server) = fidl::endpoints::create_proxy::<P>();
         fdio::service_connect_at(
             dir_proxy.as_channel().as_ref(),
             &entry.name,

@@ -262,8 +262,7 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
 
         // NB: We are loading all the files we are going to serialize into memory first.
         // if the partition is too big this will be a problem.
-        let (file_proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()
-            .context("failed to create fidl proxy")?;
+        let (file_proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         dir.open(
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),
@@ -433,7 +432,7 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         dir.open(
             scope,
@@ -459,7 +458,7 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         dir.open(
             scope,

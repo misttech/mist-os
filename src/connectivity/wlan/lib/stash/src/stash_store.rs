@@ -44,7 +44,7 @@ impl StashNode {
     }
 
     async fn fields(&self) -> Result<StashNodeFields, Error> {
-        let (local, remote) = fidl::endpoints::create_proxy::<_>()?;
+        let (local, remote) = fidl::endpoints::create_proxy::<_>();
         let () = self.stash.get_prefix(&self.key, remote)?;
         let parent_key_len = self.key.len();
         let mut fields = HashMap::new();
@@ -65,7 +65,7 @@ impl StashNode {
     }
 
     async fn children(&self) -> Result<Vec<Self>, Error> {
-        let (local, remote) = fidl::endpoints::create_proxy::<_>()?;
+        let (local, remote) = fidl::endpoints::create_proxy::<_>();
         let () = self.stash.list_prefix(&self.key, remote)?;
 
         let parent_key_len = self.key.len();
@@ -121,8 +121,7 @@ impl StashStore {
         proxy: fidl_stash::SecureStoreProxy,
     ) -> Result<Self, Error> {
         proxy.identify(id).context("failed to identify client to store")?;
-        let (store_proxy, accessor_server) =
-            create_proxy().context("failed to create accessor proxy")?;
+        let (store_proxy, accessor_server) = create_proxy();
         proxy.create_accessor(false, accessor_server).context("failed to create accessor")?;
 
         Ok(Self::new(store_proxy, POLICY_STASH_PREFIX))
@@ -258,7 +257,7 @@ mod tests {
         let store_client = connect_to_protocol::<fidl_stash::StoreMarker>()
             .expect("failed connecting to Stash service");
         store_client.identify(id).expect("failed identifying client to store");
-        let (proxy, remote) = create_proxy().expect("failed creating accessor proxy");
+        let (proxy, remote) = create_proxy();
         store_client.create_accessor(false, remote).expect("failed creating Stash accessor");
         proxy
     }
@@ -439,8 +438,7 @@ mod tests {
         let store_client = connect_to_protocol::<fidl_stash::SecureStoreMarker>()
             .expect("failed to connect to store");
         store_client.identify(stash_id).expect("failed to identify client to store");
-        let (store_proxy, accessor_server) =
-            create_proxy().expect("failed to create accessor proxy");
+        let (store_proxy, accessor_server) = create_proxy();
         store_client.create_accessor(false, accessor_server).expect("failed to create accessor");
         let mut stash = StashStore::new(store_proxy, POLICY_STASH_PREFIX);
         stash.delete_store().await.expect("failed to clear stash");

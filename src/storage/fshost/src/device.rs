@@ -251,7 +251,7 @@ impl BlockDevice {
     ) -> Result<Self, Error> {
         let topological_path =
             controller_proxy.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        let (partition_proxy, server) = create_proxy::<PartitionMarker>()?;
+        let (partition_proxy, server) = create_proxy::<PartitionMarker>();
         controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(Self {
             path: path.to_string(),
@@ -353,13 +353,13 @@ impl Device for BlockDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        let (proxy, server) = create_proxy::<BlockMarker>()?;
+        let (proxy, server) = create_proxy::<BlockMarker>();
         self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(proxy)
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        let (proxy, server) = create_proxy::<VolumeMarker>()?;
+        let (proxy, server) = create_proxy::<VolumeMarker>();
         self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(proxy)
     }

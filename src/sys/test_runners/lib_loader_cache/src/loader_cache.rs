@@ -181,7 +181,7 @@ mod tests {
             pkg_lib = fuchsia_fs::directory::open_directory_async(&pkg_lib, name, rights)?;
         }
 
-        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         let cache = Arc::new(LibraryLoaderCache {
             lib_proxy: pkg_lib.into(),
             load_response_map: FutMutex::new(HashMap::new()),
@@ -219,7 +219,7 @@ mod tests {
         }
 
         // also test clone
-        let (loader_proxy2, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy2, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         assert_eq!(zx::sys::ZX_OK, loader_proxy.clone(loader_service).await?);
         for (obj_name, should_succeed) in tests {
             let (res, o_vmo) = loader_proxy2.load_object(obj_name).await?;
@@ -255,7 +255,7 @@ mod tests {
             "/pkg/lib/config_test/",
             fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )?;
-        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
+        let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>();
         let cache = Arc::new(LibraryLoaderCache {
             lib_proxy: pkg_lib.into(),
             load_response_map: FutMutex::new(HashMap::new()),

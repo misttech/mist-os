@@ -4342,8 +4342,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_child_to_child_realm() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         realm_and_builder_task
             .realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
@@ -4545,8 +4544,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_local_child_to_child_realm() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         realm_and_builder_task
             .realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
@@ -4701,8 +4699,7 @@ mod tests {
     #[fuchsia::test]
     async fn all_functions_error_after_build() {
         let mut rabt = RealmAndBuilderTask::new();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().unwrap();
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         rabt.realm_proxy
             .add_child_realm("a", &ftest::ChildOptions::default(), child_realm_server_end)
             .await
@@ -4729,7 +4726,7 @@ mod tests {
         assert_err(rabt.realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
         assert_err(rabt.realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
         assert_err(rabt.realm_proxy.add_local_child("a", &empty_opts())).await;
-        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
+        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>();
         assert_err(rabt.realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(rabt.realm_proxy.get_component_decl("b")).await;
         assert_err(rabt.realm_proxy.replace_component_decl("b", &empty_decl())).await;
@@ -4740,7 +4737,7 @@ mod tests {
         assert_err(child_realm_proxy.add_child("a", "test:///a", &empty_opts())).await;
         assert_err(child_realm_proxy.add_child_from_decl("a", &empty_decl(), &empty_opts())).await;
         assert_err(child_realm_proxy.add_local_child("a", &empty_opts())).await;
-        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>().unwrap();
+        let (_child_realm_proxy, server_end) = create_proxy::<ftest::RealmMarker>();
         assert_err(child_realm_proxy.add_child_realm("a", &empty_opts(), server_end)).await;
         assert_err(child_realm_proxy.get_component_decl("b")).await;
         assert_err(child_realm_proxy.replace_component_decl("b", &empty_decl())).await;

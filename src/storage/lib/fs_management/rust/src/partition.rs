@@ -113,7 +113,7 @@ pub async fn partition_matches_with_proxy(
     );
 
     let (partition_proxy, partition_server_end) =
-        fidl::endpoints::create_proxy::<PartitionMarker>().context("making partition endpoints")?;
+        fidl::endpoints::create_proxy::<PartitionMarker>();
     controller_proxy
         .connect_to_device_fidl(partition_server_end.into_channel())
         .context("connecting to partition protocol")?;

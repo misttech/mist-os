@@ -30,8 +30,7 @@ impl Manager {
     ///
     /// Returns an object representing the connected fuzzer, or an error.
     pub async fn connect(&self, url: &Url) -> Result<fuzz::ControllerProxy> {
-        let (proxy, server_end) = create_proxy::<fuzz::ControllerMarker>()
-            .context("failed to create fuchsia.fuzzer.Controller proxy")?;
+        let (proxy, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let result = self
             .proxy
             .connect(url.as_str(), server_end)
@@ -90,7 +89,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_connect() -> Result<()> {
         let test = Test::try_new()?;
-        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>()?;
+        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>();
         let _task = create_task(serve_manager(server_end, test.clone()), test.writer());
         let manager = Manager::new(proxy);
 
@@ -106,7 +105,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop() -> Result<()> {
         let test = Test::try_new()?;
-        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>()?;
+        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>();
         let _task = create_task(serve_manager(server_end, test.clone()), test.writer());
         let manager = Manager::new(proxy);
 

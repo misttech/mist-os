@@ -210,7 +210,7 @@ async fn run_test_case(
     component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     debug!("running generic fallback test suite");
-    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
     let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 

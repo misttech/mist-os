@@ -78,8 +78,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                     ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() };
 
                 let (case_listener_proxy, case_listener) =
-                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                        .expect("cannot create proxy");
+                    fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
                 proxy
                     .on_test_case_started(
                         &tests.pop().unwrap(),

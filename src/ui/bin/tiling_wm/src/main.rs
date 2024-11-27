@@ -107,7 +107,7 @@ impl TilingWm {
 
                 // Create a Viewport that houses the view we are creating.
                 let (tile_watcher, tile_watcher_request) =
-                    create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+                    create_proxy::<ui_comp::ChildViewWatcherMarker>();
                 let viewport_content_id = self.id_generator.next_content_id();
                 let viewport_properties = ui_comp::ViewportProperties {
                     logical_size: Some(self.layout_info.logical_size.unwrap()),
@@ -267,11 +267,9 @@ impl TilingWm {
 
         // Create the root view for tiles.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ui_comp::ParentViewportWatcherMarker>()
-                .expect("Failed to create ParentViewportWatcher channel");
+            create_proxy::<ui_comp::ParentViewportWatcherMarker>();
         let (view_focuser, view_focuser_request) =
-            fidl::endpoints::create_proxy::<ui_views::FocuserMarker>()
-                .expect("Failed to create Focuser channel");
+            fidl::endpoints::create_proxy::<ui_views::FocuserMarker>();
         let view_identity = ui_views::ViewIdentityOnCreation::from(ViewRefPair::new()?);
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             view_focuser: Some(view_focuser_request),

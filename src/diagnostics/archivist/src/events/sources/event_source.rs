@@ -148,8 +148,7 @@ pub mod tests {
     fn spawn_fake_event_stream(
     ) -> (fcomponent::EventStreamProxy, fasync::Task<()>, UnboundedSender<fcomponent::Event>) {
         let (sender, mut receiver) = futures::channel::mpsc::unbounded::<fcomponent::Event>();
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>();
         let task = fasync::Task::spawn(async move {
             let mut request_stream = server_end.into_stream();
             loop {

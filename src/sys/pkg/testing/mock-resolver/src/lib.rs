@@ -40,7 +40,7 @@ impl TestPackage {
     fn serve_on(&self, dir_request: ServerEnd<fio::DirectoryMarker>) {
         // Connect to the backing directory which we'll proxy _most_ requests to.
         let (backing_dir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fuchsia_fs::directory::open_channel_in_namespace(
             self.root.to_str().unwrap(),
             fio::PERM_READABLE,
@@ -78,7 +78,7 @@ pub async fn handle_package_directory_stream(
     backing_dir_proxy: fio::DirectoryProxy,
 ) {
     async move {
-        let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         backing_dir_proxy
             .open3(
                 PACKAGE_CONTENTS_PATH,
@@ -435,7 +435,7 @@ mod tests {
         url: &str,
     ) -> impl Future<Output = Result<(fio::DirectoryProxy, fpkg::ResolutionContext), ResolveError>>
     {
-        let (package_dir, package_dir_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (package_dir, package_dir_server_end) = fidl::endpoints::create_proxy();
         let fut = proxy.resolve(url, package_dir_server_end);
 
         async move {

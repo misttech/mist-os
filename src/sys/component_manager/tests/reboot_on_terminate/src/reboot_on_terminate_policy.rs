@@ -18,8 +18,7 @@ async fn main() {
 
     // Expect an ACCESS_DENIED epitaph due to failed policy check.
     let realm_proxy = client::connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
-    let (exposed_dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_proxy
         .open_exposed_dir(
             &fdecl::ChildRef { name: "critical_child_not_allowlisted".into(), collection: None },

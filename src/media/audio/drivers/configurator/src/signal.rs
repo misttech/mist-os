@@ -24,7 +24,7 @@ impl SignalInterface {
 
     /// Connect a codec to the SignalInterface.
     pub fn connect_codec(&mut self, codec_proxy: &CodecProxy) -> Result<(), Error> {
-        let (ours, theirs) = fidl::endpoints::create_proxy::<SignalProcessingMarker>()?;
+        let (ours, theirs) = fidl::endpoints::create_proxy::<SignalProcessingMarker>();
         codec_proxy.signal_processing_connect(theirs)?;
 
         self.proxy = Some(ours);

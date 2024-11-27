@@ -123,8 +123,7 @@ impl ComponentManagerInstance {
     async fn connect_to_statecontrol_admin(
         &self,
     ) -> Result<fstatecontrol::AdminProxy, RebootError> {
-        let (exposed_dir, server) =
-            endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+        let (exposed_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = self.root();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server);
         root.open_exposed(OpenRequest::new(

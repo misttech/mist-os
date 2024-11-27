@@ -129,15 +129,13 @@ async fn configure_interface(
     let nicid = {
         let device = {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fhardware_network::DeviceMarker>()
-                    .context("create proxy")?;
+                fidl::endpoints::create_proxy::<fhardware_network::DeviceMarker>();
             device_instance.into_proxy().get_device(server_end)?;
             proxy
         };
         let mut port_events = {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fhardware_network::PortWatcherMarker>()
-                    .context("create proxy")?;
+                fidl::endpoints::create_proxy::<fhardware_network::PortWatcherMarker>();
             device.get_port_watcher(server_end)?;
             HangingGetStream::new(proxy, fhardware_network::PortWatcherProxy::watch)
         };
@@ -167,8 +165,7 @@ async fn configure_interface(
         };
         let device_control = {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                    .context("create proxy")?;
+                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
             let device = fidl::endpoints::ClientEnd::new(
                 device.into_channel().expect("extract channel from proxy").into_zx_channel(),
             );
@@ -268,8 +265,7 @@ async fn configure_interface(
             let address_state_provider = {
                 let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                     fnet_interfaces_admin::AddressStateProviderMarker,
-                >()
-                .context("create proxy")?;
+                >();
                 control
                     .add_address(
                         &interface_address,

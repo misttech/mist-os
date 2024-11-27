@@ -266,8 +266,7 @@ async fn do_connect<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> Resul
     };
 
     // Initialize the remote service proxy.
-    let (proxy, server) = endpoints::create_proxy::<RemoteServiceMarker>()
-        .context("Failed to create RemoteService endpoints")?;
+    let (proxy, server) = endpoints::create_proxy::<RemoteServiceMarker>();
 
     // First close the connection to the currently active service.
     let _ = client.write().active_service.take();

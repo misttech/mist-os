@@ -538,11 +538,10 @@ mod tests {
             fs.close().await.expect("close failed");
         }
 
-        let (client_end, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let (lifecycle_client, lifecycle_server) =
-            fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LifecycleMarker>();
 
         let mut component_task = Box::pin(
             async {
@@ -632,8 +631,7 @@ mod tests {
 
             async move {
                 let (dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -653,8 +651,7 @@ mod tests {
 
                 // Creating another volume with the same name should fail.
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -672,8 +669,7 @@ mod tests {
 
                 // Create the same volume again and it should now succeed.
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
@@ -695,8 +691,7 @@ mod tests {
                 .expect("Unable to connect to Volumes protocol");
 
             let (volumes_dir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("create_proxy failed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             client
                 .open(
                     fio::OpenFlags::RIGHT_READABLE,
@@ -711,8 +706,7 @@ mod tests {
 
             async move {
                 let (_dir_proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("create_proxy failed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volumes_proxy
                     .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await

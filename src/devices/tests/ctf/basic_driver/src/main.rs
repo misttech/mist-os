@@ -112,7 +112,7 @@ async fn test_basic_driver() -> Result<()> {
     }
 
     // Check to make sure our topological devfs connections is working.
-    let (devfs_client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (devfs_client, server) = create_proxy::<fio::DirectoryMarker>();
     fdio::open(
         &format!("{}/dev-topological", test_ns.prefix()),
         fio::PERM_READABLE,
@@ -124,7 +124,7 @@ async fn test_basic_driver() -> Result<()> {
     // Connect to the device. We have already received an ack from the driver, but sometimes
     // seeing the item in the service directory doesn't happen immediately. So we wait for a
     // corresponding directory watcher event.
-    let (service, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (service, server) = create_proxy::<fio::DirectoryMarker>();
     fdio::open(
         &format!("{}/{}", test_ns.prefix(), ctf::ServiceMarker::SERVICE_NAME),
         fio::PERM_READABLE,

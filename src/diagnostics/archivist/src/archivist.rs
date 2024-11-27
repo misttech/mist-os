@@ -476,7 +476,7 @@ mod tests {
     // run archivist and send signal when it dies.
     async fn run_archivist_and_signal_on_exit(
     ) -> (fio::DirectoryProxy, LifecycleProxy, oneshot::Receiver<()>) {
-        let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (directory, server_end) = create_proxy::<fio::DirectoryMarker>();
         let mut fs = ServiceFs::new();
         fs.serve_connection(server_end).unwrap();
         let archivist = init_archivist(&mut fs).await;
@@ -493,7 +493,7 @@ mod tests {
 
     // runs archivist and returns its directory.
     async fn run_archivist() -> (fio::DirectoryProxy, LifecycleProxy) {
-        let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (directory, server_end) = create_proxy::<fio::DirectoryMarker>();
         let mut fs = ServiceFs::new();
         fs.serve_connection(server_end).unwrap();
         let archivist = init_archivist(&mut fs).await;

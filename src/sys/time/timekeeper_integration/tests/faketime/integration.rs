@@ -41,7 +41,7 @@ async fn connect_into_realm<T>(
 where
     T: endpoints::ProtocolMarker,
 {
-    let (proxy, server_end) = endpoints::create_proxy::<T>().expect("infallible");
+    let (proxy, server_end) = endpoints::create_proxy::<T>();
     let _result = realm_proxy
         .connect_to_named_protocol(
             <T as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
@@ -86,8 +86,7 @@ where
         })?;
 
     // realm_proxy must live as long as you need your test realm to live.
-    let (realm_proxy, realm_server_end) =
-        endpoints::create_proxy::<ffth::RealmProxy_Marker>().expect("infallible");
+    let (realm_proxy, realm_server_end) = endpoints::create_proxy::<ffth::RealmProxy_Marker>();
 
     let (push_source_puppet, _opts, cobalt_metric_client) = test_realm_proxy
         .create_realm(fttr::RealmOptions { ..Default::default() }, utc_clock_copy, realm_server_end)

@@ -456,8 +456,7 @@ mod tests {
         }
 
         // Instantiate the fake Watcher implementation.
-        let (state, state_server_end) =
-            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state, state_server_end) = fidl::endpoints::create_proxy::<I::StateMarker>();
         let (mut state_request_stream, _control_handle) =
             state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
@@ -500,7 +499,7 @@ mod tests {
     #[should_panic(expected = "received multiple RouteTable requests")]
     async fn test_serve_one_route_set_panic<I: FidlRouteAdminIpExt>() {
         let (routes_set_provider_proxy, routes_set_provider_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let mut provider = admin::serve_one_route_set::<I>(routes_set_provider_server_end);
         let _rs1 = crate::admin::new_route_set::<I>(&routes_set_provider_proxy)
             .expect("created first RouteSet");

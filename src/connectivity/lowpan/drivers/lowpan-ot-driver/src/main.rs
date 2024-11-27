@@ -138,8 +138,7 @@ impl Config {
         let state = connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
             .expect("error connecting to StateMarker");
         let (watcher_client, watcher_server) =
-            create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
-                .expect("error connecting to WatcherMarker");
+            create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         state
             .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), watcher_server)
             .expect("error getting interface watcher");

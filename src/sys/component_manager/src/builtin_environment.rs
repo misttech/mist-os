@@ -1577,7 +1577,7 @@ impl BuiltinEnvironment {
         // If capability passthrough is enabled, add a remote directory to proxy
         // capabilities exposed by the root component.
         if self.capability_passthrough {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             service_fs.add_remote("root-exposed", proxy);
             let root = self.model.top_instance().root();
             let root = WeakComponentInstance::new(&root);

@@ -2704,8 +2704,7 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("create_symlink failed");
 
-            let (proxy, server_end) =
-                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.open(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                 fio::ModeType::empty(),
@@ -2732,8 +2731,7 @@ mod tests {
                 panic!("Unexpected on_open {on_open:?}");
             }
 
-            let (proxy, server_end) =
-                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.create_symlink("symlink2", b"target2", Some(server_end))
                 .await
                 .expect("FIDL call failed")
@@ -2791,8 +2789,7 @@ mod tests {
                 .expect("create_symlink failed");
 
             async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
-                let (proxy, server_end) =
-                    create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
                 root.open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                     fio::ModeType::empty(),
@@ -2937,7 +2934,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -2966,7 +2963,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -2991,7 +2988,7 @@ mod tests {
 
         {
             let (iterator_client, iterator_server) =
-                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fio::ExtendedAttributeIteratorMarker>();
             file.list_extended_attributes(iterator_server).expect("Failed to make FIDL call");
             let (chunk, last) = iterator_client
                 .get_next()
@@ -3123,7 +3120,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
@@ -3171,7 +3168,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
@@ -3212,7 +3209,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
@@ -3262,7 +3259,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
             let mode = fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let uid = 1;
@@ -3322,7 +3319,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
 
             let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
             let options = Default::default();
@@ -3360,7 +3357,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
-            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
             let mode = fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let uid = 1;
@@ -3467,7 +3464,7 @@ mod tests {
             attributes: Some(fio::NodeAttributesQuery::SELINUX_CONTEXT),
             ..Default::default()
         };
-        let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (node, server_end) = create_proxy::<fio::NodeMarker>();
         root_dir.open3(path, flags, &options, server_end.into_channel()).expect("Reopening node");
         let repr = node
             .take_event_stream()
@@ -3510,7 +3507,7 @@ mod tests {
                     }),
                     ..Default::default()
                 };
-                let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+                let (node, server_end) = create_proxy::<fio::NodeMarker>();
                 root_dir
                     .open3(path, flags, &options, server_end.into_channel())
                     .expect("Creating node");
@@ -3580,7 +3577,7 @@ mod tests {
             let path = "symlink";
             let root_dir = fixture.root();
             // Create node with the context.
-            let (node, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+            let (node, server_end) = create_proxy::<fio::SymlinkMarker>();
             root_dir
                 .create_symlink(path, ".".as_bytes(), Some(server_end))
                 .await

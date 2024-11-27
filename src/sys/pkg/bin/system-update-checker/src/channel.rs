@@ -115,7 +115,7 @@ impl<S: ServiceConnect> TargetChannelManager<S> {
     pub async fn get_channel_list(&self) -> Result<Vec<String>, anyhow::Error> {
         let repository_manager =
             self.service_connector.connect_to_service::<RepositoryManagerMarker>()?;
-        let (repo_iterator, server_end) = fidl::endpoints::create_proxy()?;
+        let (repo_iterator, server_end) = fidl::endpoints::create_proxy();
         repository_manager.list(server_end)?;
         let mut repo_configs = vec![];
         loop {

@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_command_channel_stream_lifecycle() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>();
         let (stream, control_handle) = server.into_stream_and_control_handle();
         let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
 
@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn test_command_channel() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>();
         let (stream, control_handle) = server.into_stream_and_control_handle();
         let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
         let mut mock = HciTransportMock::from_stream(stream, timeout_duration());

@@ -79,7 +79,7 @@ fn default_address() -> Address {
 }
 
 async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
-    let (local, remote) = fidl::endpoints::create_proxy()?;
+    let (local, remote) = fidl::endpoints::create_proxy();
     let params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),

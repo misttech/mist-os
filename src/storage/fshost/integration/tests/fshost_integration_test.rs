@@ -214,7 +214,7 @@ async fn wipe_storage_not_supported() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
 
-    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
 
     let result = admin
         .wipe_storage(Some(blobfs_server), None)
@@ -340,8 +340,7 @@ async fn partition_max_size_set() {
             .expect("failed to find data partition");
 
     // Get the data instance guid.
-    let (volume_proxy, volume_server_end) =
-        fidl::endpoints::create_proxy::<VolumeMarker>().unwrap();
+    let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
     data_partition_controller.connect_to_device_fidl(volume_server_end.into_channel()).unwrap();
 
     let (status, data_instance_guid) = volume_proxy.get_instance_guid().await.unwrap();

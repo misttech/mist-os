@@ -42,7 +42,7 @@ async fn list_devices(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Resu
             filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
         usb_device_dir.open(
             fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),
@@ -328,7 +328,7 @@ async fn list_tree(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<
             filename.to_str().ok_or_else(|| format_err!("to_str for filename failed"))?;
 
         let (device, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
         usb_device_dir.open(
             fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),

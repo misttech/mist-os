@@ -468,8 +468,7 @@ mod tests {
         provider: &fidl_policy::AccessPointProviderProxy,
     ) -> (fidl_policy::AccessPointControllerProxy, fidl_policy::AccessPointStateUpdatesRequestStream)
     {
-        let (controller, requests) = create_proxy::<fidl_policy::AccessPointControllerMarker>()
-            .expect("failed to create ClientController proxy");
+        let (controller, requests) = create_proxy::<fidl_policy::AccessPointControllerMarker>();
         let (update_sink, update_stream) =
             create_request_stream::<fidl_policy::AccessPointStateUpdatesMarker>()
                 .expect("failed to create ClientStateUpdates proxy");
@@ -487,8 +486,7 @@ mod tests {
     /// Setup channels and proxies needed for the tests to use use the AP Provider and
     /// AP Controller APIs in tests.
     fn test_setup() -> TestValues {
-        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
+        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>();
         let requests = requests.into_stream();
 
         let iface_manager = FakeIfaceManager::new();
@@ -828,8 +826,7 @@ mod tests {
 
         // Create another request stream and begin serving it.  This is equivalent to the behavior
         // that occurs when a second client connects to the AccessPointProvider service.
-        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
-            .expect("failed to create AccessPointProvider proxy");
+        let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>();
         let requests = requests.into_stream();
         let second_serve_fut = test_values.ap.serve_provider_requests(requests);
         let mut second_serve_fut = pin!(second_serve_fut);

@@ -682,8 +682,7 @@ mod tests {
     ) -> (bredr::ProfileRequest, bredr::ScoConnectionProxy) {
         let (profile_proxy, mut profile_request_stream) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
-        let (connection_proxy, connection_server) =
-            create_proxy::<bredr::ScoConnectionMarker>().unwrap();
+        let (connection_proxy, connection_server) = create_proxy::<bredr::ScoConnectionMarker>();
 
         assert!(profile_proxy
             .connect_sco(bredr::ProfileConnectScoRequest {

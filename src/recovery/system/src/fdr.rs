@@ -182,7 +182,7 @@ fn get_other_slot_config(config: Configuration) -> Configuration {
 /// Requires fuchsia.paver.Paver protocol capability.
 pub async fn reset_active_slot() -> Result<(), Error> {
     let paver_proxy = connect_to_protocol::<PaverMarker>().context("failed to connect to paver")?;
-    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>();
 
     paver_proxy.find_boot_manager(server).context("failed to find boot manager")?;
 

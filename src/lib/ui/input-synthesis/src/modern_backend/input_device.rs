@@ -455,8 +455,7 @@ mod tests {
             pin_mut!(input_device_server_fut);
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .context("sending get_input_reports_reader request")?;
@@ -1218,15 +1217,13 @@ mod tests {
             let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending first get_input_reports_reader request");
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending second get_input_reports_reader request");
@@ -1284,8 +1281,7 @@ mod tests {
             input_device_proxy: &InputDeviceProxy,
         ) -> InputReportsReaderProxy {
             let (input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .expect("internal error creating InputReportsReader proxy and server end");
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending get_input_reports_reader request");

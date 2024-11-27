@@ -11,7 +11,7 @@ pub async fn connect_to_incoming_capabilities_for_component_without_program() {
     let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     // We can't open the component namespace until the component is resolved.
-    let (_, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (_, server_end) = fidl::endpoints::create_proxy();
     let err = query
         .open_directory("no_program", fsys::OpenDirType::NamespaceDir, server_end)
         .await
@@ -29,7 +29,7 @@ pub async fn connect_to_incoming_capabilities_for_component_without_program() {
         .expect("resolved instance");
 
     // Connect to the echo protocol in the component's namespace directory.
-    let (namespace_dir, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (namespace_dir, server_end) = fidl::endpoints::create_proxy();
     query
         .open_directory("no_program", fsys::OpenDirType::NamespaceDir, server_end)
         .await

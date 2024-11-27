@@ -723,7 +723,7 @@ mod tests {
                 self.connector.connect_to_protocol::<fpowerclient::ConnectorMarker>().unwrap();
 
             let (watcher_proxy, watcher_server_end) =
-                fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fpowerclient::WatcherMarker>();
 
             // Pass the `watcher_server_end` to the node, so it will be associated with power level
             // changes of `client_type`

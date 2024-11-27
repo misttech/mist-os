@@ -58,8 +58,7 @@ impl Cobalt for CobaltImpl {
 fn get_logger_from_factory(
     factory_proxy: MetricEventLoggerFactoryProxy,
 ) -> Result<MetricEventLoggerProxy, Error> {
-    let (logger_proxy, server_end) =
-        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+    let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
     fasync::Task::spawn(async move {
         if let Err(err) = factory_proxy
             .create_metric_event_logger(

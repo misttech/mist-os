@@ -41,8 +41,7 @@ fn get_client_controller(
 ) -> Result<(wlan_policy::ClientControllerProxy, wlan_policy::ClientStateUpdatesRequestStream), Error>
 {
     let policy_provider = connect_to_protocol::<wlan_policy::ClientProviderMarker>()?;
-    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>()
-        .context("create ClientController proxy")?;
+    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>();
     let (update_client_end, update_stream) =
         create_request_stream::<wlan_policy::ClientStateUpdatesMarker>()
             .context("create ClientStateUpdates request stream")?;
@@ -160,8 +159,7 @@ impl WifiConnect for WifiConnectImpl {
 async fn handle_scan(
     client_controller: wlan_policy::ClientControllerProxy,
 ) -> Result<Vec<wlan_policy::ScanResult>, Error> {
-    let (client_proxy, server_end) =
-        create_proxy::<wlan_policy::ScanResultIteratorMarker>().unwrap();
+    let (client_proxy, server_end) = create_proxy::<wlan_policy::ScanResultIteratorMarker>();
     client_controller.scan_for_networks(server_end)?;
 
     let mut scanned_networks = Vec::<wlan_policy::ScanResult>::new();

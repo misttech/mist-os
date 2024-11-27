@@ -286,7 +286,7 @@ impl FlatlandViewStrategy {
         view_creation_token: fidl_fuchsia_ui_views::ViewCreationToken,
     ) -> Result<(), Error> {
         let (parent_viewport_watcher, server_end) =
-            create_proxy::<flatland::ParentViewportWatcherMarker>()?;
+            create_proxy::<flatland::ParentViewportWatcherMarker>();
 
         let viewref_pair = fuchsia_scenic::ViewRefPair::new()?;
         let view_ref = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;

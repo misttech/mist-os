@@ -213,8 +213,7 @@ mod tests {
     async fn test_does_not_change_metadata_when_disabled() {
         // We shouldn't even attempt to talk to the paver when disabled, so a proxy with the remote
         // end closed should work fine.
-        let boot_manager_proxy =
-            create_proxy::<paver::BootManagerMarker>().expect("Creating proxy succeeds").0;
+        let boot_manager_proxy = create_proxy::<paver::BootManagerMarker>().0;
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =

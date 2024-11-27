@@ -296,8 +296,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         fasync::Task::local(run_metrics_service(factory_stream, loggers.clone()).map(|_| ()))
             .detach();
@@ -324,8 +323,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");
@@ -369,8 +367,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");
@@ -418,8 +415,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");
@@ -481,8 +477,7 @@ mod metrics_tests {
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");
-        let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
         // via expect method calls below.
@@ -520,8 +515,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         fasync::Task::local(run_metrics_service(factory_stream, loggers.clone()).map(|_| ()))
             .detach();
@@ -583,8 +577,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");
@@ -641,8 +634,7 @@ mod metrics_tests {
         let (factory_proxy, factory_stream) =
             create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
                 .expect("create logger factroy proxy and stream to succeed");
-        let (logger_proxy, logger_proxy_server_end) = create_proxy::<MetricEventLoggerMarker>()
-            .expect("create logger proxy and server end to succeed");
+        let (logger_proxy, logger_proxy_server_end) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
             create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
                 .expect("create logger querier proxy and stream to succeed");

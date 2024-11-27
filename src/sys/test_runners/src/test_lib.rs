@@ -283,7 +283,7 @@ pub async fn connect_to_test_manager() -> Result<ftest_manager::RunBuilderProxy,
         .context("could not connect to Realm service")?;
 
     let child_ref = fdecl::ChildRef { name: "test_manager".to_owned(), collection: None };
-    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     realm
         .open_exposed_dir(&child_ref, server_end)
         .await

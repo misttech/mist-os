@@ -623,15 +623,12 @@ mod test {
             let _executor = fuchsia_async::TestExecutor::new();
 
             let (main_route_table_proxy, _server_end) =
-                fidl::endpoints::create_proxy::<<Ipv6 as FidlRouteAdminIpExt>::RouteTableMarker>()
-                    .unwrap();
+                fidl::endpoints::create_proxy::<<Ipv6 as FidlRouteAdminIpExt>::RouteTableMarker>();
             let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
-                fidl::endpoints::create_proxy::<<Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker>()
-                    .unwrap();
+                fidl::endpoints::create_proxy::<<Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker>();
             let (route_table_provider, _server_end) = fidl::endpoints::create_proxy::<
                 <Ipv6 as FidlRouteAdminIpExt>::RouteTableProviderMarker,
-            >()
-            .unwrap();
+            >();
 
             let mut route_table_map = RouteTableMap::<Ipv6>::new(
                 main_route_table_proxy,
@@ -703,17 +700,14 @@ mod test {
                     // Create placeholder proxies.
                     let (route_table_proxy, _server_end) = fidl::endpoints::create_proxy::<
                         <Ipv6 as FidlRouteAdminIpExt>::RouteTableMarker,
-                    >()
-                    .unwrap();
+                    >();
                     let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<
                         <Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker,
-                    >()
-                    .unwrap();
+                    >();
                     let (route_set_from_main_table_proxy, _server_end) =
                         fidl::endpoints::create_proxy::<
                             <Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker,
-                        >()
-                        .unwrap();
+                        >();
 
                     // It's expected that the netstack will ensure no-FIDL-ID clashes
                     // for us as long as we keep route table proxies alive.

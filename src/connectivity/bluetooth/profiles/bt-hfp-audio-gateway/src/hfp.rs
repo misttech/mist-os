@@ -931,7 +931,7 @@ mod tests {
             }
         });
 
-        let (call_manager, _call_manager_server) = create_proxy::<CallManagerMarker>().unwrap();
+        let (call_manager, _call_manager_server) = create_proxy::<CallManagerMarker>();
         hfp.handle_new_call_manager(call_manager).await.expect("can set call manager");
 
         assert_data_tree!(inspector, root: {
@@ -951,8 +951,7 @@ mod tests {
         let manager_id = hfp.call_manager.connection_id().expect("just set");
         drop(_call_manager_server);
         let peer_id = PeerId(123);
-        let (_peer_handler_client, peer_handler_server) =
-            create_proxy::<PeerHandlerMarker>().unwrap();
+        let (_peer_handler_client, peer_handler_server) = create_proxy::<PeerHandlerMarker>();
         hfp.handle_internal_event(Event::PeerConnected {
             peer_id,
             manager_id,

@@ -67,7 +67,7 @@ impl LazyNodeFetcher {
     }
 
     async fn get_child_names(&self) -> Result<Vec<String>, Error> {
-        let (name_iterator, server_end) = create_proxy::<TreeNameIteratorMarker>()?;
+        let (name_iterator, server_end) = create_proxy::<TreeNameIteratorMarker>();
         self.channel.list_child_names(server_end)?;
         let mut names = vec![];
         loop {
@@ -80,7 +80,7 @@ impl LazyNodeFetcher {
     }
 
     async fn get_child_tree_channel(&self, name: &str) -> Result<TreeProxy, Error> {
-        let (child_channel, server_end) = create_proxy::<TreeMarker>()?;
+        let (child_channel, server_end) = create_proxy::<TreeMarker>();
         self.channel.open_child(name, server_end)?;
         Ok(child_channel)
     }

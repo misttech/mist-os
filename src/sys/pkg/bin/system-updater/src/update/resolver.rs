@@ -16,9 +16,6 @@ pub enum ResolveError {
 
     #[error("error while resolving {1}")]
     Error(#[source] fidl_fuchsia_pkg_ext::ResolveError, AbsolutePackageUrl),
-
-    #[error("while creating fidl proxy and stream")]
-    CreateProxy(#[source] fidl::Error),
 }
 
 /// Resolves the update package given by `url` through the pkg_resolver.
@@ -71,8 +68,7 @@ async fn resolve_package(
     pkg_resolver: &fpkg::PackageResolverProxy,
     url: AbsolutePackageUrl,
 ) -> Result<fio::DirectoryProxy, ResolveError> {
-    let (dir, dir_server_end) =
-        fidl::endpoints::create_proxy().map_err(ResolveError::CreateProxy)?;
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy();
     let res = pkg_resolver.resolve(&url.to_string(), dir_server_end);
     let res = res.await.map_err(|e| ResolveError::Fidl(e, url.clone()))?;
 

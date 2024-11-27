@@ -291,7 +291,7 @@ async fn open_component_dir_for_moniker(
     moniker: &str,
     dir_type: &fsys::OpenDirType,
 ) -> Result<fio::DirectoryProxy> {
-    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     let flags = match dir_type {
         fsys::OpenDirType::PackageDir => fio::OpenFlags::RIGHT_READABLE,

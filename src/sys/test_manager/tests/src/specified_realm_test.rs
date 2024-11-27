@@ -126,7 +126,7 @@ async fn enumerate_echo_test() {
         ..Default::default()
     }));
 
-    let (iterator, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = fidl::endpoints::create_proxy();
 
     proxy
         .enumerate_in_realm(

@@ -74,7 +74,7 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
 }
 
 async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let (peer, remote) = fidl::endpoints::create_proxy();
     let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
@@ -91,7 +91,7 @@ async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<Pe
 async fn start_discovery(access: &AccessHarness) -> Result<ProcedureTokenProxy, Error> {
     // We create a capability to capture the discovery token, and pass it to the profile provider
     // Discovery will stop once we drop this token
-    let (token, token_server) = fidl::endpoints::create_proxy()?;
+    let (token, token_server) = fidl::endpoints::create_proxy();
     let fidl_response = access.aux().start_discovery(token_server);
     fidl_response
         .await?

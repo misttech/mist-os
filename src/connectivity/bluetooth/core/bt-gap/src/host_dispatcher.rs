@@ -968,7 +968,7 @@ impl HostDispatcher {
             .map_err(|e| e.as_failure())
             .context(format!("{:?}: failed to set name of bt-host", dbg_ids))?;
 
-        let (gatt_server_proxy, remote_gatt_server) = fidl::endpoints::create_proxy()?;
+        let (gatt_server_proxy, remote_gatt_server) = fidl::endpoints::create_proxy();
         host_device
             .proxy()
             .request_protocol(ProtocolRequest::Gatt2Server(remote_gatt_server))

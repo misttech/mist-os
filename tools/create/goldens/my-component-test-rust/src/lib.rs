@@ -18,7 +18,7 @@ async fn my_component_test_rust_test() -> Result<(), Error> {
     // use fidl::endpoints;
     //
     // let realm_proxy = fclient::realm()?;
-    // let (exposed_directory, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    // let (exposed_directory, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     // let () = realm_proxy
     //     .open_exposed_dir(
     //         &mut fdecl::ChildRef { name: "hello-world".to_string(), collection: None },

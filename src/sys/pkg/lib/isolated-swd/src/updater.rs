@@ -42,8 +42,7 @@ impl Updater {
         };
 
         let (reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>()
-                .context("creating reboot controller proxy")?;
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
         let () = reboot_controller.detach().context("disabling automatic reboot")?;
 
         let attempt = start_update(
@@ -82,8 +81,7 @@ impl Updater {
     }
 
     async fn activate_installed_slot(paver: &PaverProxy) -> Result<(), Error> {
-        let (boot_manager, remote) = fidl::endpoints::create_proxy::<BootManagerMarker>()
-            .context("Creating boot manager proxy")?;
+        let (boot_manager, remote) = fidl::endpoints::create_proxy::<BootManagerMarker>();
 
         paver.find_boot_manager(remote).context("finding boot manager")?;
 

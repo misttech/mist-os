@@ -308,7 +308,7 @@ impl TestEnv {
         &self,
         url: &str,
     ) -> Result<(fio::DirectoryProxy, fpkg::ResolutionContext), fpkg::ResolveError> {
-        let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (package, package_server_end) = fidl::endpoints::create_proxy();
         let context = self.package_resolver().resolve(url, package_server_end).await.unwrap()?;
         Ok((package, context))
     }
@@ -326,7 +326,7 @@ impl TestEnv {
         url: &str,
         in_context: fpkg::ResolutionContext,
     ) -> Result<(fio::DirectoryProxy, fpkg::ResolutionContext), fpkg::ResolveError> {
-        let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (package, package_server_end) = fidl::endpoints::create_proxy();
         let out_context = self
             .package_resolver()
             .resolve_with_context(url, &in_context, package_server_end)

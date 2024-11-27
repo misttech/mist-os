@@ -28,7 +28,7 @@ pub async fn run_selinux_cases(
         let (component_controller, std_handles) =
             start_selinux(&mut start_info, component_runner, test_name)?;
 
-        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
         run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
         let result = read_selinux_test_result(component_controller.take_event_stream()).await;

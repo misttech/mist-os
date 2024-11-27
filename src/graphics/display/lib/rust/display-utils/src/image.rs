@@ -186,7 +186,7 @@ async fn allocate_image_buffer(
         })?;
     }
     let collection_token = {
-        let (proxy, remote) = create_proxy::<BufferCollectionTokenMarker>()?;
+        let (proxy, remote) = create_proxy::<BufferCollectionTokenMarker>();
         allocator.allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
             token_request: Some(remote),
             ..Default::default()

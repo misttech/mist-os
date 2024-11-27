@@ -28,7 +28,7 @@ impl Nl80211Family {
         let wlanix_svc =
             fuchsia_component::client::connect_to_protocol::<fidl_wlanix::WlanixMarker>()
                 .context("failed to connect to wlanix")?;
-        let (nl80211_proxy, nl80211_server) = fidl::endpoints::create_proxy()?;
+        let (nl80211_proxy, nl80211_server) = fidl::endpoints::create_proxy();
         wlanix_svc
             .get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
                 nl80211: Some(nl80211_server),

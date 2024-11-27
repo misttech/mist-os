@@ -24,7 +24,7 @@ async fn find_network_device(
     mac: MacAddress,
 ) -> (netdevice_client::Client, netdevice_client::Port) {
     let (directory, directory_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_io::DirectoryMarker>().expect("create proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_io::DirectoryMarker>();
     fdio::service_connect(NETDEV_DIRECTORY, directory_server.into_channel().into())
         .expect("connect to netdevice devfs");
     let devices =
@@ -36,8 +36,7 @@ async fn find_network_device(
                     .unwrap_or_else(|| panic!("{} failed to convert to str", filepath.display()));
                 let (netdevice, netdevice_server) = fidl::endpoints::create_proxy::<
                     fidl_fuchsia_hardware_network::DeviceInstanceMarker,
-                >()
-                .expect("create proxy");
+                >();
                 fdio::service_connect(filepath, netdevice_server.into_channel())
                     .expect("connect to service");
                 netdevice
@@ -45,8 +44,7 @@ async fn find_network_device(
         );
     let results = futures::stream::iter(devices).filter_map(|netdev_device| async move {
         let (device_proxy, device_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>();
         netdev_device.get_device(device_server).expect("get device");
         let device_proxy = &device_proxy;
         let client = netdevice_client::Client::new(Clone::clone(device_proxy));
@@ -67,12 +65,10 @@ async fn find_network_device(
             }
         };
         let (port, port_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
         device_proxy.get_port(&port_id, port_server).expect("failed to get port");
         let (mac_addressing, mac_addressing_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>();
         port.get_mac(mac_addressing_server).expect("failed to get mac addressing");
         let addr = mac_addressing.get_unicast_address().await.expect("failed to get address");
 

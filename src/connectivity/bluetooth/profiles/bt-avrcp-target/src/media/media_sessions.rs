@@ -453,7 +453,7 @@ fn create_session_control_proxy(
     discovery: DiscoveryProxy,
     id: MediaSessionId,
 ) -> Result<SessionControlProxy, Error> {
-    let (session_proxy, session_request_stream) = create_proxy()?;
+    let (session_proxy, session_request_stream) = create_proxy();
     discovery.connect_to_session(id.0, session_request_stream)?;
     Ok(session_proxy)
 }
@@ -505,8 +505,7 @@ pub(crate) mod tests {
     /// Since there are no state updates, it should stay there until the variable goes
     /// out of program scope.
     async fn test_register_notification_supported() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
             .expect("Couldn't create proxy and stream");
         let disc_clone = discovery.clone();
@@ -549,8 +548,7 @@ pub(crate) mod tests {
     /// Test the insertion of a TrackPosChangedNotification.
     /// It should be successfully inserted, and a timeout duration should be returned.
     async fn test_register_notification_track_pos_changed() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
             .expect("Couldn't create proxy and stream");
         let disc_clone = discovery.clone();
@@ -598,8 +596,7 @@ pub(crate) mod tests {
     /// Test the insertion of a AddressedPlayerChanged notification.
     /// It should not resolve.
     async fn test_register_notification_addressed_player_changed() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Couldn't create discovery service endpoints.");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
             .expect("Couldn't create proxy and stream");
         let disc_clone = discovery.clone();
@@ -685,7 +682,7 @@ pub(crate) mod tests {
     /// proxy, and inserts into the state map. No outstanding notifications so no updates.
     /// 2. Test updating of an existing MediaSession in the map. The SessionInfo should change.
     async fn test_create_and_update_media_session() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
 
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery.clone(), id, true);
@@ -729,8 +726,7 @@ pub(crate) mod tests {
             .expect("Couldn't create proxy and stream");
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery.clone(), id, true);
 
@@ -785,8 +781,7 @@ pub(crate) mod tests {
             .expect("Couldn't create TargetHandler proxy and stream");
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery, id, true);
 
@@ -966,7 +961,7 @@ pub(crate) mod tests {
         let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>().unwrap();
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(14);
         let mut sessions = create_session(discovery, id, true);
 
@@ -1014,8 +1009,7 @@ pub(crate) mod tests {
             .expect("Couldn't create proxy and stream");
 
         // Create a new active session with default state.
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>()
-            .expect("Discovery service should be able to be created");
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
         let id = MediaSessionId(1234);
         let mut sessions = create_session(discovery, id, true);
 
@@ -1105,7 +1099,7 @@ pub(crate) mod tests {
     /// 3. Test clearing an existing and active session updates `active_session_id` and
     /// removes from map.
     async fn test_clear_session() {
-        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);
@@ -1144,7 +1138,7 @@ pub(crate) mod tests {
     /// We only support one player id: `MEDIA_SESSION_ADDRESSED_PLAYER_ID`, so any
     /// calls to `set_addressed_player` with a different ID should result in an error.
     async fn test_set_addressed_player() {
-        let (discovery, _stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);
@@ -1170,7 +1164,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     /// Getting the media items should return the same static response.
     async fn test_get_media_player_items() {
-        let (discovery, _stream) = create_proxy::<DiscoveryMarker>().unwrap();
+        let (discovery, _stream) = create_proxy::<DiscoveryMarker>();
 
         // Create a new active session with default state.
         let id = MediaSessionId(1234);

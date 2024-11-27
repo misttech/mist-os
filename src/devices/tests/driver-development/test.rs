@@ -73,7 +73,7 @@ fn send_get_device_info_request(
     exact_match: bool,
 ) -> Result<fdd::NodeInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::NodeInfoIteratorMarker>();
 
     service
         .get_node_info(
@@ -110,7 +110,7 @@ fn send_get_driver_info_request(
     driver_filter: &[&str],
 ) -> Result<fdd::DriverInfoIteratorProxy> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
 
     service
         .get_driver_info(

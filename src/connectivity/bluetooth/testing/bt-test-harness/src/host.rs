@@ -151,7 +151,7 @@ async fn new_host_harness(realm: Arc<HostRealm>) -> Result<(HostHarness, Emulato
 
     let peers = HashMap::new();
 
-    let (bonding_delegate, bonding_server) = fidl::endpoints::create_proxy().unwrap();
+    let (bonding_delegate, bonding_server) = fidl::endpoints::create_proxy();
     host.set_bonding_delegate(bonding_server).context("Error setting bonding delegate")?;
 
     let harness = HostHarness(expectable(
@@ -165,7 +165,7 @@ async fn new_host_harness(realm: Arc<HostRealm>) -> Result<(HostHarness, Emulato
 async fn watch_peers(harness: HostHarness) -> Result<(), Error> {
     // Clone the proxy so that the aux() lock is not held while waiting.
     let proxy = harness.aux().host.clone();
-    let (peer_watcher, server) = fidl::endpoints::create_proxy().unwrap();
+    let (peer_watcher, server) = fidl::endpoints::create_proxy();
     proxy.set_peer_watcher(server)?;
     loop {
         let response = peer_watcher.get_next().await?;

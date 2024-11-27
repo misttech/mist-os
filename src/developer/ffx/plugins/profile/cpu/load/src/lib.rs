@@ -164,7 +164,7 @@ mod tests {
     /// Tests that invalid arguments are rejected.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_invalid_args() {
-        let (proxy, _) = fidl::endpoints::create_proxy::<fstats::StatsMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy::<fstats::StatsMarker>();
         assert!(measure(proxy, Duration::from_secs(0), &mut std::io::stdout()).await.is_err());
     }
 

@@ -26,7 +26,7 @@ impl Migration for V1653667208LightMigration {
     }
 
     async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError> {
-        let (stash_proxy, server_end) = create_proxy().expect("failed to create proxy for stash");
+        let (stash_proxy, server_end) = create_proxy();
         self.0.create_accessor(true, server_end).expect("failed to create accessor for stash");
         let value = stash_proxy.get_value(LIGHT_KEY).await.context("failed to call get_value")?;
         let str_json = match value {
@@ -91,8 +91,7 @@ mod tests {
     // an unrecoverable error.
     #[fuchsia::test]
     async fn v1653667208_light_migration_error_getting_value() {
-        let (store_proxy, server_end) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
+        let (store_proxy, server_end) = create_proxy::<StoreMarker>();
         let mut request_stream = server_end.into_stream();
         let task = fasync::Task::local(async move {
             let mut tasks = vec![];
@@ -133,8 +132,7 @@ mod tests {
     // Ensure we see that no data is available when the data is not in stash.
     #[fuchsia::test]
     async fn v1653667208_light_migration_no_data() {
-        let (store_proxy, server_end) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
+        let (store_proxy, server_end) = create_proxy::<StoreMarker>();
         let mut request_stream = server_end.into_stream();
         let task = fasync::Task::local(async move {
             let mut tasks = vec![];
@@ -171,8 +169,7 @@ mod tests {
     // Ensure we can properly migrate the original json data in stash over to persistent fidl.
     #[fuchsia::test]
     async fn v1653667208_light_migration_test() {
-        let (store_proxy, server_end) =
-            create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
+        let (store_proxy, server_end) = create_proxy::<StoreMarker>();
         let mut request_stream = server_end.into_stream();
         let task = fasync::Task::local(async move {
             let mut tasks = vec![];

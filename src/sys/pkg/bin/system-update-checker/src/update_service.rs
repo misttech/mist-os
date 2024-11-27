@@ -136,8 +136,7 @@ impl Notify for RealAttemptNotifier {
 
         async move {
             let (monitor_proxy, monitor_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>()
-                    .map_err(|_| ClosedClient)?;
+                fidl::endpoints::create_proxy::<fidl_fuchsia_update::MonitorMarker>();
             update_attempt_event_queue
                 .add_client(RealStateNotifier { proxy: monitor_proxy })
                 .await

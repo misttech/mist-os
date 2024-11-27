@@ -102,9 +102,8 @@ impl Program {
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
-            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
-        let (runtime_dir, runtime_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();
+        let (runtime_dir, runtime_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let start_info = start_info.into_fidl(escrowed_state, runtime_server)?;
 
@@ -228,7 +227,7 @@ impl Program {
     ) -> Program {
         let controller = ComponentController::new(controller.into_proxy(), None);
         let (runtime_dir, _runtime_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         Program { controller, runtime_dir }
     }
 }

@@ -111,9 +111,9 @@ async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifie
 async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient, Error> {
     info!(%id, "Trying to connect");
     // Try to connect and establish a GATT connection.
-    let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>()?;
+    let (le_client, le_server) = fidl::endpoints::create_proxy::<ConnectionMarker>();
     central.connect(&id.into(), &ConnectionOptions::default(), le_server)?;
-    let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>()?;
+    let (gatt_client, gatt_server) = fidl::endpoints::create_proxy::<gatt::ClientMarker>();
     le_client.request_gatt_client(gatt_server)?;
 
     // Read the GATT services offered by the peer.
@@ -121,7 +121,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
     let (added, _) = gatt_client.watch_services(uuids).await?;
     let service_handle = read_services(added)?;
     let (remote_client, remote_server) =
-        fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>()?;
+        fidl::endpoints::create_proxy::<gatt::RemoteServiceMarker>();
     gatt_client.connect_to_service(&service_handle, remote_server)?;
 
     // Discover the characteristics provided by the service.
@@ -208,7 +208,7 @@ async fn watch_scan_results(
 async fn main() -> Result<(), Error> {
     info!("Starting LE Battery Monitor");
     let central = connect_to_protocol::<CentralMarker>()?;
-    let (scan_client, scan_server) = fidl::endpoints::create_proxy::<ScanResultWatcherMarker>()?;
+    let (scan_client, scan_server) = fidl::endpoints::create_proxy::<ScanResultWatcherMarker>();
     // Only scan for devices with the Battery Service.
     let options = ScanOptions {
         filters: Some(vec![Filter {

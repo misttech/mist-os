@@ -108,8 +108,7 @@ pub async fn connect(
     peer_id: PeerId,
     service_uuid: Option<Uuid>,
 ) -> Result<(), Error> {
-    let (conn_proxy, conn_server) = endpoints::create_proxy::<ConnectionMarker>()
-        .context("Failed to create Connection endpoints")?;
+    let (conn_proxy, conn_server) = endpoints::create_proxy::<ConnectionMarker>();
 
     let conn_opts = ConnectionOptions {
         bondable_mode: Some(true),
@@ -123,8 +122,7 @@ pub async fn connect(
         .connect(&peer_id.into(), &conn_opts, conn_server)
         .context("Failed to connect")?;
 
-    let (gatt_proxy, gatt_server) = endpoints::create_proxy::<ClientMarker>()
-        .context("Failed to create GATT Client endpoints")?;
+    let (gatt_proxy, gatt_server) = endpoints::create_proxy::<ClientMarker>();
     conn_proxy.request_gatt_client(gatt_server).context("GATT client request failed")?;
 
     let mut conn_closed_fut = conn_proxy.on_closed().fuse();

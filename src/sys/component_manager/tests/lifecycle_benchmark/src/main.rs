@@ -130,7 +130,7 @@ impl ElfComponentLaunchTest {
         mode: SetupMode,
     ) -> fcomponent::ControllerProxy {
         let (controller, controller_server) =
-            endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            endpoints::create_proxy::<fcomponent::ControllerMarker>();
         let collection_ref = fdecl::CollectionRef { name: "coll".into() };
         let id: u64 = rand::thread_rng().gen();
         let child_name = format!("auto-{:x}", id);
@@ -154,7 +154,7 @@ impl ElfComponentLaunchTest {
             SetupMode::Resolved => {
                 let child =
                     fdecl::ChildRef { name: child_name.into(), collection: Some("coll".into()) };
-                let (_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                let (_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
                 realm
                     .open_exposed_dir(&child, server)
                     .await

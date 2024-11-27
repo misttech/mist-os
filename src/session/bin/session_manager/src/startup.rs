@@ -224,8 +224,7 @@ async fn set_session(
             err,
         })?;
 
-    let (controller, controller_server_end) =
-        create_proxy::<fcomponent::ControllerMarker>().expect("creating proxy should not fail");
+    let (controller, controller_server_end) = create_proxy::<fcomponent::ControllerMarker>();
     let create_child_args = fcomponent::CreateChildArgs {
         controller: Some(controller_server_end),
         dictionary: create_config_dict(config_capabilities).await.map_err(|err| {
@@ -269,8 +268,7 @@ async fn set_session(
 
     // Start the component.
     let (execution_controller, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>()
-            .expect("creating proxy should not fail");
+        create_proxy::<fcomponent::ExecutionControllerMarker>();
     controller
         .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
         .await

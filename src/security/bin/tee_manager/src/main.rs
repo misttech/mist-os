@@ -282,8 +282,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn tee_device_closed() {
         let (dev_connector_proxy, dev_connector_server) =
-            fidl::endpoints::create_proxy::<DeviceConnectorMarker>()
-                .expect("Unable to create DeviceConnectorProxy");
+            fidl::endpoints::create_proxy::<DeviceConnectorMarker>();
         let (_sender, receiver) = mpsc::channel::<IncomingRequest>(1);
 
         dev_connector_server

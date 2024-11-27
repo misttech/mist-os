@@ -411,8 +411,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_target() {
         let scope = ExecutionScope::new();
-        let (client_end, server_end) =
-            create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
 
         scope.spawn(
             Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
@@ -430,8 +429,7 @@ mod tests {
         let scope = ExecutionScope::new();
 
         let check = |mut flags: fio::OpenFlags| {
-            let (client_end, server_end) =
-                create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+            let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
             flags |= fio::OpenFlags::DESCRIBE;
             flags.to_object_request(server_end).handle(|object_request| {
                 object_request.spawn_connection(
@@ -482,8 +480,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_attr() {
         let scope = ExecutionScope::new();
-        let (client_end, server_end) =
-            create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
 
         scope.spawn(
             Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
@@ -511,7 +508,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_clone2() {
         let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
         scope.spawn(
             Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
                 .run(fio::Flags::PERM_GET_ATTRIBUTES.to_object_request(server_end)),
@@ -522,7 +519,7 @@ mod tests {
             .expect("fidl failed")
             .unwrap();
         // Clone the original connection and query it's attributes, which should match the original.
-        let (cloned_client, cloned_server) = create_proxy::<fio::SymlinkMarker>().unwrap();
+        let (cloned_client, cloned_server) = create_proxy::<fio::SymlinkMarker>();
         client_end.clone2(ServerEnd::new(cloned_server.into_channel())).unwrap();
         let cloned_attrs = cloned_client
             .get_attributes(fio::NodeAttributesQuery::all())
@@ -535,8 +532,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_describe() {
         let scope = ExecutionScope::new();
-        let (client_end, server_end) =
-            create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
 
         scope.spawn(
             Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
@@ -555,8 +551,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_xattrs() {
         let scope = ExecutionScope::new();
-        let (client_end, server_end) =
-            create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
 
         scope.spawn(
             Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
@@ -577,7 +572,7 @@ mod tests {
             fio::ExtendedAttributeValue::Bytes(b"bar".to_vec()),
         );
         let (iterator_client_end, iterator_server_end) =
-            create_proxy::<fio::ExtendedAttributeIteratorMarker>().unwrap();
+            create_proxy::<fio::ExtendedAttributeIteratorMarker>();
         client_end.list_extended_attributes(iterator_server_end).unwrap();
         assert_eq!(
             iterator_client_end.get_next().await.unwrap().unwrap(),

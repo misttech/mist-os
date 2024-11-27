@@ -570,16 +570,14 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
         return Err(anyhow!(zx_status::Status::NOT_CONNECTED));
     }
 
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     guest_manager
         .connect(guest_server_end)
         .await
         .map_err(|err| anyhow!("failed to get a connect response: {}", err))?
         .map_err(|err| anyhow!("connect failed with: {:?}", err))?;
 
-    let (vsock_endpoint, vsock_server_end) = create_proxy::<HostVsockEndpointMarker>()
-        .map_err(|err| anyhow!("failed to create vsock proxy: {}", err))?;
+    let (vsock_endpoint, vsock_server_end) = create_proxy::<HostVsockEndpointMarker>();
     guest_endpoint
         .get_host_vsock_endpoint(vsock_server_end)
         .await?

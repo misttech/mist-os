@@ -39,8 +39,7 @@ async fn get_admin_unknown<N: Netstack>(name: &str) {
 
     // Request unknown NIC ID, expect request channel to be closed.
     let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     let () = root_interfaces.get_admin(id + 1, server_end).expect("get admin failed");
 
     let events = admin_control.take_event_stream().try_collect::<Vec<_>>().await;
@@ -59,8 +58,7 @@ async fn get_admin_loopback<N: Netstack>(name: &str) {
         realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     let id = get_loopback_id(&realm).await;
     root_interfaces.get_admin(id, server_end).expect("get admin failed");
 
@@ -82,8 +80,7 @@ async fn get_admin_netemul_endpoint<N: Netstack>(name: &str) {
         .await
         .expect("add to stack");
     let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
 
     root_interfaces.get_admin(id, server_end).expect("get admin failed");
 
@@ -196,12 +193,12 @@ async fn get_port<N: Netstack>(name: &str) {
         .expect("add to stack");
 
     {
-        let (port, server_end) = fidl::endpoints::create_proxy().expect("create_proxy");
+        let (port, server_end) = fidl::endpoints::create_proxy();
         debug_interfaces.get_port(id, server_end).expect("calling get_port");
         assert_matches!(port.get_info().await, Ok(fhardware_network::PortInfo { .. }));
     }
     {
-        let (port, server_end) = fidl::endpoints::create_proxy().expect("create_proxy");
+        let (port, server_end) = fidl::endpoints::create_proxy();
         // Try some bogus identifier.
         debug_interfaces.get_port(id + 100, server_end).expect("calling get_port");
         assert_matches!(

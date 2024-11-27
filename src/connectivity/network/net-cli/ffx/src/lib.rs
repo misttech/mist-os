@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context as _;
 use fho::{user_error, FfxMain, FfxTool, MachineWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use {
@@ -39,8 +38,7 @@ impl FfxConnector<'_> {
             moniker = moniker.replace("\\:", ":");
             moniker = format!("/{moniker}");
         }
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-            .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
         remote_control
             .deprecated_open_capability(
                 &moniker,

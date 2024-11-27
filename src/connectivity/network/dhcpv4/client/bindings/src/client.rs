@@ -282,10 +282,8 @@ impl Client {
             )
             .get();
 
-        let (asp_proxy, asp_server_end) = endpoints::create_proxy::<
-            fnet_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .expect("should never get FIDL error while creating AddressStateProvider endpoints");
+        let (asp_proxy, asp_server_end) =
+            endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
 
         let previous_lease = current_lease.replace(Lease {
             event_stream: asp_proxy.take_event_stream(),

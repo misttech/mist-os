@@ -193,14 +193,11 @@ impl EnabledTransmitSuspensionHandler {
         };
 
         let (mut current_level_proxy, current_level_server_end) =
-            fidl::endpoints::create_proxy::<fpower_broker::CurrentLevelMarker>()
-                .expect("create FIDL proxy");
+            fidl::endpoints::create_proxy::<fpower_broker::CurrentLevelMarker>();
         let (required_level, required_level_server_end) =
-            fidl::endpoints::create_proxy::<fpower_broker::RequiredLevelMarker>()
-                .expect("create FIDL proxy");
+            fidl::endpoints::create_proxy::<fpower_broker::RequiredLevelMarker>();
         let (lessor, lessor_server_end) =
-            fidl::endpoints::create_proxy::<fpower_broker::LessorMarker>()
-                .expect("create FIDL proxy");
+            fidl::endpoints::create_proxy::<fpower_broker::LessorMarker>();
         let (element_control, element_control_server_end) =
             fidl::endpoints::create_endpoints::<fpower_broker::ElementControlMarker>();
 

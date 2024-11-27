@@ -137,8 +137,7 @@ impl RunningSuite {
             .map_err(|e| LaunchTestError::CreateTestFidl(e))?
             .map_err(|e| LaunchTestError::CreateTest(e))?;
 
-        let (exposed_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let child_ref = fdecl::ChildRef {
             name: TEST_ROOT_REALM_NAME.into(),
             collection: Some(TEST_ROOT_COLLECTION.into()),
@@ -393,7 +392,7 @@ impl RunningSuite {
         let artifact_storage_admin = self.connect_to_storage_admin()?;
 
         let root_moniker = "./";
-        let (iterator, iter_server) = create_proxy::<fsys::StorageIteratorMarker>()?;
+        let (iterator, iter_server) = create_proxy::<fsys::StorageIteratorMarker>();
         artifact_storage_admin
             .list_storage_in_realm(&root_moniker, iter_server)
             .await?
@@ -554,8 +553,7 @@ pub(crate) async fn enumerate_test_cases(
     matcher: Option<&CaseMatcher>,
 ) -> Result<Vec<Invocation>, anyhow::Error> {
     debug!("enumerating tests");
-    let (case_iterator, server_end) =
-        fidl::endpoints::create_proxy().expect("cannot create case iterator");
+    let (case_iterator, server_end) = fidl::endpoints::create_proxy();
     suite.get_tests(server_end).map_err(enumeration_error)?;
     let mut invocations = vec![];
 

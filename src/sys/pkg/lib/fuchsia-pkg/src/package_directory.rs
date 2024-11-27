@@ -92,7 +92,7 @@ impl PackageDirectory {
     /// Creates a new channel pair, returning the client end as Self and the
     /// server end as a channel.
     pub fn create_request() -> Result<(Self, ServerEnd<fio::DirectoryMarker>), fidl::Error> {
-        let (proxy, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+        let (proxy, request) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         Ok((Self::from_proxy(proxy), request))
     }
 
@@ -196,7 +196,7 @@ mod tests {
     async fn reopen_is_new_connection() {
         let pkg = PackageDirectory::open_from_namespace().unwrap();
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         assert_matches!(pkg.reopen(server_end), Ok(()));
         assert_matches!(PackageDirectory::from_proxy(proxy).close().await, Ok(()));
 

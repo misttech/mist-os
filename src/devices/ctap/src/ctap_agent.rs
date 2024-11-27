@@ -307,7 +307,7 @@ mod tests {
         // Create a watcher on the pseudo directory.
         let pseudo_dir_clone = dir.clone();
         let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
         dir.open(
@@ -321,8 +321,7 @@ mod tests {
 
         // Get a proxy to the pseudo directory for the ctap agent. The ctap agent may use this
         // proxy to get connections to ctaphid devices.
-        let (dir_proxy_for_agent, dir_server_for_agent) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy_for_agent, dir_server_for_agent) = create_proxy::<fio::DirectoryMarker>();
         let server_end_for_agent = dir_server_for_agent.into_channel().into();
         let scope_for_agent = ExecutionScope::new();
         pseudo_dir_clone.open(

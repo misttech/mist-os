@@ -387,7 +387,7 @@ impl GuestManager {
     async fn host_network_state() -> Result<HostNetworkState, Error> {
         // Connect to interface watcher.
         let state_proxy = connect_to_protocol::<ninterfaces::StateMarker>()?;
-        let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>()?;
+        let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>();
         state_proxy.get_watcher(&ninterfaces::WatcherOptions::default(), watcher_server)?;
 
         // Collect interface state events until Idle is received, indicating the end of current

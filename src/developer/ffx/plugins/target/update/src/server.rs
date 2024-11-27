@@ -167,8 +167,7 @@ pub(crate) async fn unregister_pb_repo_server(
     retry = true;
 
     loop {
-        let (repo_iterator, repo_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
         match repo_manager_proxy.list(repo_iterator_server) {
             Ok(_) => {
                 loop {
@@ -222,8 +221,7 @@ async fn is_server_registered(
 ) -> Result<bool> {
     let repo_manager_proxy = get_repo_manager_proxy(rcs_proxy_connector, time_to_wait).await?;
 
-    let (repo_iterator, repo_iterator_server) =
-        fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+    let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
     repo_manager_proxy.list(repo_iterator_server).map_err(|e| bug!(e))?;
     loop {
         let repos = repo_iterator.next().await.map_err(|e| bug!(e))?;
@@ -341,8 +339,7 @@ async fn get_rewrite_proxy(
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
 
     let (rewrite_proxy, rewrite_server) =
-        fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>()
-            .map_err(|e| bug!(e))?;
+        fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>();
     rcs_proxy
         .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
@@ -369,8 +366,7 @@ async fn get_repo_manager_proxy(
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
     let (repo_manager_proxy, repo_manager_server) = fidl::endpoints::create_proxy::<
         <RepositoryManagerProxy as fidl::endpoints::Proxy>::Protocol,
-    >()
-    .map_err(|e| bug!(e))?;
+    >();
     rcs_proxy
         .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,

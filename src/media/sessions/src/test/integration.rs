@@ -610,7 +610,7 @@ async fn player_status() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching player status");
     let actual_player_status = status.player_status.expect("Unwrapping player status");
@@ -638,7 +638,7 @@ async fn player_capabilities() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching player capabilities");
     let actual_player_capabilities =
@@ -685,7 +685,7 @@ async fn media_images() -> Result<()> {
         })
         .await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.discovery.connect_to_session(player.id, session_request)?;
     let status = session.watch_status().await.expect("Watching media images");
     let actual_media_images = status.media_images.expect("Unwrapping media images");
@@ -715,7 +715,7 @@ async fn session_controllers_can_watch_session_status() -> Result<()> {
     let mut player1 = TestPlayer::new(&service).await?;
     let mut player2 = TestPlayer::new(&service).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
@@ -749,7 +749,7 @@ async fn session_observers_can_watch_session_status() -> Result<()> {
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     service.observer_discovery.connect_to_session(player1.id, session1_request)?;
     let status1 = session1.watch_status().await.context("Watching session status (1st time)")?;
     assert_matches!(
@@ -779,7 +779,7 @@ async fn player_disconnection_disconects_observers() -> Result<()> {
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session, session_request) = create_proxy()?;
+    let (session, session_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session_request)?;
     assert!(session.watch_status().await.is_ok());
 
@@ -801,7 +801,7 @@ async fn observers_caught_up_with_state_of_session() -> Result<()> {
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
 
-    let (session1, session1_request) = create_proxy()?;
+    let (session1, session1_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session1_request)?;
     let status1 = session1.watch_status().await.context("Watching session status (1st time)")?;
     assert_matches!(
@@ -809,7 +809,7 @@ async fn observers_caught_up_with_state_of_session() -> Result<()> {
         Some(PlayerStatus { player_state: Some(PlayerState::Playing), .. })
     );
 
-    let (session2, session2_request) = create_proxy()?;
+    let (session2, session2_request) = create_proxy();
     service.observer_discovery.connect_to_session(player.id, session2_request)?;
     let status2 = session2.watch_status().await.context("Watching session status (2nd time)")?;
     assert_matches!(
@@ -921,7 +921,7 @@ async fn player_paused_before_interruption_is_not_resumed_by_its_end() -> Result
 async fn player_paused_during_interruption_is_not_resumed_by_its_end() -> Result<()> {
     let mut service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
-    let (session, session_server) = create_proxy()?;
+    let (session, session_server) = create_proxy();
     service.discovery.connect_to_session(player.id, session_server)?;
 
     player

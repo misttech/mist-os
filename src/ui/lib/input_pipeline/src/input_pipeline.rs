@@ -988,7 +988,7 @@ mod tests {
         // Create a Watcher on the pseudo directory.
         let pseudo_dir_clone = dir.clone();
         let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
         dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
@@ -997,7 +997,7 @@ mod tests {
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
         let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
@@ -1111,7 +1111,7 @@ mod tests {
         // Create a Watcher on the pseudo directory.
         let pseudo_dir_clone = dir.clone();
         let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
         let scope_for_watcher = ExecutionScope::new();
         dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
@@ -1120,7 +1120,7 @@ mod tests {
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
         let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
+            create_proxy::<fio::DirectoryMarker>();
         let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(

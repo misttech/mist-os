@@ -249,8 +249,7 @@ impl ClientProviderExt for fnet_dhcp::ClientProviderProxy {
         interface_id: NonZeroU64,
         new_client_params: fnet_dhcp::NewClientParams,
     ) -> fnet_dhcp::ClientProxy {
-        let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>()
-            .expect("create DHCPv4 client fidl endpoints");
+        let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>();
         self.new_client(interface_id.get(), &new_client_params, server)
             .expect("create new DHCPv4 client");
         client

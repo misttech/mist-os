@@ -616,8 +616,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     }
 
     async fn connect_to_manager(&self) -> Result<Manager> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>()
-            .context("failed to create proxy for fuchsia.fuzzer.Manager")?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>();
         let result = self
             .remote_control
             .deprecated_open_capability(
@@ -694,7 +693,7 @@ mod test_fixtures {
                 .create_tests_json(urls.iter())
                 .context("failed to write URLs for shell script")?;
             let tests_json = Some(tests_json.to_string_lossy().to_string());
-            let (proxy, server_end) = create_proxy::<rcs::RemoteControlMarker>()?;
+            let (proxy, server_end) = create_proxy::<rcs::RemoteControlMarker>();
             let rcs_task = create_task(serve_rcs(server_end, test.clone()), test.writer());
             let reader = ScriptReader::new();
             let shell = Shell::new(tests_json, proxy, reader, test.writer());

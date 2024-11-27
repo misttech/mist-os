@@ -13,7 +13,7 @@ pub async fn handle_revert() -> Result<(), Error> {
     let admin = connect_to_protocol::<AdminMarker>().context("while connecting to admin")?;
 
     let paver = connect_to_protocol::<PaverMarker>().context("while connecting to paver")?;
-    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>();
     let () = paver.find_boot_manager(server_end).context("while connecting to boot manager")?;
 
     println!("Reverting the update.");

@@ -13,7 +13,7 @@ use futures::prelude::*;
 use futures::TryStreamExt;
 use std::sync::{Arc, Weak};
 use test_runners_lib::cases::TestCaseInfo;
-use test_runners_lib::elf::{Component, EnumeratedTestCases, FidlError, KernelError, SuiteServer};
+use test_runners_lib::elf::{Component, EnumeratedTestCases, KernelError, SuiteServer};
 use test_runners_lib::errors::*;
 use test_runners_lib::logs::SocketLogWriter;
 use tracing::{debug, error};
@@ -117,9 +117,7 @@ where
         let (test_stdout, stdout_client) = zx::Socket::create_stream();
         let (test_stderr, stderr_client) = zx::Socket::create_stream();
         let (case_listener_proxy, listener) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
-                .map_err(FidlError::CreateProxy)
-                .unwrap();
+            fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>();
         run_listener
             .on_test_case_started(
                 &invocation,

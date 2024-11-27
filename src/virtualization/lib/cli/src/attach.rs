@@ -38,8 +38,7 @@ pub async fn handle_attach<P: PlatformServices>(
         return Ok(AttachResult::NotRunning);
     }
 
-    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>()
-        .map_err(|err| anyhow!("failed to create guest proxy: {}", err))?;
+    let (guest_endpoint, guest_server_end) = create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await

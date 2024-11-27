@@ -46,8 +46,8 @@ async fn get_single_package_with_no_content_blobs(env: TestEnv) {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -148,9 +148,9 @@ async fn get_and_hold_directory() {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*package.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
 
-    let (dir_2, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir_2, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     // Request same package again.
     let get_fut = env
         .proxies
@@ -185,8 +185,8 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -286,9 +286,9 @@ async fn get_package_already_present_on_fs() {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
 
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     // Call `PackageCache.Get()` for already cached package.
     let get_fut = env
@@ -333,9 +333,8 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (pkgdir, pkgdir_server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (pkgdir, pkgdir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     drop(needed_blobs);
 
@@ -579,8 +578,8 @@ async fn get_with_specific_blobfs_implementation(
         .unwrap();
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let get_fut = env
         .proxies
@@ -669,14 +668,14 @@ async fn get_with_retained_protection_refetches_blobs() {
     // is in the cache packages manifest which short-circuits the fetch, so the deleted content
     // blob should still be missing.
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
         .get(
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
-            fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap().1,
+            fidl::endpoints::create_proxy::<NeededBlobsMarker>().1,
             dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
@@ -691,8 +690,8 @@ async fn get_with_retained_protection_refetches_blobs() {
     // check all the blobs.
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache
@@ -727,7 +726,7 @@ async fn get_subpackage_fails_if_superpackage_closed() {
         .await;
     let () = env.block_until_started().await;
 
-    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     assert_matches!(
         env.proxies
             .package_cache
@@ -767,7 +766,7 @@ async fn get_uses_open_packages_to_short_circuit() {
         // A second Get while the package is still open will not require writing any blobs, even
         // though the content blob is missing, because of the short-circuit.
         let (needed_blobs, needed_blobs_server_end) =
-            fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+            fidl::endpoints::create_proxy::<NeededBlobsMarker>();
         let _get_fut = env
             .proxies
             .package_cache
@@ -793,7 +792,7 @@ async fn get_uses_open_packages_to_short_circuit() {
     // With the package out of the open package cache, the short-circuit logic should no longer
     // trigger and pkg-cache should ask for the content blob we deleted.
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>();
     let _get_fut = env
         .proxies
         .package_cache

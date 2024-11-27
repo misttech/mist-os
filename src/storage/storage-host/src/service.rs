@@ -386,7 +386,7 @@ mod tests {
         let server = Arc::new(FakeServer::from_vmo(512, vmo));
         {
             let (block_client, block_server) =
-                fidl::endpoints::create_proxy::<fblock::BlockMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fblock::BlockMarker>();
             let volume_stream = fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(
                 block_server.into_channel(),
             )
@@ -402,9 +402,9 @@ mod tests {
     #[fuchsia::test]
     async fn lifecycle() {
         let (outgoing_dir, outgoing_dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let (lifecycle_client, lifecycle_server) =
-            fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LifecycleMarker>();
         let (block_client, block_server) =
             fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
         let volume_stream =
@@ -474,9 +474,9 @@ mod tests {
     #[fuchsia::test]
     async fn transaction_lifecycle() {
         let (outgoing_dir, outgoing_dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let (lifecycle_client, lifecycle_server) =
-            fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LifecycleMarker>();
         let (block_client, block_server) =
             fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
         let volume_stream =

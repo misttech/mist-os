@@ -64,8 +64,7 @@ struct PendingSession {
 
 impl PendingSession {
     fn new() -> (fio::DirectoryProxy, Self) {
-        let (exposed_dir, exposed_dir_server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("creating proxy should not fail");
+        let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>();
         (exposed_dir, Self { exposed_dir_server_end })
     }
 }
@@ -997,7 +996,7 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
         // Start the session.
@@ -1066,7 +1065,7 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
 

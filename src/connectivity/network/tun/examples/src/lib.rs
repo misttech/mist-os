@@ -110,13 +110,11 @@ async fn tap_like_over_network_tun() {
 
     // Request device creation.
     let (tun_device, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>()
-            .expect("failed to create device endpoints");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>();
     let () = tun.create_device(&device_config, server_end).expect("failed to create device");
     // Add a port.
     let (tun_port, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
-            .expect("failed to create port endpoints");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>();
     let () = tun_device.add_port(&port_config, server_end).expect("failed to add port");
 
     // Install the interface in the stack.
@@ -231,13 +229,11 @@ async fn tun_like_over_network_tun() {
 
     // Request device creation.
     let (tun_device, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>()
-            .expect("failed to create device endpoints");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::DeviceMarker>();
     let () = tun.create_device(&device_config, server_end).expect("failed to create device");
     // Add a port.
     let (tun_port, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>()
-            .expect("failed to create port endpoints");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_tun::PortMarker>();
     let () = tun_device.add_port(&port_config, server_end).expect("failed to add port");
 
     // Install the interface in the stack.
@@ -532,11 +528,9 @@ mod helpers {
         // Get the information Installer needs to install the device.
         let (network_device, port_id) = {
             let (network_device, netdevice_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()
-                    .expect("failed to create netdevice proxy");
+                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>();
             let (port, port_server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                    .expect("failed to create port proxy");
+                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>();
 
             let () = tun_device.get_device(netdevice_server_end).expect("get_device failed");
             let () = tun_port.get_port(port_server_end).expect("get_port failed");
@@ -557,8 +551,7 @@ mod helpers {
         let device_control = {
             let (control, server_end) = fidl::endpoints::create_proxy::<
                 fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
-            >()
-            .expect("create proxy");
+            >();
             let () = installer
                 .install_device(network_device, server_end)
                 .expect("install_device failed");
@@ -594,8 +587,7 @@ mod helpers {
     ) {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-        >()
-        .expect("create proxy");
+        >();
         // AddressStateProvider allows us to tie the lifetime of the address to
         // this proxy, opt out by detaching.
         let () = address_state_provider.detach().expect("detach failed");

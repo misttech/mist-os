@@ -555,16 +555,14 @@ mod tests {
     struct StubEnvironmentConnector;
     impl EnvironmentConnector for StubEnvironmentConnector {
         fn connect() -> Result<Environment, anyhow::Error> {
-            let (data_sink, _) = fidl::endpoints::create_proxy::<DataSinkMarker>().unwrap();
-            let (boot_manager, _) = fidl::endpoints::create_proxy::<BootManagerMarker>().unwrap();
-            let (pkg_resolver, _) =
-                fidl::endpoints::create_proxy::<PackageResolverMarker>().unwrap();
-            let (pkg_cache, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>().unwrap();
-            let (retained_packages, _) =
-                fidl::endpoints::create_proxy::<RetainedPackagesMarker>().unwrap();
-            let (space_manager, _) = fidl::endpoints::create_proxy::<SpaceManagerMarker>().unwrap();
+            let (data_sink, _) = fidl::endpoints::create_proxy::<DataSinkMarker>();
+            let (boot_manager, _) = fidl::endpoints::create_proxy::<BootManagerMarker>();
+            let (pkg_resolver, _) = fidl::endpoints::create_proxy::<PackageResolverMarker>();
+            let (pkg_cache, _) = fidl::endpoints::create_proxy::<PackageCacheMarker>();
+            let (retained_packages, _) = fidl::endpoints::create_proxy::<RetainedPackagesMarker>();
+            let (space_manager, _) = fidl::endpoints::create_proxy::<SpaceManagerMarker>();
             let (power_state_control, _) =
-                fidl::endpoints::create_proxy::<PowerStateControlMarker>().unwrap();
+                fidl::endpoints::create_proxy::<PowerStateControlMarker>();
 
             Ok(Environment {
                 data_sink,

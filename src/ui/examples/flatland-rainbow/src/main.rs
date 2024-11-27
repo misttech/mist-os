@@ -164,14 +164,10 @@ impl<'a> AppModel<'a> {
         view_identity: fviews::ViewIdentityOnCreation,
     ) {
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<fland::ParentViewportWatcherMarker>()
-                .expect("failed to create ParentViewportWatcherProxy");
-        let (focused, focused_request) = create_proxy::<fviews::ViewRefFocusedMarker>()
-            .expect("failed to create ViewRefFocusedProxy");
-        let (touch, touch_request) =
-            create_proxy::<fptr::TouchSourceMarker>().expect("failed to create TouchSource");
-        let (mouse, mouse_request) =
-            create_proxy::<fptr::MouseSourceMarker>().expect("failed to create MouseSource");
+            create_proxy::<fland::ParentViewportWatcherMarker>();
+        let (focused, focused_request) = create_proxy::<fviews::ViewRefFocusedMarker>();
+        let (touch, touch_request) = create_proxy::<fptr::TouchSourceMarker>();
+        let (mouse, mouse_request) = create_proxy::<fptr::MouseSourceMarker>();
 
         let view_bound_protocols = fland::ViewBoundProtocols {
             view_ref_focused: Some(focused_request),

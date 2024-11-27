@@ -50,14 +50,14 @@ impl Stash {
         let stash_svc = fuchsia_component::client::connect_to_protocol::<Store2Marker>()?;
         stash_svc.identify(identity)?;
 
-        let (proxy, server_end) = create_proxy::<StoreAccessorMarker>()?;
+        let (proxy, server_end) = create_proxy::<StoreAccessorMarker>();
         stash_svc.create_accessor(false, server_end)?;
         Ok(proxy)
     }
 
     #[cfg(test)]
     fn new_mock() -> (Self, fidl_fuchsia_stash::StoreAccessorRequestStream) {
-        let (proxy, server_end) = create_proxy::<StoreAccessorMarker>().unwrap();
+        let (proxy, server_end) = create_proxy::<StoreAccessorMarker>();
         (Stash { proxy: Some(proxy) }, server_end.into_stream())
     }
 

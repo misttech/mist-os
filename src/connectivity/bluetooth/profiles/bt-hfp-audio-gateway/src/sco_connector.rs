@@ -171,7 +171,7 @@ impl ScoConnector {
         params: Vec<bredr::ScoConnectionParameters>,
     ) -> Result<ScoConnection, ScoConnectError> {
         let (connection_proxy, server) =
-            fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>()?;
+            fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>();
         profile_proxy.connect_sco(bredr::ProfileConnectScoRequest {
             peer_id: Some(peer_id.into()),
             initiator: Some(role == ScoInitiatorRole::Initiate),

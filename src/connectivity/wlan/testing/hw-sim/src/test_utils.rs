@@ -49,7 +49,7 @@ use {
 //
 // // Connect to dev/class/network in the test realm
 // let (directory, directory_server) =
-//      create_proxy::<fidl_fuchsia_io::DirectoryMarker>()?;
+//      create_proxy::<fidl_fuchsia_io::DirectoryMarker>();
 //  fdio::service_connect_at(
 //     ctx.devfs().as_channel().as_ref(),
 //     "class/network",
@@ -74,7 +74,7 @@ impl TestRealmContext {
             .expect("Could not connect to realm factory protocol");
 
         let (dict_client, dict_server) = create_endpoints();
-        let (devfs_proxy, devfs_server) = create_proxy().expect("Could not create devfs proxy");
+        let (devfs_proxy, devfs_server) = create_proxy();
 
         // Create the test realm for this test. This returns a
         // `fuchsia.component.sandbox/Dictionary`, which is then consumed by `extend_namespace`
@@ -375,8 +375,7 @@ impl Drop for TestHelper {
         // Create a placeholder proxy to swap into place of self.proxy. This allows this
         // function to create a synchronous proxy from the real proxy.
         let (placeholder_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<wlantap::WlantapPhyMarker>()
-                .expect("failed to create placeholder WlantapPhyProxy");
+            fidl::endpoints::create_proxy::<wlantap::WlantapPhyMarker>();
         let mut proxy = Arc::new(placeholder_proxy);
         std::mem::swap(&mut self.proxy, &mut proxy);
 
@@ -545,7 +544,7 @@ pub async fn policy_scan_for_networks<'a>(
     client_controller: fidl_policy::ClientControllerProxy,
 ) -> Vec<fidl_policy::ScanResult> {
     // Request a scan from the policy layer.
-    let (scan_proxy, server_end) = create_proxy().unwrap();
+    let (scan_proxy, server_end) = create_proxy();
     client_controller.scan_for_networks(server_end).expect("requesting scan");
     let mut scan_result_list = Vec::new();
     loop {

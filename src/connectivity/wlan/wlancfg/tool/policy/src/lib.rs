@@ -260,8 +260,7 @@ pub async fn handle_connect(
 pub async fn handle_get_saved_networks(
     client_controller: &wlan_policy::ClientControllerProxy,
 ) -> Result<Vec<wlan_policy::NetworkConfig>, Error> {
-    let (client_proxy, server_end) =
-        create_proxy::<wlan_policy::NetworkConfigIteratorMarker>().unwrap();
+    let (client_proxy, server_end) = create_proxy::<wlan_policy::NetworkConfigIteratorMarker>();
     let fut = async { client_controller.get_saved_networks(server_end) };
     run_proxy_command(Box::pin(fut)).await?;
 
@@ -518,8 +517,7 @@ async fn save_network(
 pub async fn handle_scan(
     client_controller: wlan_policy::ClientControllerProxy,
 ) -> Result<Vec<wlan_policy::ScanResult>, Error> {
-    let (client_proxy, server_end) =
-        create_proxy::<wlan_policy::ScanResultIteratorMarker>().unwrap();
+    let (client_proxy, server_end) = create_proxy::<wlan_policy::ScanResultIteratorMarker>();
     let fut = async { client_controller.scan_for_networks(server_end) };
     run_proxy_command(Box::pin(fut)).await?;
 

@@ -37,7 +37,7 @@ impl Control {
         };
 
         let res = (|| {
-            let (suspender_proxy, server_end) = fidl::endpoints::create_proxy()?;
+            let (suspender_proxy, server_end) = fidl::endpoints::create_proxy();
             let id = peer_id.map(Into::into);
             Ok((suspender_proxy, proxy.suspend(id.as_ref(), server_end)))
         })();

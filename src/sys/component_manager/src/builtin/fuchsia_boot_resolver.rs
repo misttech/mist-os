@@ -115,7 +115,7 @@ impl FuchsiaBootResolver {
         let canonicalized_package_path = fuchsia_fs::canonicalize_path(boot_url.path());
         match &self.boot_package_resolver {
             Some(boot_package_resolver) => {
-                let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let (proxy, server) = fidl::endpoints::create_proxy();
                 let () = boot_package_resolver
                     .resolve_name(
                         fuchsia_url::PackageName::from_str(canonicalized_package_path).map_err(
@@ -526,7 +526,7 @@ mod tests {
 
     fn serve_vfs_dir(root: Arc<impl Directory>) -> (Task<()>, fio::DirectoryProxy) {
         let fs_scope = ExecutionScope::new();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,

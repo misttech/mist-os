@@ -82,7 +82,7 @@ pub struct HostDebugIdentifiers {
 impl HostDevice {
     pub fn new(device_path: String, proxy: HostProxy, info: Inspectable<HostInfo>) -> Self {
         let (bonding_delegate_proxy, server) =
-            fidl::endpoints::create_proxy::<BondingDelegateMarker>().unwrap();
+            fidl::endpoints::create_proxy::<BondingDelegateMarker>();
         proxy.set_bonding_delegate(server).unwrap();
         HostDevice(Arc::new(HostDeviceState {
             device_path,
@@ -133,7 +133,7 @@ impl HostDevice {
     }
 
     pub fn start_discovery(&self) -> types::Result<DiscoverySessionProxy> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<DiscoverySessionMarker>().unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<DiscoverySessionMarker>();
         let result = self.0.proxy.start_discovery(HostStartDiscoveryRequest {
             token: Some(server),
             ..Default::default()
@@ -325,7 +325,7 @@ impl HostDevice {
         let proxy = self.0.proxy.clone();
         async move {
             let (peer_watcher_proxy, peer_watcher_server) =
-                fidl::endpoints::create_proxy::<PeerWatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<PeerWatcherMarker>();
             proxy.set_peer_watcher(peer_watcher_server)?;
             loop {
                 match peer_watcher_proxy.get_next().await {

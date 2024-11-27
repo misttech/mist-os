@@ -189,8 +189,7 @@ impl FlatlandScanout {
 
         // Create a view.
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
-            create_proxy::<ParentViewportWatcherMarker>()
-                .context("failed to create ParentViewportWatcherProxy")?;
+            create_proxy::<ParentViewportWatcherMarker>();
         let (view_token, viewport_token) = create_view_creation_tokens();
         let viewref_pair = ViewRefPair::new()?;
         let view_ref_for_presenter = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;

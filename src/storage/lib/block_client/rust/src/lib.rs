@@ -618,7 +618,7 @@ impl RemoteBlockClient {
     pub async fn new(remote: impl AsBlockProxy) -> Result<Self, zx::Status> {
         let info =
             remote.get_info().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
-        let (session, server) = fidl::endpoints::create_proxy().map_err(fidl_to_status)?;
+        let (session, server) = fidl::endpoints::create_proxy();
         let () = remote.open_session(server).map_err(fidl_to_status)?;
         let fifo =
             session.get_fifo().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
@@ -1342,7 +1342,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_trace_flow_ids_set() {
-        let (proxy, server) = fidl::endpoints::create_proxy().expect("create_proxy failed");
+        let (proxy, server) = fidl::endpoints::create_proxy();
 
         futures::join!(
             async {

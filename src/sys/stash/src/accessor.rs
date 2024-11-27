@@ -497,7 +497,7 @@ mod tests {
                         mut expected: Vec<String>| {
             async move {
                 let mut acc = Accessor::new(sm, true, false, "test_client".to_string());
-                let (list_iterator, server_end) = create_proxy().unwrap();
+                let (list_iterator, server_end) = create_proxy();
                 acc.list_prefix(prefix.to_string(), server_end).await;
 
                 let actual = drain_stash_iterator(|| list_iterator.get_next()).await;
@@ -562,7 +562,7 @@ mod tests {
                         mut expected: Vec<String>| {
             async move {
                 let mut acc = Accessor::new(sm, true, false, "test_client".to_string());
-                let (list_iterator, server_end) = create_proxy().unwrap();
+                let (list_iterator, server_end) = create_proxy();
                 acc.list_prefix(prefix.to_string(), server_end).await;
 
                 let actual = drain_stash_iterator(|| list_iterator.get_next()).await;
@@ -632,7 +632,7 @@ mod tests {
                         mut expected: Vec<(String, bool)>| {
             async move {
                 let mut acc = Accessor::new(sm, true, false, "test_client".to_string());
-                let (get_iterator, server_end) = create_proxy().unwrap();
+                let (get_iterator, server_end) = create_proxy();
                 acc.get_prefix(prefix.to_string(), server_end).await.unwrap();
 
                 let mut actual = Vec::new();
@@ -719,7 +719,7 @@ mod tests {
         assert_eq!(4, acc.fields_updated.lock().await.len());
         acc.commit().await.unwrap();
 
-        let (list_iterator, server_end) = create_proxy().unwrap();
+        let (list_iterator, server_end) = create_proxy();
         acc.list_prefix("".to_string(), server_end).await;
 
         let mut actual = Vec::new();
@@ -904,7 +904,7 @@ mod tests {
             acc.set_value(key.to_owned(), Value::Boolval(true)).await.unwrap();
         }
 
-        let (list_iterator, server_end) = create_proxy().unwrap();
+        let (list_iterator, server_end) = create_proxy();
         acc.list_prefix("".to_string(), server_end).await;
 
         let res = drain_stash_iterator(|| list_iterator.get_next()).await;
@@ -930,7 +930,7 @@ mod tests {
             acc.set_value(key.to_owned(), Value::Boolval(true)).await.unwrap();
         }
 
-        let (get_iterator, server_end) = create_proxy().unwrap();
+        let (get_iterator, server_end) = create_proxy();
         acc.get_prefix("".to_string(), server_end).await.unwrap();
 
         let res = drain_stash_iterator(|| get_iterator.get_next()).await;

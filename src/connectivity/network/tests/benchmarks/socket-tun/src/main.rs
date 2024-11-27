@@ -115,11 +115,9 @@ async fn setup<'a>(
     let (tun_or_network, left_port, right_port) = if capture_packets {
         let net = sandbox.create_network(DEBUG_NETWORK_NAME).await.expect("create network");
         let (left_port, left_port_server_end) =
-            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-                .expect("create left port proxy");
+            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
         let (right_port, right_port_server_end) =
-            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-                .expect("create right port proxy");
+            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
         let ep1 = net.create_endpoint("ep1").await.expect("failed to create endpoint");
         let ep2 = net.create_endpoint("ep2").await.expect("failed to create endpoint");
         ep1.get_port(left_port_server_end).expect("failed to get port for endpoint");
@@ -464,8 +462,7 @@ async fn main() {
         .expect("connect to tracing controller");
         let (tracing_socket, tracing_socket_write) = fidl::Socket::create_stream();
         let (trace_session, server) =
-            fidl::endpoints::create_proxy::<ftracing_controller::SessionMarker>()
-                .expect("Failed to create trace session proxy");
+            fidl::endpoints::create_proxy::<ftracing_controller::SessionMarker>();
         trace_provisioner
             .initialize_tracing(
                 server,

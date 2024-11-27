@@ -723,7 +723,7 @@ impl ServiceProxy {
     ///
     /// member comment #3
     pub fn connect_to_interface(&self) -> Result<InterfaceProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<InterfaceMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<InterfaceMarker>();
         self.connect_channel_to_interface(server_end)?;
         Ok(proxy)
     }

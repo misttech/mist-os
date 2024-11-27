@@ -876,8 +876,7 @@ pub fn event_stream_from_state<I: FieldInterests>(
     interface_state: &fnet_interfaces::StateProxy,
     included_addresses: IncludedAddresses,
 ) -> Result<impl Stream<Item = Result<EventWithInterest<I>, fidl::Error>>, WatcherCreationError> {
-    let (watcher, server) = ::fidl::endpoints::create_proxy::<fnet_interfaces::WatcherMarker>()
-        .map_err(WatcherCreationError::CreateProxy)?;
+    let (watcher, server) = ::fidl::endpoints::create_proxy::<fnet_interfaces::WatcherMarker>();
     let () = interface_state
         .get_watcher(
             &fnet_interfaces::WatcherOptions {

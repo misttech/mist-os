@@ -1326,7 +1326,7 @@ probably not intended: {}",
             // Built-in resolver are hosted by a LaunchTaskOnReceive, which returns a Connector
             // capability for new routes.
             RouterResponse::<Connector>::Capability(resolver_connector) => {
-                let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
+                let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>();
                 resolver_connector.send(Message { channel: server_end.into_channel() }).map_err(
                     |_| {
                         ResolverError::routing_error(RoutingError::BedrockFailedToSend {

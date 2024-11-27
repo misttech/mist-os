@@ -380,8 +380,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         interface_id: u64,
     ) -> fnet_interfaces_ext::admin::Control {
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create Control proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
         interfaces_proxy.get_admin(interface_id, server_end).expect("send get admin request");
         fnet_interfaces_ext::admin::Control::new(control)
     }
@@ -1633,15 +1632,15 @@ mod tests {
         route_clients.add_client(wrong_client);
 
         let (route_set_from_main_table_proxy, _route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_proxy, _route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (unmanaged_route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table = RouteTableMap::new(
             route_table_proxy.clone(),
@@ -1862,17 +1861,16 @@ mod tests {
         route_clients.add_client(wrong_client);
 
         let (main_route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_from_main_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_proxy, _route_table_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
-        let (route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table = RouteTableMap::new(
             main_route_table_proxy,
@@ -2161,8 +2159,7 @@ mod tests {
         let (interfaces_handler, _interfaces_handler_sink) = FakeInterfacesHandler::new();
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_proxy, interfaces) =
-            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>()
-                .expect("create proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>();
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -2194,15 +2191,12 @@ mod tests {
             base_inputs,
             |base_inputs| {
                 let (v4_routes_state, routes_state) =
-                    fidl::endpoints::create_proxy::<fnet_routes::StateV4Marker>()
-                        .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes::StateV4Marker>();
                 let (v4_main_route_table, routes_set_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>()
-                        .expect("create proxy should succeed");
-                let (v4_route_table_provider, route_table_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableProviderV4Marker>(
-                    )
-                    .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>();
+                let (v4_route_table_provider, route_table_provider) = fidl::endpoints::create_proxy::<
+                    fnet_routes_admin::RouteTableProviderV4Marker,
+                >();
                 let inputs = crate::eventloop::EventLoopInputs {
                     v4_routes_state: EventLoopComponent::Present(v4_routes_state),
                     v4_main_route_table: EventLoopComponent::Present(v4_main_route_table),
@@ -2215,15 +2209,12 @@ mod tests {
             },
             |base_inputs| {
                 let (v6_routes_state, routes_state) =
-                    fidl::endpoints::create_proxy::<fnet_routes::StateV6Marker>()
-                        .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes::StateV6Marker>();
                 let (v6_main_route_table, routes_set_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV6Marker>()
-                        .expect("create proxy should succeed");
-                let (v6_route_table_provider, route_table_provider) =
-                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableProviderV6Marker>(
-                    )
-                    .expect("create proxy should succeed");
+                    fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV6Marker>();
+                let (v6_route_table_provider, route_table_provider) = fidl::endpoints::create_proxy::<
+                    fnet_routes_admin::RouteTableProviderV6Marker,
+                >();
                 let inputs = crate::eventloop::EventLoopInputs {
                     v6_routes_state: EventLoopComponent::Present(v6_routes_state),
                     v6_main_route_table: EventLoopComponent::Present(v6_main_route_table),
@@ -4465,17 +4456,16 @@ mod tests {
         let _executor = fuchsia_async::TestExecutor::new();
 
         let (main_route_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
         let (own_route_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
-        let (route_set_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_set_from_main_table_proxy, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
-            fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
         let (route_table_provider, _server_end) =
-            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
 
         let mut route_table_map = RouteTableMap::<I>::new(
             main_route_table_proxy,

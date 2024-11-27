@@ -144,15 +144,8 @@ async fn start<D: DeviceOps + 'static>(
 
     // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
     //                         in *.cml files
-    let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
-        fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-    >() {
-        Ok(r) => r,
-        Err(e) => {
-            error!("Failed to create persistence proxy: {}", e);
-            return Err(zx::Status::INTERNAL);
-        }
-    };
+    let (persistence_proxy, _persistence_server_end) =
+        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>();
     let (persistence_req_sender, _persistence_req_forwarder_fut) =
         auto_persist::create_persistence_req_sender(persistence_proxy);
 
@@ -679,7 +672,7 @@ mod tests {
         let sent_legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
         let (generic_sme_proxy, generic_sme_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>();
         let inspect_vmo_fut =
             usme_bootstrap_proxy.start(generic_sme_server, &sent_legacy_privacy_support);
         let mut inspect_vmo_fut = pin!(inspect_vmo_fut);
@@ -782,7 +775,7 @@ mod tests {
         let legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
         let (generic_sme_proxy, generic_sme_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>();
         (generic_sme_proxy, usme_client_proxy.start(generic_sme_server, &legacy_privacy_support))
     }
 
@@ -939,7 +932,7 @@ mod tests {
     ) {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
-            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
         let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
@@ -961,7 +954,7 @@ mod tests {
     async fn serve_wlansoftmac_ifc_bridge_enqueues_notify_scan_complete() {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
-            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
         let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
@@ -999,8 +992,7 @@ mod tests {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
             let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
             let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
-                fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                    .unwrap();
+                fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
             let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
             let (complete_mlme_sender, complete_mlme_receiver) = oneshot::channel();
             let mlme = Box::pin(async { complete_mlme_receiver.await.unwrap() });
@@ -1030,7 +1022,7 @@ mod tests {
     async fn serve_wlansoftmac_ifc_bridge_enqueues_report_tx_result() {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
-            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
         let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
@@ -1429,10 +1421,8 @@ mod tests {
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
 
-        let (sme_telemetry_proxy, sme_telemetry_server) =
-            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        let (client_sme_proxy, client_sme_server) =
-            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
+        let (sme_telemetry_proxy, sme_telemetry_server) = fidl::endpoints::create_proxy();
+        let (client_sme_proxy, client_sme_server) = fidl::endpoints::create_proxy();
 
         let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
         let mut resp_fut = pin!(resp_fut);
@@ -1485,8 +1475,7 @@ mod tests {
             Poll::Ready(Ok(status)) => assert_eq!(zx::Status::OK.into_raw(), status)
         );
 
-        let (client_sme_proxy, client_sme_server) =
-            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
+        let (client_sme_proxy, client_sme_server) = fidl::endpoints::create_proxy();
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
         let mut resp_fut = pin!(resp_fut);

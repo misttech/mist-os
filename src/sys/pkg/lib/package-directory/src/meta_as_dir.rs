@@ -266,8 +266,7 @@ mod tests {
             fio::OpenFlags::TRUNCATE,
             fio::OpenFlags::APPEND,
         ] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             meta_as_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
@@ -286,7 +285,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_self() {
         let (_env, meta_as_dir) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         meta_as_dir.open(
             ExecutionScope::new(),
@@ -311,7 +310,7 @@ mod tests {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
         for path in ["dir/file", "dir/file/"] {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
             meta_as_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
@@ -328,8 +327,7 @@ mod tests {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
         for path in ["dir", "dir/"] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             meta_as_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
@@ -411,7 +409,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open3_self() {
         let (_env, meta_as_dir) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags = fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -433,7 +431,7 @@ mod tests {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
         for path in ["dir/file", "dir/file/"] {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -449,8 +447,7 @@ mod tests {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
         for path in ["dir", "dir/"] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
@@ -474,8 +471,7 @@ mod tests {
             fio::Flags::PERM_WRITE,
             fio::Flags::PERM_EXECUTE,
         ] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PERM_READ | invalid_flags;
             ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -494,8 +490,7 @@ mod tests {
 
         // Requesting to open with `PROTOCOL_FILE` should return a `NOT_FILE` error.
         {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PROTOCOL_FILE;
             ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
@@ -509,8 +504,7 @@ mod tests {
 
         // Opening with file flags is also invalid.
         for file_flags in [fio::Flags::FILE_APPEND, fio::Flags::FILE_TRUNCATE] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             ObjectRequest::new3(file_flags, &fio::Options::default(), server_end.into())
                 .handle(|req| meta_as_dir.clone().open3(scope, VfsPath::dot(), file_flags, req));

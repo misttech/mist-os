@@ -19,8 +19,7 @@ async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,
     moniker: &str,
 ) -> anyhow::Result<S::Proxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-        .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
     remote_control
         .deprecated_open_capability(
             moniker,

@@ -29,7 +29,7 @@ async fn static_child() {
     let resolved_info = instance.resolved_info.unwrap();
     assert!(resolved_info.execution_info.is_none());
 
-    let (binder, server) = fidl::endpoints::create_proxy().unwrap();
+    let (binder, server) = fidl::endpoints::create_proxy();
     lifecycle_controller.start_instance("./echo_server", server).await.unwrap().unwrap();
 
     // echo server is running
@@ -93,7 +93,7 @@ async fn dynamic_child() {
     let resolved_info = instance.resolved_info.unwrap();
     assert!(resolved_info.execution_info.is_none());
 
-    let (binder, server) = fidl::endpoints::create_proxy().unwrap();
+    let (binder, server) = fidl::endpoints::create_proxy();
     lifecycle_controller
         .start_instance("./servers:dynamic_echo_server", server)
         .await
@@ -195,7 +195,7 @@ async fn dynamic_child_with_arguments() {
     let handle = Event::create();
     let koid = handle.basic_info().unwrap().koid;
 
-    let (_binder, server) = fidl::endpoints::create_proxy().unwrap();
+    let (_binder, server) = fidl::endpoints::create_proxy();
     lifecycle_controller
         .start_instance_with_args(
             "./servers:dynamic_child_with_arguments/numbered_handles_child",

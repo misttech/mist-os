@@ -90,7 +90,7 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
     let run_access = access::run(hd.clone(), access_server);
 
     // Create access client future
-    let (discovery_session, discovery_session_server) = endpoints::create_proxy()?;
+    let (discovery_session, discovery_session_server) = endpoints::create_proxy();
     let run_client = async move {
         // Request discovery on active Host #1
         let response = access_client.start_discovery(discovery_session_server).await;

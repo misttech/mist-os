@@ -72,8 +72,7 @@ impl RebootController {
     }
 
     async fn init_admin_proxy(&self) -> Result<AdminProxy> {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<AdminMarker>();
         self.get_remote_proxy()
             .await?
             .deprecated_open_capability(

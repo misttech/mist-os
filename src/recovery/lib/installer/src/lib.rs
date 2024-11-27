@@ -119,8 +119,7 @@ pub async fn restart() {
 /// Set the active boot configuration for the newly-installed system. We always boot from the "A"
 /// slot to start with.
 async fn set_active_configuration(paver: &PaverProxy) -> Result<(), Error> {
-    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>()
-        .context("Creating boot manager endpoints")?;
+    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>();
 
     paver.find_boot_manager(server).context("Could not find boot manager")?;
 

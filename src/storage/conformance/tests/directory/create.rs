@@ -30,7 +30,7 @@ async fn create_directory_with_create_if_absent_flag() {
     )
     .await;
 
-    let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+    let (client, server) = create_proxy::<fio::NodeMarker>();
 
     dir.open(
         fio::OpenFlags::CREATE_IF_ABSENT

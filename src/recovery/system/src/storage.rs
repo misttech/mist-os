@@ -15,7 +15,7 @@ pub async fn wipe_storage() -> Result<fio::DirectoryProxy, Error> {
     let fshost_admin = fuchsia_component::client::connect_to_protocol::<AdminMarker>()
         .context("Connecting to fshost Admin service.")?;
 
-    let (blobfs_client, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (blobfs_client, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     fshost_admin
         .wipe_storage(Some(blobfs_server), None)
         .await

@@ -62,7 +62,7 @@ async fn run_test(url: &str, expected_result: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
         .open(
@@ -223,7 +223,7 @@ async fn route_directories_from_component_manager_namespace() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
     let server_end = server_end.into_channel().into();
     realm_query
         .open(

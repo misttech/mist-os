@@ -56,7 +56,7 @@ async fn watch_and_update_ports(
 ) {
     // TODO(https://fxbug.dev/42061512): Return `RecorderError::INTERNAL` instead of unwrap.
     let (port_watcher, port_watcher_server_end) =
-        fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>();
     device.get_port_watcher(port_watcher_server_end).unwrap();
 
     match port_watcher.watch().await.unwrap() {
@@ -68,8 +68,7 @@ async fn watch_and_update_ports(
         }
         // When watcher was created, ports might already exist.
         fhwnet::DevicePortEvent::Added(port_id) | fhwnet::DevicePortEvent::Existing(port_id) => {
-            let (port, port_server_end) =
-                fidl::endpoints::create_proxy::<fhwnet::PortMarker>().unwrap();
+            let (port, port_server_end) = fidl::endpoints::create_proxy::<fhwnet::PortMarker>();
             device.get_port(&port_id, port_server_end).unwrap();
 
             match port.get_info().await {

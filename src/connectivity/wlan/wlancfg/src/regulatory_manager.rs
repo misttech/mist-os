@@ -119,8 +119,7 @@ mod tests {
         ) -> TestContext<impl Stream<Item = Result<(), Error>> + Unpin> {
             let executor = fasync::TestExecutor::new();
             let (regulatory_region_proxy, regulatory_region_server_channel) =
-                create_proxy::<RegulatoryRegionWatcherMarker>()
-                    .expect("failed to create RegulatoryRegionWatcher proxy");
+                create_proxy::<RegulatoryRegionWatcherMarker>();
             let iface_manager = Arc::new(Mutex::new(iface_manager));
             let regulatory_manager =
                 RegulatoryManager::new(regulatory_region_proxy, iface_manager.clone());

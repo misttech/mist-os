@@ -47,7 +47,7 @@ impl PaverFacade {
     pub(super) async fn query_active_configuration(
         &self,
     ) -> Result<QueryActiveConfigurationResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -71,7 +71,7 @@ impl PaverFacade {
     pub(super) async fn query_current_configuration(
         &self,
     ) -> Result<QueryCurrentConfigurationResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -97,7 +97,7 @@ impl PaverFacade {
         &self,
         args: QueryConfigurationStatusRequest,
     ) -> Result<QueryConfigurationStatusResult, Error> {
-        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy()?;
+        let (boot_manager, boot_manager_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_boot_manager(boot_manager_server_end)?;
 
@@ -120,7 +120,7 @@ impl PaverFacade {
     ///  * connecting to the paver service fails, or
     ///  * the paver service returns an unexpected error
     pub(super) async fn read_asset(&self, args: ReadAssetRequest) -> Result<String, Error> {
-        let (data_sink, data_sink_server_end) = fidl::endpoints::create_proxy()?;
+        let (data_sink, data_sink_server_end) = fidl::endpoints::create_proxy();
 
         self.proxy()?.find_data_sink(data_sink_server_end)?;
 

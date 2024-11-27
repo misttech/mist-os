@@ -125,7 +125,7 @@ impl SysmemAllocation {
         // Ignore errors since only debug information is being sent.
         set_allocator_name(&allocator, debug_info).context("Setting alloocator name")?;
         let (client_token, client_token_request) =
-            fidl::endpoints::create_proxy::<BufferCollectionTokenMarker>()?;
+            fidl::endpoints::create_proxy::<BufferCollectionTokenMarker>();
         allocator
             .allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
                 token_request: Some(client_token_request),
@@ -169,7 +169,7 @@ impl SysmemAllocation {
         constraints: BufferCollectionConstraints,
     ) -> Result<Self, Error> {
         let (buffer_collection, collection_request) =
-            fidl::endpoints::create_proxy::<BufferCollectionMarker>()?;
+            fidl::endpoints::create_proxy::<BufferCollectionMarker>();
         allocator.bind_shared_collection(AllocatorBindSharedCollectionRequest {
             token: Some(token),
             buffer_collection_request: Some(collection_request),
@@ -506,7 +506,7 @@ mod tests {
         let token = token.expect("receive token");
 
         let (buffer_collection_client, buffer_collection_requests) =
-            fidl::endpoints::create_proxy::<BufferCollectionMarker>().expect("proxy creation");
+            fidl::endpoints::create_proxy::<BufferCollectionMarker>();
         sysmem_client
             .bind_shared_collection(AllocatorBindSharedCollectionRequest {
                 token: Some(token),

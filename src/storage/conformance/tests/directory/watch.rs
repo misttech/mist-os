@@ -107,7 +107,7 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
     );
     {
-        let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+        let (client, server) = create_proxy::<fio::NodeMarker>();
         dir.open(
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
             fio::ModeType::empty(),

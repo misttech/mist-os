@@ -222,7 +222,7 @@ mod tests {
 
     fn serve_vfs_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
         let fs_scope = ExecutionScope::new();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,

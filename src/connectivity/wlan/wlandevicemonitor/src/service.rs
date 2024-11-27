@@ -421,7 +421,7 @@ async fn destroy_iface(
     info!("destroy_iface(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
 
-    let (telemetry_proxy, telemetry_server) = fidl::endpoints::create_proxy().unwrap();
+    let (telemetry_proxy, telemetry_server) = fidl::endpoints::create_proxy();
     let result = get_sme_telemetry(&ifaces, id, telemetry_server).await;
     let destroyed_iface_vmo = match result {
         Ok(()) => match telemetry_proxy.clone_inspect_vmo().await {
@@ -585,8 +585,7 @@ mod tests {
     }
 
     fn test_setup() -> TestValues {
-        let (monitor_proxy, requests) = create_proxy::<fidl_svc::DeviceMonitorMarker>()
-            .expect("failed to create DeviceMonitor proxy");
+        let (monitor_proxy, requests) = create_proxy::<fidl_svc::DeviceMonitorMarker>();
         let monitor_req_stream = requests.into_stream();
         let (phys, phy_events) = PhyMap::new();
         let phys = Arc::new(phys);
@@ -620,8 +619,7 @@ mod tests {
     }
 
     fn fake_phy() -> (PhyDevice, fidl_dev::PhyRequestStream) {
-        let (proxy, server) =
-            create_proxy::<fidl_dev::PhyMarker>().expect("fake_phy: create_proxy() failed");
+        let (proxy, server) = create_proxy::<fidl_dev::PhyMarker>();
         let stream = server.into_stream();
         (PhyDevice { proxy, device_path: String::from("/test/path") }, stream)
     }
@@ -733,8 +731,7 @@ mod tests {
         });
 
         // Add a fake iface.
-        let (generic_sme, _) =
-            create_proxy::<fidl_sme::GenericSmeMarker>().expect("Failed to create generic sme");
+        let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
             generic_sme,
@@ -926,8 +923,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Watch for new devices.
-        let (watcher_proxy, watcher_server_end) =
-            fidl::endpoints::create_proxy().expect("failed to create watcher proxy");
+        let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
         test_values
             .monitor_proxy
             .watch_devices(watcher_server_end)
@@ -987,8 +983,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
 
         // Watch for new devices.
-        let (watcher_proxy, watcher_server_end) =
-            fidl::endpoints::create_proxy().expect("failed to create watcher proxy");
+        let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
         test_values
             .monitor_proxy
             .watch_devices(watcher_server_end)
@@ -1041,8 +1036,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Watch for new devices.
-        let (watcher_proxy, watcher_server_end) =
-            fidl::endpoints::create_proxy().expect("failed to create watcher proxy");
+        let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
         test_values
             .monitor_proxy
             .watch_devices(watcher_server_end)
@@ -1058,8 +1052,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // Create a generic SME proxy but drop the server since we won't use it.
-        let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
         // Add an interface and make sure the update is received.
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
@@ -1103,8 +1096,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Create a generic SME proxy but drop the server since we won't use it.
-        let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (generic_sme, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
         // Add an interface before beginning to watch for devices.
         let fake_iface = IfaceDevice {
             phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
@@ -1114,8 +1106,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut watcher_fut), Poll::Pending);
 
         // Watch for new devices.
-        let (watcher_proxy, watcher_server_end) =
-            fidl::endpoints::create_proxy().expect("failed to create watcher proxy");
+        let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy();
         test_values
             .monitor_proxy
             .watch_devices(watcher_server_end)
@@ -1695,8 +1686,7 @@ mod tests {
         let (phy, phy_stream) = fake_phy();
         phy_map.insert(10, phy);
         // Create a generic SME proxy but drop the server since we won't use it.
-        let (proxy, _) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (proxy, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
         iface_map.insert(
             42,
             device::IfaceDevice {
@@ -1828,8 +1818,7 @@ mod tests {
         let test_values = test_setup();
 
         // Set the PHY ID of the interface to be some non-existent PHY ID.
-        let (proxy, _) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (proxy, _) = create_proxy::<fidl_sme::GenericSmeMarker>();
         test_values.ifaces.insert(
             1,
             device::IfaceDevice {
@@ -1898,8 +1887,7 @@ mod tests {
             },
         );
 
-        let (client_sme_proxy, client_sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
+        let (client_sme_proxy, client_sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 42, client_sme_server);
         let mut req_fut = pin!(req_fut);
@@ -1931,8 +1919,7 @@ mod tests {
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
         test_values.phys.insert(phy_id, phy);
-        let (generic_sme_proxy, generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (generic_sme_proxy, generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>();
 
         test_values.ifaces.insert(
             42,
@@ -1942,8 +1929,7 @@ mod tests {
             },
         );
 
-        let (_client_sme_proxy, client_sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
+        let (_client_sme_proxy, client_sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 42, client_sme_server);
         let mut req_fut = pin!(req_fut);
@@ -1966,8 +1952,7 @@ mod tests {
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
         test_values.phys.insert(phy_id, phy);
-        let (generic_sme_proxy, _generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>()
-            .expect("Failed to create generic SME proxy");
+        let (generic_sme_proxy, _generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>();
 
         test_values.ifaces.insert(
             42,
@@ -1977,8 +1962,7 @@ mod tests {
             },
         );
 
-        let (_client_sme_proxy, client_sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
+        let (_client_sme_proxy, client_sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 1337, client_sme_server);
         let mut req_fut = pin!(req_fut);
@@ -1997,7 +1981,7 @@ mod tests {
                 .expect("Failed to create generic SME proxy and stream");
 
         let (_feature_support_proxy, feature_support_server) =
-            create_proxy::<fidl_sme::FeatureSupportMarker>().expect("Failed to create client SME");
+            create_proxy::<fidl_sme::FeatureSupportMarker>();
 
         test_values.ifaces.insert(
             42,
@@ -2087,8 +2071,7 @@ mod tests {
         let id = 42;
         let phy_ownership = PhyOwnership { phy_id, phy_assigned_id: 0 };
 
-        let (generic_sme_proxy, generic_sme_server) =
-            create_proxy::<fidl_sme::GenericSmeMarker>().expect("Failed to make generic SME");
+        let (generic_sme_proxy, generic_sme_server) = create_proxy::<fidl_sme::GenericSmeMarker>();
 
         test_values.ifaces.insert(
             id,

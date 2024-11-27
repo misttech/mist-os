@@ -53,11 +53,11 @@ impl PackageResolver {
         url: &str,
         subpackages: &[String],
     ) -> Result<fio::DirectoryProxy, Error> {
-        let (mut dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+        let (mut dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let resolver = self.get_resolver(url)?;
         let mut context = resolver.resolve(url, server).await?.map_err(Error::Application)?;
         for subpackage in subpackages {
-            let (sub_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+            let (sub_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             context = resolver
                 .resolve_with_context(subpackage, &context, server)
                 .await?

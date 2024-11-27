@@ -24,8 +24,7 @@ pub fn create_tun_device_with(
 ) -> (fnet_tun::DeviceProxy, fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>) {
     let tun_ctl = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("connect to protocol");
-    let (tun_dev, tun_dev_server_end) =
-        fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>().expect("create proxy");
+    let (tun_dev, tun_dev_server_end) = fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>();
     tun_ctl.create_device(&device_config, tun_dev_server_end).expect("create tun device");
     let (netdevice_client_end, netdevice_server_end) =
         fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
@@ -40,8 +39,7 @@ pub fn install_device(
     device: fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>,
 ) -> fnet_interfaces_admin::DeviceControlProxy {
     let (admin_device_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
     let installer = realm
         .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
         .expect("connect to protocol");
@@ -58,8 +56,7 @@ pub async fn create_tun_port_with(
     tx_frame_types: impl IntoIterator<Item = fhardware_network::FrameType>,
     mac: Option<fnet::MacAddress>,
 ) -> (fnet_tun::PortProxy, fhardware_network::PortProxy) {
-    let (port, server_end) =
-        fidl::endpoints::create_proxy::<fnet_tun::PortMarker>().expect("create proxy");
+    let (port, server_end) = fidl::endpoints::create_proxy::<fnet_tun::PortMarker>();
     let rx_types = rx_frame_types.into_iter().collect();
     let tx_types = tx_frame_types
         .into_iter()
@@ -87,7 +84,7 @@ pub async fn create_tun_port_with(
         .expect("add port");
 
     let (network_port, server_end) =
-        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>().expect("create endpoints");
+        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
     port.get_port(server_end).expect("get port");
 
     (port, network_port)
@@ -115,8 +112,7 @@ pub async fn add_pure_ip_interface(
     let port_id = id.expect("port id");
 
     let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
 
     let () = admin_device_control
         .create_interface(
@@ -181,7 +177,7 @@ pub async fn create_tun_pair_with(
     let tun_ctl = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("connect to protocol");
     let (tun_dev_pair, tun_dev_pair_server_end) =
-        fidl::endpoints::create_proxy::<fnet_tun::DevicePairMarker>().expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_tun::DevicePairMarker>();
     tun_ctl.create_pair(&dev_pair_config, tun_dev_pair_server_end).expect("create tun device pair");
 
     let port_id = assert_matches!(dev_pair_port_config, fnet_tun::DevicePairPortConfig {
@@ -199,11 +195,9 @@ pub async fn create_tun_pair_with(
         .expect("add port");
 
     let (left_port, left_port_server_end) =
-        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("create left port proxy");
+        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
     let (right_port, right_port_server_end) =
-        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("create right port proxy");
+        fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
     tun_dev_pair.get_left_port(port_id, left_port_server_end).expect("get left port");
     tun_dev_pair.get_right_port(port_id, right_port_server_end).expect("get right port");
 

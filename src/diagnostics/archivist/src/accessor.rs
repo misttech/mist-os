@@ -806,8 +806,7 @@ mod tests {
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.
-        let (batch_iterator, server_end) =
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
+        let (batch_iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
         assert!(accessor
             .r#stream_diagnostics(
                 &StreamParameters {
@@ -828,8 +827,7 @@ mod tests {
         );
 
         // A selector of the form `component:root` is accepted.
-        let (batch_iterator, server_end) =
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
+        let (batch_iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
         assert!(accessor
             .r#stream_diagnostics(
                 &StreamParameters {
@@ -869,8 +867,7 @@ mod tests {
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.
-        let (batch_iterator, server_end) =
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
+        let (batch_iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
 
         assert!(accessor
             .r#stream_diagnostics(
@@ -1015,8 +1012,7 @@ mod tests {
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.
-        let (batch_iterator, server_end) =
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().unwrap();
+        let (batch_iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
         assert!(accessor
             .r#stream_diagnostics(
                 &StreamParameters {

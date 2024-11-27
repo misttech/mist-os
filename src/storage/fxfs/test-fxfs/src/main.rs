@@ -79,7 +79,7 @@ async fn main() -> Result<(), Error> {
     let root_object_id = volume.store().root_directory_object_id();
     let root_dir = Arc::new(FxDirectory::from(Directory::open(&volume, root_object_id).await?));
 
-    let (root, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+    let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     root_dir.as_directory().open(
         volume.scope().clone(),

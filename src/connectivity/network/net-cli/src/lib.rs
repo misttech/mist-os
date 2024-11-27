@@ -646,8 +646,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let subnet = fnet_ext::Subnet { addr, prefix_len: prefix };
                 let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                     finterfaces_admin::AddressStateProviderMarker,
-                >()
-                .context("create proxy")?;
+                >();
                 let () = control
                     .add_address(
                         &subnet.into(),
@@ -829,7 +828,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     )
                     .await?;
 
-            let (bridge, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+            let (bridge, server_end) = fidl::endpoints::create_proxy();
             stack.bridge_interfaces(&ids, server_end).context("bridge interfaces")?;
             let bridge_id = bridge.get_id().await.context("get bridge id")?;
             // Detach the channel so it won't cause bridge destruction on exit.

@@ -1245,22 +1245,19 @@ impl Telemetry {
                             .await
                     }
 
-                    let telemetry_proxy = match fidl::endpoints::create_proxy() {
-                        Ok((proxy, server)) => {
-                            match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await {
-                                Ok(Ok(())) => Some(proxy),
-                                Ok(Err(e)) => {
-                                    error!("Request for SME telemetry for iface {} completed with error {}. No telemetry will be captured.", iface_id, e);
-                                    None
-                                }
-                                Err(e) => {
-                                    error!("Failed to request SME telemetry for iface {} with error {}. No telemetry will be captured.", iface_id, e);
-                                    None
-                                }
-                            }
+                    let (proxy, server) = fidl::endpoints::create_proxy();
+                    let telemetry_proxy = match self
+                        .monitor_svc_proxy
+                        .get_sme_telemetry(iface_id, server)
+                        .await
+                    {
+                        Ok(Ok(())) => Some(proxy),
+                        Ok(Err(e)) => {
+                            error!("Request for SME telemetry for iface {} completed with error {}. No telemetry will be captured.", iface_id, e);
+                            None
                         }
                         Err(e) => {
-                            error!("Failed to create SME telemetry channel with error {}. No telemetry will be captured.", e);
+                            error!("Failed to request SME telemetry for iface {} with error {}. No telemetry will be captured.", iface_id, e);
                             None
                         }
                     };
@@ -1719,8 +1716,7 @@ pub async fn create_metrics_logger(
     experiment_ids: Option<Vec<u32>>,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
     let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .context("failed to create MetricEventLoggerMarker endponts")?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia
@@ -4567,8 +4563,7 @@ mod tests {
         // get to the point of querying histograms, we need to reply that we are in the connected
         // state.
         let (telemetry_proxy, _telemetry_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>()
-                .expect("failed to create telemetry proxy");
+            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>();
         assert_variant!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::QueryStatus {sender})) => {
@@ -4631,8 +4626,7 @@ mod tests {
 
         // Setup the Telemetry struct so that it thinks that it is connected.
         let (telemetry_proxy, _telemetry_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>()
-                .expect("failed to create telemetry proxy");
+            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>();
         telemetry.connection_state = ConnectionState::Connected(ConnectedState {
             iface_id: 0,
             ap_state: random_bss_description!(Wpa2).into(),

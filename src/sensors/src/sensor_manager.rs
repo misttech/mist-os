@@ -446,9 +446,9 @@ mod tests {
     async fn test_invalid_configure_playback() {
         // Creates an invalid playback_proxy so that ConfigurePlayback gets PEER_CLOSED when trying
         // to make a request.
-        let (playback_proxy, _) = create_proxy::<PlaybackMarker>().unwrap();
+        let (playback_proxy, _) = create_proxy::<PlaybackMarker>();
 
-        let (driver_proxy, _) = create_proxy::<DriverMarker>().unwrap();
+        let (driver_proxy, _) = create_proxy::<DriverMarker>();
         let sm = SensorManager::new(Vec::new(), Some(Playback::new(driver_proxy, playback_proxy)));
 
         let manager = Arc::new(Mutex::new(sm));

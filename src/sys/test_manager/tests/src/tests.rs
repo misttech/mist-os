@@ -150,7 +150,7 @@ async fn calling_builder_kill_should_kill_test() {
         .unwrap();
     let proxy = builder.take_proxy();
 
-    let (controller_proxy, controller) = endpoints::create_proxy().unwrap();
+    let (controller_proxy, controller) = endpoints::create_proxy();
     proxy.build(controller).unwrap();
     let (sender, mut recv) = mpsc::channel(1024);
     let _task = fasync::Task::spawn(async move { suite.collect_events(sender).await });
@@ -731,7 +731,7 @@ async fn debug_data_test(compressed: bool) {
 async fn early_boot_profile_test() {
     let proxy = client::connect_to_protocol::<ftest_manager::EarlyBootProfileMarker>()
         .expect("cannot connect to run builder proxy");
-    let (debug_data_proxy, iterator) = endpoints::create_proxy().unwrap();
+    let (debug_data_proxy, iterator) = endpoints::create_proxy();
     proxy.register_watcher(iterator).unwrap();
 
     // We cannot check the returned value as it can be empty vector or bunch of socket connections.
@@ -873,7 +873,7 @@ async fn custom_artifact_realm_test() {
 #[fuchsia::test]
 async fn enumerate_invalid_test() {
     let proxy = connect_query_server!().unwrap();
-    let (_iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (_iterator, server_end) = endpoints::create_proxy();
     let err = proxy
         .enumerate("fuchsia-pkg://fuchsia.com/test_manager_test#meta/invalid_cml.cm", server_end)
         .await
@@ -885,7 +885,7 @@ async fn enumerate_invalid_test() {
 #[fuchsia::test]
 async fn enumerate_echo_test() {
     let proxy = connect_query_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
@@ -912,7 +912,7 @@ async fn enumerate_echo_test() {
 #[fuchsia::test]
 async fn enumerate_huge_test() {
     let proxy = connect_query_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/huge_gtest.cm",
@@ -1527,7 +1527,7 @@ async fn debug_data_test_for_suite(compressed: bool) {
 async fn early_boot_profile_test_for_suite() {
     let proxy = client::connect_to_protocol::<ftest_manager::EarlyBootProfileMarker>()
         .expect("cannot connect to run builder proxy");
-    let (debug_data_proxy, iterator) = endpoints::create_proxy().unwrap();
+    let (debug_data_proxy, iterator) = endpoints::create_proxy();
     proxy.register_watcher(iterator).unwrap();
 
     // We cannot check the returned value as it can be empty vector or bunch of socket connections.
@@ -1600,7 +1600,7 @@ async fn custom_artifact_realm_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_invalid_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (_iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (_iterator, server_end) = endpoints::create_proxy();
     let err = proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/invalid_cml.cm",
@@ -1616,7 +1616,7 @@ async fn enumerate_invalid_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_echo_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
@@ -1644,7 +1644,7 @@ async fn enumerate_echo_test_for_suite() {
 #[fuchsia::test]
 async fn enumerate_huge_test_for_suite() {
     let proxy = connect_test_case_enumerator_server!().unwrap();
-    let (iterator, server_end) = endpoints::create_proxy().unwrap();
+    let (iterator, server_end) = endpoints::create_proxy();
     proxy
         .enumerate(
             "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/huge_gtest.cm",

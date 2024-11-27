@@ -78,8 +78,6 @@ pub(crate) struct NetdeviceWorker {
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
-    #[error("failed to create system resources: {0}")]
-    SystemResource(fidl::Error),
     #[error("client error: {0}")]
     Client(#[from] netdevice_client::Error),
     #[error("port {0:?} already installed")]
@@ -629,8 +627,7 @@ async fn get_mac(
     port: &netdevice_client::Port,
 ) -> Result<(UnicastAddr<Mac>, fhardware_network::MacAddressingProxy), Error> {
     let (mac_proxy, mac_server) =
-        fidl::endpoints::create_proxy::<fhardware_network::MacAddressingMarker>()
-            .map_err(Error::SystemResource)?;
+        fidl::endpoints::create_proxy::<fhardware_network::MacAddressingMarker>();
     let () = port_proxy.get_mac(mac_server).map_err(Error::CantConnectToPort)?;
 
     let mac_addr = {

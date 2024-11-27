@@ -436,8 +436,7 @@ async fn add_address_for_dad<
 ) -> impl futures::stream::Stream<Item = DadState> {
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create AddressStateProvider proxy");
+    >();
     // Create the state stream before adding the address to observe all events.
     let state_stream =
         fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);

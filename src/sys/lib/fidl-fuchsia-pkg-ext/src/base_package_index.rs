@@ -20,7 +20,7 @@ impl BasePackageIndex {
     /// Creates a `BasePackageIndex` from a PackageCache proxy.
     pub async fn from_proxy(cache: &PackageCacheProxy) -> Result<Self, Error> {
         let (pkg_iterator, server_end) =
-            fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>()?;
+            fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
         cache.base_package_index(server_end)?;
 
         let mut index = HashMap::with_capacity(256);

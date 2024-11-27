@@ -236,8 +236,7 @@ async fn filtered_service_through_collection_test() {
     };
     let provider_source = fdecl::Ref::Child(dynamic_provider_child_ref.clone());
 
-    let (provider_exposed_dir, provider_server) =
-        create_proxy::<fio::DirectoryMarker>().expect("Failed to create directory proxy");
+    let (provider_exposed_dir, provider_server) = create_proxy::<fio::DirectoryMarker>();
     let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("could not connect to Realm service");
     let _ = realm

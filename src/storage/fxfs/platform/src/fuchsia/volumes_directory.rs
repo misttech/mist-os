@@ -914,8 +914,7 @@ mod tests {
         let old_dirty = volumes_directory.pager_dirty_bytes_count.load(Ordering::SeqCst);
 
         let new_dirty = {
-            let (root, server_end) =
-                create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+            let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
             vol.root().clone().as_directory().open(
                 vol.volume().scope().clone(),
                 fio::OpenFlags::DIRECTORY
@@ -1142,8 +1141,7 @@ mod tests {
             entries
         };
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir_proxy = Arc::new(dir_proxy);
 
         volumes_directory.directory_node().clone().open(
@@ -1223,8 +1221,7 @@ mod tests {
         };
         volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
-        let (volume_proxy, volume_server_end) =
-            fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+        let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
@@ -1232,8 +1229,7 @@ mod tests {
             volume_server_end.into_channel().into(),
         );
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let crypt_service = fxfs_crypt::CryptService::new();
         crypt_service
@@ -1269,8 +1265,7 @@ mod tests {
 
                 // Attempting to mount again should fail with ALREADY_BOUND.
                 let (_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
                 assert_eq!(
                     Status::from_raw(
@@ -1342,8 +1337,7 @@ mod tests {
         };
         volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
-        let (volume_proxy, volume_server_end) =
-            fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+        let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
@@ -1382,8 +1376,7 @@ mod tests {
         join!(
             async {
                 let (_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 if let Err(status) = volume_proxy
                     .mount(
                         dir_server_end,
@@ -1400,8 +1393,7 @@ mod tests {
             },
             async {
                 let (_dir_proxy, dir_server_end) =
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                        .expect("Create proxy to succeed");
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 if let Err(status) = volume_proxy
                     .mount(
                         dir_server_end,
@@ -1490,8 +1482,7 @@ mod tests {
             .await
             .expect("create encrypted volume failed");
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         volumes_directory.serve_volume(&vol, dir_server_end, false).expect("serve_volume failed");
 
@@ -1524,8 +1515,7 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
 
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::empty(),
@@ -1600,14 +1590,12 @@ mod tests {
                 .expect("create unencrypted volume failed");
 
             let (volume_dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volumes_directory
                 .serve_volume(&volume, dir_server_end, false)
                 .expect("serve_volume failed");
 
-            let (volume_proxy, volume_server_end) =
-                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::empty(),
@@ -1616,8 +1604,7 @@ mod tests {
             );
 
             let (root_proxy, root_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volume_dir_proxy
                 .open(
                     fio::OpenFlags::RIGHT_READABLE

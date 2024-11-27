@@ -123,7 +123,7 @@ async fn get_remote_proxy_impl(
     let (target_proxy, target_proxy_fut) =
         open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
-    let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
+    let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     let mut open_remote_control_fut =
         target_proxy.open_remote_control(remote_server_end).boxed_local().fuse();
     let res = loop {
@@ -181,8 +181,8 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     target_timeout: Duration,
     env_context: &'b EnvironmentContext,
 ) -> Result<(TargetProxy, impl Future<Output = Result<()>> + 'a)> {
-    let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>()?;
-    let (target_proxy, target_server_end) = create_proxy::<TargetMarker>()?;
+    let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>();
+    let (target_proxy, target_server_end) = create_proxy::<TargetMarker>();
     let t_clone = target.clone();
     let target_collection_fut = async move {
         daemon_proxy
@@ -393,8 +393,7 @@ async fn knock_target_with_timeout(
             rcs::RCS_KNOCK_TIMEOUT
         )));
     }
-    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
-        .map_err(|e| KnockError::NonCriticalError(e.into()))?;
+    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     timeout(rcs_timeout, target.open_remote_control(remote_server_end))
         .await
         .context("timing out")?
@@ -414,8 +413,7 @@ pub async fn knock_target_by_name(
     open_timeout: Duration,
     rcs_timeout: Duration,
 ) -> Result<(), KnockError> {
-    let (target_proxy, target_remote) =
-        create_proxy::<TargetMarker>().map_err(|e| KnockError::NonCriticalError(e.into()))?;
+    let (target_proxy, target_remote) = create_proxy::<TargetMarker>();
 
     timeout::timeout(
         open_timeout,
@@ -567,7 +565,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {
-        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
         let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
         assert!(res.is_err());
         let res = knock_target_with_timeout(

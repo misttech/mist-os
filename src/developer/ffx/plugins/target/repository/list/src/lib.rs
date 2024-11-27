@@ -137,8 +137,7 @@ impl ListTool {
     }
 
     async fn list_from_device(&self) -> fho::Result<Vec<RepositoryInfo>> {
-        let (repo_iterator, repo_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
         self.repo_proxy.list(repo_iterator_server).map_err(|e| bug!(e))?;
         let mut ret: Vec<RepositoryInfo> = vec![];
         loop {
@@ -149,8 +148,7 @@ impl ListTool {
             ret.extend(repos.into_iter().map(|r| r.try_into().unwrap()))
         }
 
-        let (rule_iterator, rule_iterator_server) =
-            fidl::endpoints::create_proxy().map_err(|e| bug!(e))?;
+        let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
         self.engine_proxy.list(rule_iterator_server).map_err(|e| bug!("{e}"))?;
 
         let mut rewrite_rules: Vec<Rule> = vec![];

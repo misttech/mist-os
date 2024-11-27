@@ -458,7 +458,7 @@ async fn open_parent(package_root: &fio::DirectoryProxy, parent_path: &str) -> f
 }
 
 fn open_node(parent: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> fio::NodeProxy {
-    let (node, server_end) = create_proxy::<fio::NodeMarker>().expect("create_proxy");
+    let (node, server_end) = create_proxy::<fio::NodeMarker>();
     parent.open(flags, fio::ModeType::empty(), path, server_end).expect("open node");
     node
 }
@@ -794,7 +794,7 @@ async fn assert_clone_directory_no_overflow(
         flags |= fuchsia_fs::PERM_EXECUTABLE;
     }
     let parent = open_directory(package_root, path, flags).await.expect("open parent directory");
-    let (clone, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
+    let (clone, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
     parent.open(flags_deprecated, fio::ModeType::empty(), ".", node_request).expect("cloned node");
@@ -807,7 +807,7 @@ async fn assert_clone_directory_overflow(
     expected_dirents: Vec<DirEntry>,
 ) {
     let parent = open_parent(package_root, path).await;
-    let (clone, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
+    let (clone, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
     parent.clone2(node_request).expect("cloned node");

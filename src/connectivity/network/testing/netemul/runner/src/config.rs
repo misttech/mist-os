@@ -998,8 +998,7 @@ mod tests {
     async fn configurable_netstack() {
         let (tx, mut rx) = mpsc::unbounded();
         let (controller, server_end) =
-            fidl::endpoints::create_proxy::<fsys2::LifecycleControllerMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fsys2::LifecycleControllerMarker>();
         drop(server_end);
         let configure_environment = async {
             Config {
@@ -1010,8 +1009,7 @@ mod tests {
             .apply(
                 |name| {
                     let (proxy, server_end) =
-                        fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>()
-                            .context("create proxy")?;
+                        fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>();
                     let stream = server_end.into_stream();
                     tx.unbounded_send((name, stream))
                         .expect("request stream receiver should not be closed");
@@ -1101,8 +1099,7 @@ mod tests {
                 .apply(
                     |_name| {
                         let (proxy, server_end) =
-                            fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>()
-                                .context("create proxy")?;
+                            fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>();
                         drop(server_end);
                         Ok(proxy)
                     },

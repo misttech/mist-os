@@ -213,8 +213,7 @@ impl Environment for FlatlandEnvironment {
                 buttons: None,
                 ..Default::default()
             };
-            let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>()
-                .expect("Failed to create DeviceProxy.");
+            let (device_proxy, device_server) = create_proxy::<pointerinjector::DeviceMarker>();
             injector_registry_proxy
                 .register(config, device_server)
                 .await

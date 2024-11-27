@@ -240,7 +240,7 @@ mod tests {
     fn transaction_list_dynamic_rules(
         client: &EditTransactionProxy,
     ) -> impl Future<Output = Vec<Rule>> {
-        let (iterator, request_stream) = create_proxy::<RuleIteratorMarker>().unwrap();
+        let (iterator, request_stream) = create_proxy::<RuleIteratorMarker>();
         client.list_dynamic(request_stream).unwrap();
 
         collect_iterator(move || iterator.next())

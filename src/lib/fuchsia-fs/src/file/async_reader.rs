@@ -140,7 +140,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn exclusive_ownership() {
-        let (proxy, _) = endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, _) = endpoints::create_proxy::<fio::FileMarker>();
         let _stream = proxy.take_event_stream();
 
         assert_matches!(AsyncReader::from_proxy(proxy), Err(_));

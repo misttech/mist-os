@@ -258,7 +258,7 @@ impl FakeRunBuilderEndpoint {
 
 impl FidlEndpoint<RunBuilderMarker> for FakeRunBuilderEndpoint {
     fn create_proxy(&self) -> Result<RunBuilderProxy> {
-        let (proxy, server_end) = create_proxy::<RunBuilderMarker>()?;
+        let (proxy, server_end) = create_proxy::<RunBuilderMarker>();
         self.sender.unbounded_send(server_end)?;
         Ok(proxy)
     }

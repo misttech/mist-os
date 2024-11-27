@@ -1178,7 +1178,7 @@ async fn doctor_summary<W: Write>(
     ledger.close(main_node)?;
     main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
 
-    let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()?;
+    let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>();
     match timeout(
         retry_delay,
         daemon_proxy
@@ -1298,7 +1298,7 @@ async fn doctor_summary<W: Write>(
         ledger.set_outcome(message_node, outcome)?;
 
         //TODO(https://fxbug.dev/42167543): Offer a fix when we cannot connect to a device via RCS.
-        let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>()?;
+        let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>();
         match timeout(
             retry_delay,
             tc_proxy.open_target(
@@ -1330,7 +1330,7 @@ async fn doctor_summary<W: Write>(
             }
         }
 
-        let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
+        let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
 
         match timeout(retry_delay, target_proxy.open_remote_control(remote_server_end)).await {
             Ok(Ok(res)) => {

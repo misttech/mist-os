@@ -29,7 +29,7 @@ impl Wlantap {
         config: wlantap::WlantapPhyConfig,
     ) -> Result<wlantap::WlantapPhyProxy, Error> {
         let Self { proxy } = self;
-        let (ours, theirs) = fidl::endpoints::create_proxy()?;
+        let (ours, theirs) = fidl::endpoints::create_proxy();
 
         let status = proxy.create_phy(&config, theirs).await?;
         let () = zx::ok(status)?;

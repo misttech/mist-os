@@ -102,8 +102,7 @@ mod tests {
     }
 
     fn test_setup() -> TestValues {
-        let (sme, server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create ClientSmeProxy");
+        let (sme, server) = create_proxy::<fidl_sme::ClientSmeMarker>();
 
         let iface = Iface { sme, iface_id: 0 };
         let iface_ref = IfaceRef::new();

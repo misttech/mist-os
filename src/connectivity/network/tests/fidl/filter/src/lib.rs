@@ -285,8 +285,7 @@ async fn watcher_already_pending(name: &str) {
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
-    let (watcher, server_end) =
-        fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>().expect("create proxy");
+    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>();
     state.get_watcher(&fnet_filter::WatcherOptions::default(), server_end).expect("get watcher");
 
     let events = watcher.watch().await.expect("get existing resources");
@@ -309,8 +308,7 @@ async fn watcher_channel_closed_if_not_polled(name: &str) {
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
-    let (watcher, server_end) =
-        fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>().expect("create proxy");
+    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>();
     state.get_watcher(&fnet_filter::WatcherOptions::default(), server_end).expect("get watcher");
 
     let events = watcher.watch().await.expect("get existing resources");
@@ -583,7 +581,7 @@ async fn push_change_missing_required_field(name: &str) {
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
     assert_eq!(
         controller
@@ -612,7 +610,7 @@ async fn push_change_invalid_interface_matcher(name: &str) {
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
     assert_eq!(
         controller
@@ -687,7 +685,7 @@ async fn push_change_invalid_address_matcher(name: &str, matcher: fnet_filter::A
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
     assert_eq!(
         controller
@@ -725,7 +723,7 @@ async fn push_change_invalid_port_matcher(name: &str) {
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
     assert_eq!(
         controller
@@ -836,7 +834,7 @@ async fn push_change_invalid_action(
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
     assert_eq!(
         controller
@@ -878,7 +876,7 @@ async fn push_changes_index_based_error_return(name: &str, pos: InvalidChangePos
     // Use the FIDL bindings directly rather than going through the extension
     // library, because it intentionally does not allow us to express the
     // invalid types that we are testing.
-    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (controller, server_end) = fidl::endpoints::create_proxy();
     control.open_controller("test", server_end).expect("open controller");
 
     // Create a batch of valid changes, and insert an invalid change somewhere in the batch.

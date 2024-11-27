@@ -221,7 +221,7 @@ mod tests {
         let server = RootDirCache::new(blobfs_client);
 
         let dir = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = vfs::execution_scope::ExecutionScope::new();
         let () = dir.open(
             scope.clone(),

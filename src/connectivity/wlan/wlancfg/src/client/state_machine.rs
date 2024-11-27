@@ -1140,8 +1140,7 @@ mod tests {
     fn test_setup() -> TestValues {
         let (client_req_sender, client_req_stream) = mpsc::channel(1);
         let (update_sender, update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
+        let (sme_proxy, sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let sme_req_stream = sme_server.into_stream();
         let saved_networks = FakeSavedNetworksManager::new();
         let saved_networks_manager = Arc::new(saved_networks);
@@ -3592,8 +3591,7 @@ mod tests {
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
 
         // Make our own SME proxy for this test
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
+        let (sme_proxy, sme_server) = create_proxy::<fidl_sme::ClientSmeMarker>();
         let (sme_req_stream, sme_control_handle) = sme_server.into_stream_and_control_handle();
 
         let sme_fut = sme_req_stream.into_future();

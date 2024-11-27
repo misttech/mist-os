@@ -446,7 +446,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
-        let (client_proxy, client_server) = create_proxy().unwrap();
+        let (client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -467,7 +467,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
-        let (_ap_proxy, ap_server) = create_proxy().unwrap();
+        let (_ap_proxy, ap_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_ap_sme(ap_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -481,7 +481,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (ap_proxy, ap_server) = create_proxy().unwrap();
+        let (ap_proxy, ap_server) = create_proxy();
         let mut ap_sme_fut = helper.proxy.get_ap_sme(ap_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut ap_sme_fut), Poll::Ready(Ok(Ok(()))));
@@ -499,7 +499,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (_client_proxy, client_server) = create_proxy().unwrap();
+        let (_client_proxy, client_server) = create_proxy();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
@@ -512,7 +512,7 @@ mod tests {
         helper: &mut GenericSmeTestHelper,
         serve_fut: &mut Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
     ) -> fidl_sme::TelemetryProxy {
-        let (proxy, server) = create_proxy().unwrap();
+        let (proxy, server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(server);
         assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Ok(()))));
@@ -566,7 +566,7 @@ mod tests {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
-        let (_telemetry_proxy, telemetry_server) = create_proxy().unwrap();
+        let (_telemetry_proxy, telemetry_server) = create_proxy();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(telemetry_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Err(_))));
@@ -576,7 +576,7 @@ mod tests {
         helper: &mut GenericSmeTestHelper,
         serve_fut: &mut Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
     ) -> fidl_sme::FeatureSupportProxy {
-        let (proxy, server) = create_proxy().unwrap();
+        let (proxy, server) = create_proxy();
         let mut features_fut = helper.proxy.get_feature_support(server);
         assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut features_fut), Poll::Ready(Ok(Ok(()))));

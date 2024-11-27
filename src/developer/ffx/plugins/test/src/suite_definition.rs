@@ -142,8 +142,8 @@ mod test {
     async fn test_params_from_reader_valid() {
         let reader = VALID_JSON.as_bytes();
         let (lifecycle_controller, _server_end1) =
-            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
-        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
+            create_proxy::<fsys::LifecycleControllerMarker>();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>();
         let test_params = test_params_from_reader(
             reader,
             &lifecycle_controller,
@@ -159,8 +159,8 @@ mod test {
     async fn test_params_from_reader_invalid() {
         let reader = CONTAINS_VALID_AND_INVALID.as_bytes();
         let (lifecycle_controller, _server_end1) =
-            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
-        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
+            create_proxy::<fsys::LifecycleControllerMarker>();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>();
         let test_params = test_params_from_reader(
             reader,
             &lifecycle_controller,
@@ -175,8 +175,8 @@ mod test {
     async fn test_params_from_reader_invalid_skipped() {
         let reader = CONTAINS_VALID_AND_INVALID.as_bytes();
         let (lifecycle_controller, _server_end1) =
-            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
-        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
+            create_proxy::<fsys::LifecycleControllerMarker>();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>();
         let test_params = test_params_from_reader(
             reader,
             &lifecycle_controller,

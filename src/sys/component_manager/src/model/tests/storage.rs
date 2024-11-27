@@ -711,7 +711,7 @@ async fn open_storage_subdirectory() {
         .expect("could not resolve state");
 
     // `consumer` should be able to open its storage at the root dir
-    let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel();
     let scope = ExecutionScope::new();
     let flags =
@@ -741,7 +741,7 @@ async fn open_storage_subdirectory() {
     assert!(entries.is_empty());
 
     // `consumer` should be able to open its storage at "foo/bar"
-    let (bar_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (bar_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
     let flags =
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;

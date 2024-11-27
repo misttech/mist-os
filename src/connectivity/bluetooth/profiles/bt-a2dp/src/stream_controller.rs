@@ -278,7 +278,7 @@ mod tests {
         controller_svc: &ControllerProxy,
         id: Option<PeerId>,
     ) -> (QueryResponseFut<()>, StreamSuspenderProxy) {
-        let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
+        let (c, s) = create_proxy::<StreamSuspenderMarker>();
         let peer_id: Option<fidl_fuchsia_bluetooth::PeerId> = id.map(|id| id.into());
         let fidl_req = controller_svc
             .suspend(peer_id.as_ref(), s)
@@ -442,7 +442,7 @@ mod tests {
 
         // Client wants to suspend stream for some peer but closes token before sending the request.
         let remote_id = PeerId(11);
-        let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
+        let (c, s) = create_proxy::<StreamSuspenderMarker>();
         drop(c);
         let fidl_request = controller_svc
             .suspend(Some(remote_id.into()).as_ref(), s)

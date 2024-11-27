@@ -70,8 +70,7 @@ impl VmmLauncher {
         }
 
         // Connect to exposed service directory for the vmm.
-        let (svc_dir_proxy, svc_dir) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create directory proxy");
+        let (svc_dir_proxy, svc_dir) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let child_ref =
             cdecl::ChildRef { name: child_name, collection: Some(collection_name.to_string()) };
         let realm_result = self.realm.open_exposed_dir(&child_ref, svc_dir).await;

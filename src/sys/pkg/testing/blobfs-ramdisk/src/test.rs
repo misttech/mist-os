@@ -66,7 +66,7 @@ async fn open_blob(
     merkle: &str,
     mut flags: fio::OpenFlags,
 ) -> Result<(fio::FileProxy, zx::Event), zx::Status> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
 
     flags |= fio::OpenFlags::DESCRIBE;

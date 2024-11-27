@@ -404,7 +404,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_is_supported_passthrough_command() {
         let _exec = fasync::TestExecutor::new();
-        let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
+        let (session_proxy, _) = create_proxy::<SessionControlMarker>();
         let media_state = MediaState::new(session_proxy);
         assert!(media_state
             .is_supported_passthrough_command(fidl_avrcp::AvcPanelCommand::Play)
@@ -433,7 +433,7 @@ pub(crate) mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
-        let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
+        let (session_proxy, _) = create_proxy::<SessionControlMarker>();
         let mut media_state = MediaState::new(session_proxy);
 
         // 1. Only metadata
@@ -522,7 +522,7 @@ pub(crate) mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
-        let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
+        let (session_proxy, _) = create_proxy::<SessionControlMarker>();
         let mut media_state = MediaState::new(session_proxy);
 
         // 1. Query when no state updates.
@@ -579,7 +579,7 @@ pub(crate) mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
-        let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
+        let (session_proxy, _) = create_proxy::<SessionControlMarker>();
         let mut media_state = MediaState::new(session_proxy);
 
         // Add the media session status.
@@ -647,8 +647,7 @@ pub(crate) mod tests {
     fn test_get_notification_value() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
-        let (session_proxy, _) =
-            create_proxy::<SessionControlMarker>().expect("Couldn't create fidl proxy.");
+        let (session_proxy, _) = create_proxy::<SessionControlMarker>();
         let mut media_state = MediaState::new(session_proxy);
 
         // 1. Unsupported ID.

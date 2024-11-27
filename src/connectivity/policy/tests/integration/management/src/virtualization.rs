@@ -139,8 +139,7 @@ impl<'a> Guest<'a> {
         device.get_port(&port_id, server_end).expect("get_port");
 
         let (interface_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>()
-                .expect("failed to create fuchsia.net.virtualization/Interface proxy");
+            fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>();
         network_proxy.add_port(port, server_end).expect("add_port");
         Self { interface_proxy, realm, _net: net, _ep: ep, guest_if }
     }
@@ -170,8 +169,7 @@ fn create_bridged_network(
     virtualization_control: &fnet_virtualization::ControlProxy,
 ) -> fnet_virtualization::NetworkProxy {
     let (network_proxy, server_end) =
-        fidl::endpoints::create_proxy::<fnet_virtualization::NetworkMarker>()
-            .expect("failed to create fuchsia.net.virtualization/Network proxy");
+        fidl::endpoints::create_proxy::<fnet_virtualization::NetworkMarker>();
     virtualization_control
         .create_network(
             &fnet_virtualization::Config::Bridged(fnet_virtualization::Bridged::default()),

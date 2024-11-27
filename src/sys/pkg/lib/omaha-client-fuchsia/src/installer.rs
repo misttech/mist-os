@@ -170,8 +170,7 @@ where
 
         let proxy = self.installer_connector.connect().map_err(FuchsiaInstallError::Connect)?;
         let (reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>()
-                .map_err(FuchsiaInstallError::Fidl)?;
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         if self.allow_reboot {
             self.reboot_controller = Some(reboot_controller);

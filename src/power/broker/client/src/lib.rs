@@ -94,12 +94,12 @@ impl<'a> PowerElementContextBuilder<'a> {
 
     pub async fn build(self) -> Result<PowerElementContext> {
         let (current_level, current_level_server_end) =
-            create_proxy::<fbroker::CurrentLevelMarker>()?;
+            create_proxy::<fbroker::CurrentLevelMarker>();
         let (required_level, required_level_server_end) =
-            create_proxy::<fbroker::RequiredLevelMarker>()?;
-        let (lessor, lessor_server_end) = create_proxy::<fbroker::LessorMarker>()?;
+            create_proxy::<fbroker::RequiredLevelMarker>();
+        let (lessor, lessor_server_end) = create_proxy::<fbroker::LessorMarker>();
         let (element_control, element_control_server_end) =
-            create_proxy::<fbroker::ElementControlMarker>()?;
+            create_proxy::<fbroker::ElementControlMarker>();
         self.topology
             .add_element(fbroker::ElementSchema {
                 element_name: Some(self.element_name.into()),

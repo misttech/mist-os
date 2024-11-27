@@ -88,7 +88,7 @@ fn connect_di_client(
 
     let records = &[record(primary)];
     let (token_client, token_server) =
-        fidl::endpoints::create_proxy::<DeviceIdentificationHandleMarker>().unwrap();
+        fidl::endpoints::create_proxy::<DeviceIdentificationHandleMarker>();
     let request =
         di_svc.set_device_identification(records, token_server).check().expect("can register");
     let fut = request.map(|r| r.expect("fidl call is ok"));

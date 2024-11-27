@@ -27,7 +27,7 @@ async fn main() -> Result<(), Error> {
 
     // Create a future that obtains an Echo protocol using the pipelined GetEcho
     // method
-    let (proxy, server_end) = create_proxy::<EchoMarker>()?;
+    let (proxy, server_end) = create_proxy::<EchoMarker>();
     echo_launcher.get_echo_pipelined("pipelined", server_end)?;
     // We can make a request to the server right after sending the pipelined request
     let pipelined_fut =

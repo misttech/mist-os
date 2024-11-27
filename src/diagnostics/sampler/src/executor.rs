@@ -445,8 +445,7 @@ impl ProjectSampler {
         // TODO(https://fxbug.dev/42071858): we should remove this once we support batching. There should be
         // only one metric logger per ProjectSampler.
         if project_id != 0 {
-            let (metric_logger_proxy, metrics_server_end) =
-                fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+            let (metric_logger_proxy, metrics_server_end) = fidl::endpoints::create_proxy();
             let project_spec = ProjectSpec {
                 customer_id: Some(customer_id),
                 project_id: Some(project_id),
@@ -461,8 +460,7 @@ impl ProjectSampler {
         for metric in &config.metrics {
             if let Some(metric_project_id) = metric.project_id {
                 if let Entry::Vacant(entry) = metric_loggers.entry(metric_project_id) {
-                    let (metric_logger_proxy, metrics_server_end) =
-                        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+                    let (metric_logger_proxy, metrics_server_end) = fidl::endpoints::create_proxy();
                     let project_spec = ProjectSpec {
                         customer_id: Some(customer_id),
                         project_id: Some(metric_project_id),

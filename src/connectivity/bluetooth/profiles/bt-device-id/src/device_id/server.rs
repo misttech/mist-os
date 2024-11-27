@@ -266,8 +266,7 @@ pub(crate) mod tests {
     ) -> (di::DeviceIdentificationHandleProxy, QueryResponseFut<Result<(), i32>>) {
         let records = &[minimal_record(primary)];
         let (token_client, token_server) =
-            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>();
         let request_fut = client
             .set_device_identification(records, token_server)
             .check()

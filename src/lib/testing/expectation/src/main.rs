@@ -75,8 +75,7 @@ impl ExpectationsComparer {
         CaseStart { invocation, std_handles }: CaseStart,
         end_stream: impl futures::TryStream<Ok = CaseEnd, Error = anyhow::Error>,
     ) -> Result<Option<(fidl_fuchsia_test::Invocation, ExpectationError)>, anyhow::Error> {
-        let (case_listener_proxy, case_listener) =
-            fidl::endpoints::create_proxy().context("error creating CaseListenerProxy")?;
+        let (case_listener_proxy, case_listener) = fidl::endpoints::create_proxy();
         run_listener_proxy
             .on_test_case_started(&invocation, std_handles, case_listener)
             .context("error calling run_listener_proxy.on_test_case_started(...)")?;
@@ -158,8 +157,7 @@ impl ExpectationsComparer {
 
         let listener_proxy = listener.into_proxy();
         for (invocation, _) in skipped {
-            let (case_listener_proxy, case_listener_server_end) =
-                fidl::endpoints::create_proxy().context("error creating case listener proxy")?;
+            let (case_listener_proxy, case_listener_server_end) = fidl::endpoints::create_proxy();
             let name = invocation.name.as_ref().expect("fuchsia.test/Invocation had no name");
             tracing::info!("{name} skip is expected.");
             listener_proxy

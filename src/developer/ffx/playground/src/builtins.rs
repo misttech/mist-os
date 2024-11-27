@@ -210,7 +210,7 @@ impl Interpreter {
 
                     for _ in 0..SYMLINK_RECURSION_LIMIT {
                         let path = canonicalize_path(path_initial, pwd.duplicate())?;
-                        let (node, server) = fidl::endpoints::create_proxy()?;
+                        let (node, server) = fidl::endpoints::create_proxy();
                         fs_root.open(
                             fio::OpenFlags::NODE_REFERENCE,
                             fio::ModeType::empty(),
@@ -222,7 +222,7 @@ impl Interpreter {
 
                         return if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
                             let (dir, server) =
-                                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+                                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                             let server = fidl::endpoints::ServerEnd::new(server.into_channel());
                             fs_root.open(
                                 fio::OpenFlags::RIGHT_READABLE,
@@ -247,7 +247,7 @@ impl Interpreter {
                             ))
                         } else if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_SYMLINK {
                             let (client, server) =
-                                fidl::endpoints::create_proxy::<fio::SymlinkMarker>()?;
+                                fidl::endpoints::create_proxy::<fio::SymlinkMarker>();
                             let server = fidl::endpoints::ServerEnd::new(server.into_channel());
                             fs_root.open(
                                 fio::OpenFlags::RIGHT_READABLE,
@@ -825,7 +825,7 @@ mod test {
                 let Value::OutOfLine(PlaygroundValue::Invocable(value)) = value else {
                     panic!();
                 };
-                let (echo, server) = fidl::endpoints::create_proxy::<fctest::EchoMarker>().unwrap();
+                let (echo, server) = fidl::endpoints::create_proxy::<fctest::EchoMarker>();
                 let server = Value::ServerEnd(
                     server.into_channel(),
                     "test.fidlcodec.examples/Echo".to_owned(),

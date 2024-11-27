@@ -520,7 +520,7 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
-        let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+        let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>();
         let request_stream_koid = server_end.as_handle_ref().get_koid().unwrap();
         let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
             server_end.into_channel(),

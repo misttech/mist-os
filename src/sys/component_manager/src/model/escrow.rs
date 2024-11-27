@@ -79,7 +79,7 @@ impl Actor {
     /// typically be run in a non-blocking task group of the component.
     pub fn new(scope: &TaskGroup, starter: impl Start + Send + Sync + 'static) -> Actor {
         let (sender, receiver) = mpsc::unbounded();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         let escrow = EscrowedState { outgoing_dir: server, escrowed_dictionary: None };
         let outgoing_dir = Arc::new(Mutex::new(client));
         let actor = ActorImpl {
@@ -268,7 +268,7 @@ impl ActorImpl {
         } else {
             // No outgoing directory server endpoint was escrowed. Mint a new pair and
             // update our client counterpart.
-            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             *self.outgoing_dir.lock().unwrap() = client;
             server
         };

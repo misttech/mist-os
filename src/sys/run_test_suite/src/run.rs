@@ -143,7 +143,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;
         suite.set_tags(params.tags);
         suite_reporters.insert(suite_id, suite);
-        let (suite_controller, suite_server_end) = fidl::endpoints::create_proxy()?;
+        let (suite_controller, suite_server_end) = fidl::endpoints::create_proxy();
         let suite_and_id_fut = RunningSuite::wait_for_start(
             suite_controller,
             params.max_severity_logs,
@@ -168,7 +168,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     }
 
     request_scheduling_options(&run_params, &builder_proxy).await?;
-    let (run_controller, run_server_end) = fidl::endpoints::create_proxy()?;
+    let (run_controller, run_server_end) = fidl::endpoints::create_proxy();
     let run_controller_ref = &run_controller;
     builder_proxy.build(run_server_end)?;
     let cancel_fut = cancel_fut.shared();

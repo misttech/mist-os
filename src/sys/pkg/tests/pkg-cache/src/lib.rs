@@ -128,7 +128,7 @@ async fn compress_and_write_blob(
 // the subpackages.
 async fn get_missing_blobs(proxy: &fpkg::NeededBlobsProxy) -> Vec<fpkg::BlobInfo> {
     let (blob_iterator, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = proxy.get_missing_blobs(blob_iterator_server_end).unwrap();
 
     let mut res = vec![];
@@ -155,8 +155,8 @@ async fn get_and_verify_package(
         fpkg::BlobInfo { blob_id: fpkg_ext::BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = package_cache
         .get(&meta_blob_info, gc_protection, needed_blobs_server_end, dir_server_end)
         .map_ok(|res| res.map_err(zx::Status::from_raw));
@@ -188,7 +188,7 @@ pub async fn write_needed_blobs(
     mut available_blobs: HashMap<Hash, Vec<u8>>,
 ) {
     let (blob_iterator, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
 
     loop {
@@ -243,9 +243,9 @@ async fn verify_package_cached(
         fpkg::BlobInfo { blob_id: fpkg_ext::BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
 
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let get_fut = proxy
         .get(
@@ -274,7 +274,7 @@ async fn verify_package_cached(
     };
 
     let (blob_iterator, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
     let chunk = blob_iterator.next().await;
 
@@ -310,7 +310,7 @@ async fn verify_get_subpackage(
     url: String,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let () = proxy
         .get_subpackage(
             &fpkg_ext::BlobId::from(superpackage).into(),
@@ -604,9 +604,7 @@ where
             // The capability is optional, so if there are no bootfs blobs give pkg-cache a broken
             // proxy.
             if self.bootfs_blobs.is_empty() {
-                vfs::remote::remote_dir(
-                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
-                )
+                vfs::remote::remote_dir(fidl::endpoints::create_proxy::<fio::DirectoryMarker>().0)
             } else {
                 let dir = vfs::directory::immutable::simple();
                 for (hash, contents) in self.bootfs_blobs {

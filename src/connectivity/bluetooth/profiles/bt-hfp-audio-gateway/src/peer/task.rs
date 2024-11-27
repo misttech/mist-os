@@ -254,8 +254,7 @@ impl PeerTask {
     }
 
     async fn notify_peer_connected(&mut self, manager_id: hfp::ManagerConnectionId) {
-        let (proxy, handle) =
-            fidl::endpoints::create_proxy().expect("Cannot create required fidl handle");
+        let (proxy, handle) = fidl::endpoints::create_proxy();
         self.hfp_sender
             .send(hfp::Event::PeerConnected { peer_id: self.id, manager_id, handle })
             .await
@@ -1117,7 +1116,7 @@ mod tests {
     async fn handle_peer_request_decline_to_handle() {
         let mut peer = setup_peer_task(None).0;
         assert!(peer.handler.is_none());
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<PeerHandlerMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<PeerHandlerMarker>();
 
         // close the PeerHandler channel by dropping the server endpoint.
         drop(server_end);

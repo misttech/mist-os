@@ -1227,8 +1227,7 @@ pub enum WatchError {
 pub fn event_stream_from_state(
     state: fnet_filter::StateProxy,
 ) -> Result<impl Stream<Item = Result<Event, WatchError>>, WatcherCreationError> {
-    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>()
-        .map_err(WatcherCreationError::CreateProxy)?;
+    let (watcher, server_end) = fidl::endpoints::create_proxy::<fnet_filter::WatcherMarker>();
     state
         .get_watcher(&fnet_filter::WatcherOptions::default(), server_end)
         .map_err(WatcherCreationError::GetWatcher)?;
@@ -1589,8 +1588,7 @@ impl Controller {
         root: &fnet_root::FilterProxy,
         ControllerId(id): &ControllerId,
     ) -> Result<Self, ControllerCreationError> {
-        let (controller, server_end) =
-            fidl::endpoints::create_proxy().map_err(ControllerCreationError::CreateProxy)?;
+        let (controller, server_end) = fidl::endpoints::create_proxy();
         root.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
 
         let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id } = controller
@@ -1611,8 +1609,7 @@ impl Controller {
         control: &fnet_filter::ControlProxy,
         ControllerId(id): &ControllerId,
     ) -> Result<Self, ControllerCreationError> {
-        let (controller, server_end) =
-            fidl::endpoints::create_proxy().map_err(ControllerCreationError::CreateProxy)?;
+        let (controller, server_end) = fidl::endpoints::create_proxy();
         control.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
 
         let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id } = controller

@@ -83,8 +83,8 @@ async fn packages_are_retained_gc_mid_process() {
     let meta_blob_info = fpkg::BlobInfo { blob_id: blob_id.into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
-        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
-    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let get_fut = env
         .proxies
         .package_cache

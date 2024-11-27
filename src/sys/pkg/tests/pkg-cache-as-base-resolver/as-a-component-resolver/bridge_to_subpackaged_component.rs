@@ -23,8 +23,7 @@ async fn main() {
     fs.for_each_concurrent(0, |IncomingRequest::Ping(mut stream)| async move {
         let realm = connect_to_protocol::<RealmMarker>()
             .expect("failed to connect to fuchsia.component.Realm");
-        let (subpackaged_component_exposed_dir, server_end) =
-            create_proxy().expect("failed to create proxy");
+        let (subpackaged_component_exposed_dir, server_end) = create_proxy();
         realm
             .open_exposed_dir(
                 &ChildRef { name: "base-subpackaged-component".into(), collection: None },

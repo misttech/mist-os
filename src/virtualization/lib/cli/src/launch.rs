@@ -100,8 +100,7 @@ async fn launch<P: PlatformServices>(
     guest_type: arguments::GuestType,
     config: GuestConfig,
 ) -> Result<GuestProxy, LaunchResult> {
-    let (guest, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()
-        .map_err(|err| LaunchResult::FidlError(format!("Create proxy - {}", err)))?;
+    let (guest, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
 
     println!("Starting {}", guest_type.to_string());
     let manager = services

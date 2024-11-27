@@ -16,7 +16,7 @@ async fn routing() {
 
     // Bind to `echo_client`, causing it to execute.
     let child_ref = fdecl::ChildRef { name: "echo_client".to_string(), collection: None };
-    let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     realm
         .open_exposed_dir(&child_ref, server_end)
         .await

@@ -88,7 +88,7 @@ pub async fn run_gunit_cases(
 
     // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
     let (overall_test_listener_proxy, overall_test_listener) =
-        create_proxy::<ftest::CaseListenerMarker>()?;
+        create_proxy::<ftest::CaseListenerMarker>();
     run_listener_proxy.on_test_case_started(
         &ftest::Invocation {
             name: Some(start_info.resolved_url.clone().unwrap_or_default()),
@@ -163,7 +163,7 @@ pub async fn run_gtest_cases(
 
     // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
     let (overall_test_listener_proxy, overall_test_listener) =
-        create_proxy::<ftest::CaseListenerMarker>()?;
+        create_proxy::<ftest::CaseListenerMarker>();
     run_listener_proxy.on_test_case_started(
         &ftest::Invocation {
             name: Some(start_info.resolved_url.clone().unwrap_or_default()),
@@ -256,7 +256,7 @@ fn start_tests(
         let test_name = test.name.clone().expect("No test name.");
         test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
 
-        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
         run_listener_proxy.on_test_case_started(
             &test,
             ftest::StdHandles::default(),

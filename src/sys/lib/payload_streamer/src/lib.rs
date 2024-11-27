@@ -463,7 +463,7 @@ mod tests {
             let ramdisk_controller = ramdisk_client
                 .as_controller()
                 .ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
-            let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+            let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
             let payload_streamer = BlockDevicePayloadStreamer::new(ramdisk_block).await?;
             Box::new(payload_streamer)
@@ -555,7 +555,7 @@ mod tests {
         // channel, use open() to acquire the BlockProxy here.
         let ramdisk_controller =
             ramdisk_client.as_controller().ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
-        let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+        let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
         let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(BlockDevicePayloadStreamer::new(ramdisk_block).await?);

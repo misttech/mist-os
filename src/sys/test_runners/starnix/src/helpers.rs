@@ -55,7 +55,7 @@ pub async fn run_starnix_benchmark(
     test_data_path: &str,
     converter: impl FnOnce(&str, &str) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error>,
 ) -> Result<(), Error> {
-    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
     let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
@@ -174,7 +174,7 @@ pub fn start_test_component(
     component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<frunner::ComponentControllerProxy, Error> {
     let (component_controller, component_controller_server_end) =
-        create_proxy::<frunner::ComponentControllerMarker>()?;
+        create_proxy::<frunner::ComponentControllerMarker>();
 
     debug!(?start_info, "asking kernel to start component");
     component_runner.start(start_info, component_controller_server_end)?;

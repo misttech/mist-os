@@ -63,8 +63,7 @@ fn connect_to_hrtimer_async() -> Result<fhrtimer::DeviceProxy, Errno> {
         .into_string()
         .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
 
-    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>()
-        .map_err(|e| errno!(EINVAL, format!("Failed to create hrtimer proxy: {e}")))?;
+    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>();
     fdio::service_connect(&path, server_end.into_channel())
         .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
 

@@ -204,7 +204,7 @@ mod tests {
         defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) };
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         dir.clone().open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,

@@ -152,8 +152,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
     }
 
     // Inject keyboard input.
-    let (keyboard_proxy, keyboard_server) =
-        create_proxy::<KeyboardMarker>().expect("Failed to create KeyboardProxy.");
+    let (keyboard_proxy, keyboard_server) = create_proxy::<KeyboardMarker>();
     let input_registry = realm
         .root
         .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
@@ -221,8 +220,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
     }
 
     // Inject mouse input.
-    let (mouse_proxy, mouse_server) =
-        create_proxy::<MouseMarker>().expect("Failed to create MouseProxy.");
+    let (mouse_proxy, mouse_server) = create_proxy::<MouseMarker>();
     let input_registry = realm
         .root
         .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
@@ -289,8 +287,7 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
     }
 
     // Inject touch input.
-    let (touchscreen_proxy, touchscreen_server) =
-        create_proxy::<TouchScreenMarker>().expect("Failed to create TouchScreenProxy.");
+    let (touchscreen_proxy, touchscreen_server) = create_proxy::<TouchScreenMarker>();
     let input_registry = realm
         .root
         .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
@@ -356,8 +353,7 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
     }
 
     // Inject media buttons input.
-    let (media_buttons_proxy, media_buttons_server) =
-        create_proxy::<MediaButtonsDeviceMarker>().expect("Failed to create MediaButtonsProxy");
+    let (media_buttons_proxy, media_buttons_server) = create_proxy::<MediaButtonsDeviceMarker>();
     let input_registry = realm
         .root
         .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()

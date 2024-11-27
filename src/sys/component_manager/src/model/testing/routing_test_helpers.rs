@@ -777,7 +777,7 @@ impl RoutingTestModel for RoutingTest {
                         &"/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     )
                     .await;
-                let (storage_proxy, server_end) = create_proxy().unwrap();
+                let (storage_proxy, server_end) = create_proxy();
                 let moniker_string = format!("{}", storage_relation);
                 let component_moniker = moniker.concat(&storage_relation);
                 let instance_id =
@@ -1045,7 +1045,7 @@ pub mod capability_util {
         dir_proxy: &fio::DirectoryProxy,
         expected_res: ExpectedResult,
     ) {
-        let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+        let (file_proxy, server_end) = create_proxy::<fio::FileMarker>();
         let flags =
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY;
         let res = async {
@@ -1338,7 +1338,7 @@ pub mod capability_util {
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
         open_exposed_dir(&path, moniker, model, true, server_end).await;
         let dir_proxy = fio::DirectoryProxy::new(node_proxy.into_channel().unwrap());
         match expected_res {
@@ -1377,7 +1377,7 @@ pub mod capability_util {
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
         open_exposed_dir(&path, moniker, model, false, server_end).await;
         let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
         call_echo_and_validate_result(echo_proxy, expected_res).await;
@@ -1391,7 +1391,7 @@ pub mod capability_util {
         model: &Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
         open_exposed_dir(&path, moniker, model, true, server_end).await;
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
@@ -1411,7 +1411,7 @@ pub mod capability_util {
         moniker: &Moniker,
         model: &Arc<Model>,
     ) -> Vec<String> {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
         open_exposed_dir(&path, moniker, model, true, server_end).await;
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.

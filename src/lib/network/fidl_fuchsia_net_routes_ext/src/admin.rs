@@ -291,8 +291,7 @@ pub fn new_route_table<I: Ip + FidlRouteAdminIpExt>(
     name: Option<String>,
 ) -> Result<<I::RouteTableMarker as ProtocolMarker>::Proxy, RouteTableCreationError> {
     let (route_table_proxy, route_table_server_end) =
-        fidl::endpoints::create_proxy::<I::RouteTableMarker>()
-            .map_err(RouteTableCreationError::CreateProxy)?;
+        fidl::endpoints::create_proxy::<I::RouteTableMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -334,8 +333,7 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
     route_table_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
-        fidl::endpoints::create_proxy::<I::RouteSetMarker>()
-            .map_err(RouteSetCreationError::CreateProxy)?;
+        fidl::endpoints::create_proxy::<I::RouteSetMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -363,8 +361,7 @@ pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
     route_table_proxy: &<I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {
     let (route_set_proxy, route_set_server_end) =
-        fidl::endpoints::create_proxy::<I::RouteSetMarker>()
-            .map_err(RouteSetCreationError::CreateProxy)?;
+        fidl::endpoints::create_proxy::<I::RouteSetMarker>();
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]

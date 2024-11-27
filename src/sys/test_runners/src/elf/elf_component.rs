@@ -246,8 +246,7 @@ impl Component {
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
             .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
 
-        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>()
-            .map_err(|e| ComponentError::Fidl("Cannot create proxy".into(), e))?;
+        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>();
         lib_loader_cache_builder
             .create(lib_proxy.into_channel().unwrap().into_zx_channel().into(), server_end)
             .map_err(|e| {
@@ -321,8 +320,7 @@ impl Component {
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
             .map_err(|e| ComponentError::LibraryLoadError(args.url.clone(), e))?;
 
-        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>()
-            .map_err(|e| ComponentError::Fidl("Cannot create proxy".into(), e))?;
+        let (lib_loader_cache, server_end) = create_proxy::<LibraryLoaderCacheMarker>();
         lib_loader_cache_builder
             .create(lib_proxy.into_channel().unwrap().into_zx_channel().into(), server_end)
             .map_err(|e| {
@@ -703,7 +701,7 @@ mod tests {
             runtime_dir: None,
             ..Default::default()
         };
-        let (client_controller, server_controller) = endpoints::create_proxy().unwrap();
+        let (client_controller, server_controller) = endpoints::create_proxy();
         let get_test_server = || DummyServer {};
         let err = start_component(start_info, server_controller, get_test_server, |_| Ok(())).await;
         assert_matches!(err, Err(ComponentError::MissingResolvedUrl));

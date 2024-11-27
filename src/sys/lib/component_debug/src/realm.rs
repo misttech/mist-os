@@ -447,7 +447,7 @@ pub async fn get_runtime(
 ) -> Result<Runtime, GetRuntimeError> {
     // Parse the runtime directory and add it into the State object
     let moniker_str = moniker.to_string();
-    let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -523,7 +523,7 @@ pub async fn get_outgoing_capabilities(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = moniker.to_string();
-    let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -548,7 +548,7 @@ pub async fn get_merkle_root(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
     let moniker_str = moniker.to_string();
-    let (meta_file, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+    let (meta_file, server_end) = create_proxy::<fio::FileMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .open(

@@ -378,7 +378,7 @@ async fn get_tests<W: Write>(
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
     let writer = &mut write;
-    let (iterator_proxy, iterator) = create_proxy().unwrap();
+    let (iterator_proxy, iterator) = create_proxy();
 
     tracing::info!("launching test suite {}", cmd.test_url);
 

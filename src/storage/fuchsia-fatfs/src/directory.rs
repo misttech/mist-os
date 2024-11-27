@@ -1238,7 +1238,7 @@ mod tests {
         let dir = fs.get_root().expect("get_root OK");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
         let scope_clone = scope.clone();
 
@@ -1248,7 +1248,7 @@ mod tests {
             .expect("Send request OK")
             .map_err(Status::from_raw)
             .expect("First close OK");
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         dir.clone().open(
             scope_clone,
             fio::OpenFlags::RIGHT_READABLE,
@@ -1276,7 +1276,7 @@ mod tests {
         let scope = ExecutionScope::new();
 
         // Open and close root.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
             .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
@@ -1288,7 +1288,7 @@ mod tests {
             .expect("First close failed");
 
         // Re-open and close root at "test".
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
@@ -1317,7 +1317,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
@@ -1351,7 +1351,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
@@ -1401,7 +1401,7 @@ mod tests {
         let root = fs.get_root().expect("get_root failed");
 
         let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags =
             fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
         ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {

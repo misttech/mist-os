@@ -138,7 +138,7 @@ impl TestStack {
 
     /// Connect to a discoverable service offered by the netstack.
     pub(crate) fn connect_proxy<M: NetstackServiceMarker>(&self) -> M::Proxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<M>().expect("create proxy");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<M>();
         self.connect_service(M::make_service(server_end));
         proxy
     }
@@ -157,8 +157,7 @@ impl TestStack {
     ) -> fnet_interfaces_ext::admin::Control {
         let root_interfaces = self.connect_proxy::<fnet_root::InterfacesMarker>();
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
         root_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
         fnet_interfaces_ext::admin::Control::new(control)
     }
@@ -199,8 +198,7 @@ impl TestStack {
     pub(crate) fn new_interfaces_watcher(&self) -> fidl_fuchsia_net_interfaces::WatcherProxy {
         let state = self.connect_proxy::<fidl_fuchsia_net_interfaces::StateMarker>();
         let (watcher, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>();
         state
             .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server_end)
             .expect("get watcher");
@@ -386,7 +384,7 @@ impl TestSetup {
             .unwrap_or_else(|| panic!("failed to retrieve endpoint {ep_name}"))
             .into_proxy();
 
-        let (port, server_end) = fidl::endpoints::create_proxy().expect("create proxy");
+        let (port, server_end) = fidl::endpoints::create_proxy();
         ep.get_port(server_end).expect("get port");
         let (device, server_end) = fidl::endpoints::create_endpoints();
         port.get_device(server_end).expect("get device");
@@ -509,8 +507,7 @@ impl TestSetupBuilder {
 
                 let installer = stack.connect_interfaces_installer();
 
-                let (device_control, server_end) =
-                    fidl::endpoints::create_proxy().expect("create proxy");
+                let (device_control, server_end) = fidl::endpoints::create_proxy();
                 installer.install_device(endpoint, server_end).expect("install device");
 
                 // Discard strong ownership of device, we're already holding
@@ -518,8 +515,7 @@ impl TestSetupBuilder {
                 // to the netstack side of it too.
                 device_control.detach().expect("detach");
 
-                let (interface_control, server_end) =
-                    fidl::endpoints::create_proxy().expect("create proxy");
+                let (interface_control, server_end) = fidl::endpoints::create_proxy();
                 device_control
                     .create_interface(
                         &port_id,
@@ -569,8 +565,7 @@ impl TestSetupBuilder {
                     let control = fnet_interfaces_ext::admin::Control::new(interface_control);
                     let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                         fnet_interfaces_admin::AddressStateProviderMarker,
-                    >()
-                    .expect("create proxy should succeed");
+                    >();
                     control
                         .add_address(
                             &addr.into_fidl(),

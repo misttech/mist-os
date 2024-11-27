@@ -35,7 +35,7 @@ async fn setup_connected_to_open_bss(
 
         let client_fut = async {
             let (connect_txn, connect_txn_server) =
-                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
 
             let connect_req = fidl_sme::ConnectRequest {
                 ssid: COMPATIBLE_OPEN_BSS.ssid.clone().into(),
@@ -219,7 +219,7 @@ async fn test_open_connect_request_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -318,7 +318,7 @@ async fn test_open_connect_request_error() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -419,7 +419,7 @@ async fn test_wpa2_connect_request_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {
@@ -615,7 +615,7 @@ async fn test_wpa3_connect_success() {
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
         let mut connect_txn_event_stream = connect_txn.take_event_stream();
 
         let connect_req = fidl_sme::ConnectRequest {

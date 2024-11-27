@@ -53,13 +53,13 @@ pub async fn start_policy_test(
     // Get to the Realm protocol
     let realm_query =
         instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (exposed_dir, server_end) = create_proxy().unwrap();
+    let (exposed_dir, server_end) = create_proxy();
     realm_query
         .open_directory("./root", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();
-    let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>().unwrap();
+    let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>();
     exposed_dir
         .open3(
             fcomponent::RealmMarker::DEBUG_NAME,
@@ -76,7 +76,7 @@ pub async fn open_exposed_dir(
     name: &str,
 ) -> Result<fio::DirectoryProxy, fcomponent::Error> {
     let child_ref = fdecl::ChildRef { name: name.to_string(), collection: None };
-    let (exposed_dir, server_end) = create_proxy().unwrap();
+    let (exposed_dir, server_end) = create_proxy();
     realm
         .open_exposed_dir(&child_ref, server_end)
         .await

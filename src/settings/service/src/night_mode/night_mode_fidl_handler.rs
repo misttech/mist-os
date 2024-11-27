@@ -121,8 +121,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>();
         let _fut =
             proxy.set(&NightModeSettings { night_mode_enabled: Some(true), ..Default::default() });
         let mut request_stream: NightModeRequestStream = server.into_stream();
@@ -139,8 +138,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
-        let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>()
-            .expect("should be able to create proxy");
+        let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>();
         let _fut = proxy.watch();
         let mut request_stream: NightModeRequestStream = server.into_stream();
         let request = request_stream

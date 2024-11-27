@@ -771,7 +771,7 @@ mod tests {
                 .unwrap();
 
             let (watcher_proxy, watcher_server_end) =
-                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fthermal::ClientStateWatcherMarker>();
 
             // Pass the `watcher_server_end` to the node, so it will be associated with thermal
             // state changes of `client_type`

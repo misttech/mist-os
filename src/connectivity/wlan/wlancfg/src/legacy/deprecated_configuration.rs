@@ -169,8 +169,7 @@ mod tests {
 
         // Create the request stream and proxy.
         let (configurator_proxy, remote) =
-            create_proxy::<fidl_deprecated::DeprecatedConfiguratorMarker>()
-                .expect("error creating proxy");
+            create_proxy::<fidl_deprecated::DeprecatedConfiguratorMarker>();
         let stream = remote.into_stream();
 
         // Kick off the serve loop and wait for it to stall out waiting for requests.

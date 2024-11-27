@@ -37,9 +37,6 @@ pub enum Error {
 
 #[derive(Debug, thiserror::Error)]
 pub enum UpdatePackage {
-    #[error("creating Directory proxy to resolve the update package")]
-    CreateDirectoryProxy(#[source] fidl::Error),
-
     #[error("fidl error resolving update package")]
     ResolveFidl(#[source] fidl::Error),
 

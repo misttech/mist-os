@@ -398,8 +398,7 @@ impl ArchiveReader {
 
         let archive = archive.as_ref().unwrap();
 
-        let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()
-            .map_err(Error::CreateIteratorProxy)?;
+        let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
 
         let stream_parameters = StreamParameters {
             stream_mode: Some(mode),

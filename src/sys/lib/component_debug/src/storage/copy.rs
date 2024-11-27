@@ -25,7 +25,7 @@ pub async fn copy(
     source_path: String,
     destination_path: String,
 ) -> Result<()> {
-    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 

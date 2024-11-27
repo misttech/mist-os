@@ -85,7 +85,7 @@ impl FactoryStoreFacade {
         &self,
         provider: FactoryStoreProvider,
     ) -> Result<fio::DirectoryProxy, Error> {
-        let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>()?;
+        let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>();
 
         match provider {
             FactoryStoreProvider::Alpha => {

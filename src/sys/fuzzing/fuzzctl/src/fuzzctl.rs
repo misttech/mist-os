@@ -467,7 +467,7 @@ mod tests {
 
     fn perform_setup() -> Result<(Test, FuzzCtl<BufferSink>, LibFuzzerPathBuf, fasync::Task<()>)> {
         let test = Test::try_new()?;
-        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>()?;
+        let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>();
         let fuzz_ctl = FuzzCtl::new(proxy, test.root_dir(), test.writer());
         let task = create_task(serve_manager(server_end, test.clone()), test.writer());
 

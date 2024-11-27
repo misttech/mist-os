@@ -290,7 +290,7 @@ impl TestFixture {
     }
 
     pub fn dir(&self, dir: &str, flags: fio::Flags) -> fio::DirectoryProxy {
-        let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let (dev, server) = create_proxy::<fio::DirectoryMarker>();
         let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
         self.realm
             .root
@@ -318,8 +318,7 @@ impl TestFixture {
             .expect("failed to connect to the BlobReader");
             let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
         } else {
-            let (blob, server_end) =
-                create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+            let (blob, server_end) = create_proxy::<fio::FileMarker>();
             let path = &format!("{}", expected_blob_hash);
             self.dir("blob", fio::PERM_READABLE)
                 .open3(
@@ -336,7 +335,7 @@ impl TestFixture {
     /// Check for the existence of a well-known set of test files in the data volume. These files
     /// are placed by the disk builder if it formats the filesystem beforehand.
     pub async fn check_test_data_file(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
             .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
@@ -364,7 +363,7 @@ impl TestFixture {
     /// Checks for the absence of the .testdata marker file, indicating the data filesystem was
     /// reformatted.
     pub async fn check_test_data_file_absent(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
             .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");

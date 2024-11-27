@@ -61,7 +61,7 @@ async fn run_mocks(
     // The black_hole directory points to a channel we will never answer, so that capabilities
     // provided from this directory will behave similarly to as if they were from an unlaunched
     // component.
-    let (proxy, _server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (proxy, _server_end) = create_proxy::<fio::DirectoryMarker>();
     fs.add_remote("black_hole", proxy);
 
     fs.serve_connection(handles.outgoing_dir)?;

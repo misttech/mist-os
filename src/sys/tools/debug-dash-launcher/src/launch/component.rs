@@ -91,7 +91,7 @@ async fn open_outgoing_dir(
     query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
-    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
         .open(
@@ -126,7 +126,7 @@ async fn open_runtime_dir(
     query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
-    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
         .open(
@@ -159,7 +159,7 @@ async fn open_exposed_dir(
     query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<fio::DirectoryProxy, LauncherError> {
-    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     let result = query
         .open(
@@ -215,8 +215,7 @@ mod tests {
     use futures::StreamExt;
 
     fn serve_realm_query(result: fsys::RealmQueryOpenResult) -> fsys::RealmQueryProxy {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>();
         fasync::Task::spawn(async move {
             let mut stream = server_end.into_stream();
             let request = stream.next().await.unwrap().unwrap();

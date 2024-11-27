@@ -447,8 +447,8 @@ async fn connect_avrcp(
     avrcp: &mut avrcp::PeerManagerProxy,
     peer_id: PeerId,
 ) -> Result<(avrcp::ControllerProxy, avrcp::BrowseControllerProxy), Error> {
-    let (controller, server) = endpoints::create_proxy()?;
-    let (browse_controller, browse_server) = endpoints::create_proxy()?;
+    let (controller, server) = endpoints::create_proxy();
+    let (browse_controller, browse_server) = endpoints::create_proxy();
 
     let _ = avrcp.get_controller_for_target(&peer_id.into(), server).await?;
     let _ = avrcp.get_browse_controller_for_target(&peer_id.into(), browse_server).await?;

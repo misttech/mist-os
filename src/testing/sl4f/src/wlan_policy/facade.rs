@@ -4,7 +4,7 @@
 
 use crate::common_utils::common::macros::with_line;
 use crate::wlan_policy::types::{ClientStateSummary, NetworkConfig};
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{format_err, Error};
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fuchsia_async::{self as fasync, DurationExt as _};
@@ -79,7 +79,7 @@ impl WlanPolicyFacade {
     > {
         let provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>()?;
         let (controller, req) =
-            fidl::endpoints::create_proxy::<fidl_policy::ClientControllerMarker>()?;
+            fidl::endpoints::create_proxy::<fidl_policy::ClientControllerMarker>();
         let (update_sink, update_stream) =
             fidl::endpoints::create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()?;
         provider.get_controller(req, update_sink)?;
@@ -132,8 +132,7 @@ impl WlanPolicyFacade {
 
         // Policy will send results back through this iterator
         let (iter, server) =
-            fidl::endpoints::create_proxy::<fidl_policy::ScanResultIteratorMarker>()
-                .context("failed to create iterator")?;
+            fidl::endpoints::create_proxy::<fidl_policy::ScanResultIteratorMarker>();
         // Request a scan from policy
         controller.scan_for_networks(server)?;
 
@@ -364,8 +363,7 @@ impl WlanPolicyFacade {
 
         // Policy will send configs back through this iterator
         let (iter, server) =
-            fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>()
-                .context("failed to create iterator")?;
+            fidl::endpoints::create_proxy::<fidl_policy::NetworkConfigIteratorMarker>();
         controller
             .get_saved_networks(server)
             .map_err(|e| format_err!("Get saved networks: fidl error {:?}", e))?;

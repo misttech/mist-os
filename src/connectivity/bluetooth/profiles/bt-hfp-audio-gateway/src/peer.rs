@@ -248,8 +248,7 @@ impl Peer for PeerImpl {
         Ok(())
     }
     async fn build_handler(&mut self) -> Result<ServerEnd<PeerHandlerMarker>, Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy()
-            .map_err(|e| Error::system("Could not create call manager fidl endpoints", e))?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         self.queue
             .try_send_fut(PeerRequest::Handle(proxy))
             .await

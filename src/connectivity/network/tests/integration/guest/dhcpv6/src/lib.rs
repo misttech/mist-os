@@ -61,8 +61,7 @@ async fn gets_dns_servers(name: &str) {
     let client_provider = realm
         .connect_to_protocol::<fnet_dhcpv6::ClientProviderMarker>()
         .expect("connect to fuchsia.net.dhcpv6/ClientProvider");
-    let (dhcpv6_client, server_end) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
-        .expect("create fuchsia.net.dhcpv6/Client client and server ends");
+    let (dhcpv6_client, server_end) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>();
     let () = client_provider
         .new_client(
             &fnet_dhcpv6_ext::NewClientParams {
@@ -244,8 +243,7 @@ fn start_stateful_dhcpv6_client(
     addr: net_types::ip::Ipv6Addr,
     client_config: fnet_dhcpv6_ext::ClientConfig,
 ) -> fnet_dhcpv6::ClientProxy {
-    let (dhcpv6_client, server_end) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
-        .expect("create fuchsia.net.dhcpv6/Client client and server ends");
+    let (dhcpv6_client, server_end) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>();
     let () = client_provider
         .new_client(
             &fnet_dhcpv6_ext::NewClientParams {

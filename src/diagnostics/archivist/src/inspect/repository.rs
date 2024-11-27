@@ -292,8 +292,7 @@ mod tests {
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
-        let (proxy, _stream) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, _stream) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         let proxy_clone = proxy.clone();
         inspect_repo
             .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
@@ -313,8 +312,7 @@ mod tests {
         let data_repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         data_repo
             .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         assert!(data_repo.inner.read().get(&identity).is_some());
@@ -331,8 +329,7 @@ mod tests {
     async fn related_handle_closes_when_repo_handle_is_removed() {
         let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let identity = Arc::new(ComponentIdentity::unknown());
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         let koid = proxy.as_channel().as_handle_ref().get_koid().unwrap();
         repo.add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         {
@@ -352,8 +349,7 @@ mod tests {
             Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker.clone(), TEST_URL));
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         data_repo
             .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         assert!(data_repo.inner.read().get(&identity).is_some());
@@ -378,15 +374,13 @@ mod tests {
         let moniker = ExtendedMoniker::parse_str("./a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
 
-        let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         data_repo
             .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
 
         let moniker2 = ExtendedMoniker::parse_str("./a/b/foo2").unwrap();
         let identity2 = Arc::new(ComponentIdentity::new(moniker2, TEST_URL));
-        let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         data_repo
             .add_inspect_handle(Arc::clone(&identity2), InspectHandle::tree(proxy, Some("test")));
 
@@ -472,8 +466,7 @@ mod tests {
         let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
-            .expect("create directory proxy");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>();
         let koid = proxy.as_channel().as_handle_ref().get_koid().unwrap();
 
         repo.add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("tree")));

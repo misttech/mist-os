@@ -1034,8 +1034,7 @@ impl RealmBuilder {
         realm_name: String,
     ) -> Result<Self, Error> {
         let (exposed_dir_proxy, exposed_dir_server_end) =
-            endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("failed to create channel pair");
+            endpoints::create_proxy::<fio::DirectoryMarker>();
         component_realm_proxy
             .open_exposed_dir(
                 &fdecl::ChildRef {
@@ -1053,10 +1052,8 @@ impl RealmBuilder {
         >(&exposed_dir_proxy)
         .map_err(Error::ConnectToServer)?;
 
-        let (realm_proxy, realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().expect("failed to create channel pair");
-        let (builder_proxy, builder_server_end) =
-            create_proxy::<ftest::BuilderMarker>().expect("failed to create channel pair");
+        let (realm_proxy, realm_server_end) = create_proxy::<ftest::RealmMarker>();
+        let (builder_proxy, builder_server_end) = create_proxy::<ftest::BuilderMarker>();
         match fragment_only_url {
             Some(fragment_only_url) => {
                 realm_builder_factory_proxy
@@ -1567,8 +1564,7 @@ impl SubRealmBuilder {
         options: ChildOptions,
     ) -> Result<Self, Error> {
         let name: String = name.into();
-        let (child_realm_proxy, child_realm_server_end) =
-            create_proxy::<ftest::RealmMarker>().expect("failed to create channel pair");
+        let (child_realm_proxy, child_realm_server_end) = create_proxy::<ftest::RealmMarker>();
         self.realm_proxy.add_child_realm(&name, &options.into(), child_realm_server_end).await??;
 
         let mut child_path = self.realm_path.clone();
@@ -2021,7 +2017,7 @@ impl ScopedInstanceFactory {
             startup: Some(fdecl::StartupMode::Lazy),
             ..Default::default()
         };
-        let (controller_proxy, controller) = create_proxy::<fcomponent::ControllerMarker>()?;
+        let (controller_proxy, controller) = create_proxy::<fcomponent::ControllerMarker>();
         let child_args = fcomponent::CreateChildArgs {
             numbered_handles: None,
             controller: Some(controller),
@@ -2036,8 +2032,7 @@ impl ScopedInstanceFactory {
             name: child_name.clone(),
             collection: Some(self.collection_name.clone()),
         };
-        let (exposed_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>()
-            .context("Failed to create directory proxy")?;
+        let (exposed_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = realm
             .open_exposed_dir(&child_ref, server)
             .await
@@ -2119,7 +2114,7 @@ impl ScopedInstance {
         args: fcomponent::StartChildArgs,
     ) -> Result<ExecutionController, anyhow::Error> {
         let (execution_proxy, execution_server_end) =
-            create_proxy::<fcomponent::ExecutionControllerMarker>()?;
+            create_proxy::<fcomponent::ExecutionControllerMarker>();
         self.controller_proxy
             .start(args, execution_server_end)
             .await

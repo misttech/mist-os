@@ -1149,8 +1149,7 @@ async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
     let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
 
     let (address_state_provider, server) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-            .expect("create proxy");
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
     // Create the state stream before adding the address to ensure that all
     // generated events are observed.
     let state_stream = fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
@@ -1993,8 +1992,7 @@ async fn install_ip_device(
     };
     let device_control = {
         let (control, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>();
         let () = installer.install_device(device, server_end).expect("install device");
         control
     };
@@ -2014,8 +2012,7 @@ async fn install_ip_device(
         .for_each_concurrent(None, |subnet| {
             let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                 fnet_interfaces_admin::AddressStateProviderMarker,
-            >()
-            .expect("create proxy");
+            >();
 
             // We're not interested in maintaining the address' lifecycle through
             // the proxy.
@@ -2204,8 +2201,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("failed to connect to tun protocol");
 
-    let (tun_dev, req) = fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>()
-        .expect("failed to create endpoints");
+    let (tun_dev, req) = fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>();
     let () = tun
         .create_device(
             &fnet_tun::DeviceConfig { base: None, blocking: Some(true), ..Default::default() },
@@ -2214,8 +2210,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .expect("failed to create tun pair");
 
     let (_tun_port, port) = {
-        let (tun_port, server_end) = fidl::endpoints::create_proxy::<fnet_tun::PortMarker>()
-            .expect("failed to create endpoints");
+        let (tun_port, server_end) = fidl::endpoints::create_proxy::<fnet_tun::PortMarker>();
         let () = tun_dev
             .add_port(
                 &fnet_tun::DevicePortConfig {
@@ -2229,8 +2224,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             )
             .expect("add_port failed");
 
-        let (port, server_end) = fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
-            .expect("failed to create endpoints");
+        let (port, server_end) = fidl::endpoints::create_proxy::<fhardware_network::PortMarker>();
         let () = tun_port.get_port(server_end).expect("get_port failed");
         (tun_port, port)
     };

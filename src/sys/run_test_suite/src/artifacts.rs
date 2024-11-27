@@ -389,7 +389,7 @@ mod file_tests {
         directory_writer: InMemoryDirectoryWriter,
     ) {
         let (directory_client, directory_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         fake_dir.open(
             scope,

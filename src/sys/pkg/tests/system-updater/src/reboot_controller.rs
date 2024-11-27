@@ -17,7 +17,7 @@ async fn reboot_controller_detach_causes_deferred_reboot() {
         .add_file("images.json", make_images_json_zbi());
 
     // Start the system update.
-    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
         &UPDATE_PKG_URL.parse().unwrap(),
         default_options(),
@@ -49,7 +49,7 @@ async fn reboot_controller_unblock_causes_reboot() {
         .add_file("images.json", make_images_json_zbi());
 
     // Start the system update.
-    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
         &UPDATE_PKG_URL.parse().unwrap(),
         default_options(),
@@ -81,7 +81,7 @@ async fn reboot_controller_dropped_causes_reboot() {
         .add_file("images.json", make_images_json_zbi());
 
     // Start the system update.
-    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (reboot_proxy, server_end) = fidl::endpoints::create_proxy();
     let attempt = start_update(
         &UPDATE_PKG_URL.parse().unwrap(),
         default_options(),

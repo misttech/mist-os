@@ -661,7 +661,7 @@ mod tests {
         test: &TestModelResult,
     ) -> (fsys::RouteValidatorProxy, RouteValidatorFrameworkCapability) {
         let host = RouteValidatorFrameworkCapability::new(Arc::downgrade(&test.model));
-        let (proxy, server) = endpoints::create_proxy::<fsys::RouteValidatorMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fsys::RouteValidatorMarker>();
         capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
         (proxy, host)
     }

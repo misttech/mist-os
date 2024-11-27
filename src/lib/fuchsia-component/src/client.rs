@@ -73,8 +73,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
     /// Note, this method does not check if the protocol exists. It is up to the
     /// caller to call `exists` to check for existence.
     pub fn connect(self) -> Result<P::Proxy, Error> {
-        let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<P>().context("error creating proxy")?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<P>();
         let () = self
             .connect_with(server_end.into_channel())
             .context("error connecting with server channel")?;
@@ -159,7 +158,7 @@ pub fn connect_to_protocol_sync<P: DiscoverableProtocolMarker>(
 pub fn connect_to_protocol_at<P: DiscoverableProtocolMarker>(
     service_prefix: impl AsRef<str>,
 ) -> Result<P::Proxy, Error> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>();
     let () =
         connect_channel_to_protocol_at::<P>(server_end.into_channel(), service_prefix.as_ref())?;
     Ok(proxy)
@@ -183,7 +182,7 @@ pub fn connect_to_protocol_sync_at<P: DiscoverableProtocolMarker>(
 pub fn connect_to_protocol_at_path<P: ProtocolMarker>(
     protocol_path: impl AsRef<str>,
 ) -> Result<P::Proxy, Error> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>();
     let () =
         connect_channel_to_protocol_at_path(server_end.into_channel(), protocol_path.as_ref())?;
     Ok(proxy)
@@ -201,7 +200,7 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
     directory: &impl AsRefDirectory,
     filename: &str,
 ) -> Result<P::Proxy, Error> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P>();
     directory.as_ref_directory().open(
         filename,
         fio::Flags::PROTOCOL_SERVICE,
@@ -479,7 +478,7 @@ pub async fn open_childs_exposed_directory(
     collection_name: Option<String>,
 ) -> Result<fio::DirectoryProxy, Error> {
     let realm_proxy = connect_to_protocol::<RealmMarker>()?;
-    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let child_ref = ChildRef { name: child_name.into(), collection: collection_name };
     realm_proxy.open_exposed_dir(&child_ref, server_end).await?.map_err(|e| {
         let ChildRef { name, collection } = child_ref;
@@ -515,8 +514,7 @@ pub mod test_util {
 
     #[cfg(test)]
     pub fn run_directory_server(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap();

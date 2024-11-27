@@ -73,7 +73,7 @@ async fn process_cmd<F>(cmd: FactoryStoreCmd, mut connect_fn: F) -> Result<Vec<S
 where
     F: FnMut(ServerEnd<fio::DirectoryMarker>) -> (),
 {
-    let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>();
     connect_fn(dir_server_end);
 
     let out = match cmd {
@@ -244,7 +244,7 @@ mod tests {
         let test_dir = tree.build();
 
         let (test_dir_proxy, test_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         test_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

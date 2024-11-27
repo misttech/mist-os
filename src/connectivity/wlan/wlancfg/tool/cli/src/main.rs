@@ -18,8 +18,7 @@ pub async fn get_client_controller(
 ) -> Result<(wlan_policy::ClientControllerProxy, wlan_policy::ClientStateUpdatesRequestStream), Error>
 {
     let policy_provider = connect_to_protocol::<wlan_policy::ClientProviderMarker>()?;
-    let (client_controller, server_end) =
-        create_proxy::<wlan_policy::ClientControllerMarker>().unwrap();
+    let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>();
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::ClientStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;
@@ -35,8 +34,7 @@ pub fn get_ap_controller() -> Result<
     Error,
 > {
     let policy_provider = connect_to_protocol::<wlan_policy::AccessPointProviderMarker>()?;
-    let (ap_controller, server_end) =
-        create_proxy::<wlan_policy::AccessPointControllerMarker>().unwrap();
+    let (ap_controller, server_end) = create_proxy::<wlan_policy::AccessPointControllerMarker>();
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::AccessPointStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;

@@ -697,7 +697,7 @@ mod tests {
         driver_filter: &[String],
     ) -> Vec<fdf::DriverInfo> {
         let (info_iterator, info_iterator_server) =
-            fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>();
         development_proxy.get_driver_info(driver_filter, info_iterator_server).unwrap();
 
         let mut driver_infos = Vec::new();

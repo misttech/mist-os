@@ -447,7 +447,7 @@ async fn open_runner(
         // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
         // capability for new routes.
         RouterResponse::<Connector>::Capability(runner_connector) => {
-            let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>();
             runner_connector.send(Message { channel: server_end.into_channel() }).map_err(
                 |_| StartActionError::ResolveRunnerError {
                     moniker: component.moniker.clone(),
@@ -627,7 +627,7 @@ async fn create_scoped_logger(
     let dir_entry = router
         .try_into_directory_entry(component.execution_scope.clone())
         .context("LogSink could not convert to DirEntry?")?;
-    let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>().unwrap();
+    let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>();
     let flags = fio::OpenFlags::empty();
     flags.to_object_request(server.into_channel()).handle(|object_request| {
         dir_entry.clone().open_entry(OpenRequest::new(

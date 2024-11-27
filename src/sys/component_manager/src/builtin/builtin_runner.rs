@@ -140,7 +140,7 @@ impl BuiltinRunner {
         let job = self.root_job.create_child_job().map_err(BuiltinRunnerError::JobCreation)?;
         let job2 = job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
         let (lifecycle_client, lifecycle_server) =
-            endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>().unwrap();
+            endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>();
         let body: BuiltinProgramFn = (self.program)();
         let program = BuiltinProgram::new(
             body,
@@ -668,7 +668,7 @@ mod tests {
         svc_dir: ClientEnd<fio::DirectoryMarker>,
         main_process_critical: bool,
     ) -> (ComponentStartInfo, DirectoryProxy) {
-        let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy();
         let mut start_info = ComponentStartInfo {
             resolved_url: Some("fuchsia-builtin://elf_runner.cm".to_string()),
             program: Some(Dictionary { entries: Some(vec![]), ..Default::default() }),
@@ -767,7 +767,7 @@ mod tests {
 
         let builtin_runner = make_builtin_runner(root_job_handle, make_test_exit_immediately());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -782,7 +782,7 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (component_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (component_controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
@@ -831,7 +831,7 @@ mod tests {
 
         let builtin_runner = make_builtin_runner(root_job_handle, make_test_watch_lifecycle());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -846,7 +846,7 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
@@ -906,7 +906,7 @@ mod tests {
 
         let builtin_runner = make_builtin_runner(root_job_handle, make_test_hang());
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -921,7 +921,7 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the "test" component.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
@@ -981,7 +981,7 @@ mod tests {
         let program = BuiltinRunner::get_elf_program(elf_runner_resources.clone());
         let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), program);
         let (client, server_end) =
-            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>();
         let scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         builtin_runner
@@ -996,7 +996,7 @@ mod tests {
                 ),
             )
             .unwrap();
-        let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy();
 
         // Start the ELF runner.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();

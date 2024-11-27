@@ -870,7 +870,7 @@ impl fidl::endpoints::ServiceProxy for ServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl ServiceProxy {
     pub fn connect_to_p(&self) -> Result<ProtocolProxy, fidl::Error> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<ProtocolMarker>()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<ProtocolMarker>();
         self.connect_channel_to_p(server_end)?;
         Ok(proxy)
     }

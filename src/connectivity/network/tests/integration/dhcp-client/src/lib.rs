@@ -214,10 +214,8 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client_a, server_end_a) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
-    let (client_b, server_end_b) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client_a, server_end_a) = endpoints::create_proxy::<ClientMarker>();
+    let (client_b, server_end_b) = endpoints::create_proxy::<ClientMarker>();
 
     proxy
         .new_client(
@@ -279,8 +277,7 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netsta
     // and shutdown DHCP clients on the same interface without running
     // afoul of the multiple-clients-on-same-interface restriction.
     for () in [(), ()] {
-        let (client, server_end) =
-            endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+        let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
 
         proxy
             .new_client(
@@ -324,8 +321,7 @@ async fn client_provider_double_watch<N: Netstack>(name: &str) {
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client, server_end) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
     proxy
         .new_client(
             client_iface.id(),
@@ -369,8 +365,7 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
     let proxy = client_realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let client_iface = &client_iface;
 
-    let (client, server_end) =
-        endpoints::create_proxy::<ClientMarker>().expect("create proxy should succeed");
+    let (client, server_end) = endpoints::create_proxy::<ClientMarker>();
     proxy
         .new_client(
             client_iface.id(),

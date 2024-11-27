@@ -165,7 +165,7 @@ impl Filesystem {
     }
 
     pub fn crypt_service(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
             Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
@@ -188,7 +188,7 @@ impl Filesystem {
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
             Filesystem::Serving(fs) => fs.exposed_dir().clone2(server.into_channel().into())?,

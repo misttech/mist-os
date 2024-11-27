@@ -954,8 +954,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_stops_on_channel_close() {
-        let (client_proxy, server_end) =
-            create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+        let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
         let ((), client_res) = join!(
             async { drop(client_proxy) },
@@ -1007,8 +1006,7 @@ mod tests {
         Fut: Future<Output = Result<(), fidl::Error>>,
         F: Fn(&fnet_dhcpv6::ClientProxy) -> Fut,
     {
-        let (client_proxy, server_end) =
-            create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+        let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
         let (caller1_res, caller2_res, client_res) = join!(
             watch(&client_proxy),
@@ -1072,8 +1070,7 @@ mod tests {
                 for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS {
                     let mut exec = fasync::TestExecutor::new();
 
-                    let (client_proxy, server_end) =
-                        create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+                    let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 
                     let test_fut = async {
                         join!(
@@ -1221,8 +1218,7 @@ mod tests {
                 duid: None,
             },
         ] {
-            let (client_proxy, server_end) =
-                create_proxy::<ClientMarker>().expect("failed to create test client proxy");
+            let (client_proxy, server_end) = create_proxy::<ClientMarker>();
             let () =
                 serve_client(params, server_end).await.expect("start server failed unexpectedly");
             // Calling any function on the client proxy should fail due to channel closed with

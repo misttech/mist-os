@@ -84,8 +84,7 @@ pub async fn add_address_wait_assigned(
 > {
     let (address_state_provider, server) = fidl::endpoints::create_proxy::<
         fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-    >()
-    .expect("create proxy");
+    >();
     let () = control
         .add_address(&address, &address_parameters, server)
         .expect("Control.AddAddress FIDL error");

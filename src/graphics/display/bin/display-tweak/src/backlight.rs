@@ -11,8 +11,7 @@ use crate::utils::{self, on_off_to_bool};
 /// Obtains a handle to the backlight service at the default hard-coded path.
 fn open_backlight() -> Result<backlight::DeviceProxy, Error> {
     tracing::trace!("Opening backlight device");
-    let (proxy, server) = fidl::endpoints::create_proxy::<backlight::DeviceMarker>()
-        .context("Failed to create fuchsia.hardware.backlight.Device proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<backlight::DeviceMarker>();
     fdio::service_connect("/dev/class/backlight/000", server.into_channel())
         .context("Failed to connect to default backlight service")?;
 

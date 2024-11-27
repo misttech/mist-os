@@ -213,8 +213,7 @@ where
     pub fn run(self) {
         let exec = self.exec.unwrap_or_else(|| TestExecutor::new());
 
-        let (client_proxy, server_end) =
-            create_proxy::<Marker>().expect("Failed to create connection endpoints");
+        let (client_proxy, server_end) = create_proxy::<Marker>();
 
         let root = Simple::new();
         root.add_entry("server", self.server).unwrap();

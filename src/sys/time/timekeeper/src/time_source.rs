@@ -230,7 +230,7 @@ impl TimeSourceLauncher {
 
     // Returns true if the `realm` contains the child referenced by `child_ref`.
     async fn has_child(&self, realm: &RealmProxy, child_ref: &ChildRef) -> Result<bool> {
-        let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>()?;
+        let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>();
         let collection = CollectionRef { name: TIMESOURCE_COLLECTION_NAME.into() };
         let _response = realm.list_children(&collection, server_end).await?;
         loop {

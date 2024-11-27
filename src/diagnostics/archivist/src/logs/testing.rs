@@ -363,7 +363,7 @@ impl LogReader for EventStreamLogReader {
         let (event_stream_proxy, mut event_stream) =
             fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
         let (log_sink_proxy, log_sink_server_end) =
-            fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy::<LogSinkMarker>();
 
         let (tx, mut rx) = mpsc::unbounded();
         tx.unbounded_send(create_log_sink_requested_event(

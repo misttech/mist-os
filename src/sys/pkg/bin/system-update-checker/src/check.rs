@@ -188,8 +188,7 @@ async fn latest_update_package_attempt(
     package_resolver: &impl PackageResolverProxyInterface,
     channel_manager: &dyn TargetChannelUpdater,
 ) -> Result<update_package::UpdatePackage, errors::UpdatePackage> {
-    let (dir_proxy, dir_server_end) =
-        fidl::endpoints::create_proxy().map_err(errors::UpdatePackage::CreateDirectoryProxy)?;
+    let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy();
     let update_package = channel_manager
         .get_target_channel_update_url()
         .unwrap_or_else(|| default_update_url.to_owned());
@@ -216,7 +215,7 @@ async fn latest_system_image_merkle(
 async fn get_asset_reader(
     paver: &fpaver::PaverProxy,
 ) -> Result<(fpaver::DataSinkProxy, fpaver::Configuration), anyhow::Error> {
-    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+    let (boot_manager, server_end) = fidl::endpoints::create_proxy::<BootManagerMarker>();
     let () = paver.find_boot_manager(server_end).context("connect to fuchsia.paver.BootManager")?;
     let configuration = match boot_manager.query_current_configuration().await {
         Ok(res) => res.map_err(zx::Status::from_raw).context("querying current configuration")?,
@@ -227,7 +226,7 @@ async fn get_asset_reader(
         Err(err) => return Err(err).context("querying current configuration"),
     };
 
-    let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>()?;
+    let (data_sink, server_end) = fidl::endpoints::create_proxy::<DataSinkMarker>();
     let () = paver.find_data_sink(server_end).context("connect to fuchsia.paver.DataSink")?;
     Ok((data_sink, configuration))
 }

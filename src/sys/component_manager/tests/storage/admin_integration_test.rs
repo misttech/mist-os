@@ -61,8 +61,7 @@ async fn collect_storage_user_monikers<T: AsRef<str>>(
     admin: &fsys::StorageAdminProxy,
     realm_moniker: T,
 ) -> HashSet<String> {
-    let (it_proxy, it_server) =
-        create_proxy::<fsys::StorageIteratorMarker>().expect("create iterator");
+    let (it_proxy, it_server) = create_proxy::<fsys::StorageIteratorMarker>();
     admin
         .list_storage_in_realm(realm_moniker.as_ref(), it_server)
         .await

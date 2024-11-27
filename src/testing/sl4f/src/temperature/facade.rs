@@ -44,13 +44,7 @@ impl TemperatureFacade {
         if let Some(proxy) = &self.device_proxy {
             Ok(proxy.clone())
         } else {
-            let (proxy, server) = match fidl::endpoints::create_proxy::<DeviceMarker>() {
-                Ok(r) => r,
-                Err(e) => fx_err_and_bail!(
-                    &with_line!(tag),
-                    format_err!("Failed to create proxy {:?}", e)
-                ),
-            };
+            let (proxy, server) = fidl::endpoints::create_proxy::<DeviceMarker>();
 
             if Path::new(&device_path).exists() {
                 fdio::service_connect(device_path.as_ref(), server.into_channel())?;

@@ -225,8 +225,7 @@ impl SuiteRunner {
         test_url: &str,
         options: ftest_manager::RunSuiteOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.run(test_url, options, controller).context("Error starting tests")?;
 
         return Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() });
@@ -273,8 +272,7 @@ impl TestBuilder {
         test_url: &str,
         run_options: ftest_manager::RunOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.add_suite(test_url, &run_options, controller)?;
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
     }
@@ -288,8 +286,7 @@ impl TestBuilder {
         test_url: &str,
         run_options: ftest_manager::RunOptions,
     ) -> Result<SuiteRunInstance, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.add_suite_in_realm(
             realm,
             offers,
@@ -315,8 +312,7 @@ impl TestBuilder {
         self,
         get_compressed_debug_data: bool,
     ) -> Result<Vec<TestRunEvent>, Error> {
-        let (controller_proxy, controller) =
-            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        let (controller_proxy, controller) = fidl::endpoints::create_proxy();
         self.proxy.build(controller).context("Error starting tests")?;
         // wait for test to end
         let mut events = vec![];

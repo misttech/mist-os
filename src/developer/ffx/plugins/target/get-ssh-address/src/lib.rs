@@ -48,7 +48,7 @@ async fn get_ssh_address_impl<W: Write>(
     writer: &mut W,
 ) -> Result<()> {
     let timeout_dur = Duration::from_secs_f64(cmd.timeout()?);
-    let (proxy, handle) = fidl::endpoints::create_proxy::<TargetMarker>()?;
+    let (proxy, handle) = fidl::endpoints::create_proxy::<TargetMarker>();
     let target_spec: Option<String> = ffx_target::get_target_specifier(&context).await?;
     let ts_clone = target_spec.clone();
     let ts_clone_2 = target_spec.clone();

@@ -137,11 +137,7 @@ impl StreamVolumeControl {
             return Ok(());
         }
 
-        let (vol_control_proxy, server_end) = create_proxy().map_err(|err| {
-            ControllerError::UnexpectedError(
-                format!("failed to create proxy for volume control: {err:?}").into(),
-            )
-        })?;
+        let (vol_control_proxy, server_end) = create_proxy();
         let stream_type = self.stored_stream.stream_type;
         let usage = Usage::RenderUsage(AudioRenderUsage::from(stream_type));
 

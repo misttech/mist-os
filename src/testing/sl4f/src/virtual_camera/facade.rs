@@ -165,7 +165,7 @@ mod tests {
         let test_width = "three hundred";
         let test_height = "four hundred";
 
-        let proxy = create_proxy::<VirtualCameraDeviceMarker>().unwrap();
+        let proxy = create_proxy::<VirtualCameraDeviceMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade = VirtualCameraFacade { camera_proxy: Some(proxy.0) };

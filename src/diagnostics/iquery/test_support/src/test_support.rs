@@ -318,7 +318,7 @@ impl MockRealmQuery {
     /// Then, instead of needing the client to discover the protocol, return the proxy for futher
     /// test use.
     pub async fn get_proxy(self: Rc<Self>) -> fsys2::RealmQueryProxy {
-        let (proxy, server_end) = create_proxy::<fsys2::RealmQueryMarker>().unwrap();
+        let (proxy, server_end) = create_proxy::<fsys2::RealmQueryMarker>();
         fuchsia_async::Task::local(async move { self.serve(server_end).await }).detach();
         proxy
     }

@@ -551,8 +551,7 @@ mod tests {
             let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
             let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
             fixture
                 .volumes_directory()
@@ -621,8 +620,7 @@ mod tests {
 
             let compressed_data: Vec<u8> = Type1Blob::generate(&datum, CompressionMode::Always);
             let (blob_volume_outgoing_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create dir proxy to succeed");
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
             fixture
                 .volumes_directory()

@@ -208,7 +208,7 @@ pub async fn write_test_blob(
         (hash.to_string(), data)
     };
 
-    let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+    let (blob, server_end) = create_proxy::<fio::FileMarker>();
     let flags =
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
     blob_volume_root
@@ -586,7 +586,7 @@ impl DiskBuilder {
 
     async fn init_data_minfs(&self, data_device: ControllerProxy) {
         if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
             // Just write the magic so it appears formatted to fshost.
@@ -602,7 +602,7 @@ impl DiskBuilder {
 
     async fn init_data_f2fs(&self, data_device: ControllerProxy) {
         if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
             // Just write the magic so it appears formatted to fshost.
@@ -621,7 +621,7 @@ impl DiskBuilder {
         let (mut fs, crypt_realm) = match fxfs {
             FxfsType::Fxfs(data_device) => {
                 if self.corrupt_data {
-                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
                     let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
                     // Just write the magic so it appears formatted to fshost.

@@ -66,7 +66,7 @@ impl TestHarness {
     ) -> fio::DirectoryProxy {
         let contents: Vec<Option<Box<io_test::DirectoryEntry>>> =
             entries.into_iter().map(|e| Some(Box::new(e))).collect();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("Cannot create proxy");
+        let (client, server) = create_proxy::<fio::DirectoryMarker>();
         self.proxy
             .create_directory(contents, flags, server)
             .expect("Cannot get directory from test harness");

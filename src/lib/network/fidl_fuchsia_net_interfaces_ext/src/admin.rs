@@ -397,7 +397,7 @@ impl Control {
     pub fn create_endpoints(
     ) -> Result<(Self, fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>), fidl::Error>
     {
-        let (proxy, server_end) = fidl::endpoints::create_proxy()?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy();
         Ok((Self::new(proxy), server_end))
     }
 
@@ -489,8 +489,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_assignment_state_stream() {
         let (address_state_provider, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         let state_stream = assignment_state_stream(address_state_provider);
         futures::pin_mut!(state_stream);
 
@@ -531,8 +530,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_assignment_state_stream_single_error() {
         let (address_state_provider, server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         let state_stream = assignment_state_stream(address_state_provider);
 
         let () = server_end

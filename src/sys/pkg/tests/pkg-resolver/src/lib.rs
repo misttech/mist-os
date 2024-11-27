@@ -1140,7 +1140,7 @@ pub fn resolve_package(
 ) -> impl Future<
     Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
 > {
-    let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve(url, package_server_end);
     async move {
         let resolved_context = response_fut.await.unwrap()?;
@@ -1155,7 +1155,7 @@ pub fn resolve_with_context(
 ) -> impl Future<
     Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
 > {
-    let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+    let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve_with_context(url, &context.into(), package_server_end);
     async move {
         let resolved_context = response_fut.await.unwrap()?;
@@ -1172,8 +1172,7 @@ pub fn make_repo() -> RepositoryConfig {
 }
 
 pub async fn get_repos(repository_manager: &RepositoryManagerProxy) -> Vec<RepositoryConfig> {
-    let (repo_iterator, repo_iterator_server) =
-        fidl::endpoints::create_proxy().expect("create repo iterator proxy");
+    let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
     repository_manager.list(repo_iterator_server).expect("list repos");
     let mut ret = vec![];
     loop {
@@ -1186,8 +1185,7 @@ pub async fn get_repos(repository_manager: &RepositoryManagerProxy) -> Vec<Repos
 }
 
 pub async fn get_rules(rewrite_engine: &fpkg_rewrite::EngineProxy) -> Vec<Rule> {
-    let (rule_iterator, rule_iterator_server) =
-        fidl::endpoints::create_proxy().expect("create rule iterator proxy");
+    let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
     rewrite_engine.list(rule_iterator_server).expect("list rules");
     let mut ret = vec![];
     loop {

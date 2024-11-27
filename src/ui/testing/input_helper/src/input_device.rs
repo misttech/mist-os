@@ -236,8 +236,7 @@ mod tests {
             // reports reader, to help debug integration test failures where no component
             // read events from the fake device.
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
 
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
@@ -275,8 +274,7 @@ mod tests {
             // reports reader, to help debug integration test failures where no component
             // read events from the fake device.
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
 
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
@@ -335,8 +333,7 @@ mod tests {
             pin_mut!(input_device_server_fut);
 
             let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .context("sending get_input_reports_reader request")?;
@@ -695,8 +692,7 @@ mod tests {
             input_device_proxy: &InputDeviceProxy,
         ) -> InputReportsReaderProxy {
             let (input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .expect("internal error creating InputReportsReader proxy and server end");
+                endpoints::create_proxy::<InputReportsReaderMarker>();
             input_device_proxy
                 .get_input_reports_reader(input_reports_reader_server_end)
                 .expect("sending get_input_reports_reader request");

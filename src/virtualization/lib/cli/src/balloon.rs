@@ -134,10 +134,7 @@ pub async fn connect_to_balloon_controller<P: PlatformServices>(
         return Err(BalloonResult::NotRunning);
     }
 
-    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()
-        .map_err(|err| {
-            BalloonResult::Internal(format!("failed to create guest endpoints: {}", err))
-        })?;
+    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
     guest_manager
         .connect(guest_server_end)
         .await
@@ -145,9 +142,7 @@ pub async fn connect_to_balloon_controller<P: PlatformServices>(
         .map_err(|err| BalloonResult::Internal(format!("failed to connect: {:?}", err)))?;
 
     let (balloon_controller, balloon_server_end) =
-        fidl::endpoints::create_proxy::<BalloonControllerMarker>().map_err(|err| {
-            BalloonResult::Internal(format!("failed to create balloon endpoints: {}", err))
-        })?;
+        fidl::endpoints::create_proxy::<BalloonControllerMarker>();
     guest_endpoint
         .get_balloon_controller(balloon_server_end)
         .await

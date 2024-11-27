@@ -841,8 +841,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             .ok_or(RequestError::UnrecognizedInterface)?;
 
         let (asp, asp_server_end) =
-            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
-                .expect("create ASP proxy");
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
         control
             .add_address(
                 &address.into_ext(),
@@ -1592,11 +1591,9 @@ pub(crate) mod testutil {
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
         let (interfaces_proxy, interfaces) =
-            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>()
-                .expect("create proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>();
         let (interfaces_state_proxy, interfaces_state) =
-            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
-                .expect("create proxy should succeed");
+            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>();
         let event_loop_inputs = crate::eventloop::EventLoopInputs::<_, _, OnlyInterfaces> {
             route_clients: EventLoopComponent::Present(route_clients),
             interfaces_handler: EventLoopComponent::Present(interfaces_handler),

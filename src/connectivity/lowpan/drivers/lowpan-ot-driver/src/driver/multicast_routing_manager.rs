@@ -236,8 +236,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_multicast_add_route_for_matching_dest() {
         let (multicast_routing_client_end, multicast_routing_server_end) =
-            fidl::endpoints::create_proxy::<fnet_mcast::Ipv6RoutingTableControllerMarker>()
-                .expect("create Ipv6RoutingTableController endpoints");
+            fidl::endpoints::create_proxy::<fnet_mcast::Ipv6RoutingTableControllerMarker>();
 
         let mut routing_manager = MulticastRoutingManager::new();
 
@@ -307,8 +306,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_multicast_no_add_route_for_different_dest() {
         let (multicast_routing_client_end, multicast_routing_server_end) =
-            fidl::endpoints::create_proxy::<fnet_mcast::Ipv6RoutingTableControllerMarker>()
-                .expect("create Ipv6RoutingTableController endpoints");
+            fidl::endpoints::create_proxy::<fnet_mcast::Ipv6RoutingTableControllerMarker>();
 
         let mut routing_manager = MulticastRoutingManager::new();
 

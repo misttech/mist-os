@@ -183,8 +183,7 @@ async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLog
     >()?;
 
     let (cobalt_proxy, cobalt_1dot1_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .context("failed to create MetricEventLoggerMarker endponts")?;
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
         customer_id: None, // defaults to fuchsia

@@ -159,9 +159,7 @@ impl RtcImpl {
             .to_str()
             .ok_or(RtcCreationError::ConnectionFailed(anyhow!("Non unicode path")))?;
         debug!("RTC at: {}", path_str);
-        let (proxy, server) = create_proxy::<frtc::DeviceMarker>().map_err(|err| {
-            RtcCreationError::ConnectionFailed(anyhow!("Failed to create proxy: {}", err))
-        })?;
+        let (proxy, server) = create_proxy::<frtc::DeviceMarker>();
         service_connect(&path_str, server.into_channel()).map_err(|err| {
             RtcCreationError::ConnectionFailed(anyhow!("Failed to connect to device: {}", err))
         })?;
@@ -425,8 +423,7 @@ mod test {
     use vfs::{execution_scope, pseudo_directory};
 
     fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         root.open(
             execution_scope::ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

@@ -152,14 +152,14 @@ async fn handle_socat_connect(
 async fn connect_to_vsock_endpoint(
     manager: GuestManagerProxy,
 ) -> Result<HostVsockEndpointProxy, SocatError> {
-    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>()?;
+    let (guest_endpoint, guest_server_end) = fidl::endpoints::create_proxy::<GuestMarker>();
     manager
         .connect(guest_server_end)
         .await?
         .map_err(|err| SocatError::InternalFailure(format!("failed to connect: {:?}", err)))?;
 
     let (vsock_endpoint, vsock_server_end) =
-        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>()?;
+        fidl::endpoints::create_proxy::<HostVsockEndpointMarker>();
 
     guest_endpoint
         .get_host_vsock_endpoint(vsock_server_end)

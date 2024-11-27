@@ -248,8 +248,7 @@ struct MetricsLogger {
 impl MetricsLogger {
     async fn new() -> Self {
         let (logger, server_end) =
-            fidl::endpoints::create_proxy::<fmetrics::MetricEventLoggerMarker>()
-                .expect("create event logger");
+            fidl::endpoints::create_proxy::<fmetrics::MetricEventLoggerMarker>();
 
         let factory = match fuchsia_component::client::connect_to_protocol::<
             fmetrics::MetricEventLoggerFactoryMarker,

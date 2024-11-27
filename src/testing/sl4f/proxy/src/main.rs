@@ -387,12 +387,11 @@ mod test {
         let control_proxy = launch_data_proxy_control();
         let target_port = 80;
 
-        let (_proxy_client, proxy_client_server_end) = create_proxy::<TcpProxy_Marker>().unwrap();
+        let (_proxy_client, proxy_client_server_end) = create_proxy::<TcpProxy_Marker>();
         let open_port =
             control_proxy.open_proxy_(target_port, 0, proxy_client_server_end).await.unwrap();
 
-        let (_proxy_client_2, proxy_client_server_end_2) =
-            create_proxy::<TcpProxy_Marker>().unwrap();
+        let (_proxy_client_2, proxy_client_server_end_2) = create_proxy::<TcpProxy_Marker>();
         let open_port_2 =
             control_proxy.open_proxy_(target_port, 0, proxy_client_server_end_2).await.unwrap();
 
@@ -406,7 +405,7 @@ mod test {
         let control_proxy = launch_data_proxy_control();
 
         // echo server reachable through proxy
-        let (tcp_proxy, tcp_proxy_server_end) = create_proxy().unwrap();
+        let (tcp_proxy, tcp_proxy_server_end) = create_proxy();
         let proxy_port =
             control_proxy.open_proxy_(test_port, 0, tcp_proxy_server_end).await.unwrap();
         assert_request(proxy_port).await;
@@ -417,7 +416,7 @@ mod test {
         assert_unreachable(proxy_port).await;
 
         // reachable after recreating proxy
-        let (_tcp_proxy, tcp_proxy_server_end) = create_proxy().unwrap();
+        let (_tcp_proxy, tcp_proxy_server_end) = create_proxy();
         let proxy_port =
             control_proxy.open_proxy_(test_port, 0, tcp_proxy_server_end).await.unwrap();
         assert_request(proxy_port).await;

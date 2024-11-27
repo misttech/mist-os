@@ -69,8 +69,7 @@ impl ReadableTree for fidl_fuchsia_inspect::TreeProxy {
 
     async fn tree_names(&self) -> Result<Vec<String>, ReaderError> {
         let (name_iterator, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_inspect::TreeNameIteratorMarker>()
-                .map_err(|e| ReaderError::Fidl(e.into()))?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_inspect::TreeNameIteratorMarker>();
         self.list_child_names(server_end).map_err(|e| ReaderError::Fidl(e.into()))?;
         let mut names = vec![];
         loop {
@@ -85,8 +84,7 @@ impl ReadableTree for fidl_fuchsia_inspect::TreeProxy {
 
     async fn read_tree(&self, name: &str) -> Result<Self, ReaderError> {
         let (child_tree, server_end) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_inspect::TreeMarker>()
-                .map_err(|e| ReaderError::Fidl(e.into()))?;
+            fidl::endpoints::create_proxy::<fidl_fuchsia_inspect::TreeMarker>();
         self.open_child(name, server_end).map_err(|e| ReaderError::Fidl(e.into()))?;
         Ok(child_tree)
     }

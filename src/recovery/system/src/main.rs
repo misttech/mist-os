@@ -1393,7 +1393,7 @@ mod tests {
         async fn test_progress_updates_reports_success_to_ota_manager() {
             let test_app_sender = AppSender::new_for_testing_purposes_only();
             let (progress_proxy, progress_server) =
-                fidl::endpoints::create_proxy::<ProgressRendererMarker>().unwrap();
+                fidl::endpoints::create_proxy::<ProgressRendererMarker>();
             let ota_manager = Arc::new(FakeOtaManager::new());
 
             let mut recovery_app_assistant = RecoveryAppAssistant::new(
@@ -1437,7 +1437,7 @@ mod tests {
         async fn test_progress_updates_reports_error_to_ota_manager() {
             let test_app_sender = AppSender::new_for_testing_purposes_only();
             let (progress_proxy, progress_server) =
-                fidl::endpoints::create_proxy::<ProgressRendererMarker>().unwrap();
+                fidl::endpoints::create_proxy::<ProgressRendererMarker>();
             let ota_manager = Arc::new(FakeOtaManager::new());
 
             let mut recovery_app_assistant = RecoveryAppAssistant::new(

@@ -24,8 +24,7 @@ async fn setup_test_env(static_packages: &[&Package]) -> TestEnv {
 
 /// Uses the test environment to retrieve the package iterator.
 async fn get_pkg_iterator(env: &TestEnv) -> PackageIndexIteratorProxy {
-    let (pkg_iterator, server_end) =
-        fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>().unwrap();
+    let (pkg_iterator, server_end) = fidl::endpoints::create_proxy::<PackageIndexIteratorMarker>();
     env.proxies.package_cache.base_package_index(server_end).unwrap();
     pkg_iterator
 }

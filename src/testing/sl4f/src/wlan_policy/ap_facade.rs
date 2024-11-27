@@ -39,7 +39,7 @@ impl Debug for WlanApPolicyFacade {
 impl WlanApPolicyFacade {
     pub fn new() -> Result<WlanApPolicyFacade, Error> {
         let policy_provider = connect_to_protocol::<AccessPointProviderMarker>()?;
-        let (ap_controller, server_end) = create_proxy::<AccessPointControllerMarker>().unwrap();
+        let (ap_controller, server_end) = create_proxy::<AccessPointControllerMarker>();
 
         let (update_client_end, update_listener) =
             create_endpoints::<AccessPointStateUpdatesMarker>();

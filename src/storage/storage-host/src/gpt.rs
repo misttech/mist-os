@@ -424,7 +424,7 @@ mod tests {
         let server = Arc::new(FakeServer::from(opts));
         {
             let (block_client, block_server) =
-                fidl::endpoints::create_proxy::<fblock::BlockMarker>().unwrap();
+                fidl::endpoints::create_proxy::<fblock::BlockMarker>();
             let volume_stream = fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(
                 block_server.into_channel(),
             )
@@ -553,8 +553,7 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create connection endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags =
             fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
         let options = fio::Options::default();
@@ -739,8 +738,7 @@ mod tests {
 
         let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create connection endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags =
             fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
         let options = fio::Options::default();
@@ -807,10 +805,8 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (part_0_dir, server_end_0) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create connection endpoints");
-        let (part_1_dir, server_end_1) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create connection endpoints");
+        let (part_0_dir, server_end_0) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let (part_1_dir, server_end_1) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags =
             fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
         let options = fio::Options::default();
@@ -954,8 +950,7 @@ mod tests {
         partitions_dir.get_entry("part-1").map(|_| ()).expect_err("Extra entry found");
         partitions_dir.get_entry("part-2").expect("No entry found");
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Failed to create connection endpoints");
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags =
             fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
         let options = fio::Options::default();

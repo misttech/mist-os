@@ -113,7 +113,7 @@ async fn run_offers_forward(
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
 
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     client.as_ref_directory().open("svc", fio::Flags::empty(), server_end.into_channel().into())?;
     fs.add_remote("svc", proxy);
     fs.serve_connection(handles.outgoing_dir)?;

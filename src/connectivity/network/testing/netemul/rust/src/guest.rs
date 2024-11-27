@@ -149,8 +149,7 @@ impl Controller {
         let (stderr_local, stderr_remote) = zx::Socket::create_stream();
 
         let (command_listener_client, command_listener_server) =
-            fidl::endpoints::create_proxy::<fguest_interaction::CommandListenerMarker>()
-                .context("failed to create CommandListener proxy")?;
+            fidl::endpoints::create_proxy::<fguest_interaction::CommandListenerMarker>();
         let (stdin_local, stdin_remote) = match input {
             Some(input) => {
                 let (stdin_local, stdin_remote) = zx::Socket::create_stream();

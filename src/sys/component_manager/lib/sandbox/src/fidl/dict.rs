@@ -193,7 +193,7 @@ mod tests {
             .unwrap();
 
         // The dictionary has one item.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
@@ -240,7 +240,7 @@ mod tests {
         store.dictionary_legacy_import(dict_id, client).await.unwrap().unwrap();
 
         // The dictionary has one item.
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
@@ -666,7 +666,7 @@ mod tests {
 
         // Keys
         {
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
             let keys = iterator.get_next().await.unwrap();
             assert!(iterator.get_next().await.unwrap().is_empty());
@@ -674,7 +674,7 @@ mod tests {
         }
         // Enumerate
         {
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_enumerate(dict_id, server_end).await.unwrap().unwrap();
             let start_id = 100;
             let limit = 4;
@@ -765,7 +765,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let (iterator, server_end) = create_proxy().unwrap();
+        let (iterator, server_end) = create_proxy();
         store.dictionary_drain(dict_id, Some(server_end)).await.unwrap().unwrap();
         let start_id = 100;
         let limit = 4;
@@ -844,9 +844,9 @@ mod tests {
         let dict_id = id_gen.next();
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let (key_iterator, server_end) = create_proxy().unwrap();
+        let (key_iterator, server_end) = create_proxy();
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
-        let (item_iterator, server_end) = create_proxy().unwrap();
+        let (item_iterator, server_end) = create_proxy();
         store.dictionary_enumerate(dict_id, server_end).await.unwrap().unwrap();
 
         // Get all the entries from the Dict with `GetNext`.
@@ -898,7 +898,7 @@ mod tests {
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let (item_iterator, server_end) = create_proxy().unwrap();
+        let (item_iterator, server_end) = create_proxy();
         store.dictionary_drain(dict_id, Some(server_end)).await.unwrap().unwrap();
 
         // Get all the entries from the Dict with `GetNext`.
@@ -933,12 +933,12 @@ mod tests {
 
         store.import(2, Unit::default().into()).await.unwrap().unwrap();
 
-        let (_, server_end) = create_proxy().unwrap();
+        let (_, server_end) = create_proxy();
         assert_matches!(
             store.dictionary_keys(1, server_end).await.unwrap(),
             Err(fsandbox::CapabilityStoreError::IdNotFound)
         );
-        let (_, server_end) = create_proxy().unwrap();
+        let (_, server_end) = create_proxy();
         assert_matches!(
             store.dictionary_enumerate(1, server_end).await.unwrap(),
             Err(fsandbox::CapabilityStoreError::IdNotFound)
@@ -948,12 +948,12 @@ mod tests {
             Err(fsandbox::CapabilityStoreError::IdNotFound)
         );
 
-        let (_, server_end) = create_proxy().unwrap();
+        let (_, server_end) = create_proxy();
         assert_matches!(
             store.dictionary_keys(2, server_end).await.unwrap(),
             Err(fsandbox::CapabilityStoreError::WrongType)
         );
-        let (_, server_end) = create_proxy().unwrap();
+        let (_, server_end) = create_proxy();
         assert_matches!(
             store.dictionary_enumerate(2, server_end).await.unwrap(),
             Err(fsandbox::CapabilityStoreError::WrongType)
@@ -972,26 +972,26 @@ mod tests {
         store.dictionary_create(1).await.unwrap().unwrap();
 
         {
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK + 1).await.unwrap(),
                 Err(fsandbox::CapabilityStoreError::InvalidArgs)
             );
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, 0).await.unwrap(),
                 Err(fsandbox::CapabilityStoreError::InvalidArgs)
             );
 
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK + 1).await.unwrap(),
                 Err(fsandbox::CapabilityStoreError::InvalidArgs)
             );
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, 0).await.unwrap(),
@@ -1011,14 +1011,14 @@ mod tests {
 
         // Range overlaps with id 4
         {
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, 3).await.unwrap(),
                 Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
             );
 
-            let (iterator, server_end) = create_proxy().unwrap();
+            let (iterator, server_end) = create_proxy();
             store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
             assert_matches!(
                 iterator.get_next(2, 3).await.unwrap(),

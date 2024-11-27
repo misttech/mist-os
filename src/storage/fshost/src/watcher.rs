@@ -263,7 +263,7 @@ mod tests {
             ns.bind("/test-dev", client).expect("failed to bind dev in namespace");
         }
 
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         partitions_dir.clone().open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,

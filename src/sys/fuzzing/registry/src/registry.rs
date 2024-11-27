@@ -337,8 +337,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_register_before_connect() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, registrar: fuzz::RegistrarProxy| async move {
@@ -355,8 +354,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_connect_before_register() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, registrar: fuzz::RegistrarProxy| async move {
@@ -376,8 +374,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_connect_without_register() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (_, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, _| async move {
@@ -394,8 +391,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiple_registers() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end1, _) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let (client_end2, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
@@ -417,10 +413,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiple_connects() {
-        let (controller, server_end1) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
-        let (_, server_end2) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end1) = create_proxy::<fuzz::ControllerMarker>();
+        let (_, server_end2) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, registrar: fuzz::RegistrarProxy| async move {
@@ -447,13 +441,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_concurrent() {
-        let (foo_controller, foo_server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (foo_controller, foo_server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (foo_client_end, foo_stream) =
             create_request_stream::<fuzz::ControllerProviderMarker>()
                 .expect("failed to create stream");
-        let (bar_controller, bar_server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (bar_controller, bar_server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (bar_client_end, bar_stream) =
             create_request_stream::<fuzz::ControllerProviderMarker>()
                 .expect("failed to create stream");
@@ -491,8 +483,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiple_disconnects() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, registrar: fuzz::RegistrarProxy| async move {
@@ -513,8 +504,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_disconnect_closed() {
-        let (controller, server_end) =
-            create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
+        let (controller, server_end) = create_proxy::<fuzz::ControllerMarker>();
         let (client_end, stream) = create_request_stream::<fuzz::ControllerProviderMarker>()
             .expect("failed to create stream");
         let test_fut = |registry: fuzz::RegistryProxy, registrar: fuzz::RegistrarProxy| async move {

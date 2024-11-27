@@ -68,7 +68,7 @@ impl Bus {
         let sync_manager =
             fuchsia_component::client::connect_to_protocol::<fnetemul_sync::SyncManagerMarker>()
                 .map_err(Error::ConnectToProtocol)?;
-        let (bus, server_end) = fidl::endpoints::create_proxy::<fnetemul_sync::BusMarker>()?;
+        let (bus, server_end) = fidl::endpoints::create_proxy::<fnetemul_sync::BusMarker>();
         sync_manager.bus_subscribe(name, client, server_end)?;
         Ok(Bus { bus })
     }

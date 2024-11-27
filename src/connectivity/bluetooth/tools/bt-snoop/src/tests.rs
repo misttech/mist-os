@@ -358,8 +358,7 @@ fn test_handle_bad_client_request() {
 
     let id = ClientId(0);
     let err = Some(Err(FidlError::Invalid));
-    let (client, _client_req_stream) =
-        fidl::endpoints::create_proxy::<PacketObserverMarker>().unwrap();
+    let (client, _client_req_stream) = fidl::endpoints::create_proxy::<PacketObserverMarker>();
     let request = (id, err);
     let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
     subscribers.register(id, client, None).unwrap();
@@ -369,8 +368,7 @@ fn test_handle_bad_client_request() {
 
     let id = ClientId(1);
     let err = Some(Err(FidlError::Invalid));
-    let (client, _client_req_stream) =
-        fidl::endpoints::create_proxy::<PacketObserverMarker>().unwrap();
+    let (client, _client_req_stream) = fidl::endpoints::create_proxy::<PacketObserverMarker>();
     let request = (id, err);
     subscribers.register(id, client, None).unwrap();
     assert!(subscribers.is_registered(&id));

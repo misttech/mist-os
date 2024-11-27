@@ -43,7 +43,7 @@ impl FilesystemConfig for PkgDirTest {
             Box::new(Blobfs.start_filesystem(block_device_factory).await) as Box<dyn BlobFilesystem>
         };
 
-        let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fs.exposed_dir()
             .clone2(server_end.into_channel().into())
             .expect("connect to blob volume exposed dir");
@@ -88,7 +88,7 @@ impl Filesystem for PkgDirInstance {
 impl CacheClearableFilesystem for PkgDirInstance {
     async fn clear_cache(&mut self) {
         self.fs.clear_cache().await;
-        let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         self.fs
             .exposed_dir()
             .clone2(server_end.into_channel().into())

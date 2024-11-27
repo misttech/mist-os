@@ -184,7 +184,7 @@ async fn connect_to_test_fvm() -> Option<VolumeManagerProxy> {
         let gpt_controller = connect_to_protocol_at_path::<ControllerMarker>(&gpt_path)
             .expect("Failed to connect to GPT controller");
 
-        let (volume_manager, server) = create_proxy::<VolumeManagerMarker>().unwrap();
+        let (volume_manager, server) = create_proxy::<VolumeManagerMarker>();
         gpt_controller
             .connect_to_device_fidl(server.into_channel())
             .expect("Failed to connect to device FIDL");
@@ -419,8 +419,7 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        let (volume, server) =
-            fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
+        let (volume, server) = fidl::endpoints::create_proxy::<VolumeMarker>();
         let () = ramdisk
             .controller()
             .connect_to_device_fidl(server.into_channel())
@@ -440,8 +439,7 @@ mod tests {
                 fvm_volume_size: Some(RAMDISK_FVM_SLICE_SIZE as u64 * 3),
             })
             .await;
-        let (volume, server) =
-            fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
+        let (volume, server) = fidl::endpoints::create_proxy::<VolumeMarker>();
         let () = ramdisk
             .controller()
             .connect_to_device_fidl(server.into_channel())

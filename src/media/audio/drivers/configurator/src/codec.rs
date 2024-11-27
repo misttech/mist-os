@@ -48,14 +48,14 @@ impl CodecInterface {
                 .to_str()
                 .ok_or(format_err!("invalid codec path"))?;
             let (codec_connect_proxy, codec_connect_server) =
-                fidl::endpoints::create_proxy::<CodecConnectorMarker>()?;
+                fidl::endpoints::create_proxy::<CodecConnectorMarker>();
             fdio::service_connect_at(
                 self.dev_proxy.as_ref().context("dev proxy must exist")?.as_channel().as_ref(),
                 path,
                 codec_connect_server.into_channel(),
             )?;
 
-            let (ours, theirs) = fidl::endpoints::create_proxy::<CodecMarker>()?;
+            let (ours, theirs) = fidl::endpoints::create_proxy::<CodecMarker>();
             codec_connect_proxy.connect(theirs)?;
 
             self.proxy = Some(ours);

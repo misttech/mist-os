@@ -149,8 +149,7 @@ fn get_entry_iterator(
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ViewMarker>()
         .expect("failed to connect to fuchsia.net.neighbor/View");
     let (proxy, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
-            .expect("failed to create EntryIterator proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>();
     let () = view.open_entry_iterator(server_end, &options).expect("failed to open EntryIterator");
     futures::stream::unfold(proxy, |proxy| {
         proxy.get_next().map(|r| {
@@ -1046,8 +1045,7 @@ async fn cant_hang_twice<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ViewMarker>()
         .expect("failed to connect to fuchsia.net.neighbor/View");
     let (iter, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
-            .expect("failed to create EntryIterator proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>();
     let () = view
         .open_entry_iterator(
             server_end,
@@ -1091,8 +1089,7 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ViewMarker>()
         .expect("failed to connect to fuchsia.net.neighbor/View");
     let (iter, server_end) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>()
-            .expect("failed to create EntryIterator proxy");
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_neighbor::EntryIteratorMarker>();
     let () = view
         .open_entry_iterator(
             server_end,

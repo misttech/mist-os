@@ -65,8 +65,7 @@ impl fidl_contrib::protocol_connector::ConnectedProtocol for CobaltConnectedServ
         &'a mut self,
     ) -> future::BoxFuture<'a, Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error>> {
         async {
-            let (logger_proxy, server_end) =
-                fidl::endpoints::create_proxy().context("failed to create proxy endpoints")?;
+            let (logger_proxy, server_end) = fidl::endpoints::create_proxy();
             let metric_event_logger_factory = fuchsia_component::client::connect_to_protocol::<
                 fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
             >()

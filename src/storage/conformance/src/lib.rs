@@ -91,7 +91,7 @@ pub async fn open_node_status<T: ProtocolMarker>(
     path: &str,
 ) -> Result<T::Proxy, zx::Status> {
     let flags = flags | fio::OpenFlags::DESCRIBE;
-    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
     dir.open(flags, fio::ModeType::empty(), path, node_server).expect("Cannot open node");
     let status = get_open_status(&node_proxy).await;
 
@@ -150,7 +150,7 @@ pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
 
 /// Attempts to open the given file, and checks the status is `NOT_FOUND`.
 pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
-    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>();
     dir.open(
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE,
         fio::ModeType::empty(),
@@ -311,7 +311,7 @@ async fn open3_node_impl<T: ProtocolMarker>(
     flags: fio::Flags,
     options: Option<fio::Options>,
 ) -> Result<(T::Proxy, Option<fio::Representation>), zx::Status> {
-    let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    let (proxy, server) = create_proxy::<fio::NodeMarker>();
     dir.open3(path, flags, &options.unwrap_or_default(), server.into_channel())
         .expect("Failed to call open3");
     let representation = if flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION) {

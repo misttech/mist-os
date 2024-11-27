@@ -15,7 +15,7 @@ pub async fn list_composites(
     proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::CompositeInfoIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::CompositeInfoIteratorMarker>();
     proxy.get_composite_info(iterator_server).context("GetCompositeInfo() failed")?;
 
     loop {

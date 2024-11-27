@@ -292,7 +292,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
 
         let (_reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         let installer_fut = async move {
             let returned_update_attempt =
@@ -347,7 +347,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
 
         let (_reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         let installer_fut = async move {
             let returned_update_attempt =
@@ -421,7 +421,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
 
         let (_reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         let installer_fut = async move {
             let mut returned_update_attempt =
@@ -481,7 +481,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
 
         let (_reboot_controller, reboot_controller_server_end) =
-            fidl::endpoints::create_proxy::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy::<RebootControllerMarker>();
 
         let expected_states = vec![
             State::Prepare,

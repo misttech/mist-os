@@ -594,7 +594,7 @@ impl ServingMultiVolumeFilesystem {
         options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
-        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
@@ -623,7 +623,7 @@ impl ServingMultiVolumeFilesystem {
         options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
-        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
+        let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumeMarker>(
             self.exposed_dir.as_ref().unwrap(),

@@ -88,10 +88,9 @@ mod fuchsia {
     impl BatchLogStream {
         #[cfg(test)]
         pub fn new() -> Result<(Self, ftest_manager::LogsIterator), fidl::Error> {
-            fidl::endpoints::create_proxy::<BatchIteratorMarker>().map(|(proxy, server_end)| {
-                let subscription = Subscription::new(proxy);
-                (Self { subscription }, ftest_manager::LogsIterator::Batch(server_end))
-            })
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>();
+            let subscription = Subscription::new(proxy);
+            Ok((Self { subscription }, ftest_manager::LogsIterator::Batch(server_end)))
         }
 
         pub fn from_client_end(

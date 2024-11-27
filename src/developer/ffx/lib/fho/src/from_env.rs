@@ -349,8 +349,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
                             continue;
                         };
                         let (tc_proxy, server_end) =
-                            fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>()
-                                .expect("Could not create FIDL proxy");
+                            fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>();
                         let Ok(Ok(())) = daemon_proxy
                             .connect_to_protocol(
                                 ffx_fidl::TargetCollectionMarker::PROTOCOL_NAME,
@@ -1009,7 +1008,7 @@ mod tests {
             Box::pin(async {
                 // This will return an unusable proxy, but we're not going to use it so it's not
                 // important.
-                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
+                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
                 Ok(proxy)
             })
         });

@@ -101,8 +101,7 @@ pub async fn instance_namespace_is_root(
 /// used by the Nested filesystem layout.
 pub fn serve_process_launcher_and_resolver_svc_dir() -> Result<fio::DirectoryProxy, LauncherError> {
     // Serve a directory that only provides fuchsia.process.Launcher to dash.
-    let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-        .map_err(|_| LauncherError::Internal)?;
+    let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
     let mut fs = ServiceFs::new();
     fs.add_proxy_service::<fproc::LauncherMarker, ()>();
@@ -166,7 +165,7 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
     ) {
         warn!(?err, "Could not inject fuchsia.process.Resolver into filesystem layout. Ignoring.");
     }
-    let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel().into();
     vfs.open(
         ExecutionScope::new(),

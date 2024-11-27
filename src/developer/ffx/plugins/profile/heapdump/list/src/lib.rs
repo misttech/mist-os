@@ -76,7 +76,7 @@ async fn list(
     cmd: ListCommand,
     writer: &mut MachineWriter<Vec<StoredSnapshot>>,
 ) -> Result<()> {
-    let (iterator_proxy, iterator_server) = create_proxy()?;
+    let (iterator_proxy, iterator_server) = create_proxy();
     let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
         iterator: Some(iterator_server),
         process_selector: match (cmd.by_name, cmd.by_koid) {

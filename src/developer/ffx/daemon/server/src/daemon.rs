@@ -271,7 +271,7 @@ impl DaemonProtocolProvider for Daemon {
             .rcs()
             .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
-        let (proxy, remote) = fidl::endpoints::create_proxy::<RemoteControlMarker>()?;
+        let (proxy, remote) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
         rcs.copy_to_channel(remote.into_channel())?;
         Ok(proxy)
     }

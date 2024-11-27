@@ -23,8 +23,7 @@ const MAX_REGULATED_BRIGHTNESS: f64 = 1.0;
 
 fn open_backlight() -> Result<BacklightProxy, Error> {
     tracing::info!("Opening backlight");
-    let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>()
-        .context("Failed to create backlight proxy")?;
+    let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>();
     // TODO(kpt): Don't hardcode this path b/138666351
     fdio::service_connect("/dev/class/backlight/000", server.into_channel())
         .context("Failed to connect built-in service")?;

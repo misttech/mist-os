@@ -39,7 +39,7 @@ impl WeaveFacade {
 
     /// Returns the PairingStateWatcher proxy provided on instantiation.
     fn pairing_state_watcher(&self) -> Result<PairingStateWatcherProxy, Error> {
-        let (pairing_proxy, pairing_server_end) = create_proxy::<PairingStateWatcherMarker>()?;
+        let (pairing_proxy, pairing_server_end) = create_proxy::<PairingStateWatcherMarker>();
         self.stack()?.get_pairing_state_watcher(pairing_server_end)?;
         Ok(pairing_proxy)
     }

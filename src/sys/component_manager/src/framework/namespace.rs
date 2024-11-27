@@ -213,7 +213,7 @@ mod tests {
         instance: &Arc<ComponentInstance>,
     ) -> (fcomponent::NamespaceProxy, Namespace) {
         let host = Namespace::new();
-        let (proxy, server) = endpoints::create_proxy::<fcomponent::NamespaceMarker>().unwrap();
+        let (proxy, server) = endpoints::create_proxy::<fcomponent::NamespaceMarker>();
         capability::open_framework(&host, instance, server.into()).await.unwrap();
         (proxy, host)
     }

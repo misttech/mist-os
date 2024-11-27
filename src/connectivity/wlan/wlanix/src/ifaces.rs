@@ -137,7 +137,7 @@ impl IfaceManager for DeviceMonitorIfaceManager {
             }
         };
 
-        let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
+        let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>();
         self.monitor_svc.get_client_sme(iface_id, server).await?.map_err(zx::Status::from_raw)?;
         let mut iface = SmeClientIface::new(
             phy_id,
@@ -419,7 +419,7 @@ impl ClientIface for SmeClientIface {
             };
 
         info!("Selected BSS to connect to");
-        let (connect_txn, remote) = create_proxy()?;
+        let (connect_txn, remote) = create_proxy();
         let bssid = bss_description.bssid;
         let connect_req = fidl_sme::ConnectRequest {
             ssid: bss_description.ssid.clone().into(),
@@ -665,8 +665,7 @@ pub mod test_utils {
             });
             if *self.connect_success.lock() {
                 let (proxy, server) =
-                    fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
-                        .expect("Failed to create fidl endpoints");
+                    fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>();
                 let (_, handle) = server.into_stream_and_control_handle();
                 *self.transaction_handle.lock() = Some(handle);
                 Ok(ConnectResult::Success(ConnectSuccess {

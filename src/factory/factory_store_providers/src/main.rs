@@ -161,7 +161,7 @@ async fn create_dir_from_context<'a>(
 }
 
 async fn apply_config(config: Config, dir: Arc<Mutex<fio::DirectoryProxy>>) -> fio::DirectoryProxy {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
 
     let dir_mtx = dir.clone();
 
@@ -207,7 +207,7 @@ where
 }
 
 async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::DirectoryProxy, Error> {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
     match factory_config {
         FactoryConfig::FactoryItems => {
             tracing::info!("{}", "Reading from FactoryItems service");
