@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::program::Program;
+use crate::bpf::helpers::{SkBuf, BPF_HELPER_IMPLS_FOR_SOCKET_FILTER, SK_BUF_MAPPING};
+use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
@@ -121,7 +122,7 @@ struct UnixSocketInner {
     pub keepalive: bool,
 
     /// See SO_ATTACH_BPF.
-    bpf_program: Option<Arc<Program>>,
+    bpf_program: Option<LinkedProgram>,
 
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
     credentials: Option<ucred>,
@@ -376,15 +377,9 @@ impl UnixSocket {
         inner.keepalive = keepalive;
     }
 
-    fn set_bpf_program(&self, program: Option<Arc<Program>>) -> Result<(), Errno> {
-        if let Some(program) = program.as_ref() {
-            if program.info.program_type != ProgramType::SocketFilter {
-                return error!(EINVAL);
-            }
-        }
+    fn set_bpf_program(&self, program: Option<LinkedProgram>) {
         let mut inner = self.lock();
         inner.bpf_program = program;
-        Ok(())
     }
 
     fn peer_cred(&self) -> Option<ucred> {
@@ -730,7 +725,15 @@ impl SocketOps for UnixSocket {
                 SO_ATTACH_BPF => {
                     let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
                     let object = get_bpf_object(task, fd)?;
-                    self.set_bpf_program(Some(object.as_program()?.clone()))?;
+                    let program = object.as_program()?;
+
+                    let linked_program = program.link(
+                        ProgramType::SocketFilter,
+                        &[SK_BUF_MAPPING.clone()],
+                        &BPF_HELPER_IMPLS_FOR_SOCKET_FILTER,
+                    )?;
+
+                    self.set_bpf_program(Some(linked_program));
                 }
                 _ => return error!(ENOPROTOOPT),
             },
@@ -906,7 +909,8 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let s = bpf_program.run(locked, current_task, &mut ());
+            let mut sk_buf = SkBuf::default();
+            let s = bpf_program.run(locked, current_task, &mut sk_buf);
             if s == 0 {
                 None
             } else {

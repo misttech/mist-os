@@ -643,13 +643,13 @@ pub struct FunctionSignature {
 pub struct CallingContext {
     /// List of map schemas of the associated map. The maps can be accessed using LDDW instruction
     /// with `src_reg=BPF_PSEUDO_MAP_IDX`.
-    maps: Vec<MapSchema>,
+    pub maps: Vec<MapSchema>,
     /// The registered external functions.
-    helpers: HashMap<u32, FunctionSignature>,
+    pub helpers: HashMap<u32, FunctionSignature>,
     /// The args of the program.
-    args: Vec<Type>,
+    pub args: Vec<Type>,
     /// The memory id of the network packets.
-    packet_memory_id: Option<MemoryId>,
+    pub packet_memory_id: Option<MemoryId>,
 }
 
 impl CallingContext {
@@ -684,6 +684,7 @@ pub(crate) struct StructAccess {
     pub(crate) is_32_bit_ptr_load: bool,
 }
 
+#[derive(Debug)]
 pub struct VerifiedEbpfProgram {
     pub(crate) code: Vec<EbpfInstruction>,
     pub(crate) struct_access_instructions: Vec<StructAccess>,
@@ -692,7 +693,7 @@ pub struct VerifiedEbpfProgram {
 
 /// Verify the given code depending on the type of the parameters and the registered external
 /// functions. Returned `VerifiedEbpfProgram` should be linked in order to execute it.
-pub fn verify(
+pub fn verify_program(
     code: Vec<EbpfInstruction>,
     calling_context: CallingContext,
     logger: &mut dyn VerifierLogger,

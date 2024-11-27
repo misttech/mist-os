@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    new_bpf_type_identifier, EbpfError, FieldDescriptor, FieldType, FunctionSignature, MemoryId,
-    MemoryParameterSize, StructDescriptor, Type,
+    new_bpf_type_identifier, CallingContext, EbpfError, FieldDescriptor, FieldType,
+    FunctionSignature, MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
@@ -654,7 +654,7 @@ impl ProgramType {
             .collect()
     }
 
-    pub fn get_bpf_args(self) -> &'static [Type] {
+    pub fn get_args(self) -> &'static [Type] {
         match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => &SK_BUF_ARGS,
             Self::Xdp => &XDP_MD_ARGS,
@@ -673,6 +673,15 @@ impl ProgramType {
                 Some(SK_BUF_ID.clone())
             }
             _ => None,
+        }
+    }
+
+    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
+        CallingContext {
+            maps,
+            helpers: self.get_helpers(),
+            args: self.get_args().into(),
+            packet_memory_id: self.get_packet_memory_id(),
         }
     }
 }

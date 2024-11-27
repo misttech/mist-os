@@ -142,6 +142,16 @@ pub const BPF_CMPXCHG: u8 = linux_uapi::BPF_CMPXCHG as u8;
 // The load double operation that allows to write 64 bits into a register.
 pub const BPF_LDDW: u8 = BPF_LD | BPF_DW;
 
+// cBPF-specific constants.
+pub const BPF_MISC: u8 = linux_uapi::BPF_MISC as u8;
+pub const BPF_RET: u8 = linux_uapi::BPF_RET as u8;
+pub const BPF_MSH: u8 = linux_uapi::BPF_MSH as u8;
+pub const BPF_A: u8 = linux_uapi::BPF_A as u8;
+pub const BPF_K: u8 = linux_uapi::BPF_K as u8;
+pub const BPF_X: u8 = linux_uapi::BPF_X as u8;
+pub const BPF_TXA: u8 = linux_uapi::BPF_TXA as u8;
+pub const BPF_TAX: u8 = linux_uapi::BPF_TAX as u8;
+
 // Offset used to access auxiliary packet information in cBPF.
 pub const SKF_AD_OFF: i32 = linux_uapi::SKF_AD_OFF;
 pub const SKF_AD_PROTOCOL: i32 = linux_uapi::SKF_AD_PROTOCOL as i32;

@@ -5,12 +5,12 @@
 use crate::converter::cbpf_to_ebpf;
 use crate::executor::execute;
 use crate::verifier::{
-    verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifiedEbpfProgram,
-    VerifierLogger,
+    verify_program, CallingContext, FunctionSignature, NullVerifierLogger, Type,
+    VerifiedEbpfProgram, VerifierLogger,
 };
 use crate::{
-    DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, BPF_DW, BPF_LDDW,
-    BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
+    DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, BPF_CALL, BPF_DW,
+    BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
 };
 use derivative::Derivative;
 use linux_uapi::sock_filter;
@@ -267,10 +267,10 @@ pub struct MapDescriptor {
 
 /// Rewrites the code to ensure mapped fields are correctly handled. Returns
 /// runnable `EbpfProgram<C>`.
-fn link_program<C: EbpfRunContext>(
+pub fn link_program<C: EbpfRunContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
-    maps: &Vec<MapDescriptor>,
+    maps: &[MapDescriptor],
     helpers: HashMap<u32, EbpfHelperImpl<C>>,
 ) -> Result<EbpfProgram<C>, EbpfError> {
     let mut code = program.code.clone();
@@ -314,9 +314,21 @@ fn link_program<C: EbpfRunContext>(
         }
     }
 
-    // Link maps.
     for pc in 0..code.len() {
         let instruction = &mut code[pc];
+
+        // Check that we have implementations for all helper calls.
+        if instruction.code == (BPF_JMP | BPF_CALL) {
+            let helper_id = instruction.imm as u32;
+            if helpers.get(&helper_id).is_none() {
+                return Err(EbpfError::ProgramLinkError(format!(
+                    "Missing implementation for helper with id={}",
+                    helper_id,
+                )));
+            }
+        }
+
+        // Link maps.
         if instruction.code == BPF_LDDW {
             // If the instruction references BPF_PSEUDO_MAP_FD, then we need to look up the map fd
             // and create a reference from this program to that object.
@@ -407,7 +419,7 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         logger: &mut dyn VerifierLogger,
     ) -> Result<EbpfProgram<C>, EbpfError> {
         let Self { calling_context, struct_mappings, maps, helper_impls } = self;
-        let verified_program = verify(code, calling_context, logger)?;
+        let verified_program = verify_program(code, calling_context, logger)?;
         link_program(&verified_program, &struct_mappings, &maps, helper_impls)
     }
 }
@@ -501,9 +513,12 @@ impl EbpfProgram<()> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::api::*;
     use crate::conformance::test::parse_asm;
     use crate::{FieldDescriptor, FieldMapping, FieldType, NullVerifierLogger, StructDescriptor};
-    use linux_uapi::*;
+    use linux_uapi::{
+        seccomp_data, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW, SECCOMP_RET_TRAP,
+    };
     use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
