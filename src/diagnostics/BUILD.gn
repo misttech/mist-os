@@ -38,6 +38,9 @@ group("tests") {
     "tests",
     "triage:tests",
     "validator:tests",
+    "//src/developer/ffx/plugins/inspect:tests($host_toolchain)",
+    "//src/developer/ffx/plugins/log:tests($host_toolchain)",
+    "//src/developer/ffx/tools/triage:tests($host_toolchain)",
     "//src/lib/diagnostics:tests",
 
     # Disabled due to lack of support in Clang and Rust toolchain;

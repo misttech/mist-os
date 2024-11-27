@@ -20,7 +20,7 @@ static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
     manifest: String,
     tree_selectors: Vec<String>,
-    accessor: &Option<String>,
+    accessor: Option<String>,
     provider: &P,
 ) -> Result<Vec<Selector>, Error> {
     let list_command = ListCommand {
@@ -246,7 +246,7 @@ pub async fn get_accessor_selectors(
                     if decl.exposes.iter().any(|expose| expose.source_name() == capability.name()) {
                         let moniker_str = instance.moniker.to_string();
                         let moniker = selectors::sanitize_moniker_for_selectors(&moniker_str);
-                        result.push(format!("{moniker}:expose:{capability_name}"));
+                        result.push(format!("{moniker}:{capability_name}"));
                     }
                 }
             }
@@ -279,11 +279,11 @@ mod test {
         assert_eq!(
             res.unwrap(),
             vec![
-                String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
+                String::from("example/component:fuchsia.diagnostics.ArchiveAccessor"),
                 String::from(
-                    "foo/bar/thing\\:instance:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"
+                    "foo/bar/thing\\:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"
                 ),
-                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("foo/component:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
     }
@@ -336,7 +336,7 @@ mod test {
     impl DiagnosticsProvider for FakeProvider {
         async fn snapshot<D: diagnostics_data::DiagnosticsData>(
             &self,
-            _: &Option<String>,
+            _: Option<&str>,
             _: impl IntoIterator<Item = Selector>,
         ) -> Result<Vec<diagnostics_data::Data<D>>, Error> {
             unreachable!("unimplemented");

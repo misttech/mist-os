@@ -137,14 +137,14 @@ async fn test_list_with_data_with_manifest_and_archive() {
     let cmd = ListCommand {
         manifest: Some(String::from("moniker1")),
         with_url: true,
-        accessor: Some("./test/component:expose:fuchsia.diagnostics.ArchiveAccessor".to_owned()),
+        accessor: Some("test/component:fuchsia.diagnostics.ArchiveAccessor".to_owned()),
     };
     let (accessor, _task) = setup_fake_rcs_with_embedded_archive_accessor(
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params.clone(),
             expected_responses.clone(),
         )]),
-        "/test/component".into(),
+        "test/component".into(),
         "fuchsia.diagnostics.host.ArchiveAccessor".into(),
     );
     run_command(

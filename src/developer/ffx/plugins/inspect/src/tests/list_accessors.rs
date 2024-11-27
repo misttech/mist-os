@@ -22,9 +22,9 @@ async fn test_list_accessors() {
     .unwrap();
 
     let expected = serde_json::to_string(&vec![
-        String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
-        String::from("foo/bar/thing\\:instance:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
-        String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("example/component:fuchsia.diagnostics.ArchiveAccessor"),
+        String::from("foo/bar/thing\\:instance:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("foo/component:fuchsia.diagnostics.FeedbackArchiveAccessor"),
     ])
     .unwrap();
     let output = test_buffers.into_stdout_str();

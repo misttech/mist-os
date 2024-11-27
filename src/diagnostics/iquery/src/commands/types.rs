@@ -21,7 +21,7 @@ pub trait Command {
 pub trait DiagnosticsProvider: Send + Sync {
     fn snapshot<D: DiagnosticsData>(
         &self,
-        accessor: &Option<String>,
+        accessor: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
     ) -> impl Future<Output = Result<Vec<Data<D>>, Error>>;
 

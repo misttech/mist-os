@@ -100,7 +100,7 @@ fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResul
 }
 
 pub fn list_response_items_from_components(
-    manifest: &Option<String>,
+    manifest: Option<&str>,
     with_url: bool,
     components: Vec<ListResultItem>,
 ) -> Vec<ListResultItem> {
@@ -146,11 +146,11 @@ pub struct ListCommand {
     #[argh(option)]
     /// A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
     /// The selector will be in the form of:
-    /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
+    /// <moniker>:fuchsia.diagnostics.ArchiveAccessorName
     ///
     /// Typically this is the output of `iquery list-accessors`.
     ///
-    /// For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor`
+    /// For example: `bootstrap/archivist:fuchsia.diagnostics.FeedbackArchiveAccessor`
     /// means that the command will connect to the `FeedbackArchiveAccecssor`
     /// exposed by `bootstrap/archivist`.
     pub accessor: Option<String>,
@@ -160,10 +160,14 @@ impl Command for ListCommand {
     type Result = ListResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        let inspect = provider.snapshot::<Inspect>(&self.accessor, std::iter::empty()).await?;
+        let inspect =
+            provider.snapshot::<Inspect>(self.accessor.as_deref(), std::iter::empty()).await?;
         let components = components_from_inspect_data(inspect);
-        let results =
-            list_response_items_from_components(&self.manifest, self.with_url, components);
+        let results = list_response_items_from_components(
+            self.manifest.as_deref(),
+            self.with_url,
+            components,
+        );
         Ok(ListResult(results))
     }
 }

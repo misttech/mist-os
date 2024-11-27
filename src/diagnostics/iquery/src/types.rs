@@ -48,6 +48,9 @@ pub enum Error {
     #[error("Invalid selector: {0}")]
     InvalidSelector(String),
 
+    #[error("Invalid accessor: {0}")]
+    InvalidAccessor(String),
+
     #[error(transparent)]
     GetManifestError(#[from] component_debug::realm::GetDeclarationError),
 
@@ -78,7 +81,9 @@ pub enum Error {
     #[error(transparent)]
     FuzzyMatchRealmQuery(anyhow::Error),
 
-    #[error("Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}")]
+    #[error(
+        "Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}"
+    )]
     FuzzyMatchTooManyMatches(FuzzyMatchErrorWrapper),
 
     #[error(
@@ -113,6 +118,10 @@ impl From<ConnectCapabilityError> for Error {
 }
 
 impl Error {
+    pub fn invalid_accessor(name: impl Into<String>) -> Error {
+        Error::InvalidAccessor(name.into())
+    }
+
     pub fn invalid_format(format: impl Into<String>) -> Error {
         Error::InvalidFormat(format.into())
     }
