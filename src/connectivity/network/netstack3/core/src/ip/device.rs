@@ -1199,9 +1199,13 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv4>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_proto, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp }, gmp_proto)
+        cb(
+            locked.cast_core_ctx(),
+            GmpStateRef { enabled, groups, gmp, config: gmp_config },
+            gmp_proto,
+        )
     }
 }
 
@@ -1247,9 +1251,9 @@ impl<
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv6>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config, gmp_proto: _ } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp })
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }
 }
 

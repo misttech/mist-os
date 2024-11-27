@@ -461,7 +461,7 @@ pub enum Igmpv2Actions {
 }
 
 #[derive(Debug)]
-pub struct Igmpv2HostConfig {
+pub struct IgmpConfig {
     // When a host wants to send a report not because of a query, this value is
     // used as the delay timer.
     unsolicited_report_interval: Duration,
@@ -489,9 +489,9 @@ const DEFAULT_V1_ROUTER_PRESENT_TIMEOUT: Duration = Duration::from_secs(400);
 /// [RFC 2236 Section 4]: https://tools.ietf.org/html/rfc2236#section-4
 const DEFAULT_V1_QUERY_MAX_RESP_TIME: Duration = Duration::from_secs(10);
 
-impl Default for Igmpv2HostConfig {
+impl Default for IgmpConfig {
     fn default() -> Self {
-        Igmpv2HostConfig {
+        IgmpConfig {
             unsolicited_report_interval: IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
             send_leave_anyway: false,
             v1_router_present_timeout: DEFAULT_V1_ROUTER_PRESENT_TIMEOUT,
@@ -501,7 +501,7 @@ impl Default for Igmpv2HostConfig {
 
 impl ProtocolSpecificTypes for Igmpv2ProtocolSpecific {
     type Actions = Igmpv2Actions;
-    type Config = Igmpv2HostConfig;
+    type Config = IgmpConfig;
 }
 
 impl gmp::v1::ProtocolSpecific for Igmpv2ProtocolSpecific {
@@ -625,6 +625,7 @@ mod tests {
         groups: MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>,
         igmp_state: IgmpState<FakeBindingsCtx>,
         gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
+        config: IgmpConfig,
     }
 
     impl FakeIgmpCtx {
@@ -687,8 +688,8 @@ mod tests {
             let enabled = *igmp_enabled;
             let shared = Rc::clone(shared);
             let mut shared = shared.borrow_mut();
-            let Shared { igmp_state, gmp_state, groups } = &mut *shared;
-            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state }, igmp_state)
+            let Shared { igmp_state, gmp_state, groups, config } = &mut *shared;
+            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config }, igmp_state)
         }
     }
 
@@ -744,10 +745,11 @@ mod tests {
     fn test_igmp_state_with_igmpv1_router() {
         run_with_many_seeds(|seed| {
             let mut rng = new_rng(seed);
+            let cfg = IgmpConfig::default();
             let (mut s, _actions) =
-                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false);
+                gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
+                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
                     generic: None,
                     protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
@@ -766,14 +768,16 @@ mod tests {
     fn test_igmp_state_igmpv1_router_present_timer_expires() {
         run_with_many_seeds(|seed| {
             let mut rng = new_rng(seed);
+            let cfg = IgmpConfig::default();
             let (mut s, _actions) =
                 gmp::v1::GmpStateMachine::<_, Igmpv2ProtocolSpecific>::join_group(
                     &mut rng,
                     FakeInstant::default(),
                     false,
+                    &cfg,
                 );
             assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
+                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
                     generic: None,
                     protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
@@ -782,7 +786,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
+                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
                     generic: None,
                     protocol_specific: Some(Igmpv2Actions::ScheduleV1RouterPresentTimer(
@@ -857,6 +861,7 @@ mod tests {
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                     ),
+                    config: Default::default(),
                 })),
                 igmp_enabled: true,
                 addr_subnet: None,

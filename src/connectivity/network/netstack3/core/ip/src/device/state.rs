@@ -35,8 +35,8 @@ use crate::internal::device::{
     IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
-use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpGroupState, IgmpState, IgmpTimerId};
+use crate::internal::gmp::mld::{MldConfig, MldGroupState, MldTimerId};
 use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
@@ -66,6 +66,8 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
     type GmpGroupState<I: Instant>;
     /// The GMP protocol-specific state.
     type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
+    /// The GMP protocol-specific configuration.
+    type GmpProtoConfig: Default;
     /// The timer id for GMP timers.
     type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpDelayedReportTimerId<Self, D>>;
 
@@ -85,6 +87,7 @@ impl IpDeviceStateIpExt for Ipv4 {
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpGroupState<I: Instant> = IgmpGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
+    type GmpProtoConfig = IgmpConfig;
 
     fn new_gmp_state<
         D: WeakDeviceIdentifier,
@@ -149,6 +152,7 @@ impl IpDeviceStateIpExt for Ipv6 {
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpGroupState<I: Instant> = MldGroupState<I>;
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
+    type GmpProtoConfig = MldConfig;
 
     fn new_gmp_state<
         D: WeakDeviceIdentifier,
@@ -195,6 +199,8 @@ pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindi
     pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.
     pub gmp: GmpState<I, BT>,
+    /// GMP protocol-specific configuration.
+    pub gmp_config: I::GmpProtoConfig,
 }
 
 /// A container for the default hop limit kept by [`IpDeviceState`].
@@ -312,6 +318,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
                 groups: Default::default(),
                 gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
+                gmp_config: Default::default(),
             }),
             default_hop_limit: Default::default(),
             flags: Default::default(),

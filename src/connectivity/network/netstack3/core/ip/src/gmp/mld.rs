@@ -488,6 +488,7 @@ mod tests {
     struct Shared {
         groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
+        config: MldConfig,
     }
 
     fn new_context() -> FakeCtxImpl {
@@ -499,6 +500,7 @@ mod tests {
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                     ),
+                    config: Default::default(),
                 })),
                 mld_enabled: true,
                 ipv6_link_local: None,
@@ -546,8 +548,8 @@ mod tests {
             let enabled = *mld_enabled;
             let shared = Rc::clone(shared);
             let mut shared = shared.borrow_mut();
-            let Shared { gmp_state, groups } = &mut *shared;
-            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state })
+            let Shared { gmp_state, groups, config } = &mut *shared;
+            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config })
         }
     }
 
@@ -608,13 +610,15 @@ mod tests {
             // host should send the report immediately instead of setting a
             // timer.
             let mut rng = new_rng(seed);
+            let cfg = MldConfig::default();
             let (mut s, _actions) = gmp::v1::GmpStateMachine::<_, MldProtocolSpecific>::join_group(
                 &mut rng,
                 FakeInstant::default(),
                 false,
+                &cfg,
             );
             assert_eq!(
-                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
+                s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
                 gmp::v1::QueryReceivedActions {
                     generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport(
                         MldProtocolSpecific

@@ -167,13 +167,13 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
         group: MulticastAddr<A>,
         rng: &mut R,
         now: I,
+        cfg: &P::Config,
     ) -> GroupJoinResult<v1::JoinGroupActions<P>>
     where
         T: From<v1::GmpStateMachine<I, P>>,
-        P::Config: Default,
     {
         self.join_group_with(group, || {
-            let (state, actions) = v1::GmpStateMachine::join_group(rng, now, gmp_disabled);
+            let (state, actions) = v1::GmpStateMachine::join_group(rng, now, gmp_disabled, cfg);
             (T::from(state), actions)
         })
     }
@@ -191,11 +191,12 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
     fn leave_group_gmp<I: Instant, P: ProtocolSpecific>(
         &mut self,
         group: MulticastAddr<A>,
+        cfg: &P::Config,
     ) -> GroupLeaveResult<v1::LeaveGroupActions>
     where
         T: Into<v1::GmpStateMachine<I, P>>,
     {
-        self.leave_group(group).map(|state| state.into().leave_group())
+        self.leave_group(group).map(|state| state.into().leave_group(cfg))
     }
 
     /// Does the set contain the given group?
@@ -323,7 +324,7 @@ pub trait ProtocolSpecificTypes: Copy + Default {
     /// The type for protocol-specific actions.
     type Actions;
     /// The type for protocol-specific configs.
-    type Config: Debug + Default;
+    type Config: Debug;
 }
 
 /// Randomly generates a timeout in (0, period].
@@ -404,6 +405,8 @@ pub struct GmpStateRef<'a, I: IpExt, CC: GmpTypeLayout<I, BT>, BT: GmpBindingsTy
     pub groups: &'a mut MulticastGroupSet<I::Addr, CC::GroupState>,
     /// Mutable reference to the device's GMP state.
     pub gmp: &'a mut GmpState<I, BT>,
+    /// Protocol specific configuration.
+    pub config: &'a <CC::ProtocolSpecific as ProtocolSpecificTypes>::Config,
 }
 
 /// Provides IP-specific associated types for GMP.
