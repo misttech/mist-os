@@ -664,6 +664,7 @@ sdk_molecule("core_bindlib") {
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_sdk",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_sdk",
     "//src/devices/bind/fuchsia.khadas.platform:fuchsia.khadas.platform_sdk",
+    "//src/devices/bind/fuchsia.mailbox:fuchsia.mailbox_sdk",
     "//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_sdk",
     "//src/devices/bind/fuchsia.pci:fuchsia.pci_sdk",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_sdk",

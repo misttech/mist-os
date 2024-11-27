@@ -17,6 +17,7 @@ bind_library://bind/fuchsia.google.platform
 bind_library://bind/fuchsia.gpio
 bind_library://bind/fuchsia.i2c
 bind_library://bind/fuchsia.khadas.platform
+bind_library://bind/fuchsia.mailbox
 bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.pci
 bind_library://bind/fuchsia.platform
