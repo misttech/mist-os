@@ -633,13 +633,15 @@ impl Journal {
                     },
                 ..
             }) => {
-                checksum_list.push(
-                    journal_offset,
-                    *device_offset..*device_offset + range.length().unwrap(),
-                    checksums.maybe_as_ref().context("Malformed snooped checksums")?,
-                    // Cow mode extents are always writing for the first time
-                    true,
-                )?;
+                checksum_list
+                    .push(
+                        journal_offset,
+                        *device_offset..*device_offset + range.length().unwrap(),
+                        checksums.maybe_as_ref().context("Malformed snooped checksums")?,
+                        // Cow mode extents are always writing for the first time
+                        true,
+                    )
+                    .context("Pushing snooped checksums to checksum list")?;
             }
             Mutation::ObjectStore(_) => {}
             Mutation::Allocator(AllocatorMutation::Deallocate { device_range, .. }) => {
@@ -748,8 +750,10 @@ impl Journal {
         }
 
         let mut reader = JournalReader::new(handle, &super_block.journal_checkpoint);
-        let JournaledTransactions { mut transactions, device_flushed_offset } =
-            self.read_transactions(&mut reader, None, INVALID_OBJECT_ID).await?;
+        let JournaledTransactions { mut transactions, device_flushed_offset } = self
+            .read_transactions(&mut reader, None, INVALID_OBJECT_ID)
+            .await
+            .context("Reading transactions for replay")?;
 
         // Validate all the mutations.
         let mut checksum_list = ChecksumList::new(device_flushed_offset);
@@ -765,12 +769,14 @@ impl Journal {
         } in &transactions
         {
             for JournaledChecksums { device_range, checksums, first_write } in checksums {
-                checksum_list.push(
-                    checkpoint.file_offset,
-                    device_range.clone(),
-                    checksums.maybe_as_ref().context("Malformed checksums")?,
-                    *first_write,
-                )?;
+                checksum_list
+                    .push(
+                        checkpoint.file_offset,
+                        device_range.clone(),
+                        checksums.maybe_as_ref().context("Malformed checksums")?,
+                        *first_write,
+                    )
+                    .context("Pushing journal checksum records to checksum list")?;
             }
             for mutation in root_parent_mutations
                 .iter()
@@ -881,7 +887,7 @@ impl Journal {
                 .context("Failed to replay mutations")?;
         }
 
-        allocator.on_replay_complete().await?;
+        allocator.on_replay_complete().await.context("Failed to complete replay for allocator")?;
 
         let discarded_to =
             if last_checkpoint.file_offset != reader.journal_file_checkpoint().file_offset {
