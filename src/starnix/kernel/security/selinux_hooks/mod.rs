@@ -822,8 +822,13 @@ fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
 
     // We should never reach here, but for now enforce it (see above) in debug builds.
     let info = fs_node.info();
-    if fs_node.fs().name() == "anon" {
+    let fs_name = fs_node.fs().name();
+    if fs_name == "anon" {
         track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
+    } else if fs_name == "sockfs" {
+        track_stub!(TODO("https://fxbug.dev/364568517"), "Label socket nodes properly");
+    } else if fs_name == "pipefs" {
+        track_stub!(TODO("https://fxbug.dev/380448690"), "Label fifo nodes properly");
     } else {
         panic!(
             "Unlabeled FsNode@{} of class {:?} in {}",
