@@ -67,7 +67,6 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
   // Not started (and therefore not joinable) until Start() is called.
   std::thread start_thread_;
 
-  std::optional<compat::BanjoServer> display_banjo_server_;
   compat::SyncInitializedDeviceServer display_compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> display_node_controller_;
 

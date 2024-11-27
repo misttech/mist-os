@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -34,12 +35,20 @@ namespace virtio_display {
 
 DisplayControllerBanjo::DisplayControllerBanjo(DisplayEngine* engine,
                                                DisplayCoordinatorEventsBanjo* coordinator_events)
-    : engine_(*engine), coordinator_events_(*coordinator_events) {
+    : engine_(*engine),
+      coordinator_events_(*coordinator_events),
+      banjo_server_(ZX_PROTOCOL_DISPLAY_ENGINE, GetProtocol().ctx, GetProtocol().ops) {
   ZX_DEBUG_ASSERT(engine != nullptr);
   ZX_DEBUG_ASSERT(coordinator_events != nullptr);
 }
 
 DisplayControllerBanjo::~DisplayControllerBanjo() = default;
+
+compat::DeviceServer::BanjoConfig DisplayControllerBanjo::CreateBanjoConfig() {
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = banjo_server_.callback();
+  return banjo_config;
+}
 
 void DisplayControllerBanjo::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* display_engine_listener) {
