@@ -53,7 +53,7 @@ mod tests {
         let msi_resource = get_msi_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::MsiResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::MsiResourceMarker>();
         fasync::Task::local(
             MsiResource::new(msi_resource)
                 .unwrap_or_else(|e| panic!("Error while creating msi resource service: {}", e))

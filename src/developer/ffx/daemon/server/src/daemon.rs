@@ -931,7 +931,7 @@ mod test {
         let socket_path = tempdir.path().join("ascendd.sock");
         let d = Daemon::new(socket_path);
 
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<DaemonMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<DaemonMarker>();
         let (quit_tx, _quit_rx) = mpsc::channel(1);
 
         let d2 = d.clone();

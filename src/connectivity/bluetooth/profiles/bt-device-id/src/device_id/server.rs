@@ -232,8 +232,7 @@ pub(crate) mod tests {
 
         let (sender, receiver) = mpsc::channel(0);
         let (profile, profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
         let max = max.unwrap_or(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS);
         let server = DeviceIdServer::new(max, None, profile, receiver);
 
@@ -248,8 +247,7 @@ pub(crate) mod tests {
     where
         Fut: Future + Unpin,
     {
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>()
-            .expect("valid endpoints");
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>();
 
         let send_fut = sender.send(s);
         let (send_result, server_fut) = run_while(exec, server_fut, send_fut);
@@ -415,8 +413,7 @@ pub(crate) mod tests {
 
         let (sender, receiver) = mpsc::channel(0);
         let (profile, mut profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
         let default = (&minimal_record(true)).try_into().ok();
         let server =
             DeviceIdServer::new(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS, default, profile, receiver);

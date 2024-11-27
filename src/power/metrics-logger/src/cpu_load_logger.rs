@@ -406,7 +406,7 @@ pub mod tests {
         mut get_cpu_stats: impl FnMut() -> fkernel::CpuStats + 'static,
     ) -> (fkernel::StatsProxy, fasync::Task<()>) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {

@@ -432,8 +432,7 @@ mod tests {
 
     /// Sets up control and browse connections for a peer acting as AVRCP Target role.
     fn set_up() -> (Controller, AvcPeer, AvctpPeer) {
-        let (profile_proxy, mut _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("should have initialized");
+        let (profile_proxy, mut _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
         let peer = RemotePeerHandle::spawn_peer(
             PeerId(0x1),
             Arc::new(TargetDelegate::new()),
@@ -469,8 +468,7 @@ mod tests {
         let controller = set_up().0;
 
         // Initialize client.
-        let (proxy, server) =
-            create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
+        let (proxy, server) = create_proxy_and_stream::<ControllerMarker>();
         let mut client = ControllerService::new(controller, server);
         let run_fut = pin!(client.run());
 
@@ -492,8 +490,7 @@ mod tests {
         let controller = set_up().0;
 
         // Initialize client.
-        let (proxy, server) =
-            create_proxy_and_stream::<ControllerExtMarker>().expect("Controller proxy creation");
+        let (proxy, server) = create_proxy_and_stream::<ControllerExtMarker>();
         let mut client = ControllerExtService { controller, fidl_stream: server };
 
         let run_fut = pin!(client.run());
@@ -547,8 +544,7 @@ mod tests {
         expect_outgoing_commands(&mut exec, &mut avc_cmd_stream, &mut avctp_cmd_stream);
 
         // Initialize client.
-        let (_proxy, server) =
-            create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
+        let (_proxy, server) = create_proxy_and_stream::<ControllerMarker>();
         let mut client = ControllerService::new(controller, server);
 
         // When available players changed notification is sent, available players are fetched.
@@ -605,8 +601,7 @@ mod tests {
         let controller = set_up().0;
 
         // Initialize client.
-        let (_proxy, server) =
-            create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
+        let (_proxy, server) = create_proxy_and_stream::<ControllerMarker>();
         let mut client = ControllerService::new(controller, server);
 
         // Set test filter.
@@ -641,8 +636,7 @@ mod tests {
         expect_outgoing_commands(&mut exec, &mut avc_cmd_stream, &mut avctp_cmd_stream);
 
         // Initialize client.
-        let (proxy, server) =
-            create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
+        let (proxy, server) = create_proxy_and_stream::<ControllerMarker>();
         let mut client = ControllerService::new(controller, server);
         let run_fut = client.run();
         let mut run_fut = pin!(run_fut);
@@ -686,8 +680,7 @@ mod tests {
         }
 
         // Initialize client.
-        let (proxy, server) =
-            create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
+        let (proxy, server) = create_proxy_and_stream::<ControllerMarker>();
         let mut client = ControllerService::new(controller, server);
         client.cache_controller_notification_state(&PeerControllerEvent::TrackIdChanged(2));
         let run_fut = client.run();

@@ -199,7 +199,7 @@ mod test {
         expected_kvs: Vec<cm_rust::ConfigOverride>,
     ) -> fsys::ConfigOverrideProxy {
         let (config_override, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::ConfigOverrideMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsys::ConfigOverrideMarker>();
 
         fuchsia_async::Task::local(async move {
             loop {

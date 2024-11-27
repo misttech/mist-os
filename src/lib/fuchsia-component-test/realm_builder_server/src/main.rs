@@ -2544,8 +2544,7 @@ mod tests {
             realm_contents,
         };
 
-        let (builder_proxy, builder_stream) =
-            create_proxy_and_stream::<ftest::BuilderMarker>().unwrap();
+        let (builder_proxy, builder_stream) = create_proxy_and_stream::<ftest::BuilderMarker>();
 
         let builder_stream_task = fasync::Task::local(async move {
             builder.handle_stream(builder_stream).await.expect("failed to handle builder stream");
@@ -2601,8 +2600,7 @@ mod tests {
 
     impl RealmAndBuilderTask {
         fn new() -> Self {
-            let (realm_proxy, realm_stream) =
-                create_proxy_and_stream::<ftest::RealmMarker>().unwrap();
+            let (realm_proxy, realm_stream) = create_proxy_and_stream::<ftest::RealmMarker>();
             let pkg_dir = fuchsia_fs::directory::open_in_namespace(
                 "/pkg",
                 fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,

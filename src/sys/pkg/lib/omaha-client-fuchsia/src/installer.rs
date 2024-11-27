@@ -537,9 +537,8 @@ mod tests {
         CupRequestStream,
     ) {
         let (installer_proxy, installer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
-        let (cup_proxy, cup_stream) =
-            fidl::endpoints::create_proxy_and_stream::<CupMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
+        let (cup_proxy, cup_stream) = fidl::endpoints::create_proxy_and_stream::<CupMarker>();
         let app = omaha_client::common::App::builder().id("system_id").version([1]).build();
         let app_metadata = AppMetadata { appid_source: AppIdSource::VbMetadata };
         let app_set = Rc::new(AsyncMutex::new(FuchsiaAppSet::new(app, app_metadata)));
@@ -919,7 +918,7 @@ mod tests {
     async fn test_reboot() {
         let mut installer = new_installer();
         let (reboot_controller, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RebootControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RebootControllerMarker>();
         installer.reboot_controller = Some(reboot_controller);
 
         {

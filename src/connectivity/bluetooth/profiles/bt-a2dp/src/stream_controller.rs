@@ -244,7 +244,7 @@ mod tests {
     fn setup_server_and_mock_controller(
         should_error: bool,
     ) -> (fasync::Task<()>, ControllerProxy, mpsc::Receiver<Event>) {
-        let (c, s) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+        let (c, s) = create_proxy_and_stream::<ControllerMarker>();
         let (controller, test_events) = MockStreamController::new(should_error);
 
         let _server_task =

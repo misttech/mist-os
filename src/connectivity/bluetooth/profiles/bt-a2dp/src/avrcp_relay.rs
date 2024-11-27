@@ -485,9 +485,9 @@ mod tests {
     fn setup_media_relay() -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future)
     {
         let (player_proxy, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(0);
 
         let relay = AvrcpRelay::default();
@@ -500,9 +500,9 @@ mod tests {
     ) -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future, TestBatteryManager)
     {
         let (player_proxy, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(1);
 
         let mut setup_fut = pin!(TestBatteryManager::make_battery_client_with_test_manager());
@@ -1282,9 +1282,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
 
         let (player_client, player_requests) =
-            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>();
         let (avrcp_proxy, avrcp_requests) =
-            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>();
         let peer_id = PeerId(0);
 
         let relay = AvrcpRelay::default()

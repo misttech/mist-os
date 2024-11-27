@@ -296,7 +296,7 @@ mod tests {
     /// provided epitaph.
     fn spawn_runner(component_controller_epitaph: zx::Status) -> frunner::ComponentRunnerProxy {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<frunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<frunner::ComponentRunnerMarker>();
         fasync::Task::local(async move {
             while let Some(event) =
                 request_stream.try_next().await.expect("Error in test runner request stream")

@@ -221,8 +221,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_feature_report() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -259,8 +258,7 @@ mod tests {
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -288,8 +286,7 @@ mod tests {
         #[test]
         fn multiple_requests_before_call_to_get_input_reports_reader() -> Result<(), Error> {
             let mut executor = fasync::TestExecutor::new();
-            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                .context("creating InputDevice proxy and stream")?;
+            let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>();
 
             let input_device_server_fut = Box::new(InputDevice::new(
                 request_stream,
@@ -671,8 +668,7 @@ mod tests {
         pub(super) fn make_input_device_proxy_and_struct(
         ) -> (InputDeviceProxy, Box<InputDevice>, AsyncEvent) {
             let (input_device_proxy, input_device_request_stream) =
-                endpoints::create_proxy_and_stream::<InputDeviceMarker>()
-                    .expect("creating InputDevice proxy and stream");
+                endpoints::create_proxy_and_stream::<InputDeviceMarker>();
             let got_input_reports_reader = AsyncEvent::new();
             let input_device = Box::new(InputDevice::new(
                 input_device_request_stream,

@@ -397,8 +397,7 @@ mod tests {
         // Create the proxy/stream to register the watcher
         let (register_proxy, register_stream) = fidl::endpoints::create_proxy_and_stream::<
             fpower::RebootMethodsWatcherRegisterMarker,
-        >()
-        .unwrap();
+        >();
 
         // Start the RebootMethodsWatcherRegister server that will handle Register calls from
         // register_proxy
@@ -426,8 +425,7 @@ mod tests {
     async fn test_reboot_watcher_reason() {
         let node = ShutdownWatcherBuilder::new().build().unwrap();
         let (watcher_proxy, mut watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         node.notify_reboot_watchers(RebootReason::HighTemperature, Seconds(0.0)).await;
 
@@ -447,18 +445,15 @@ mod tests {
 
         // Create three separate reboot watchers
         let (watcher_proxy1, mut watcher_stream1) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy1);
 
         let (watcher_proxy2, mut watcher_stream2) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy2);
 
         let (watcher_proxy3, mut watcher_stream3) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy3);
 
         // Close the channel of the first watcher to verify the node still correctly notifies the
@@ -500,8 +495,7 @@ mod tests {
 
         // Register the reboot watcher
         let (watcher_proxy, mut watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         assert_eq!(node.reboot_watchers.borrow().len(), 1);
 
@@ -534,8 +528,7 @@ mod tests {
 
         // Register the reboot watcher
         let (watcher_proxy, _watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         assert_eq!(node.reboot_watchers.borrow().len(), 1);
 
@@ -567,8 +560,7 @@ mod tests {
         // Create the registration proxy/stream
         let (register_proxy, register_stream) = fidl::endpoints::create_proxy_and_stream::<
             fpower::RebootMethodsWatcherRegisterMarker,
-        >()
-        .unwrap();
+        >();
 
         // Start the RebootMethodsWatcherRegister server that will handle Register requests from
         // `register_proxy`

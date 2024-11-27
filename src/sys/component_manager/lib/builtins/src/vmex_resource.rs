@@ -53,7 +53,7 @@ mod tests {
         let vmex_resource = get_vmex_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::VmexResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::VmexResourceMarker>();
         fasync::Task::local(
             VmexResource::new(vmex_resource)
                 .unwrap_or_else(|e| panic!("Error while creating vmex resource service: {}", e))

@@ -453,7 +453,7 @@ mod tests {
     async fn test_client_connected_to_peer_manager() {
         // Create the ControllerPool. This stores all active peers and handles listening
         // to PeerManager and PeerController requests.
-        let (pm_proxy, pm_stream) = create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+        let (pm_proxy, pm_stream) = create_proxy_and_stream::<PeerManagerMarker>();
         let controller_pool = ControllerPool::new();
         let mut peer_map = DetachableMap::new();
 
@@ -462,8 +462,7 @@ mod tests {
 
         // Create a fake peer, and simulate connection by sending the `peer_connected` signal.
         let fake_peer_id = PeerId(12345);
-        let (profile_proxy, _requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
+        let (profile_proxy, _requests) = create_proxy_and_stream::<ProfileMarker>();
         let (remote, signaling) = Channel::create();
         let avdtp_peer = AvdtpPeer::new(signaling);
         let mut streams = Streams::default();

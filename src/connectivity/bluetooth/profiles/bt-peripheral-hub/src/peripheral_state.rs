@@ -208,7 +208,7 @@ mod tests {
 
     type WatchRequest = QueryResponseFut<Vec<Information>>;
     async fn make_watch_request() -> (WatchRequest, WatcherWatchResponder) {
-        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>().unwrap();
+        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<WatcherMarker>();
         let watch_fut = c.watch(&[]).check().expect("can make Watch request");
         let (_ids, responder) = s
             .select_next_some()

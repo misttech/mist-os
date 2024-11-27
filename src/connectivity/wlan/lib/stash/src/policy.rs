@@ -634,8 +634,7 @@ mod tests {
     fn migration_metrics_test_values() -> MetricsTestValues {
         let (cobalt_proxy, cobalt_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
-        >()
-        .expect("failed to create MetricsEventLogger proxy");
+        >();
 
         let (legacy_stash, stash_stream) = stash_for_test();
         let root = StorageStore::new(format!("{FILE_PATH_FORMAT}{}", rand_string()));

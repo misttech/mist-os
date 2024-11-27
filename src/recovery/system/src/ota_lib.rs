@@ -252,7 +252,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_complete_ota_sends_no_requests() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
 
         let ota_manager = OtaComponent::new_with_realm_and_launcher(
@@ -272,7 +272,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_start_propagates_success_on_ota_success() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = Arc::new(OtaComponent::new_with_realm_and_launcher(
             client,
@@ -305,7 +305,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_start_propagates_error_on_ota_failure() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = Arc::new(OtaComponent::new_with_realm_and_launcher(
             client,
@@ -330,7 +330,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_start_propagates_error_on_launch_child_failure() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = Arc::new(OtaComponent::new_with_realm_and_launcher(
             client,
@@ -356,7 +356,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_stop_proxies_to_realm_returns_ok() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = OtaComponent::new_with_realm_and_launcher(
             client,
@@ -381,7 +381,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_stop_proxies_to_realm_returns_err() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = OtaComponent::new_with_realm_and_launcher(
             client,
@@ -406,7 +406,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_stop_unblocks_start_with_err() {
-        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>().unwrap();
+        let (client, mut stream) = create_proxy_and_stream::<RealmMarker>();
         let launch_count = Arc::new(AtomicU8::new(0));
         let ota_manager = Arc::new(OtaComponent::new_with_realm_and_launcher(
             client,
@@ -451,8 +451,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_log_listener_listens() -> Result<(), Error> {
-        let (log_proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<flog::LogMarker>().unwrap();
+        let (log_proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<flog::LogMarker>();
         let listener = OtaLogListenerImpl::new_with_proxy(log_proxy);
         let lines = Arc::new(Mutex::new(Vec::new()));
         let lines2 = lines.clone();

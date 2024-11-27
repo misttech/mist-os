@@ -445,8 +445,7 @@ pub mod tests {
     fn setup_fake_network_port(
         mut get_counter: impl FnMut() -> fhwnet::PortGetCountersResponse + 'static,
     ) -> (fhwnet::PortProxy, fasync::Task<()>) {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fhwnet::PortMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fhwnet::PortMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {

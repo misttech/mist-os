@@ -172,8 +172,7 @@ mod tests {
     use std::sync::Arc;
 
     fn setup() -> Controller {
-        let (profile_proxy, mut _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("should have initialized");
+        let (profile_proxy, mut _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
         let peer = RemotePeerHandle::spawn_peer(
             PeerId(0x1),
             Arc::new(TargetDelegate::new()),
@@ -193,8 +192,7 @@ mod tests {
         let controller = setup();
 
         // Initialize client.
-        let (bc_proxy, bc_server) =
-            create_proxy_and_stream::<BrowseControllerMarker>().expect("Controller proxy creation");
+        let (bc_proxy, bc_server) = create_proxy_and_stream::<BrowseControllerMarker>();
         let mut client = BrowseControllerService::new(controller, bc_server);
         let run_fut = client.run();
         let run_fut = pin!(run_fut);
@@ -221,8 +219,7 @@ mod tests {
         let controller = setup();
 
         // Initialize client.
-        let (bc_proxy, bc_server) = create_proxy_and_stream::<BrowseControllerExtMarker>()
-            .expect("Controller proxy creation");
+        let (bc_proxy, bc_server) = create_proxy_and_stream::<BrowseControllerExtMarker>();
         let mut client = BrowseControllerExtService { controller, fidl_stream: bc_server };
 
         let run_fut = pin!(client.run());

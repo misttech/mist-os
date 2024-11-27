@@ -41,8 +41,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_handle_request_forwards_stream_and_returns_ok() {
         let (server, mut receiver) = make_server_and_receiver();
-        let (_proxy, stream) =
-            create_proxy_and_stream::<DeviceMarker>().expect("should make proxy/stream");
+        let (_proxy, stream) = create_proxy_and_stream::<DeviceMarker>();
         assert_matches!(server.handle_request(stream).await, Ok(()));
         assert!(receiver.try_next().expect("should return ok").is_some());
     }
@@ -50,8 +49,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_handle_request_returns_error_on_disconnected_receiver() {
         let (server, receiver) = make_server_and_receiver();
-        let (_proxy, stream) =
-            create_proxy_and_stream::<DeviceMarker>().expect("should make proxy/stream");
+        let (_proxy, stream) = create_proxy_and_stream::<DeviceMarker>();
         std::mem::drop(receiver);
         assert_matches!(server.handle_request(stream).await, Err(_));
     }

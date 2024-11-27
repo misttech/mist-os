@@ -1058,8 +1058,7 @@ mod tests {
         // set up the dial result so that an outgoing call request will be a success.
         manager.set_dial_result("123".to_string(), zx::Status::OK).await;
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // Create a background task to manage a peer channel.
         fasync::Task::local({

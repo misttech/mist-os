@@ -653,8 +653,7 @@ impl MockPaverService {
 
     /// Spawns a new task to serve the data sink protocol.
     pub fn spawn_data_sink_service(self: &Arc<Self>) -> paver::DataSinkProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<paver::DataSinkMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::DataSinkMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)
@@ -682,8 +681,7 @@ impl MockPaverService {
 
     /// Spawns a new task to serve the paver protocol.
     pub fn spawn_paver_service(self: &Arc<Self>) -> paver::PaverProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)
@@ -880,8 +878,7 @@ pub mod tests {
         {
             let paver = f(MockPaverServiceBuilder::new());
             let paver = Arc::new(paver.build());
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>()
-                .expect("Creating paver endpoints");
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<paver::PaverMarker>();
 
             fasync::Task::spawn(
                 Arc::clone(&paver)

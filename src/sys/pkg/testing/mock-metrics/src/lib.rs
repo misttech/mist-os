@@ -110,8 +110,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_metrics() {
         let mock = Arc::new(MockMetricEventLoggerFactory::new());
-        let (factory, stream) =
-            create_proxy_and_stream::<fidl::MetricEventLoggerFactoryMarker>().unwrap();
+        let (factory, stream) = create_proxy_and_stream::<fidl::MetricEventLoggerFactoryMarker>();
 
         let task = fasync::Task::spawn(Arc::clone(&mock).run_logger_factory(stream));
 

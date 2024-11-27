@@ -49,8 +49,7 @@ impl MockCrashReporterService {
 
     /// Spawns an `fasync::Task` which serves fuchsia.feedback/CrashReporter.
     pub fn spawn_crash_reporter_service(self: Arc<Self>) -> (CrashReporterProxy, Task<()>) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<CrashReporterMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<CrashReporterMarker>();
 
         let task = Task::spawn(self.run_crash_reporter_service(stream));
 

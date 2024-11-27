@@ -284,7 +284,7 @@ mod test {
     const BUFFER_COUNT: usize = 3;
 
     fn spawn_allocator_server() -> Result<AllocatorProxy, Error> {
-        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>()?;
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>();
 
         fasync::Task::spawn(async move {
             while let Some(_) = stream.try_next().await.expect("Failed to get request") {}
@@ -295,7 +295,7 @@ mod test {
 
     fn spawn_buffer_collection() -> Result<BufferCollectionProxy, Error> {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<BufferCollectionMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<BufferCollectionMarker>();
 
         fasync::Task::spawn(async move {
             let mut stored_constraints = None;

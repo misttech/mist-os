@@ -49,7 +49,7 @@ mod tests {
         let irq_resource = get_irq_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>();
         fasync::Task::local(
             IrqResource::new(irq_resource)
                 .serve(stream)
@@ -61,7 +61,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn fail_with_no_irq_resource() -> Result<(), Error> {
-        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>()?;
+        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>();
         IrqResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
             .await

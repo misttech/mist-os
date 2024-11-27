@@ -329,11 +329,11 @@ mod tests {
     const INITIAL_AVRCP_VOLUME: u8 = 101;
 
     fn setup_avrcp_proxy() -> (avrcp::PeerManagerProxy, avrcp::PeerManagerRequestStream) {
-        endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap()
+        endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>()
     }
 
     fn setup_settings_proxy() -> (settings::AudioProxy, settings::AudioRequestStream) {
-        endpoints::create_proxy_and_stream::<settings::AudioMarker>().unwrap()
+        endpoints::create_proxy_and_stream::<settings::AudioMarker>()
     }
 
     /// Builds all of the Proxies and request streams involved with setting up a Volume Relay

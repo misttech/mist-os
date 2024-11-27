@@ -49,8 +49,7 @@ impl MockRebootService {
     pub fn spawn_reboot_service(self: Arc<Self>) -> AdminProxy {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
-        >()
-        .unwrap();
+        >();
 
         fasync::Task::spawn(
             self.run_reboot_service(stream)

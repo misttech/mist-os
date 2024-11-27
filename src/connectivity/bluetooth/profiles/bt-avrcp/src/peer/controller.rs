@@ -519,8 +519,7 @@ pub mod tests {
     }
 
     fn set_up() -> (Controller, AvcPeer, AvctpPeer) {
-        let (profile_proxy, mut _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().expect("should have initialized");
+        let (profile_proxy, mut _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
         let peer = RemotePeerHandle::spawn_peer(
             PeerId(0x1),
             Arc::new(TargetDelegate::new()),

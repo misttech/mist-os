@@ -1576,8 +1576,7 @@ mod test {
         send_internal_error: bool,
         nodename_response: String,
     ) -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
 
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -1624,8 +1623,7 @@ mod test {
     fn setup_fake_unresponsive_remote_control_service(
         done: channel::oneshot::Receiver<()>,
     ) -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
 
         fuchsia_async::Task::local(async move {
             while let Ok(Some(_req)) = stream.try_next().await {}

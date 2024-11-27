@@ -460,7 +460,7 @@ mod tests {
         };
 
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

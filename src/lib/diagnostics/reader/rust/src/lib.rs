@@ -863,8 +863,7 @@ mod tests {
 
     fn spawn_fake_archive(data_to_send: serde_json::Value) -> fdiagnostics::ArchiveAccessorProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>();
         fasync::Task::spawn(async move {
             while let Some(request) = stream.try_next().await.expect("stream request") {
                 match request {

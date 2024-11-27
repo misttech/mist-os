@@ -2241,7 +2241,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn event_stream_from_state_conversion_error() {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>();
         let stream = event_stream_from_state(proxy).expect("get event stream");
         futures::pin_mut!(stream);
 
@@ -2279,7 +2279,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn event_stream_from_state_empty_event_batch() {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>();
         let stream = event_stream_from_state(proxy).expect("get event stream");
         futures::pin_mut!(stream);
 
@@ -2595,7 +2595,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_push_changes_reports_invalid_change() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>();
         let push_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
                 .await
@@ -2635,7 +2635,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_commit_reports_invalid_change() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>();
         let commit_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
                 .await

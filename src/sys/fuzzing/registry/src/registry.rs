@@ -304,11 +304,9 @@ mod tests {
         Fut: Future<Output = ()>,
     {
         let fuzz_registry = FuzzRegistry::new();
-        let (registry, stream) = create_proxy_and_stream::<fuzz::RegistryMarker>()
-            .expect("failed to create proxy and/or stream");
+        let (registry, stream) = create_proxy_and_stream::<fuzz::RegistryMarker>();
         let serve_registry_fut = fuzz_registry.serve_registry(stream).fuse();
-        let (registrar, stream) = create_proxy_and_stream::<fuzz::RegistrarMarker>()
-            .expect("failed to create proxy and/or stream");
+        let (registrar, stream) = create_proxy_and_stream::<fuzz::RegistrarMarker>();
         let serve_registrar_fut = fuzz_registry.serve_registrar(stream).fuse();
         let test_fut = test_fut(registry, registrar).fuse();
         pin_mut!(serve_registry_fut, serve_registrar_fut, test_fut);

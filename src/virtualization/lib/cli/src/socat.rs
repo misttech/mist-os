@@ -229,7 +229,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn socat_listen_invalid_host_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         let server = async move {
             let (port, _acceptor, responder) = stream
                 .next()
@@ -251,7 +251,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn socat_listen_mismatched_ports_returns_err() {
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         let server = async move {
             let (port, acceptor, responder) = stream
                 .next()

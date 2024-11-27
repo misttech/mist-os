@@ -321,7 +321,7 @@ mod tests {
 
         // Create channels and send the registration message.
         let (registry_proxy, registry_stream) =
-            create_proxy_and_stream::<fheapdump_process::RegistryMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_process::RegistryMarker>();
         let (snapshot_proxy, snapshot_server) =
             create_proxy::<fheapdump_process::SnapshotSinkV1Marker>();
         registry_proxy
@@ -464,7 +464,7 @@ mod tests {
         // Take a live snapshot.
         let mut received_snapshot = ex.run_singlethreaded(async {
             let (receiver_proxy, receiver_stream) =
-                create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+                create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
             let receive_worker =
                 fasync::Task::local(heapdump_snapshot::Snapshot::receive_from(receiver_stream));
 
@@ -550,7 +550,7 @@ mod tests {
         let mut receive_named_snapshot_fn = |snapshot_name| {
             ex.run_singlethreaded(async {
                 let (receiver_proxy, receiver_stream) =
-                    create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+                    create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
                 let receive_worker =
                     fasync::Task::local(heapdump_snapshot::Snapshot::receive_from(receiver_stream));
                 let snapshot = registry

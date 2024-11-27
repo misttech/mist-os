@@ -139,8 +139,7 @@ mod test {
         expected_moniker: &'static str,
         reports: Vec<fsys::RouteReport>,
     ) -> fsys::RouteValidatorProxy {
-        let (route_validator, mut stream) =
-            create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let (route_validator, mut stream) = create_proxy_and_stream::<fsys::RouteValidatorMarker>();
         fuchsia_async::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {

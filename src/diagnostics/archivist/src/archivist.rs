@@ -482,7 +482,7 @@ mod tests {
         let archivist = init_archivist(&mut fs).await;
         let (signal_send, signal_recv) = oneshot::channel();
         let (lifecycle_proxy, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>();
         fasync::Task::spawn(async move {
             archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
@@ -498,7 +498,7 @@ mod tests {
         fs.serve_connection(server_end).unwrap();
         let archivist = init_archivist(&mut fs).await;
         let (lifecycle_proxy, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>();
         fasync::Task::spawn(async move {
             archivist.run(fs, false, request_stream).await.expect("Cannot run archivist");
         })

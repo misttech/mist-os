@@ -505,8 +505,7 @@ pub(crate) mod tests {
     /// out of program scope.
     async fn test_register_notification_supported() {
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -548,8 +547,7 @@ pub(crate) mod tests {
     /// It should be successfully inserted, and a timeout duration should be returned.
     async fn test_register_notification_track_pos_changed() {
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -596,8 +594,7 @@ pub(crate) mod tests {
     /// It should not resolve.
     async fn test_register_notification_addressed_player_changed() {
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
         let disc_clone = discovery.clone();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
@@ -627,8 +624,7 @@ pub(crate) mod tests {
     /// Upon insertion, the supported notification should be rejected and sent over
     /// the responder.
     async fn test_register_notification_no_active_session() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
             .await
@@ -655,8 +651,7 @@ pub(crate) mod tests {
     /// Upon insertion, the unsupported notification should be rejected, and the responder
     /// should immediately be called with a `RejectedInvalidParameter`.
     async fn test_register_notification_unsupported() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         let (result_fut, responder) = generate_empty_watch_notification(&mut proxy, &mut stream)
             .await
@@ -721,8 +716,7 @@ pub(crate) mod tests {
     /// 1. Test updating active_session_id with the same id does nothing.
     /// 2. Test updating active_session_id with a new id updates active id.
     async fn update_target_session_id() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
@@ -776,8 +770,7 @@ pub(crate) mod tests {
     /// 5. Ensures the resolved responders return the correct updated current notification
     /// values.
     async fn test_update_notification_responders() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create TargetHandler proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
@@ -957,7 +950,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     async fn test_notification_update_with_unchanged_value_is_no_op() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>().unwrap();
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();
@@ -1004,8 +997,7 @@ pub(crate) mod tests {
     /// Tests `clear_notification_responders` correctly sends AddressedPlayerChanged
     /// error to all outstanding notifications.
     async fn test_clear_notification_responders() {
-        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Couldn't create proxy and stream");
+        let (mut proxy, mut stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // Create a new active session with default state.
         let (discovery, _request_stream) = create_proxy::<DiscoveryMarker>();

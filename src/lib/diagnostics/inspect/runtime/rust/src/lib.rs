@@ -378,7 +378,7 @@ mod tests {
             }
         };
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<finspect::InspectSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<finspect::InspectSinkMarker>();
         let (client_token, request) = futures::future::join(
             controller.escrow_frozen(EscrowOptions {
                 name: Some("test".into()),

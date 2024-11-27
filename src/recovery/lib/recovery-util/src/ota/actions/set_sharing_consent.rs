@@ -78,7 +78,7 @@ mod test {
     // fxr/753732/4/src/recovery/lib/recovery-util/src/reboot.rs#49
     fn create_mock_privacy_server(will_succeed: Option<bool>) -> Result<PrivacyProxy, Error> {
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PrivacyMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<PrivacyMarker>();
         fasync::Task::local(async move {
             while let Some(request) =
                 request_stream.try_next().await.expect("failed to read mock request")

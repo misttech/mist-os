@@ -264,7 +264,6 @@ mod tests {
     ) -> (fidl_ui_input3::KeyEventInjectorProxy, fidl_ui_input3::KeyEventInjectorRequestStream)
     {
         fidl::endpoints::create_proxy_and_stream::<fidl_ui_input3::KeyEventInjectorMarker>()
-            .expect("Failed to create proxy and stream for fuchsia.ui.input3.KeyEventInjector")
     }
 
     fn create_unhandled_keyboard_event(

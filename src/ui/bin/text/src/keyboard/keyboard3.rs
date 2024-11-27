@@ -439,8 +439,7 @@ mod tests {
         fn new() -> Self {
             let fake_now = zx::MonotonicInstant::ZERO;
             let (keyboard_proxy, keyboard_request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<ui_input3::KeyboardMarker>()
-                    .expect("Failed to create KeyboardProxy and stream.");
+                fidl::endpoints::create_proxy_and_stream::<ui_input3::KeyboardMarker>();
 
             let service = KeyboardService::new();
             let service_clone = service.clone();

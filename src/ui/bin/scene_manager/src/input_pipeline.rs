@@ -205,8 +205,7 @@ fn setup_pointer_injector_config_request_stream(
 ) -> SetupProxy {
     let (setup_proxy, setup_request_stream) = fidl::endpoints::create_proxy_and_stream::<
         fidl_fuchsia_ui_pointerinjector_configuration::SetupMarker,
-    >()
-    .expect("Failed to create pointerinjector.configuration.Setup channel.");
+    >();
 
     scene_management::handle_pointer_injector_configuration_setup_request_stream(
         setup_request_stream,

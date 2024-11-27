@@ -183,8 +183,7 @@ async fn migration_error_does_not_cause_early_exit() {
         fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
     )
     .expect("failed to open connection to tempdir");
-    let (store_proxy, mut request_stream) =
-        create_proxy_and_stream::<StoreMarker>().expect("can create");
+    let (store_proxy, mut request_stream) = create_proxy_and_stream::<StoreMarker>();
     fasync::Task::local(async move {
         while let Some(request) = request_stream.next().await {
             match request.unwrap() {

@@ -242,8 +242,7 @@ mod tests {
     impl FakeSettingsSvc {
         fn new() -> (fsettings::InputProxy, Self) {
             let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fsettings::InputMarker>()
-                    .expect("Failed to create Input proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<fsettings::InputMarker>();
             (proxy, Self { stream, pending_request: None })
         }
 

@@ -1057,8 +1057,7 @@ mod tests {
     impl WorkerWatcherSink {
         fn create_watcher(&mut self) -> finterfaces::WatcherProxy {
             let (watcher, stream) =
-                fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>()
-                    .expect("create proxy");
+                fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>();
             self.add_watcher(stream, WatcherOptions::default())
                 .now_or_never()
                 .expect("unexpected backpressure on sink")
@@ -2285,8 +2284,7 @@ mod tests {
     fn watcher_blocking_push() {
         let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>()
-                .expect("failed to create watcher");
+            fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>();
         let mut watcher = Watcher {
             stream,
             events: EventQueue { events: Default::default() },

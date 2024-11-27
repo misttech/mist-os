@@ -386,8 +386,7 @@ mod tests {
         }
 
         fn build(self) -> (PaverFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<PaverMarker>().unwrap();
+            let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<PaverMarker>();
             let fut = async move {
                 for expected in self.expected {
                     expected(stream.next().await.unwrap().unwrap());

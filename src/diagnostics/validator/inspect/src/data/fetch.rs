@@ -148,7 +148,7 @@ mod tests {
     }
 
     fn spawn_root_tree_server(tree_name: &str, vmos: Arc<TestVmos>) -> Result<TreeProxy, Error> {
-        let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
+        let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>();
         spawn_tree_server(tree_name.to_string(), vmos, request_stream);
         Ok(tree)
     }

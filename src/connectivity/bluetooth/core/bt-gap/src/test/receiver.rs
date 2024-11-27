@@ -111,8 +111,7 @@ async fn add_component_succeeds() {
     let hd = host_dispatcher::test::make_simple_test_dispatcher();
 
     // Create the receiver server
-    let (receiver_client, receiver_stream) =
-        endpoints::create_proxy_and_stream::<ReceiverMarker>().unwrap();
+    let (receiver_client, receiver_stream) = endpoints::create_proxy_and_stream::<ReceiverMarker>();
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Mock the host server
@@ -151,14 +150,12 @@ async fn add_multiple_components_succeeds() {
 
     // Start HostWatcher client/server
     let (host_watcher_proxy, host_watcher_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>()
-            .expect("FIDL endpoints");
+        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_sys::HostWatcherMarker>();
     let host_watcher_fut = crate::host_watcher::run(hd.clone(), host_watcher_stream);
     let _host_watcher_task = fasync::Task::spawn(host_watcher_fut);
 
     // Create Receiver client/server
-    let (receiver_client, receiver_stream) =
-        endpoints::create_proxy_and_stream::<ReceiverMarker>().unwrap();
+    let (receiver_client, receiver_stream) = endpoints::create_proxy_and_stream::<ReceiverMarker>();
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Create mock Host server

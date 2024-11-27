@@ -103,16 +103,7 @@ async fn start<D: DeviceOps + 'static>(
     wtrace::duration!(c"rust_driver::start");
 
     let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_request_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-            .map_err(|e| {
-                // Failure to unwrap indicates a critical failure in the driver init thread.
-                error!(
-                    "Failed to get {} server stream: {}",
-                    fidl_softmac::WlanSoftmacIfcBridgeMarker::DEBUG_NAME,
-                    e
-                );
-                zx::Status::INTERNAL
-            })?;
+        fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
 
     // Bootstrap USME
     let BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspector } =
@@ -575,7 +566,7 @@ mod tests {
     macro_rules! make_bootstrap_generic_sme_test_harness {
         (&mut $fake_device:ident, $driver_event_sink:ident $(,)?) => {{
             let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
             (
                 Box::pin(bootstrap_generic_sme(
                     &mut $fake_device,

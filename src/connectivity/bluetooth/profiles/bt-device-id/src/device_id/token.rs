@@ -127,8 +127,7 @@ mod tests {
         QueryResponseFut<Result<(), i32>>,
     ) {
         let (c, mut s) =
-            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>()
-                .expect("valid endpoints");
+            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>();
 
         let records = &[minimal_record(false)];
         let (token_client, token_server) =
@@ -155,7 +154,7 @@ mod tests {
             .expect("should parse record");
         // A BR/EDR advertise request.
         let (connect_client, connect_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ConnectionReceiverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ConnectionReceiverMarker>();
         let advertisement = BrEdrProfileAdvertisement { connect_stream };
         let token = DeviceIdRequestToken::new(svc, advertisement, request_server, responder);
 

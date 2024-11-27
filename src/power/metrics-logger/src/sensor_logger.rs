@@ -765,7 +765,7 @@ pub mod tests {
         mut get_temperature: impl FnMut() -> f32 + 'static,
     ) -> (ftemperature::DeviceProxy, fasync::Task<()>) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -784,7 +784,7 @@ pub mod tests {
         mut get_power: impl FnMut() -> f32 + 'static,
     ) -> (fpower::DeviceProxy, fasync::Task<()>) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -1230,7 +1230,7 @@ pub mod tests {
         runner.power_2.set(7.0);
 
         let (provider_proxy, mut provider_stream) =
-            fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>();
         let listener_proxy: Rc<OnceCell<factivity::ListenerProxy>> = Rc::new(OnceCell::new());
         let listener_proxy2 = listener_proxy.clone();
 

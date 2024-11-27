@@ -384,7 +384,7 @@ pub mod tests {
         mut get_temperature: impl FnMut() -> Celsius + 'static,
     ) -> ftemperature::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>();
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {

@@ -306,8 +306,7 @@ mod tests {
         // Create a client and start serving its stream from a detached task.
         let proxy = {
             let registry = registry.clone();
-            let (proxy, stream) =
-                create_proxy_and_stream::<fheapdump_client::CollectorMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<fheapdump_client::CollectorMarker>();
 
             let worker_fn = async move { registry.serve_client_stream(stream).await.unwrap() };
             fasync::Task::local(worker_fn).detach();

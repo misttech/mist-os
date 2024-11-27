@@ -1027,8 +1027,7 @@ mod test {
 
     /// Creates a simple target handler that responds with error and basic values for most commands.
     fn create_dummy_target_handler(stall_responses: bool) -> TargetHandlerProxy {
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         fasync::Task::spawn(async move {
             while let Some(Ok(event)) = target_stream.next().await {
@@ -1213,8 +1212,7 @@ mod test {
     ///    works.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_continuations() -> Result<(), Error> {
-        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
-            .expect("Error creating TargetHandler endpoint");
+        let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>();
 
         // spawn a target handler that responds with a large element response
         fasync::Task::spawn(async move {
@@ -1787,8 +1785,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn handle_register_notification_volume() -> Result<(), Error> {
         let (volume_proxy, mut volume_stream) =
-            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>()
-                .expect("Error creating AbsoluteVolumeHandler endpoint");
+            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>();
         let cmd_handler = create_command_handler(None, Some(volume_proxy));
 
         fasync::Task::spawn(async move {
@@ -1937,8 +1934,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn handle_set_absolute_volume_cmd() -> Result<(), Error> {
         let (volume_proxy, mut volume_stream) =
-            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>()
-                .expect("Error creating AbsoluteVolumeHandler endpoint");
+            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>();
 
         let cmd_handler = create_command_handler(None, Some(volume_proxy));
 
@@ -1997,8 +1993,7 @@ mod test {
     async fn handle_set_absolute_volume_cmd_bad_packet() -> Result<(), Error> {
         // absolute volume handler shouldn't even get called since the packet decode should fail.
         let (volume_proxy, volume_stream) =
-            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>()
-                .expect("Error creating AbsoluteVolumeHandler endpoint");
+            create_proxy_and_stream::<AbsoluteVolumeHandlerMarker>();
 
         let cmd_handler = create_command_handler(None, Some(volume_proxy));
 

@@ -255,7 +255,7 @@ mod test {
         expect_destroy: bool,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             if expect_destroy {
                 let req = stream.try_next().await.unwrap().unwrap();
@@ -332,7 +332,7 @@ mod test {
         expected_url: &'static str,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
@@ -385,7 +385,7 @@ mod test {
         expected_moniker: &'static str,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {

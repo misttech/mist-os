@@ -562,7 +562,7 @@ mod test {
         dirs: HashMap<(String, sys2::OpenDirType), fio::DirectoryProxy>,
     ) -> sys2::RealmQueryProxy {
         let (client, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<sys2::RealmQueryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sys2::RealmQueryMarker>();
 
         let mut instance_map = HashMap::new();
         for instance in instances {

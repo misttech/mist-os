@@ -84,7 +84,7 @@ impl AsyncRequestHandler<EchoMarker> for RendezvousEchoHandler {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_accept_handler_function() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
 
     serve_detached(stream, handle_echo_request);
 
@@ -96,7 +96,7 @@ async fn should_accept_handler_function() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_accept_handler_closure() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
 
     serve_detached(stream, |request| handle_echo_request(request));
 
@@ -108,7 +108,7 @@ async fn should_accept_handler_closure() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_accept_handler_object() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
 
     serve_detached(stream, EchoHandler);
 
@@ -120,7 +120,7 @@ async fn should_accept_handler_object() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_accept_async_handler_object() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
 
     serve_async_detached(stream, EchoHandler);
 
@@ -132,7 +132,7 @@ async fn should_accept_async_handler_object() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_serve_all_requests() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
     let server_fut = async move {
         serve(stream, EchoHandler).await.unwrap();
     };
@@ -148,7 +148,7 @@ async fn should_serve_all_requests() -> Result<(), Error> {
 // This test will hang indefinitely if requests are not handled concurrently.
 #[fasync::run_singlethreaded(test)]
 async fn should_serve_all_requests_concurrently() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
     let server_fut = async move {
         serve_async_concurrent(stream, 0, RendezvousEchoHandler::new()).await.unwrap();
     };
@@ -191,7 +191,7 @@ async fn should_stop_after_fidl_error() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded(test)]
 async fn should_stop_after_handler_returns_error() -> Result<(), Error> {
-    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>();
     let handler = |request| {
         let EchoRequest::EchoString { value, responder } = request else {
             panic!();

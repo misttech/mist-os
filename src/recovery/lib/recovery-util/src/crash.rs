@@ -216,8 +216,7 @@ mod tests {
         // Set up a proxy to receive error messages
         let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_feedback::CrashReporterMarker,
-        >()
-        .unwrap();
+        >();
 
         let crash_reporter = CrashReportBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))
@@ -260,8 +259,7 @@ mod tests {
         // Set up a proxy to receive error messages
         let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_feedback::CrashReporterMarker,
-        >()
-        .unwrap();
+        >();
 
         let crash_reporter = CrashReportBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))
@@ -297,8 +295,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, _stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_feedback::CrashReporterMarker,
-        >()
-        .unwrap();
+        >();
 
         let crash_reporter = CrashReportBuilder::new()
             .with_proxy_fn(Box::new(move || Ok(proxy.clone())))

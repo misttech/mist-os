@@ -125,8 +125,7 @@ mod tests {
     fn spawn_provider_handler_with_channel_handler(
         channel_handler: ChannelHandler,
     ) -> ProviderProxy {
-        let (proxy, stream) =
-            create_proxy_and_stream::<ProviderMarker>().expect("create_proxy_and_stream");
+        let (proxy, stream) = create_proxy_and_stream::<ProviderMarker>();
         fasync::Task::spawn(async move {
             channel_handler.handle_provider_request_stream(stream).map(|_| ()).await
         })
@@ -136,8 +135,7 @@ mod tests {
 
     fn spawn_channel_handler(info_dir: &TempDir) -> ChannelControlProxy {
         let channel_handler = new_test_channel_handler(info_dir);
-        let (proxy, stream) =
-            create_proxy_and_stream::<ChannelControlMarker>().expect("create_proxy_and_stream");
+        let (proxy, stream) = create_proxy_and_stream::<ChannelControlMarker>();
         fasync::Task::spawn(async move {
             channel_handler.handle_control_request_stream(stream).map(|_| ()).await
         })

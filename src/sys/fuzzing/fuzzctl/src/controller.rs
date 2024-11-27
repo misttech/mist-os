@@ -431,8 +431,7 @@ mod tests {
         test: &Test,
     ) -> Result<(FakeController, fuzz::ControllerProxy, fasync::Task<()>)> {
         let fake = test.controller();
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::ControllerMarker>()
-            .context("failed to create FIDL connection")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::ControllerMarker>();
         let task = create_task(serve_controller(stream, test.clone()), test.writer());
         Ok((fake, proxy, task))
     }

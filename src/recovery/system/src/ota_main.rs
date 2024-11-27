@@ -172,7 +172,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_main_internal_reports_ota_success() {
         let (progress_proxy, mut progress_stream) =
-            create_proxy_and_stream::<ProgressRendererMarker>().unwrap();
+            create_proxy_and_stream::<ProgressRendererMarker>();
         let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>();
 
         fasync::Task::local(async move {
@@ -206,7 +206,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_main_internal_sends_error_when_ota_fails() {
         let (progress_proxy, mut progress_stream) =
-            create_proxy_and_stream::<ProgressRendererMarker>().unwrap();
+            create_proxy_and_stream::<ProgressRendererMarker>();
         let (_dir_proxy, dir_server) = create_proxy::<fio::DirectoryMarker>();
 
         fasync::Task::local(async move {

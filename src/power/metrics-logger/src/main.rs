@@ -771,7 +771,7 @@ mod tests {
 
             // Construct the server task.
             let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fmetrics::RecorderMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fmetrics::RecorderMarker>();
             let server_task = server.clone().handle_new_service_connection(stream);
 
             Self { executor, server, server_task, proxy, inspector }
@@ -1906,8 +1906,7 @@ mod tests {
     fn test_logging_network_activity_request_dispatch() {
         let runner_builder = RunnerBuilder::new();
 
-        let (proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<fhwnet::DeviceMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<fhwnet::DeviceMarker>();
         let network_drivers = vec![proxy];
 
         let mut runner = runner_builder.with_network_drivers(network_drivers).build();

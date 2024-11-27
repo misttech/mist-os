@@ -362,7 +362,7 @@ impl Connect for BuiltInConnector {
     type Proxy = fproc::LauncherProxy;
 
     fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fproc::LauncherMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fproc::LauncherMarker>();
         fasync::Task::spawn(async move {
             let result = ProcessLauncher::serve(stream).await;
             if let Err(error) = result {

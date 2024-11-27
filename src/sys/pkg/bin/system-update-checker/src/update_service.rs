@@ -193,8 +193,7 @@ mod tests {
                 .spawn(),
         };
         let update_service_clone = update_service.clone();
-        let (proxy, stream) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(async move {
             update_service.handle_request_stream(stream).map(|_| ()).await
         })
@@ -277,8 +276,7 @@ mod tests {
             download_size: None,
         });
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )
@@ -559,8 +557,7 @@ mod tests {
 
         drop(proxy0);
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )
@@ -790,8 +787,7 @@ mod tests {
 
         drop(proxy0);
 
-        let (proxy1, stream1) =
-            create_proxy_and_stream::<ManagerMarker>().expect("create_proxy_and_stream");
+        let (proxy1, stream1) = create_proxy_and_stream::<ManagerMarker>();
         fasync::Task::spawn(
             async move { service.handle_request_stream(stream1).map(|_| ()).await },
         )

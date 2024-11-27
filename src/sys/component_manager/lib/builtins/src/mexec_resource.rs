@@ -54,7 +54,7 @@ mod tests {
         let mexec_resource = get_mexec_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::MexecResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::MexecResourceMarker>();
         fasync::Task::local(
             MexecResource::new(mexec_resource)
                 .unwrap_or_else(|e| panic!("Error while creating MEXEC resource service: {}", e))

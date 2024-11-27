@@ -108,8 +108,7 @@ pub fn send_directory_representation(
 }
 
 pub fn spawn_directory_handler() -> (fio::DirectoryProxy, OpenCounter) {
-    let (proxy, stream) =
-        fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+    let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
     let open_counts = Arc::new(Mutex::new(HashMap::<String, u64>::new()));
     fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
     (proxy, open_counts)

@@ -270,8 +270,7 @@ pub(crate) mod tests {
         in_band: bool,
     ) -> (ScoConnection, bredr::ScoConnectionRequestStream) {
         let sco_params = parameter_sets_for_codec(codec_id, in_band).pop().unwrap();
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>();
         let connection = ScoConnection::build(peer_id, sco_params, proxy);
         (connection, stream)
     }

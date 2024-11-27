@@ -390,7 +390,7 @@ mod tests {
     #[fuchsia::test]
     async fn resolve_component_without_context_forwards_to_pkg_resolver_and_returns_context() {
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let server = async move {
             let cm_bytes = fidl::persist(&fdecl::Component::default().clone()).unwrap();
             let fs = pseudo_directory! {
@@ -436,7 +436,7 @@ mod tests {
     #[fuchsia::test]
     async fn resolve_component_with_context_forwards_to_pkg_resolver_and_returns_context() {
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let server = async move {
             let cm_bytes = fidl::persist(&fdecl::Component::default().clone()).unwrap();
             let fs = pseudo_directory! {
@@ -491,8 +491,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_without_context_fails_bad_connection() {
-        let (proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         assert_matches!(
             resolve_component_without_context(
                 "fuchsia-pkg://fuchsia.example/test#meta/test.cm",
@@ -505,8 +504,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_with_context_fails_bad_connection() {
-        let (proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         assert_matches!(
             resolve_component_with_context(
                 "fuchsia-pkg://fuchsia.example/test#meta/test.cm",
@@ -521,7 +519,7 @@ mod tests {
     #[fuchsia::test]
     async fn resolve_component_without_context_fails_with_package_resolver_failure() {
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let server = async move {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::Resolve { responder, .. } => {
@@ -547,7 +545,7 @@ mod tests {
     #[fuchsia::test]
     async fn resolve_component_with_context_fails_with_package_resolver_failure() {
         let (proxy, mut server) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let server = async move {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::ResolveWithContext { responder, .. } => {

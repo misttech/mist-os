@@ -893,9 +893,9 @@ pub(crate) mod tests {
         /// upstream & downstream pairing actions.
         pub async fn new_with_manager() -> (PairingManager, Self) {
             let (pairing_svc, mut downstream_pairing_server) =
-                fidl::endpoints::create_proxy_and_stream::<PairingMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<PairingMarker>();
             let (delegate, upstream_delegate_server) =
-                fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>();
             let client = PairingArgs {
                 input: InputCapability::None,
                 output: OutputCapability::None,

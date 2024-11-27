@@ -624,8 +624,7 @@ pub(crate) mod tests {
         let codec_type = codec_config.codec_type().clone();
 
         let (audio_consumer_factory_proxy, mut audio_consumer_factory_request_stream) =
-            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
-                .expect("proxy pair creation");
+            create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>();
 
         let mut player = Player::new(TEST_SESSION_ID, codec_config, audio_consumer_factory_proxy)
             .expect("player to build");
@@ -909,7 +908,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (mut audio_consumer_proxy, mut audio_consumer_request_stream) =
-            create_proxy_and_stream::<AudioConsumerMarker>().expect("proxy creation");
+            create_proxy_and_stream::<AudioConsumerMarker>();
         let (_sender, receiver) = mpsc::channel(1);
 
         let mut sink = AudioConsumerSink::build(&mut audio_consumer_proxy, 48000, None, receiver)

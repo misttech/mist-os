@@ -53,7 +53,7 @@ impl NamespaceCapabilityProvider {
         mut stream: fcomponent::NamespaceRequestStream,
     ) -> Result<(), fidl::Error> {
         let (store, store_stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _store_task = fasync::Task::spawn(async move {
             let _ = sandbox::serve_capability_store(store_stream).await;
         });
@@ -225,7 +225,7 @@ mod tests {
         let (namespace_proxy, _host) = namespace(&root).await;
 
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
 
         let mut namespace_pairs = vec![];
@@ -292,7 +292,7 @@ mod tests {
         let (namespace_proxy, _host) = namespace(&root).await;
 
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
 
         // Two entries with a shadowing path.
@@ -344,7 +344,7 @@ mod tests {
 
         // Create a dictionary and close the server end.
         let (dict_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>();
         drop(stream);
         let namespace_pairs = vec![fcomponent::NamespaceInputEntry {
             path: "/svc".into(),

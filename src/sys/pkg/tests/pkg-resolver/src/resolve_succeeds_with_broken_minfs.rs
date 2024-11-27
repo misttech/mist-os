@@ -702,8 +702,7 @@ async fn create_testenv_serves_repo<H: OpenRequestHandler + Send + Sync + 'stati
 ) -> (TestEnv, RepositoryConfig, Package, ServedRepository) {
     // Create testenv with failing isolated-persistent-storage
     let directory_handler = Arc::new(DirectoryStreamHandler::new(open_handler));
-    let (proxy, stream) =
-        fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+    let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
     fasync::Task::spawn(directory_handler.handle_stream(stream)).detach();
     let env = TestEnvBuilder::new()
         .mounts(

@@ -259,7 +259,7 @@ mod tests {
         poll_read_size: u64,
         expected_file_read_size: u64,
     ) {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -293,7 +293,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn poll_read_at_pending_saves_future() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -339,7 +339,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn poll_read_at_with_smaller_buf_after_pending() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -410,7 +410,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn transition_to_empty_on_fidl_error() {
-        let (proxy, _) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, _) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -433,7 +433,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn recover_from_file_read_error() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -478,7 +478,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn poll_read_at_zero_then_read_nonzero() {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 
@@ -533,7 +533,7 @@ mod tests {
                 for second_poll_offset in 0..file_size {
                     for second_poll_read_len in 0..5 {
                         let (proxy, mut stream) =
-                            endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+                            endpoints::create_proxy_and_stream::<fio::FileMarker>();
 
                         let mut reader = AsyncFile::from_proxy(proxy);
 

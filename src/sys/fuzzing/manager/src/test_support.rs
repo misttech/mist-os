@@ -100,8 +100,7 @@ impl TestRealm {
 }
 
 pub fn connect_to_manager(test_realm: Rc<RefCell<TestRealm>>) -> Result<fuzz::ManagerProxy> {
-    let (manager_proxy, manager_stream) = create_proxy_and_stream::<fuzz::ManagerMarker>()
-        .context("failed to create Manager endpoints")?;
+    let (manager_proxy, manager_stream) = create_proxy_and_stream::<fuzz::ManagerMarker>();
     test_realm.borrow_mut().manager_streams.push(manager_stream);
     Ok(manager_proxy)
 }
@@ -117,8 +116,7 @@ pub async fn read_async(socket: &zx::Socket) -> Result<String> {
 
 pub async fn serve_test_realm(test_realm: Rc<RefCell<TestRealm>>) -> Result<()> {
     // Create a fake registry that serves requests from the fuzz-manager.
-    let (registry_proxy, registry_stream) = create_proxy_and_stream::<fuzz::RegistryMarker>()
-        .context("failed to create Registry endpoints")?;
+    let (registry_proxy, registry_stream) = create_proxy_and_stream::<fuzz::RegistryMarker>();
     let registry_fut = serve_registry(registry_stream, Rc::clone(&test_realm)).fuse();
 
     // Create a fake test_manager that serves requests from the fuzz-manager.

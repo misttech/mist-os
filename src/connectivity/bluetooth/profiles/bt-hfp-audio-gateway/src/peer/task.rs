@@ -999,7 +999,7 @@ mod tests {
         TestAudioControl,
     ) {
         let (sender, receiver) = mpsc::channel(1);
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let test_audio = TestAudioControl::default();
         let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
         let audio: Arc<Mutex<Box<dyn AudioControl>>> =
@@ -1088,8 +1088,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut peer = setup_peer_task(None).0;
         assert!(peer.handler.is_none());
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         {
             let request_fut = pin!(peer.peer_request(PeerRequest::Handle(proxy)));
@@ -1211,8 +1210,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // A vec to hold all the stream items we don't care about for this test.
         let mut junk_drawer = vec![];
@@ -1376,8 +1374,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // Pass in the client end connected to the call manager
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
@@ -1420,8 +1417,7 @@ mod tests {
         let (connection, _remote) = create_and_initialize_slc(SlcState::default());
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         // Pass in the client end connected to the call manager
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
@@ -1517,8 +1513,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         // The battery level that will be reported by the peer.
         let expected_level = 4;
 
@@ -1604,8 +1599,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -1657,8 +1651,7 @@ mod tests {
         let (connection, remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -2025,8 +2018,7 @@ mod tests {
         let (connection, mut remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
 
         let run_fut = peer.run(receiver);
         let run_fut = pin!(run_fut);
@@ -2252,8 +2244,7 @@ mod tests {
             (stream, call_stream)
         }
 
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let call_manager_fut = call_manager(stream);
         let call_manager_fut = pin!(call_manager_fut);
 

@@ -367,7 +367,7 @@ mod tests {
         }
 
         fn build_controller(self) -> (AvrcpFacade, impl Future<Output = ()>) {
-            let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>();
             let fut = async move {
                 for expected in self.expected_state {
                     expected(stream.next().await.unwrap().unwrap());

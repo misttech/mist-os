@@ -87,7 +87,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_and_modify_state_no_changes() {
         let (device, mut backlight_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>();
         let mut backlight = Backlight { device };
 
         let test_future = async move {
@@ -110,7 +110,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_and_modify_state_power_change() {
         let (device, mut backlight_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>();
         let mut backlight = Backlight { device };
 
         let test_future = async move {
@@ -141,7 +141,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_and_modify_state_brightness_change() {
         let (device, mut backlight_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>();
         let mut backlight = Backlight { device };
 
         let test_future = async move {
@@ -172,7 +172,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_and_modify_state_read_error() {
         let (device, mut backlight_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>();
         let mut backlight = Backlight { device };
 
         let test_future = async move {
@@ -195,7 +195,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_and_modify_state_modify_error() {
         let (device, mut backlight_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<backlight::DeviceMarker>();
         let mut backlight = Backlight { device };
 
         let test_future = async move {

@@ -136,7 +136,7 @@ mod tests {
             let events = Arc::new(Mutex::new(Vec::new()));
             let events_task = Arc::clone(&events);
 
-            let (engine, mut engine_stream) = create_proxy_and_stream::<EngineMarker>().unwrap();
+            let (engine, mut engine_stream) = create_proxy_and_stream::<EngineMarker>();
 
             fasync::Task::local(async move {
                 while let Some(req) = engine_stream.try_next().await.unwrap() {

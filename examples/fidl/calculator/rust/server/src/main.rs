@@ -89,8 +89,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_add() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Couldn't create test proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
         let handle_calculator_request_task = handle_calculator_request(stream).fuse();
         let proxy_task = proxy.add(4.5, 3.2).fuse();
         futures::pin_mut!(handle_calculator_request_task, proxy_task);
@@ -107,8 +106,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_subtract() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Couldn't create test proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
         let handle_calculator_request_task = handle_calculator_request(stream).fuse();
         let proxy_task = proxy.subtract(7.7, 3.2).fuse();
         futures::pin_mut!(handle_calculator_request_task, proxy_task);
@@ -125,8 +123,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiply() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Couldn't create test proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
         let handle_calculator_request_task = handle_calculator_request(stream).fuse();
         let proxy_task = proxy.multiply(1.5, 2.0).fuse();
         futures::pin_mut!(handle_calculator_request_task, proxy_task);
@@ -143,8 +140,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_divide() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Couldn't create test proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
         let handle_calculator_request_task = handle_calculator_request(stream).fuse();
         let proxy_task = proxy.divide(2.0, 4.0).fuse();
         futures::pin_mut!(handle_calculator_request_task, proxy_task);
@@ -161,8 +157,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_pow() {
-        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>()
-            .expect("Couldn't create test proxy and stream.");
+        let (proxy, stream) = create_proxy_and_stream::<CalculatorMarker>();
         let handle_calculator_request_task = handle_calculator_request(stream).fuse();
         let proxy_task = proxy.pow(3.0, 4.0).fuse();
         futures::pin_mut!(handle_calculator_request_task, proxy_task);

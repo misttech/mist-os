@@ -56,7 +56,7 @@ mod tests {
         let hypervisor_resource = get_hypervisor_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::HypervisorResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::HypervisorResourceMarker>();
         fasync::Task::local(
             HypervisorResource::new(hypervisor_resource)
                 .unwrap_or_else(|e| {

@@ -452,7 +452,7 @@ mod tests {
         let sm = SensorManager::new(Vec::new(), Some(Playback::new(driver_proxy, playback_proxy)));
 
         let manager = Arc::new(Mutex::new(sm));
-        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         let client = Client::new(stream.control_handle().clone());
         let (sender, _receiver) = mpsc::unbounded::<HashMap<SensorId, Sensor>>();
         fuchsia_async::Task::spawn(async move {

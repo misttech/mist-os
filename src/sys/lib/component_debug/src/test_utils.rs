@@ -66,7 +66,7 @@ pub fn serve_realm_query(
     configs: HashMap<String, fcdecl::ResolvedConfig>,
     dirs: HashMap<(String, fsys::OpenDirType), TempDir>,
 ) -> fsys::RealmQueryProxy {
-    let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
+    let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>();
 
     let mut instance_map = HashMap::new();
     for instance in instances {
@@ -193,7 +193,7 @@ pub fn serve_lifecycle_controller(
     expected_moniker: &'static str,
 ) -> fsys::LifecycleControllerProxy {
     let (lifecycle_controller, mut stream) =
-        create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+        create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
 
     fuchsia_async::Task::local(async move {
         // Expect 3 requests: Unresolve, Resolve, Start.

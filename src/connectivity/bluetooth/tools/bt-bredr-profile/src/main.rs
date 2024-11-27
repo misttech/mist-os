@@ -542,9 +542,9 @@ mod tests {
     #[fuchsia::test]
     async fn disconnect_l2cap_channel_succeeds() {
         let (profile, _profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let (rfcomm_test, _rfcomm_test_server) =
-            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>();
         let state = Arc::new(Mutex::new(ProfileState::new(RfcommManager::from_proxy(
             profile,
             rfcomm_test,

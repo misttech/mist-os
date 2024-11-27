@@ -58,8 +58,7 @@ impl TestProfileServer {
         service_definition: Option<bredr::ServiceDefinition>,
         service_class_profile_id: Option<bredr::ServiceClassProfileIdentifier>,
     ) -> TestProfileServerEndpoints {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Create new profile connection");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut client = match service_definition {
             None => ProfileClient::new(proxy.clone()),

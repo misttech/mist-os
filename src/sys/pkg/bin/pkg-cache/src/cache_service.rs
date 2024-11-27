@@ -873,7 +873,7 @@ mod serve_needed_blobs_tests {
     #[test_case(fpkg::GcProtection::Retained; "retained")]
     #[fuchsia::test]
     async fn start_stop(gc_protection: fpkg::GcProtection) {
-        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
+        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>();
 
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
 
@@ -900,8 +900,7 @@ mod serve_needed_blobs_tests {
         meta_blob_info: BlobInfo,
         gc_protection: fpkg::GcProtection,
     ) -> (Task<Result<(), ServeNeededBlobsError>>, NeededBlobsProxy, blobfs::Mock) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>();
 
         let (blobfs, blobfs_mock) = blobfs::Client::new_mock();
         let inspector = finspect::Inspector::default();
@@ -2353,7 +2352,7 @@ mod serve_package_index_tests {
         ];
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>();
         let task = Task::local(async move {
             serve_package_index(cache_packages.iter().map(|(url, hash)| (url, hash)), stream).await
         });

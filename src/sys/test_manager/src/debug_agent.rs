@@ -301,8 +301,7 @@ mod test {
         // Creates a new FakeLauncherService.
         fn new() -> (fdbg::LauncherProxy, Self) {
             let (proxy, request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fdbg::LauncherMarker>()
-                    .expect("create proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<fdbg::LauncherMarker>();
 
             (proxy, Self { request_stream })
         }

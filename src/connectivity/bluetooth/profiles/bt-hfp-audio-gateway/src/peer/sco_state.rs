@@ -180,8 +180,7 @@ mod tests {
             ..Default::default()
         };
         let (sco_proxy, _sco_stream) =
-            fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>()
-                .expect("ScoConnection proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>();
         let connection = ScoConnection::build(PeerId(1), params, sco_proxy);
         let vigil = Vigil::new(ScoActive::new(&connection, None));
         state.iset(ScoState::Active(vigil));

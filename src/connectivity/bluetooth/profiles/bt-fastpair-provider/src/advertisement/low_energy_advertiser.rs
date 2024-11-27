@@ -375,7 +375,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
         // Initially, with no advertisement, the advertiser Stream shouldn't be terminated.
         assert!(!advertiser.is_terminated());
@@ -417,7 +417,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         // Make a request to advertise the Model ID.
@@ -460,7 +460,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         make_model_id_advertise(&mut exec, &mut advertiser).expect("can advertise");
@@ -517,7 +517,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
 
         make_model_id_advertise(&mut exec, &mut advertiser).expect("can advertise");
@@ -541,8 +541,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn stop_advertising_with_no_active_advertisement_is_no_op() {
-        let (c, _upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
+        let (c, _upstream_server) = fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>();
         let mut advertiser = LowEnergyAdvertiser::from_proxy(c);
         assert!(!advertiser.stop_advertising().await);
     }

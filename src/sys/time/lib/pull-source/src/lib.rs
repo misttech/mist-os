@@ -182,7 +182,7 @@ mod test {
         fn new() -> (Self, PullSourceProxy) {
             let update_algorithm = TestUpdateAlgorithm::new();
             let test_source = Arc::new(PullSource::new(update_algorithm).unwrap());
-            let (proxy, stream) = create_proxy_and_stream::<PullSourceMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<PullSourceMarker>();
             let server = fasync::Task::spawn({
                 let test_source = Arc::clone(&test_source);
                 async move { test_source.handle_requests_for_stream(stream).await }

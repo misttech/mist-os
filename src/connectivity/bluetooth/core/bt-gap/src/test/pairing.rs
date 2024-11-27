@@ -29,8 +29,7 @@ async fn set_pairing_delegate() {
     hd.set_active_host(HostId(1)).expect("can set active host");
 
     // Create the pairing server
-    let (pairing_client, pairing_server) =
-        endpoints::create_proxy_and_stream::<PairingMarker>().unwrap();
+    let (pairing_client, pairing_server) = endpoints::create_proxy_and_stream::<PairingMarker>();
     let run_pairing = pin!(pairing::run(hd.clone(), pairing_server));
 
     // First client to request to set the delegate should be OK.

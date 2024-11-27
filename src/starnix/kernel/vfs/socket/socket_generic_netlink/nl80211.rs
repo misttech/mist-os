@@ -262,8 +262,7 @@ mod tests {
     fn test_get_multicast() {
         let mut exec = TestExecutor::new();
         let (nl80211_proxy, mut nl80211_stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>()
-                .expect("Failed to create client and proxy");
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
         let family = Nl80211Family { nl80211_proxy };
         let (sender, mut receiver) = mpsc::unbounded();
         let mcast_fut =

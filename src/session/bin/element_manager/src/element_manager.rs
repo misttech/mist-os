@@ -1124,8 +1124,7 @@ mod tests {
             Box::new(ElementManager::new(realm, None, example_collection_config()));
         element_manager.persistent_elements_path = "/does/not/exist/persistent_elements";
 
-        let (manager_proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager proxy and stream");
+        let (manager_proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>();
 
         futures::select! {
             _ = element_manager.handle_requests(stream).fuse() => unreachable!(),

@@ -660,7 +660,7 @@ mod tests {
     fn generate_search_request(
         exec: &mut fasync::TestExecutor,
     ) -> (bredr::ProfileRequest, bredr::SearchResultsRequestStream) {
-        let (c, mut s) = create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+        let (c, mut s) = create_proxy_and_stream::<bredr::ProfileMarker>();
         let (results, server) = create_request_stream::<bredr::SearchResultsMarker>();
 
         let search_result = c.search(bredr::ProfileSearchRequest {
@@ -681,7 +681,7 @@ mod tests {
         exec: &mut fasync::TestExecutor,
     ) -> (bredr::ProfileRequest, bredr::ScoConnectionProxy) {
         let (profile_proxy, mut profile_request_stream) =
-            create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+            create_proxy_and_stream::<bredr::ProfileMarker>();
         let (connection_proxy, connection_server) = create_proxy::<bredr::ScoConnectionMarker>();
 
         assert!(profile_proxy
@@ -761,8 +761,7 @@ mod tests {
         mut service_sender: mpsc::Sender<Service>,
         server_fut: &mut (impl Future<Output = ()> + Unpin),
     ) -> bredr::ProfileProxy {
-        let (profile_client, profile_server) =
-            create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+        let (profile_client, profile_server) = create_proxy_and_stream::<bredr::ProfileMarker>();
         let send_fut = service_sender.send(Service::Profile(profile_server));
         let mut send_fut = pin!(send_fut);
         let (send_result, _server_fut) = run_while(exec, server_fut, &mut send_fut);
@@ -782,7 +781,7 @@ mod tests {
     /// Creates the ProfileRegistrar with the upstream Profile service.
     fn setup_server() -> (fasync::TestExecutor, ProfileRegistrar, bredr::ProfileRequestStream) {
         let exec = fasync::TestExecutor::new();
-        let (client, server) = create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+        let (client, server) = create_proxy_and_stream::<bredr::ProfileMarker>();
         let profile_server = ProfileRegistrar::new(client);
         (exec, profile_server, server)
     }

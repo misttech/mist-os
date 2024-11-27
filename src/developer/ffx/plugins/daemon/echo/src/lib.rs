@@ -62,8 +62,7 @@ mod test {
     use serde_json::json;
 
     fn setup_fake_echo_proxy() -> ffx::EchoProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

@@ -60,7 +60,7 @@ mod test {
         expected_url: &'static str,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+            create_proxy_and_stream::<fsys::LifecycleControllerMarker>();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {

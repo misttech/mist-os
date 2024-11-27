@@ -106,7 +106,7 @@ mod tests {
     async fn spawn_pkg_cache(
         cache_package_index: Vec<(UnpinnedAbsolutePackageUrl, BlobId)>,
     ) -> fidl_fuchsia_pkg::PackageCacheProxy {
-        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>();
         let cache = MockPackageCacheService::new_with_cache_packages(Arc::new(cache_package_index));
         fasync::Task::spawn(cache.run_service(request_stream)).detach();
         client

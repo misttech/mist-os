@@ -473,7 +473,7 @@ mod tests {
             let mut executor = fuchsia_async::TestExecutor::new();
             executor.run_singlethreaded(async move {
                 let (proxy, stream) =
-                    fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>();
                 let mut actual_items = vec![];
 
                 let ((), ()) = futures::future::join(
@@ -511,7 +511,7 @@ mod tests {
             let mut executor = fuchsia_async::TestExecutor::new();
             executor.run_singlethreaded(async move {
                 let (proxy, fidl_stream) =
-                    fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
+                    fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>();
                 let (mut item_sender, item_stream) = futures::channel::mpsc::unbounded();
                 let mut actual_items = vec![];
 
@@ -619,7 +619,7 @@ mod tests {
             .collect();
 
         let (iter, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>();
         let task = Task::local(serve_fidl_iterator_from_slice(stream, package_entries));
 
         let chunk = iter.next().await.unwrap();
@@ -644,7 +644,7 @@ mod tests {
     fn serve_fidl_iterator_from_stream_ignores_empty_vec() {
         let mut executor = fuchsia_async::TestExecutor::new();
         let (proxy, fidl_stream) =
-            fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>();
         let (item_sender, item_stream) = futures::channel::mpsc::unbounded();
         let mut serve_task = serve_fidl_iterator_from_stream(fidl_stream, item_stream, 10).boxed();
 
@@ -672,7 +672,7 @@ mod tests {
     fn serve_fidl_iterator_from_stream_does_not_block_if_chunker_not_empty() {
         let mut executor = fuchsia_async::TestExecutor::new();
         let (proxy, fidl_stream) =
-            fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>();
         let (item_sender, item_stream) = futures::channel::mpsc::unbounded();
         let mut serve_task = serve_fidl_iterator_from_stream(fidl_stream, item_stream, 10).boxed();
 

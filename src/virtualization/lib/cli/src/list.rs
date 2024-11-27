@@ -278,8 +278,7 @@ mod test {
     use futures::StreamExt;
 
     fn serve_mock_manager(response: Option<GuestInfo>) -> GuestManagerProxy {
-        let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>()
-            .expect("failed to create GuestManager proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>();
         fasync::Task::local(async move {
             let responder = stream
                 .next()

@@ -47,7 +47,7 @@ impl HostListener for () {
 // Create a HostDevice with a fake channel, set local name and check it is updated
 #[fuchsia::test]
 async fn host_device_set_local_name() -> Result<(), Error> {
-    let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
+    let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>();
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
     let expected_name = "EXPECTED_NAME".to_string();
@@ -79,7 +79,7 @@ async fn host_device_set_local_name() -> Result<(), Error> {
 // the discovery proxy is dropped.
 #[fuchsia::test]
 async fn test_discovery_session() -> Result<(), Error> {
-    let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
+    let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>();
 
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
@@ -123,7 +123,7 @@ async fn test_discovery_session() -> Result<(), Error> {
 // over multiple paginated iterations
 #[fuchsia::test(allow_stalls = false)]
 async fn host_device_restore_bonds() -> Result<(), Error> {
-    let (client, host_request_stream) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
+    let (client, host_request_stream) = fidl::endpoints::create_proxy_and_stream::<HostMarker>();
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
     let mut fake_host_server =

@@ -176,7 +176,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_file_report_no_profile() {
-        let (client, _) = create_proxy_and_stream::<CrashReporterMarker>().unwrap();
+        let (client, _) = create_proxy_and_stream::<CrashReporterMarker>();
         let no_profiles = vec![];
         let file_report_future = file_report(no_profiles, &client);
         file_report_future
@@ -196,8 +196,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_file_report_complete_reports() {
-        let (client, mut request_stream) =
-            create_proxy_and_stream::<CrashReporterMarker>().unwrap();
+        let (client, mut request_stream) = create_proxy_and_stream::<CrashReporterMarker>();
 
         // Create some profiles with some arbitrary data.
         let size = 42;
@@ -255,8 +254,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_file_report_partial_reports() {
-        let (client, mut request_stream) =
-            create_proxy_and_stream::<CrashReporterMarker>().unwrap();
+        let (client, mut request_stream) = create_proxy_and_stream::<CrashReporterMarker>();
 
         // Create some profiles with some arbitrary data.
         let size = 42;

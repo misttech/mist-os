@@ -435,7 +435,7 @@ mod tests {
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>();
         drop(stream);
         let repos = Deferred::from_output(Ok(proxy));
 

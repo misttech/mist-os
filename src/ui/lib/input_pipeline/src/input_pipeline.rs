@@ -1191,8 +1191,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_input_device_registry_request_stream() {
         let (input_device_registry_proxy, input_device_registry_request_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>()
-                .unwrap();
+            create_proxy_and_stream::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>();
         let (input_device_client_end, mut input_device_request_stream) =
             create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>();
 

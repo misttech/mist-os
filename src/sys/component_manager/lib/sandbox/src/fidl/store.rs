@@ -476,7 +476,7 @@ mod tests {
     #[fuchsia::test]
     async fn import_export() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let (ch, _) = fidl::Channel::create();
@@ -502,7 +502,7 @@ mod tests {
     #[fuchsia::test]
     async fn import_error() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let cap1 = Capability::Data(Data::Int64(42));
@@ -523,7 +523,7 @@ mod tests {
     #[fuchsia::test]
     async fn export_error() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let cap1 = Capability::Data(Data::Int64(42));
@@ -538,7 +538,7 @@ mod tests {
     #[fuchsia::test]
     async fn drop() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let (ch, _) = fidl::Channel::create();
@@ -572,7 +572,7 @@ mod tests {
     #[fuchsia::test]
     async fn drop_error() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let cap1 = Capability::Data(Data::Int64(42));
@@ -587,7 +587,7 @@ mod tests {
     #[fuchsia::test]
     async fn duplicate() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         let (event, _) = fidl::EventPair::create();
@@ -608,7 +608,7 @@ mod tests {
     #[fuchsia::test]
     async fn duplicate_error() {
         let (store, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         assert_matches!(

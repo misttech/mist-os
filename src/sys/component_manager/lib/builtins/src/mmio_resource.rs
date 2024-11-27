@@ -49,7 +49,7 @@ mod tests {
         let mmio_resource = get_mmio_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::MmioResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::MmioResourceMarker>();
         fasync::Task::local(
             MmioResource::new(mmio_resource)
                 .serve(stream)

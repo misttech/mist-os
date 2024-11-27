@@ -526,7 +526,7 @@ mod tests {
     ) -> (MockPeerProxy, PeerObserverRequestStream, ProfileTestRequest) {
         // Used to simulate behavior of an integration test client. Sends
         // requests using the ProfileTest interface.
-        let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>().unwrap();
+        let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>();
 
         let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>();
         let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>();

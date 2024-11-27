@@ -229,8 +229,7 @@ impl Client {
     ///
     /// Panics on error
     pub fn new_test() -> (Self, fio::DirectoryRequestStream) {
-        let (dir, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (dir, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
 
         (Self { dir, creator: None, reader: None }, stream)
     }
@@ -242,8 +241,7 @@ impl Client {
     ///
     /// Panics on error
     pub fn new_mock() -> (Self, mock::Mock) {
-        let (dir, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (dir, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
 
         (Self { dir, creator: None, reader: None }, mock::Mock { stream })
     }
@@ -846,7 +844,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_blob_for_write_uses_fxblob_if_configured() {
         let (blob_creator, mut blob_creator_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>();
         let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>();
         let client = Client::new(
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().0,
@@ -876,7 +874,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_blob_for_write_fxblob_maps_already_exists() {
         let (blob_creator, mut blob_creator_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>();
         let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>();
 
         let client = Client::new(

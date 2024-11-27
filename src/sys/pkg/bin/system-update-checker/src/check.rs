@@ -511,7 +511,7 @@ pub mod test_check_for_system_update_impl {
         /// Spawns a new task to serve the space manager protocol.
         pub fn spawn_gc_service(self: &Arc<Self>) -> fspace::ManagerProxy {
             let (proxy, server_end) =
-                fidl::endpoints::create_proxy_and_stream::<fspace::ManagerMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fspace::ManagerMarker>();
 
             fasync::Task::spawn(Arc::clone(self).run_gc_service(server_end).unwrap_or_else(|e| {
                 panic!("error running space manager service: {:#}", anyhow!(e))

@@ -357,7 +357,7 @@ mod tests {
         mut required_power_levels: Vec<fbroker::PowerLevel>,
     ) -> fbroker::RequiredLevelProxy {
         let (required_level_proxy, mut required_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>();
 
         fasync::Task::local(async move {
             while let Some(Ok(request)) = required_level_stream.next().await {
@@ -383,13 +383,13 @@ mod tests {
     #[fuchsia::test]
     async fn basic_update_fn_factory_performs_update() -> Result<()> {
         let (element_control, _element_control_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::ElementControlMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::ElementControlMarker>();
         let (lessor, _lessor_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::LessorMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::LessorMarker>();
         let (required_level, _required_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::RequiredLevelMarker>();
         let (current_level, mut current_level_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fbroker::CurrentLevelMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fbroker::CurrentLevelMarker>();
 
         let power_element = PowerElementContext {
             element_control,

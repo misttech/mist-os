@@ -145,7 +145,7 @@ mod tests {
     async fn spawn_pkg_cache(
         base_package_index: HashMap<UnpinnedAbsolutePackageUrl, BlobId>,
     ) -> PackageCacheProxy {
-        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<PackageCacheMarker>();
         let cache = MockPackageCacheService::new_with_base_packages(Arc::new(base_package_index));
         fasync::Task::spawn(cache.run_service(request_stream)).detach();
         client

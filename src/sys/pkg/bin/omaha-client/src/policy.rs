@@ -1539,7 +1539,7 @@ mod tests {
     // calling the FIDL server once the system is committed.
     #[fasync::run_singlethreaded(test)]
     async fn test_query_commit_status_and_update_status() {
-        let (proxy, mut stream) = create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CommitStatusProviderMarker>();
         let provider_fn = || Ok(proxy.clone());
         let (p0, p1) = zx::EventPair::create();
         let fidl_call_count = Arc::new(AtomicU8::new(0));
@@ -1655,8 +1655,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_query_opt_out_preference_ok_responses() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<OptOutMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<OptOutMarker>();
 
         let ((), ()) = futures::join!(
             async move {
@@ -1683,7 +1682,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_query_opt_out_preference_no_response_is_allow_all_updates() {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<OptOutMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<OptOutMarker>();
         drop(stream);
 
         let provider = || Ok(proxy.clone());

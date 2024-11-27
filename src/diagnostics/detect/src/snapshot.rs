@@ -209,8 +209,7 @@ mod tests {
 
         // Set up the CrashReportHandler node
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>();
         let fake_time = FakeTime::new();
         fake_time.set_ticks(9876);
         let crash_report_handler =
@@ -246,8 +245,7 @@ mod tests {
         // Set up the proxy/stream and node outside of the large future used below. This way we can
         // still poll the stream after the future completes.
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>();
         let fake_time = IncrementingFakeTime::new(1000, std::time::Duration::from_nanos(1000));
         let crash_report_handler = CrashReportHandlerBuilder::new(fake_time)
             .with_proxy(proxy)

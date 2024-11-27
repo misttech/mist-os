@@ -283,7 +283,7 @@ mod tests {
             );
 
             let (mouse_source_proxy, mut $requests) =
-                create_proxy_and_stream::<MouseSourceMarker>().unwrap();
+                create_proxy_and_stream::<MouseSourceMarker>();
 
             let mut $mouse_device = MouseDevice::new($device, mouse_source_proxy);
         };

@@ -218,7 +218,7 @@ mod test {
 
     fn launch_data_proxy_control() -> TcpProxyControlProxy {
         let control = TcpProxyControl::new();
-        let (proxy, stream) = create_proxy_and_stream::<TcpProxyControlMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<TcpProxyControlMarker>();
         fasync::Task::spawn(async move {
             control.serve_requests_from_stream(stream).await.unwrap();
         })
@@ -304,8 +304,7 @@ mod test {
         assert_request(test_port).await;
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -329,8 +328,7 @@ mod test {
         let test_port = launch_test_server_v4();
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -353,8 +351,7 @@ mod test {
         assert_request(test_port).await;
 
         let (tcp_proxy, tcp_proxy_handle) = TcpProxy::new(test_port, 0).unwrap();
-        let (tcp_proxy_token, tcp_proxy_server_end) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+        let (tcp_proxy_token, tcp_proxy_server_end) = create_proxy_and_stream::<TcpProxy_Marker>();
         let proxy_port = tcp_proxy_handle
             .register_client(tcp_proxy_server_end)
             .map_err(|_| anyhow!("Error on register client"))
@@ -364,7 +361,7 @@ mod test {
 
         // create second client
         let (tcp_proxy_token_2, tcp_proxy_server_end_2) =
-            create_proxy_and_stream::<TcpProxy_Marker>().unwrap();
+            create_proxy_and_stream::<TcpProxy_Marker>();
         tcp_proxy_handle
             .register_client(tcp_proxy_server_end_2)
             .map_err(|_| anyhow!("Error on register client"))

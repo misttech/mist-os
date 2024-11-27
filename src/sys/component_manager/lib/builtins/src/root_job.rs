@@ -32,7 +32,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn has_correct_rights() -> Result<(), Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::RootJobMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::RootJobMarker>();
         fasync::Task::local(
             RootJob::serve(stream, zx::Rights::TRANSFER)
                 .unwrap_or_else(|err| panic!("Error serving root job: {}", err)),

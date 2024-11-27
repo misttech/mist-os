@@ -76,7 +76,7 @@ impl<M: fidl::endpoints::ProtocolMarker> MockServer<M> {
         F: 'static + Future<Output = ()>,
         H: Fn(M::RequestStream) -> F,
     {
-        let (proxy, request_stream) = fidl::endpoints::create_proxy_and_stream::<M>()?;
+        let (proxy, request_stream) = fidl::endpoints::create_proxy_and_stream::<M>();
         fasync::Task::local((handler)(request_stream)).detach();
         Ok(proxy)
     }

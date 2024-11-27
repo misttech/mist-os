@@ -374,7 +374,7 @@ mod tests {
         let (mut exec, mut rfcomm) = setup_rfcomm_manager();
 
         // Profile-client reserves a server channel.
-        let (c, mut s) = create_proxy_and_stream::<ConnectionReceiverMarker>().unwrap();
+        let (c, mut s) = create_proxy_and_stream::<ConnectionReceiverMarker>();
         let first_channel = {
             let fut = rfcomm.allocate_server_channel(c.clone());
             let mut fut = pin!(fut);
@@ -431,7 +431,7 @@ mod tests {
         assert!(clients.deliver_channel(PeerId(1), random_server_channel, local).await.is_err());
 
         // Registering a new client should be OK.
-        let (c, s) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (c, s) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let server_channel = clients.new_client(c).await.unwrap();
         expected_space -= 1;
         assert_eq!(clients.available_space().await, expected_space);
@@ -460,7 +460,7 @@ mod tests {
         });
 
         // New client is ok.
-        let (c1, _s1) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (c1, _s1) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let ch_number1 = clients.new_client(c1).await.expect("valid client");
         let ch_number_raw1 = u8::from(ch_number1) as u64;
         assert_data_tree!(inspect, root: {
@@ -470,7 +470,7 @@ mod tests {
         });
 
         // Multiple clients is ok.
-        let (c2, _s2) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (c2, _s2) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let ch_number2 = clients.new_client(c2).await.expect("valid client");
         let ch_number_raw2 = u8::from(ch_number2) as u64;
         assert_data_tree!(inspect, root: {
@@ -499,8 +499,7 @@ mod tests {
         bredr::ProfileConnectResponder,
         fidl::client::QueryResponseFut<Result<bredr::Channel, ErrorCode>>,
     ) {
-        let (profile, mut profile_server) =
-            create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
+        let (profile, mut profile_server) = create_proxy_and_stream::<bredr::ProfileMarker>();
         let mut profile_stream = Box::pin(profile_server.next());
         let connect_request = profile.connect(
             &id.into(),

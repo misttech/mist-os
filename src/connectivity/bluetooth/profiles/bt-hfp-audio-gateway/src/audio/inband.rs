@@ -443,8 +443,7 @@ mod tests {
     #[fuchsia::test]
     async fn reads_audio_from_connection() {
         let (proxy, _audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
@@ -484,8 +483,7 @@ mod tests {
     #[fuchsia::test]
     async fn audio_setup_error_bad_codec() {
         let (proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, _sco_request_stream) =
@@ -498,8 +496,7 @@ mod tests {
     async fn decode_sco_audio_path() {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
@@ -594,8 +591,7 @@ mod tests {
     async fn encode_sco_audio_path_msbc() {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
@@ -674,8 +670,7 @@ mod tests {
     async fn encode_sco_audio_path_cvsd() {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
@@ -744,8 +739,7 @@ mod tests {
     async fn read_from_audio_output() {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
@@ -814,8 +808,7 @@ mod tests {
     #[fuchsia::test]
     async fn audio_output_error_sends_to_events() {
         let (proxy, mut audio_enumerator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
         let mut control = InbandAudioControl::create(proxy).unwrap();
         let mut events = control.take_events();
 

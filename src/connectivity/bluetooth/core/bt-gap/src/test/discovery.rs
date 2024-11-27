@@ -125,7 +125,7 @@ proptest! {
                         // send StartDiscovery request
                         None => {
                             let (access_proxy, access_stream) =
-                                fidl::endpoints::create_proxy_and_stream::<AccessMarker>()?;
+                                fidl::endpoints::create_proxy_and_stream::<AccessMarker>();
                             access_sessions.push(access::run(hd.clone(), access_stream));
 
                             let (discovery_session, discovery_session_server) =

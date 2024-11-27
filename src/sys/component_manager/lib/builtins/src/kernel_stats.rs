@@ -221,7 +221,7 @@ mod tests {
     async fn serve_kernel_stats(on_error: OnError) -> Result<fkernel::StatsProxy, Error> {
         let info_resource = get_info_resource().await?;
 
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
         fasync::Task::local(KernelStats::new(info_resource).serve(stream).unwrap_or_else(
             move |e| match on_error {
                 OnError::Panic => panic!("Error while serving kernel stats: {}", e),

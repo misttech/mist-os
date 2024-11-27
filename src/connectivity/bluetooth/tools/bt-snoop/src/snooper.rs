@@ -222,7 +222,7 @@ mod tests {
     fn test_from_directory_proxy_timeout() {
         let _exec = fasync::TestExecutor::new();
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_io::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_io::DirectoryMarker>();
         let _ = Snooper::new(&proxy, "foo").expect_err("should have timed out");
     }
 

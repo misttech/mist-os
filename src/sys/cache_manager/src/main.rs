@@ -324,8 +324,7 @@ mod tests {
         let client = client.into_proxy();
         let (cobalt_client, cobalt_events) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
-        >()
-        .unwrap();
+        >();
         (calls_rx, exec, time_step, client, config, cobalt_client, cobalt_events)
     }
 

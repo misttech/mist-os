@@ -360,8 +360,7 @@ mod file_tests {
         });
 
         let (iterator_proxy, mut iterator_stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftest_manager::DebugDataIteratorMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftest_manager::DebugDataIteratorMarker>();
         let serve_fut = async move {
             let mut files_iter = served_files.into_iter();
             while let Ok(Some(request)) = iterator_stream.try_next().await {

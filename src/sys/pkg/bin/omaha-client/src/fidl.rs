@@ -1018,7 +1018,7 @@ mod tests {
         fidl: Rc<RefCell<stub::StubFidlServer>>,
         service: fn(M::RequestStream) -> IncomingServices,
     ) -> M::Proxy {
-        let (proxy, stream) = create_proxy_and_stream::<M>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<M>();
         fasync::Task::local(
             FidlServer::handle_client(fidl, service(stream)).unwrap_or_else(|e| panic!("{}", e)),
         )
@@ -1623,7 +1623,7 @@ mod tests {
             >,
         >,
     ) {
-        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         // Handling this request should fail because unit test can't access the Admin FIDL.
         // Don't use spawn_fidl_server to run this task, since that will panic on any errors.
 

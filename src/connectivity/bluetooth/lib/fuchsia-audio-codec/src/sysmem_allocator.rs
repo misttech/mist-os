@@ -326,7 +326,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut allocator_requests) =
-            fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>();
 
         let (sender, mut receiver) = futures::channel::oneshot::channel();
 

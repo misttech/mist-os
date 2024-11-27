@@ -190,8 +190,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (driver_event_sender, driver_event_receiver) = mpsc::unbounded();
         let (ifc_proxy, ifc_req_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>();
 
         let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sender));
         let mut server_fut =

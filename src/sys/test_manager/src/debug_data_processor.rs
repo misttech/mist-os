@@ -73,8 +73,7 @@ impl DebugDataProcessor {
     pub(crate) fn new_for_test(directory: DebugDataDirectory) -> DebugDataForTestResult {
         let (sender, receiver) = futures::channel::mpsc::channel(Self::MAX_SENT_VMOS);
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ftest_debug::DebugDataProcessorMarker>()
-                .expect("create stream");
+            fidl::endpoints::create_proxy_and_stream::<ftest_debug::DebugDataProcessorMarker>();
         let maybe_proxy = std::sync::Mutex::new(Some(proxy));
         DebugDataForTestResult {
             processor: Self {
@@ -717,7 +716,7 @@ mod test {
         let (vmo_send, vmo_recv) = mpsc::channel(5);
         let mut vmo_chunk_stream = vmo_recv.ready_chunks(5).boxed();
         let (publisher_proxy, publisher_stream) =
-            create_proxy_and_stream::<fdebug::PublisherMarker>().unwrap();
+            create_proxy_and_stream::<fdebug::PublisherMarker>();
         let mut serve_fut =
             serve_publisher(publisher_stream, TEST_URL, DebugDataSender { sender: vmo_send })
                 .boxed();

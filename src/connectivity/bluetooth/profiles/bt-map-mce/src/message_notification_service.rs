@@ -424,8 +424,7 @@ pub(crate) mod tests {
         impl Future<Output = Result<(), Error>>,
     ) {
         // Set up fake client request for notifications.
-        let (accessor_proxy, mut accessor_requests) =
-            create_proxy_and_stream::<AccessorMarker>().unwrap();
+        let (accessor_proxy, mut accessor_requests) = create_proxy_and_stream::<AccessorMarker>();
         let (relayer_client, relayer_request_stream) =
             create_request_stream::<NotificationRegistrationMarker>();
         let register_fut = accessor_proxy.set_notification_registration(

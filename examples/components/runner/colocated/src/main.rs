@@ -230,7 +230,7 @@ mod tests {
         let resource_tracker =
             Arc::new(ResourceTracker { resources: Mutex::new(Default::default()) });
         let (runner, runner_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>();
         let memory_server = get_memory_server(resource_tracker.clone());
         let server = fasync::Task::spawn(handle_runner_request(
             runner_stream,

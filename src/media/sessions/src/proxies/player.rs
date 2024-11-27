@@ -504,7 +504,7 @@ mod test {
         let (_inspector, mut player, _player_server) = test_player();
 
         let (session_control_fidl_proxy, session_control_request_stream) =
-            create_proxy_and_stream::<SessionControlMarker>()?;
+            create_proxy_and_stream::<SessionControlMarker>();
         let control_request_stream = session_control_request_stream
             .filter_map(|r| future::ready(r.ok()))
             .map(ForwardControlRequest::try_from)

@@ -614,7 +614,7 @@ mod tests {
 
         let local_node = overnet_core::Router::new(None).unwrap();
         let (proxy, _stream) =
-            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>();
         let conn = RcsConnection::new_with_proxy(local_node, proxy, &NodeId { id: 123456 });
 
         target.apply_update(TargetUpdateBuilder::new().rcs(conn.clone()).build());
@@ -628,7 +628,7 @@ mod tests {
 
         let local_node = overnet_core::Router::new(None).unwrap();
         let (proxy, _stream) =
-            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>();
         let conn = RcsConnection::new_with_proxy(local_node, proxy, &NodeId { id: 123456 });
 
         use fidl_fuchsia_net as net;

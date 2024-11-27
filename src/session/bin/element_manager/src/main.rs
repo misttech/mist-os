@@ -116,8 +116,7 @@ mod tests {
     fn spawn_manager_server(
         element_manager: Box<ElementManager>,
     ) -> (felement::ManagerProxy, fasync::Task<()>) {
-        let (proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager proxy and stream");
+        let (proxy, stream) = create_proxy_and_stream::<felement::ManagerMarker>();
 
         (
             proxy,

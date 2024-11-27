@@ -514,7 +514,7 @@ mod tests {
             self,
         ) -> (finterfaces::StateProxy, impl std::future::Future<Output = ()>) {
             let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
             let stream_fut = async move {
                 match stream.next().await {
                     Some(Ok(finterfaces::StateRequest::GetWatcher { watcher, .. })) => {

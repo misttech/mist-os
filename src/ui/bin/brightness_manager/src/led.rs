@@ -80,8 +80,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_num_lights() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<LightMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<LightMarker>();
         let mut led = Led { proxy };
 
         let fut = async move {
@@ -101,8 +100,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_info_test() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<LightMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<LightMarker>();
         let led = Led { proxy };
 
         let fut = async move {
@@ -127,8 +125,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn set_brightness() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<LightMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<LightMarker>();
         let mut led = Led { proxy };
 
         let fut = async move {

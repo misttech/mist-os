@@ -75,7 +75,7 @@ mod tests {
     ) -> (impl Future<Output = Result<(), Error>>, ReporterProxy, Arc<PeripheralState>) {
         let shared_state = Arc::new(PeripheralState::new());
         let server = Reporter::new(shared_state.clone());
-        let (c, s) = fidl::endpoints::create_proxy_and_stream::<ReporterMarker>().unwrap();
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<ReporterMarker>();
         let server_task = server.run(s);
 
         (server_task, c, shared_state)

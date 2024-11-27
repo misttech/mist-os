@@ -26,7 +26,7 @@ async fn test_pair() -> Result<(), Error> {
             .await
             .unwrap();
 
-    let (client, server) = endpoints::create_proxy_and_stream::<AccessMarker>()?;
+    let (client, server) = endpoints::create_proxy_and_stream::<AccessMarker>();
     let run_access = access::run(dispatcher, server);
 
     // The parameters to send to access.Pair()
@@ -86,7 +86,7 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
     let host_info_2 = Arc::new(RwLock::new(host_2.info()));
 
     // Create access server future
-    let (access_client, access_server) = endpoints::create_proxy_and_stream::<AccessMarker>()?;
+    let (access_client, access_server) = endpoints::create_proxy_and_stream::<AccessMarker>();
     let run_access = access::run(hd.clone(), access_server);
 
     // Create access client future

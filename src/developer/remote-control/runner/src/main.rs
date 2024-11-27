@@ -246,9 +246,8 @@ mod test {
     }
 
     fn setup_fake_rcs(handle_stream: bool) -> (RemoteControlProxy, ConnectorProxy) {
-        let (proxy, mut stream) = create_proxy_and_stream::<RemoteControlMarker>().unwrap();
-        let (runner_proxy, mut runner_stream) =
-            create_proxy_and_stream::<ConnectorMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RemoteControlMarker>();
+        let (runner_proxy, mut runner_stream) = create_proxy_and_stream::<ConnectorMarker>();
 
         if !handle_stream {
             return (proxy, runner_proxy);

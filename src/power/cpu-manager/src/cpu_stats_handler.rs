@@ -362,8 +362,7 @@ pub mod tests {
     fn setup_fake_service(
         mut get_idle_times: impl FnMut() -> Vec<Nanoseconds> + 'static,
     ) -> fstats::StatsProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fstats::StatsMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fstats::StatsMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

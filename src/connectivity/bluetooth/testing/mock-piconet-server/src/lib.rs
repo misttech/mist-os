@@ -113,7 +113,7 @@ impl PiconetMemberSpec {
             .map(|capability_name| expose_decl(&name, id, capability_name))
             .collect();
         let (peer_proxy, peer_stream) =
-            f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
+            f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>();
 
         Ok((Self { name, id, rfcomm_url, expose_decls, observer: Some(peer_proxy) }, peer_stream))
     }
@@ -498,8 +498,7 @@ async fn add_mock_piconet_component(
     // of the channel is passed to a future which just reads the channel to
     // completion.
     let observer = observer_src.unwrap_or_else(|| {
-        let (proxy, stream) =
-            f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
+        let (proxy, stream) = f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>();
         fasync::Task::local(async move {
             let _ = drain_observer(stream).await;
         })

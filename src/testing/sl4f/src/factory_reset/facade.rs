@@ -56,7 +56,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_factory_reset() {
-        let (proxy, mut stream) = create_proxy_and_stream::<FactoryResetMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<FactoryResetMarker>();
         let facade = FactoryResetFacade::new();
         facade.factory_reset_manager.set(proxy).unwrap();
         let facade_fut = async move {

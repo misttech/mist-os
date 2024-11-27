@@ -408,7 +408,7 @@ mod tests {
         let (profile, profile_svc, server) = setup_profile_and_test_server();
         let (battery_client, _test_battery_manager) =
             TestBatteryManager::make_battery_client_with_test_manager().await;
-        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>();
 
         let (mut sender, receiver) = mpsc::channel(1);
         sender.send(proxy).await.expect("Hfp to receive the proxy");
@@ -452,7 +452,7 @@ mod tests {
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
         let mut setup_fut = pin!(setup_fut);
         let (battery_client, _test_mgr) = exec.run_singlethreaded(&mut setup_fut);
-        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>();
 
         let (mut sender, receiver) = mpsc::channel(1);
         exec.run_singlethreaded(sender.send(proxy)).expect("Hfp to receive the proxy");
@@ -510,7 +510,7 @@ mod tests {
     #[fuchsia::test]
     async fn peer_then_first_manager_connected_works() {
         let (profile, profile_svc, server) = setup_profile_and_test_server();
-        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>();
         let (battery_client, _test_battery_manager) =
             TestBatteryManager::make_battery_client_with_test_manager().await;
 
@@ -555,7 +555,7 @@ mod tests {
         let (profile, profile_svc, server) = setup_profile_and_test_server();
         let (battery_client, _test_battery_manager) =
             TestBatteryManager::make_battery_client_with_test_manager().await;
-        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>();
 
         let (mut sender, receiver) = mpsc::channel(1);
         sender.send(proxy).await.expect("Hfp to receive the proxy");
@@ -592,7 +592,7 @@ mod tests {
         let _ = stream.next().await;
 
         // Setup a new call manager.
-        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>();
         sender.send(proxy).await.expect("Hfp to receive the proxy");
 
         // The new call manager should receive a peer connected notification for the peer that is
@@ -611,7 +611,7 @@ mod tests {
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
         let mut setup_fut = pin!(setup_fut);
         let (battery_client, _test_mgr) = exec.run_singlethreaded(&mut setup_fut);
-        let (proxy, mut stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CallManagerMarker>();
 
         let (mut sender, receiver) = mpsc::channel(1);
         sender.try_send(proxy).expect("Hfp to receive the proxy");
@@ -768,7 +768,7 @@ mod tests {
         let _hfp_task = fasync::Task::local(hfp.run());
 
         // Make a new fidl request by creating a channel and sending the request over the channel.
-        let (proxy, mut stream) = create_proxy_and_stream::<hfp_test::HfpTestMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<hfp_test::HfpTestMarker>();
         let fidl_request = {
             proxy.battery_indicator(1).unwrap();
             stream.next().await.unwrap().unwrap()
@@ -861,7 +861,7 @@ mod tests {
         let _hfp_task = fasync::Task::local(hfp.run());
 
         // Make a new fidl request by creating a channel and sending the request over the channel.
-        let (proxy, mut stream) = create_proxy_and_stream::<hfp_test::HfpTestMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<hfp_test::HfpTestMarker>();
         let fidl_request = {
             let behavior =
                 hfp_test::ConnectionBehavior { autoconnect: Some(false), ..Default::default() };

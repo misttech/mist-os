@@ -222,8 +222,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 
@@ -293,8 +292,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 
@@ -378,8 +376,7 @@ mod test {
 
         let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
             RepositoryRegistryMarker,
-        >()
-        .unwrap();
+        >();
 
         let _ = FakeRepositoryRegistry::new(stream, sender);
 

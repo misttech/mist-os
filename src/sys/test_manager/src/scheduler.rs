@@ -139,13 +139,11 @@ mod tests {
 
     async fn create_fake_suite(test_url: String) -> Suite {
         let (_controller_proxy, controller_stream) =
-            create_proxy_and_stream::<SuiteControllerMarker>().expect("create controller proxy");
+            create_proxy_and_stream::<SuiteControllerMarker>();
         let (resolver_proxy, _resolver_stream) =
-            create_proxy_and_stream::<fresolution::ResolverMarker>()
-                .expect("create resolver proxy");
+            create_proxy_and_stream::<fresolution::ResolverMarker>();
         let (pkg_resolver_proxy, _pkg_resolver_stream) =
-            create_proxy_and_stream::<fpkg::PackageResolverMarker>()
-                .expect("create resolver proxy");
+            create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let resolver_proxy = Arc::new(resolver_proxy);
         let pkg_resolver_proxy = Arc::new(pkg_resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());

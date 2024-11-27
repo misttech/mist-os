@@ -187,7 +187,7 @@ pub fn fake_proxy<T: fidl::endpoints::Proxy>(
     mut handle_request: impl FnMut(fidl::endpoints::Request<T::Protocol>) + 'static,
 ) -> T {
     use futures::TryStreamExt;
-    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<T::Protocol>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<T::Protocol>();
     fuchsia_async::Task::local(async move {
         while let Ok(Some(req)) = stream.try_next().await {
             handle_request(req);

@@ -91,7 +91,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_add_to_power_topology_sends_correct_schema() -> Result<()> {
         // Create and run the Topology server in the background.
-        let (topology, topology_stream) = create_proxy_and_stream::<fbroker::TopologyMarker>()?;
+        let (topology, topology_stream) = create_proxy_and_stream::<fbroker::TopologyMarker>();
         let (element_schema_sender, mut element_schema_receiver) =
             mpsc::unbounded::<fbroker::ElementSchema>();
         fasync::Task::local(async move {
@@ -118,7 +118,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_set_level_changes_topology_current_level() -> Result<()> {
         // Create and run the Topology server in the background.
-        let (topology, topology_stream) = create_proxy_and_stream::<fbroker::TopologyMarker>()?;
+        let (topology, topology_stream) = create_proxy_and_stream::<fbroker::TopologyMarker>();
         let (element_schema_sender, mut element_schema_receiver) =
             mpsc::unbounded::<fbroker::ElementSchema>();
         fasync::Task::local(async move {

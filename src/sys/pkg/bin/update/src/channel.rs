@@ -57,7 +57,7 @@ mod tests {
     where
         V: Fn(ChannelControlRequest),
     {
-        let (proxy, mut stream) = create_proxy_and_stream::<ChannelControlMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ChannelControlMarker>();
         let fut = async move {
             assert_matches!(handle_channel_control_cmd_impl(argument, &proxy).await, Ok(()));
         };

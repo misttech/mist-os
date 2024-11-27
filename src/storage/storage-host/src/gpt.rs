@@ -630,7 +630,7 @@ mod tests {
         .await;
         {
             let (client, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
             let server = block_device.clone();
             let _task = fasync::Task::spawn(async move { server.serve(stream).await });
             let client = RemoteBlockClient::new(client).await.unwrap();
@@ -678,7 +678,7 @@ mod tests {
         .await;
         {
             let (client, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
             let server = block_device.clone();
             let _task = fasync::Task::spawn(async move { server.serve(stream).await });
             let client = RemoteBlockClient::new(client).await.unwrap();

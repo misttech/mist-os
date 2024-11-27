@@ -380,7 +380,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_parse_ipv6_addr_handles_large_interface_indices() {
-        let (proxy, mut stream) = create_proxy_and_stream::<ProviderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ProviderMarker>();
 
         let provider_fut = async move {
             while let Some(req) = stream.try_next().await.unwrap_or(None) {
@@ -428,8 +428,7 @@ mod test {
     async fn test_resolve_ip_addr() {
         let (sender, receiver) =
             futures::channel::mpsc::unbounded::<Result<LookupResult, LookupError>>();
-        let (proxy, stream) = create_proxy_and_stream::<LookupMarker>()
-            .expect("failed to create Lookup proxy and stream");
+        let (proxy, stream) = create_proxy_and_stream::<LookupMarker>();
         const TEST_HOSTNAME: &'static str = "foobar.com";
         let name_lookup_fut = stream.zip(receiver).for_each(|(req, rsp)| match req {
             Ok(LookupRequest::LookupIp { hostname, options, responder }) => {

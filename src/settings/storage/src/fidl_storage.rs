@@ -551,7 +551,7 @@ mod tests {
         #[allow(clippy::arc_with_non_send_sync)]
         fn new(real_dir: fio::DirectoryProxy) -> (Arc<Self>, fio::DirectoryProxy) {
             let (proxy, requests) =
-                fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
             let this = Arc::new(Self {
                 real_dir,
                 inner: std::sync::Mutex::new(DirectoryInterceptorInner {

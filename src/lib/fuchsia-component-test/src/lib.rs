@@ -3029,9 +3029,8 @@ mod tests {
 
     fn new_realm_builder_and_server_task(
     ) -> (RealmBuilder, fasync::Task<()>, mpsc::UnboundedReceiver<ServerRequest>) {
-        let (realm_proxy, realm_stream) = create_proxy_and_stream::<ftest::RealmMarker>().unwrap();
-        let (builder_proxy, mut builder_stream) =
-            create_proxy_and_stream::<ftest::BuilderMarker>().unwrap();
+        let (realm_proxy, realm_stream) = create_proxy_and_stream::<ftest::RealmMarker>();
+        let (builder_proxy, mut builder_stream) = create_proxy_and_stream::<ftest::BuilderMarker>();
 
         let builder_task = fasync::Task::spawn(async move {
             while let Some(req) = builder_stream.try_next().await.unwrap() {

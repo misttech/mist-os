@@ -153,7 +153,7 @@ mod tests {
     #[fuchsia::test]
     async fn chain_subpackage_resolves() {
         let (resolver, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         let mut resolver = crate::package_resolver::PackageResolver::new_test(resolver);
 
         // A mock package resolver that records all requests in `requests`.

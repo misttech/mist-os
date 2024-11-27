@@ -101,7 +101,7 @@ mod tests {
         let (mut sender, receiver) = mpsc::unbounded();
 
         let (repos, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>();
 
         let task = fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {

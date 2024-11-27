@@ -49,7 +49,7 @@ mod tests {
         let smc_resource = get_smc_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::SmcResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::SmcResourceMarker>();
         fasync::Task::local(
             SmcResource::new(smc_resource)
                 .serve(stream)

@@ -118,7 +118,7 @@ mod tests {
         let test_width = 100;
         let test_height = 200;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade = VirtualCameraFacade { camera_proxy: Some(proxy) };
@@ -186,7 +186,7 @@ mod tests {
     /// after calling the FIDL service.
     #[fasync::run_singlethreaded(test)]
     async fn test_add_to_device_watcher() {
-        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade = VirtualCameraFacade { camera_proxy: Some(proxy) };
@@ -212,7 +212,7 @@ mod tests {
     /// after calling the FIDL service with an error response.
     #[fasync::run_singlethreaded(test)]
     async fn test_add_to_device_watcher_on_error() {
-        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<VirtualCameraDeviceMarker>();
 
         // Create a facade future that sends a request to `proxy`.
         let facade = VirtualCameraFacade { camera_proxy: Some(proxy) };

@@ -4130,7 +4130,7 @@ mod tests {
         fidl_sme::ClientSmeDisconnectResponder,
     ) {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let mut disconnect_fut =
             proxy.disconnect(fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme);
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Pending);

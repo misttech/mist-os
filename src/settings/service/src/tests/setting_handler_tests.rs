@@ -107,7 +107,7 @@ async fn test_write_notify() {
         crate::agent::Context::new(agent_receptor, delegate, [SettingType::Accessibility].into())
             .await;
 
-    let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>().unwrap();
+    let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>();
     let blueprint = crate::agent::storage_agent::create_registrar(
         Rc::clone(&storage_factory),
         Rc::new(FidlStorageFactory::new(1, directory_proxy)),

@@ -270,8 +270,7 @@ mod tests {
         device_type: TestDeviceType,
     ) -> Result<DeviceDescriptor, Error> {
         let (registry_proxy, mut registry_request_stream) =
-            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .expect("failed to create proxy and stream for InputDeviceRegistry");
+            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>();
         let mut input_device_registry = InputDeviceRegistry {
             proxy: registry_proxy,
             got_input_reports_reader: AsyncEvent::new(),

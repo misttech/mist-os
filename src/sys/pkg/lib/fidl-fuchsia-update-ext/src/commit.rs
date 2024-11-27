@@ -39,7 +39,7 @@ mod tests {
     // Verifies that query_commit_status returns the expected CommitStatus.
     #[fasync::run_singlethreaded(test)]
     async fn test_query_commit_status() {
-        let (proxy, mut stream) = create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CommitStatusProviderMarker>();
         let (p0, p1) = zx::EventPair::create();
 
         let _fidl_server = fasync::Task::local(async move {

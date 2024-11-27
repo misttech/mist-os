@@ -256,7 +256,7 @@ mod tests {
         Fut: futures::Future<Output = ()>,
     {
         let (provider_proxy, mut provider_requests) =
-            fidl::endpoints::create_proxy_and_stream::<audio_device::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<audio_device::ProviderMarker>();
         let mut codec = CodecAudioControl::new(provider_proxy);
 
         codec.connect(PeerId(1), &[CodecId::MSBC]);

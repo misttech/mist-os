@@ -1087,8 +1087,7 @@ mod tests {
     #[fuchsia::test]
     async fn eager_components() {
         let (controller, controller_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fsys2::LifecycleControllerMarker>()
-                .expect("create proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fsys2::LifecycleControllerMarker>();
         let configure_environment = async {
             let config = Config {
                 networks: vec![],

@@ -254,7 +254,7 @@ mod tests {
         let (mut query_last_active_sender, query_last_active_receiver) = mpsc::channel(10);
         let (mut set_active_sender, set_active_receiver) = mpsc::channel(10);
         let (proxy, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<BootManagerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<BootManagerMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) =

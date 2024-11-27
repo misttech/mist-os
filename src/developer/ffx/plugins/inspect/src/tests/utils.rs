@@ -64,7 +64,7 @@ impl FakeAccessorData {
 }
 
 pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> ArchiveAccessorProxy {
-    let (proxy, mut stream) = create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
+    let (proxy, mut stream) = create_proxy_and_stream::<ArchiveAccessorMarker>();
     fuchsia_async::Task::local(async move {
         'req: while let Ok(Some(req)) = stream.try_next().await {
             match req {
@@ -115,8 +115,7 @@ pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
     }
 
     let mock_realm_query = mock_realm_query_builder.build();
-    let (proxy, mut stream) =
-        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
     fuchsia_async::Task::local(async move {
         let querier = Rc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
@@ -151,8 +150,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
     expected_protocol: String,
 ) -> (RemoteControlProxy, Rc<RefCell<Vec<fuchsia_async::Task<()>>>>) {
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
-    let (proxy, mut stream) =
-        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
     let running_tasks = Rc::new(RefCell::new(vec![]));
     let running_tasks_clone = running_tasks.clone();
     let task = fuchsia_async::Task::local(async move {

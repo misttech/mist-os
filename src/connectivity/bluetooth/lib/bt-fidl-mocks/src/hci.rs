@@ -18,7 +18,7 @@ pub struct HciTransportMock {
 
 impl HciTransportMock {
     pub fn new(timeout: MonotonicDuration) -> Result<(HciTransportProxy, HciTransportMock), Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HciTransportMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HciTransportMarker>();
         Ok((proxy, HciTransportMock { stream, timeout }))
     }
 

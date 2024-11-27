@@ -153,7 +153,7 @@ mod tests {
         sender.send_channel(ch1).unwrap();
 
         let (receiver_proxy, mut receiver_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsandbox::ReceiverMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsandbox::ReceiverMarker>();
 
         let handler_fut = receiver.handle_receiver(receiver_proxy);
         let receive_fut = receiver_stream.next();

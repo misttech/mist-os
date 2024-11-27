@@ -47,7 +47,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_unique_client_ids() {
-        let (_, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (_, stream) = create_proxy_and_stream::<ManagerMarker>();
         let client1 = Client::new(stream.control_handle().clone());
         let client2 = Client::new(stream.control_handle().clone());
         assert_ne!(client1.id, client2.id);
@@ -58,7 +58,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_partial_eq() {
-        let (_, stream) = create_proxy_and_stream::<ManagerMarker>().unwrap();
+        let (_, stream) = create_proxy_and_stream::<ManagerMarker>();
         let client1 = Client::new(stream.control_handle().clone());
         let client2 = Client::new(stream.control_handle().clone());
         assert_ne!(client1, client2);

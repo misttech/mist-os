@@ -196,8 +196,7 @@ mod tests {
     impl FakeThermalStateProvider {
         fn new() -> (fthermal::ClientStateWatcherProxy, Self) {
             let (watcher_proxy, watcher_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fthermal::ClientStateWatcherMarker>()
-                    .expect("failed to create watcher.");
+                fidl::endpoints::create_proxy_and_stream::<fthermal::ClientStateWatcherMarker>();
 
             (watcher_proxy, Self { watcher_stream })
         }

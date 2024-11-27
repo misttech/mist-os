@@ -195,8 +195,7 @@ mod tests {
     /// Tests that the session_control tool successfully handles a call to LaunchSession with the provided URL.
     #[fasync::run_singlethreaded(test)]
     async fn test_launch_session() {
-        let (launcher, mut launcher_server) = create_proxy_and_stream::<fsession::LauncherMarker>()
-            .expect("Failed to create Launcher FIDL.");
+        let (launcher, mut launcher_server) = create_proxy_and_stream::<fsession::LauncherMarker>();
         let session_url = "test_session";
 
         let _server_task = fasync::Task::spawn(async move {
@@ -215,8 +214,7 @@ mod tests {
     /// is no LaunchConfiguration provided.
     #[fasync::run_singlethreaded(test)]
     async fn test_launch_session_error() {
-        let (launcher, mut launcher_server) = create_proxy_and_stream::<fsession::LauncherMarker>()
-            .expect("Failed to create Launcher FIDL.");
+        let (launcher, mut launcher_server) = create_proxy_and_stream::<fsession::LauncherMarker>();
         let session_url = "test_session";
 
         let _server_task = fasync::Task::spawn(async move {
@@ -234,8 +232,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_restart_session() {
         let (restarter, mut restarter_server) =
-            create_proxy_and_stream::<fsession::RestarterMarker>()
-                .expect("Failed to create Restarter FIDL.");
+            create_proxy_and_stream::<fsession::RestarterMarker>();
 
         let _server_task = fasync::Task::spawn(async move {
             let restarter_request =
@@ -252,8 +249,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_restart_session_error() {
         let (restarter, mut restarter_server) =
-            create_proxy_and_stream::<fsession::RestarterMarker>()
-                .expect("Failed to create Restarter FIDL.");
+            create_proxy_and_stream::<fsession::RestarterMarker>();
 
         let _server_task = fasync::Task::spawn(async move {
             let restarter_request =
@@ -269,8 +265,7 @@ mod tests {
     /// Tests that an element is added to the session
     #[fasync::run_singlethreaded(test)]
     async fn test_add_element() {
-        let (manager, mut manager_server) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager FIDL.");
+        let (manager, mut manager_server) = create_proxy_and_stream::<felement::ManagerMarker>();
         let element_url = "test_element";
 
         let _server_task = fasync::Task::spawn(async move {
@@ -290,8 +285,7 @@ mod tests {
     /// Tests that an element is added to the session
     #[fasync::run_singlethreaded(test)]
     async fn test_add_element_error() {
-        let (manager, mut manager_server) = create_proxy_and_stream::<felement::ManagerMarker>()
-            .expect("Failed to create Manager FIDL.");
+        let (manager, mut manager_server) = create_proxy_and_stream::<felement::ManagerMarker>();
         let element_url = "test_element";
 
         let _server_task = fasync::Task::spawn(async move {

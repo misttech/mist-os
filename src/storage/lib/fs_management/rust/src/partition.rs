@@ -255,7 +255,7 @@ mod tests {
     const DEFAULT_PATH: &str = "/fake/block/device/1/partition/001";
 
     async fn check_partition_matches(matcher: &PartitionMatcher) -> bool {
-        let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>();
 
         let fake_block_server = Arc::new(FakeServer::new(1000, 512, &constants::FVM_MAGIC));
 

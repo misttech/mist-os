@@ -302,7 +302,7 @@ mod test {
         /// Return a new proxy connected to the test PushSource.
         fn new_proxy(&mut self) -> PushSourceProxy {
             let source_clone = Arc::clone(&self.test_source);
-            let (proxy, stream) = create_proxy_and_stream::<PushSourceMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<PushSourceMarker>();
             let server_task = fasync::Task::spawn(async move {
                 source_clone.handle_requests_for_stream(stream).await
             });

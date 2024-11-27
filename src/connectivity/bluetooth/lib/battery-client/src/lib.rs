@@ -235,7 +235,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (c, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>();
         let mut client = BatteryClient::register_updates(c).expect("can register");
         expect_stream_pending(&mut exec, &mut client);
 

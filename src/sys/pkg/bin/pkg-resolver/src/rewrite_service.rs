@@ -224,14 +224,14 @@ mod tests {
     }
 
     async fn list_rules(state: Arc<RwLock<RewriteManager>>) -> Vec<Rule> {
-        let (iterator, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>().unwrap();
+        let (iterator, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>();
         RewriteService::new(state).serve_list(request_stream).await;
 
         collect_iterator(move || iterator.next()).await
     }
 
     async fn list_static_rules(state: Arc<RwLock<RewriteManager>>) -> Vec<Rule> {
-        let (iterator, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>().unwrap();
+        let (iterator, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>();
         RewriteService::new(state).serve_list_static(request_stream).await;
 
         collect_iterator(move || iterator.next()).await
@@ -309,7 +309,7 @@ mod tests {
         ));
         let mut service = RewriteService::new(state.clone());
 
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
 
         client.reset_all().unwrap();
@@ -336,7 +336,7 @@ mod tests {
         ));
         let mut service = RewriteService::new(state.clone());
 
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
 
         // The transaction should list all dynamic rules.
@@ -373,15 +373,13 @@ mod tests {
         let mut service = RewriteService::new(state.clone());
 
         let client1 = {
-            let (client, request_stream) =
-                create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+            let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
             service.serve_edit_transaction(request_stream).await;
             client
         };
 
         let client2 = {
-            let (client, request_stream) =
-                create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+            let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
             service.serve_edit_transaction(request_stream).await;
             client
         };
@@ -398,8 +396,7 @@ mod tests {
         assert_eq!(state.read().await.transaction(), Transaction::new(vec![rule], 1),);
 
         let client2 = {
-            let (client, request_stream) =
-                create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+            let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
             service.serve_edit_transaction(request_stream).await;
             client
         };
@@ -423,8 +420,7 @@ mod tests {
         assert_eq!(list_rules(state.clone()).await, vec![]);
 
         let edit_client = {
-            let (client, request_stream) =
-                create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+            let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
             service.serve_edit_transaction(request_stream).await;
             client
         };
@@ -436,7 +432,7 @@ mod tests {
         assert_eq!(list_rules(state.clone()).await, vec![]);
 
         let long_list_call = {
-            let (client, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>().unwrap();
+            let (client, request_stream) = create_proxy_and_stream::<RuleIteratorMarker>();
             service.serve_list(request_stream).await;
             client
         };
@@ -512,8 +508,7 @@ mod tests {
         ));
         let mut service = RewriteService::new(state.clone());
 
-        let (edit_client, request_stream) =
-            create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (edit_client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
 
         let replacement_rule = rule!("fuchsia.com" => "fuchsia.com", "/a" => "/c");
@@ -548,7 +543,7 @@ mod tests {
         ));
         let mut service = RewriteService::new(state.clone());
 
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
 
         let rules = vec![
@@ -564,14 +559,14 @@ mod tests {
         assert_yields_result!(client.commit(), Ok(()));
 
         // Adding a duplicate of the currently enabled source is a no-op.
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
         let rule = rule!("fuchsia.com" => "correct.fuchsia.com", "/" => "/");
         assert_yields_result!(client.add(&rule.into()), Ok(()));
         assert_yields_result!(client.commit(), Ok(()));
 
         // Adding a different entry with higher priority enables the new source.
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
         let rule = rule!("fuchsia.com" => "correcter.fuchsia.com", "/" => "/");
         assert_yields_result!(client.add(&rule.into()), Ok(()));
@@ -592,13 +587,13 @@ mod tests {
         ));
         let mut service = RewriteService::new(state.clone());
 
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
         client.reset_all().unwrap();
         assert_yields_result!(client.commit(), Ok(()));
 
         // Edits that don't change the enabled source are a no-op.
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
         client.reset_all().unwrap();
         assert_yields_result!(client.commit(), Ok(()));
@@ -611,7 +606,7 @@ mod tests {
         ));
         let mut service = RewriteService::new(state);
 
-        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>().unwrap();
+        let (client, request_stream) = create_proxy_and_stream::<EditTransactionMarker>();
         service.serve_edit_transaction(request_stream).await;
 
         let status = Status::from_raw(client.commit().await.unwrap().unwrap_err());

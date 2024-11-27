@@ -322,7 +322,7 @@ mod test {
 
     #[fuchsia::test]
     async fn rtc_impl_get_valid() {
-        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>();
 
         let rtc_impl = new_rw_rtc(proxy);
         let _responder = fasync::Task::spawn(async move {
@@ -335,7 +335,7 @@ mod test {
 
     #[fuchsia::test]
     async fn rtc_impl_get_invalid() {
-        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>();
 
         let rtc_impl = new_rw_rtc(proxy);
         let _responder = fasync::Task::spawn(async move {
@@ -350,7 +350,7 @@ mod test {
 
     #[fuchsia::test]
     async fn rtc_impl_set_whole_second() {
-        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>();
 
         let rtc_impl = new_rw_rtc(proxy);
         let _responder = fasync::Task::spawn(async move {
@@ -372,7 +372,7 @@ mod test {
 
     #[fuchsia::test]
     async fn rtc_impl_set_partial_second() {
-        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>();
 
         let rtc_impl = new_rw_rtc(proxy);
         let _responder = fasync::Task::spawn(async move {

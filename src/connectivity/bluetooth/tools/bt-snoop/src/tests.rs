@@ -70,7 +70,7 @@ fn test_register_new_client() {
 }
 
 fn fidl_endpoints() -> (SnoopProxy, SnoopRequestStream) {
-    fidl::endpoints::create_proxy_and_stream::<SnoopMarker>().unwrap()
+    fidl::endpoints::create_proxy_and_stream::<SnoopMarker>()
 }
 
 fn client_request(host_device: Option<String>) -> (SnoopStartRequest, PacketObserverRequestStream) {

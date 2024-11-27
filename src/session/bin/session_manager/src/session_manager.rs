@@ -564,7 +564,7 @@ mod tests {
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
         let (launcher_proxy, launcher_stream) =
-            create_proxy_and_stream::<fsession::LauncherMarker>().unwrap();
+            create_proxy_and_stream::<fsession::LauncherMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -580,7 +580,7 @@ mod tests {
 
     fn serve_restarter(session_manager: SessionManager) -> fsession::RestarterProxy {
         let (restarter_proxy, restarter_stream) =
-            create_proxy_and_stream::<fsession::RestarterMarker>().unwrap();
+            create_proxy_and_stream::<fsession::RestarterMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -596,7 +596,7 @@ mod tests {
 
     fn serve_lifecycle(session_manager: SessionManager) -> fsession::LifecycleProxy {
         let (lifecycle_proxy, lifecycle_stream) =
-            create_proxy_and_stream::<fsession::LifecycleMarker>().unwrap();
+            create_proxy_and_stream::<fsession::LifecycleMarker>();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {

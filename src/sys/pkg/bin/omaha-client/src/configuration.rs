@@ -534,7 +534,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_data_from_vbmeta() {
-        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>();
         let fut = async move {
             assert_eq!(
                 VbMetaData::from_proxy(proxy).await.unwrap(),
@@ -571,7 +571,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_data_from_vbmeta_missing() {
-        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>();
         let fut = async move {
             let vbmeta_data = VbMetaData::from_proxy(proxy).await.unwrap();
             assert_eq!(vbmeta_data, VbMetaData::default());
@@ -591,7 +591,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_data_from_vbmeta_error() {
-        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ArgumentsMarker>();
         let fut = async move {
             assert!(VbMetaData::from_proxy(proxy).await.is_err());
         };
@@ -700,7 +700,7 @@ mod tests {
         // now with CUP
         let app_metadata = AppMetadata { appid_source: AppIdSource::VbMetadata };
         let mut app_set = FuchsiaAppSet::new(system_app.clone(), app_metadata);
-        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>();
         let stream_fut = async move {
             while let Some(request) = stream.next().await {
                 match request {
@@ -743,7 +743,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_eager_package_version_and_channel_fallback() {
-        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>();
         let stream_fut = async move {
             match stream.next().await.unwrap() {
                 Ok(CupRequest::GetInfo { url, responder }) => {
@@ -777,7 +777,7 @@ mod tests {
         assert_eq!(version, MINIMUM_VALID_VERSION.into());
 
         // GetInfoError fallback to default
-        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<CupMarker>();
         let stream_fut = async move {
             match stream.next().await.unwrap() {
                 Ok(CupRequest::GetInfo { url, responder }) => {

@@ -452,7 +452,7 @@ mod tests {
 
     fn setup_fake_device_service() -> hwinfo::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<hwinfo::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<hwinfo::DeviceMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -472,7 +472,7 @@ mod tests {
 
     fn setup_fake_sysinfo_service(status: zx::Status) -> sysinfo::SysInfoProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<sysinfo::SysInfoMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<sysinfo::SysInfoMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -494,7 +494,7 @@ mod tests {
 
     fn setup_fake_build_info_service() -> buildinfo::ProviderProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<buildinfo::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<buildinfo::ProviderMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -515,7 +515,7 @@ mod tests {
 
     fn setup_fake_name_provider_service() -> fdevice::NameProviderProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdevice::NameProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdevice::NameProviderMarker>();
 
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -533,7 +533,7 @@ mod tests {
 
     fn setup_fake_interface_state_service() -> fnet_interfaces::StateProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>();
 
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
@@ -648,7 +648,7 @@ mod tests {
         let service = make_rcs_from_env(env);
 
         let (rcs_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>();
         fasync::Task::local({
             let service = Rc::clone(&service);
             async move {
@@ -657,7 +657,7 @@ mod tests {
         })
         .detach();
         let (connector_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<connector::ConnectorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<connector::ConnectorMarker>();
         fasync::Task::local(async move {
             service.serve_connector_stream(stream).await;
         })

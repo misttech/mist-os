@@ -470,7 +470,7 @@ mod tests {
     // Needs to be async to create the proxy and stream.
     #[fasync::run_until_stalled(test)]
     async fn can_build_migration_manager_without_migrations() {
-        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<DirectoryMarker>().unwrap();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<DirectoryMarker>();
         let mut builder = MigrationManagerBuilder::new();
         builder.set_migration_dir(proxy);
         let _migration_manager = builder.build();

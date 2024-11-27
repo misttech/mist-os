@@ -397,8 +397,7 @@ mod tests {
     }
 
     async fn setup_remote() -> RemoteControlProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -431,7 +430,7 @@ mod tests {
             overnet_node,
             fastboot_connection_builder: Box::new(connection_builder),
         };
-        let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

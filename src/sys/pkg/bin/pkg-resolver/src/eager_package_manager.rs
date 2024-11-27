@@ -716,8 +716,7 @@ mod tests {
     }
 
     fn get_mock_pkg_cache() -> (cache::Client, PackageCacheRequestStream) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
         (cache::Client::from_proxy(proxy), stream)
     }
 

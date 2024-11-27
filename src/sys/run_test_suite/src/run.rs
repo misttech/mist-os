@@ -609,8 +609,7 @@ mod test {
     #[fuchsia::test]
     async fn empty_run_no_events() {
         let (builder_proxy, _run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -628,8 +627,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_no_events() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -663,8 +661,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_custom_directory() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -733,8 +730,7 @@ mod test {
     #[fuchsia::test]
     async fn record_output_after_internal_error() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -811,8 +807,7 @@ mod test {
     #[fuchsia::test]
     async fn single_run_debug_data() {
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let reporter = InMemoryReporter::new();
         let run_reporter = RunReporter::new(reporter.clone());
@@ -915,8 +910,7 @@ mod test {
         let expected_max_parallel_suites = Some(max_parallel_suites);
 
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
@@ -945,8 +939,7 @@ mod test {
         let expected_max_parallel_suites = None;
 
         let (builder_proxy, run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>();
 
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,

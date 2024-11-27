@@ -1131,8 +1131,7 @@ mod tests {
         sandbox_name: &str,
     ) -> (fnetemul::SandboxProxy, impl futures::Future<Output = ()> + '_) {
         let (sandbox_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnetemul::SandboxMarker>()
-                .expect("failed to create SandboxProxy");
+            fidl::endpoints::create_proxy_and_stream::<fnetemul::SandboxMarker>();
         (sandbox_proxy, async move {
             handle_sandbox(stream, sandbox_name).await.expect("handle_sandbox error")
         })

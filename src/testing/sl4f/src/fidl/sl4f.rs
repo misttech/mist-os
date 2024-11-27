@@ -293,7 +293,7 @@ mod tests {
     fn test_facade_provider() -> Result<(), Error> {
         let mut executor = fasync::TestExecutor::new();
 
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<FacadeProviderMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<FacadeProviderMarker>();
         let server_fut = async {
             // Run the FacadeProvider server.
             let sl4f = TestFacadeProvider::new();

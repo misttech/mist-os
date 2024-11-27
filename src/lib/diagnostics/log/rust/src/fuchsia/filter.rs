@@ -158,7 +158,7 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn default_filter_is_info_when_unspecified() {
-        let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>();
         let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), false);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
         tracing::subscriber::set_global_default(
@@ -199,7 +199,7 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn default_filter_on_interest_changed() {
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let (filter, on_changes) = InterestFilter::new(
             proxy,
             Interest { min_severity: Some(Severity::Warn), ..Default::default() },
@@ -262,7 +262,7 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn wait_for_initial_interest() {
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let t = std::thread::spawn(move || {
             // Unused, but its existence is needed by AsyncChannel.
             let _executor = fuchsia_async::LocalExecutor::new();
@@ -291,7 +291,7 @@ mod tests {
         // Manually set to a known value.
         log::set_max_level(log::LevelFilter::Off);
 
-        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let (filter, on_changes) = InterestFilter::new(
             proxy,
             Interest { min_severity: Some(Severity::Warn), ..Default::default() },

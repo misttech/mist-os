@@ -479,7 +479,7 @@ pub mod tests {
         mut shutdown_function: impl FnMut() + 'static,
     ) -> fsys::SystemControllerProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>();
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
@@ -594,7 +594,7 @@ pub mod tests {
         // Don't use `setup_fake_component_mgr_service` here because we want a stream object that
         // doesn't respond to the request. This way we can properly exercise the timeout path.
         let (proxy, _stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>();
 
         // Create the SystemShutdownHandler node
         let node =
@@ -629,7 +629,7 @@ pub mod tests {
         // Don't use `setup_fake_component_mgr_service` here because we want a stream object that
         // doesn't respond to the request. This way we can properly exercise the timeout path.
         let (proxy, _stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>();
         let node =
             SystemShutdownHandlerBuilder::new().with_component_mgr_proxy(proxy).build().unwrap();
 
@@ -700,7 +700,7 @@ pub mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_unsupported_shutdown_methods() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpowercontrol::AdminMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fpowercontrol::AdminMarker>();
         let node = SystemShutdownHandlerBuilder::new()
             .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
             .build()

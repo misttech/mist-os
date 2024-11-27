@@ -294,8 +294,7 @@ mod metrics_tests {
         let loggers = LoggersHandle::default();
 
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         fasync::Task::local(run_metrics_service(factory_stream, loggers.clone()).map(|_| ()))
@@ -321,12 +320,10 @@ mod metrics_tests {
 
         // Create channels.
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
         // via expect method calls below.
@@ -365,12 +362,10 @@ mod metrics_tests {
 
         // Create channels.
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
         // via expect method calls below.
@@ -413,12 +408,10 @@ mod metrics_tests {
         let loggers = LoggersHandle::default();
 
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
         // via expect method calls below.
@@ -472,11 +465,9 @@ mod metrics_tests {
 
         // Create channels.
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
         let (_logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
@@ -513,8 +504,7 @@ mod metrics_tests {
         let loggers = LoggersHandle::default();
 
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
 
         fasync::Task::local(run_metrics_service(factory_stream, loggers.clone()).map(|_| ()))
@@ -575,12 +565,10 @@ mod metrics_tests {
 
         // Create channels.
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, server) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
 
         // Spawn service handlers. Any failures in the services spawned here will trigger panics
         // via expect method calls below.
@@ -632,12 +620,10 @@ mod metrics_tests {
         let loggers = LoggersHandle::default();
 
         let (factory_proxy, factory_stream) =
-            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>()
-                .expect("create logger factroy proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerFactoryMarker>();
         let (logger_proxy, logger_proxy_server_end) = create_proxy::<MetricEventLoggerMarker>();
         let (querier_proxy, query_stream) =
-            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>()
-                .expect("create logger querier proxy and stream to succeed");
+            create_proxy_and_stream::<MetricEventLoggerQuerierMarker>();
 
         let cobalt_service = run_metrics_service(factory_stream, loggers.clone());
         let cobalt_query_service = run_metrics_query_service(query_stream, loggers.clone());

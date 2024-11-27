@@ -389,7 +389,7 @@ fn get_result(result: &FuzzResult) -> &'static str {
 mod tests {
     use super::{get_result, Fuzzer};
     use crate::options;
-    use anyhow::{Context as _, Result};
+    use anyhow::Result;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
     use fuchsia_fuzzctl::digest_path;
@@ -405,8 +405,7 @@ mod tests {
         test: &Test,
     ) -> Result<(FakeController, Fuzzer<BufferSink>, fasync::Task<()>)> {
         let url = Url::parse(TEST_URL)?;
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::ControllerMarker>()
-            .context("failed to create FIDL connection")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::ControllerMarker>();
         let fake = test.controller();
         let writer = test.writer();
         let fuzzer = Fuzzer::new(&url, proxy, test.root_dir(), &writer);

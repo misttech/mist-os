@@ -208,8 +208,7 @@ impl MockUpdateInstallerService {
     }
 
     pub fn spawn_installer_service(self: Arc<Self>) -> InstallerProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         fasync::Task::spawn(self.run_service(stream)).detach();
 

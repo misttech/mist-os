@@ -124,7 +124,7 @@ mod tests {
     fn suspend_and_release() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
-            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>();
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));
@@ -162,7 +162,7 @@ mod tests {
     fn suspend_fails() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
-            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>();
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));
@@ -182,7 +182,7 @@ mod tests {
     fn proxy_is_closed_before_suspend_event() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
-            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>();
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));

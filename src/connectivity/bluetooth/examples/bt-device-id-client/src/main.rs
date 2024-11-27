@@ -66,7 +66,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (di_client, mut di_server) =
-            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>();
         let (fut, _token) = set_device_identification(di_client).expect("can set DI record");
         pin_mut!(fut);
         exec.run_until_stalled(&mut fut).expect_pending("waiting for response");

@@ -304,8 +304,7 @@ pub mod tests {
     fn setup_fake_gpu_driver(
         mut query: impl FnMut(fgpu::QueryId) -> fgpu::DeviceQueryResult + 'static,
     ) -> (fgpu::DeviceProxy, fasync::Task<()>) {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fgpu::DeviceMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<fgpu::DeviceMarker>();
         let task = fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {

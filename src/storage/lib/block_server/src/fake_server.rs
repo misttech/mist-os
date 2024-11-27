@@ -127,8 +127,7 @@ impl FakeServer {
     }
 
     pub fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy {
-        let (client, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (client, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
         let this = self.clone();
         fasync::Task::spawn(async move {
             let _ = this.serve(stream).await;

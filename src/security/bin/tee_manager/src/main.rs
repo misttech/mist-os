@@ -158,8 +158,7 @@ mod tests {
     where
         F: Future,
     {
-        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<DeviceConnectorMarker>()
-            .expect("Failed to create DeviceConnector proxy and server.");
+        let (proxy, mut stream) = endpoints::create_proxy_and_stream::<DeviceConnectorMarker>();
 
         fasync::Task::local(async move {
             while let Some(request) = stream.try_next().await.unwrap() {

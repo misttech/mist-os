@@ -1277,8 +1277,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let transaction_id = [1, 2, 3];
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1513,8 +1512,7 @@ mod tests {
     async fn test_client_should_respond_with_dns_servers_on_first_watch_if_non_empty() {
         let transaction_id = [1, 2, 3];
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1583,8 +1581,7 @@ mod tests {
         const T1: u32 = 1;
         const T2: u32 = 2000;
 
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -1918,8 +1915,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_handle_next_event_on_stateless_client() {
-        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()
-            .expect("failed to create test proxy and stream");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -2071,8 +2067,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_handle_next_event_on_stateful_client() {
-        let (client_proxy, client_stream) =
-            create_proxy_and_stream::<ClientMarker>().expect("failed to create test fidl channel");
+        let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();

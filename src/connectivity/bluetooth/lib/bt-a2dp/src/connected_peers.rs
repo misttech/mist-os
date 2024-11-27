@@ -505,8 +505,7 @@ mod tests {
     fn setup_connected_peer_test(
     ) -> (fasync::TestExecutor, PeerId, ConnectedPeers, ProfileRequestStream) {
         let exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<ProfileMarker>();
         let id = PeerId(1);
 
         let peers = ConnectedPeers::new(
@@ -690,8 +689,7 @@ mod tests {
     ) {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000));
-        let (proxy, stream) =
-            create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
+        let (proxy, stream) = create_proxy_and_stream::<ProfileMarker>();
 
         let aac_sink_codec = aac_sink_codec();
         let sbc_sink_codec = sbc_sink_codec();

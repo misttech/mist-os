@@ -744,7 +744,7 @@ pub mod tests {
     // Returns a proxy to a fake CpuCtrl driver pre-baked to return the given set of CPU opps.
     pub fn fake_cpu_ctrl_driver_with_opps(opps: Vec<OperatingPoint>) -> fcpuctrl::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcpuctrl::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcpuctrl::DeviceMarker>();
 
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {

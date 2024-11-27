@@ -351,8 +351,7 @@ mod tests {
             setup_handler_with_remote_peer();
 
         let (target_proxy, mut target_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>()
-                .expect("Error creating TargetHandler endpoint");
+            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>();
         handler.target_delegate.set_target_handler(target_proxy).expect("should not fail");
         let delegator_request_fut = target_stream.select_next_some();
         pin_mut!(delegator_request_fut);
@@ -408,8 +407,7 @@ mod tests {
             setup_handler_with_remote_peer();
 
         let (target_proxy, mut target_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>()
-                .expect("Error creating TargetHandler endpoint");
+            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>();
         handler.target_delegate.set_target_handler(target_proxy).expect("should not fail");
         let delegator_request_fut = target_stream.select_next_some();
         pin_mut!(delegator_request_fut);

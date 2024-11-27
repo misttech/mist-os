@@ -93,7 +93,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_load_hierarchy() -> Result<(), Error> {
         let (client_proxy, server_stream) =
-            fidl::endpoints::create_proxy_and_stream::<InspectMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<InspectMarker>();
         spawn_server(server_stream, "root".to_string());
         let hierarchy = load_hierarchy(client_proxy).await?;
         assert_data_tree!(hierarchy, root: {

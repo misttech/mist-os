@@ -254,8 +254,7 @@ fn serve_instance_iterator(
 }
 
 fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
-    let (proxy, mut stream) =
-        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
     fasync::Task::local(async move {
         let mut task_group = fasync::TaskGroup::new();
         while let Ok(Some(req)) = stream.try_next().await {

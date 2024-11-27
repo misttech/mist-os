@@ -14,8 +14,7 @@ use tracing::{span, Event, Metadata, Subscriber};
 use tracing_log::LogTracer;
 
 async fn setup_publisher() -> (zx::Socket, Publisher) {
-    let (proxy, mut requests) =
-        fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+    let (proxy, mut requests) = fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
     let task = fasync::Task::spawn(async move {
         let options = PublisherOptions::default()
             .tags(&["some-tag"])

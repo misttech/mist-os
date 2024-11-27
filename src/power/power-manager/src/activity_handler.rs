@@ -254,8 +254,7 @@ mod tests {
     impl FakeActivityProvider {
         fn new() -> (factivity::ProviderProxy, Self) {
             let (provider_proxy, provider_stream) =
-                fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>()
-                    .expect("Failed to create ActivityProvider proxy and stream");
+                fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>();
 
             (provider_proxy, Self { provider_stream, listener_proxy: None })
         }

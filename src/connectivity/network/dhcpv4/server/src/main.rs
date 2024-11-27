@@ -791,8 +791,7 @@ mod tests {
         Fut: Future<Output = T>,
     {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>();
         let server = RefCell::new(ServerDispatcherRuntime::new(CannedDispatcher::new()));
 
         let defaults = default_params();
@@ -916,8 +915,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn start_stop_server() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>();
         let (socket_sink, mut socket_stream) =
             futures::channel::mpsc::channel::<ServerSocketCollection<CannedSocket>>(1);
 
@@ -996,8 +994,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn start_server_fails_on_bad_params() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>();
         let server = RefCell::new(ServerDispatcherRuntime::new(CannedDispatcher::new()));
 
         let defaults = default_params();
@@ -1018,8 +1015,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn start_server_fails_on_missing_interface_names() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>();
         let server = RefCell::new(ServerDispatcherRuntime::new(CannedDispatcher::new()));
 
         let defaults = dhcpv4::configuration::ServerParameters {
@@ -1045,8 +1041,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn disallow_change_parameters_if_enabled() {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>()
-                .expect("failed to create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcp::Server_Marker>();
 
         let server = RefCell::new(ServerDispatcherRuntime::new(CannedDispatcher::new()));
         // Set default parameters to the server so we can create sockets.

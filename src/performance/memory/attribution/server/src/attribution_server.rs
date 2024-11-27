@@ -430,7 +430,7 @@ mod tests {
             vec![fattribution::AttributionUpdate::Add(new_principal)]
         }));
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
 
         let observer = server.new_observer(snapshot_request_stream.control_handle());
         fasync::Task::spawn(async move {
@@ -500,12 +500,12 @@ mod tests {
             })]
         }));
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
 
         let observer = server.new_observer(snapshot_request_stream.control_handle());
 
         let (new_snapshot_provider, new_snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
 
         let new_observer = server.new_observer(new_snapshot_request_stream.control_handle());
         fasync::Task::spawn(async move {
@@ -546,7 +546,7 @@ mod tests {
             vec![fattribution::AttributionUpdate::Add(new_principal)]
         }));
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
 
         let observer = server.new_observer(snapshot_request_stream.control_handle());
         fasync::Task::spawn(async move {
@@ -586,7 +586,7 @@ mod tests {
             vec![fattribution::AttributionUpdate::Add(new_principal)]
         }));
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
 
         let observer = server.new_observer(snapshot_request_stream.control_handle());
         fasync::Task::spawn(async move {

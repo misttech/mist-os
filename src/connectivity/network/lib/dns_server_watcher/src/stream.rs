@@ -98,8 +98,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_dns_server_stream() {
         let watcher = Arc::new(Mutex::new(MockDnsServerWatcher::new()));
-        let (proxy, rs) =
-            fidl::endpoints::create_proxy_and_stream::<DnsServerWatcherMarker>().unwrap();
+        let (proxy, rs) = fidl::endpoints::create_proxy_and_stream::<DnsServerWatcherMarker>();
         let (serve_fut, abort_handle) =
             futures::future::abortable(MockDnsServerWatcher::serve(watcher.clone(), rs));
 

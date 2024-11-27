@@ -555,7 +555,7 @@ mod test {
         // Simulate a directory that hangs indefinitely in any request so that we consistently
         // trigger the 0 timeout.
         let (directory, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
                 fasync::Timer::new(fasync::MonotonicInstant::after(
@@ -614,8 +614,7 @@ mod test {
     }
 
     fn inspect_artifacts_container_with_one_dir() -> InspectArtifactsContainer {
-        let (directory, _) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (directory, _) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
         let handle = InspectHandle::directory(directory);
         let mut container = InspectArtifactsContainer::default();
         container.push_handle(handle, |_| {});

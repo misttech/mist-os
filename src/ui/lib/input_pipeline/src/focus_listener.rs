@@ -173,13 +173,13 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn dispatch_focus() -> Result<(), Error> {
         let (focus_proxy, focus_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<kbd_focus::ControllerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<kbd_focus::ControllerMarker>();
 
         let (focus_chain_listener_client_end, focus_chain_listener) =
-            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainListenerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainListenerMarker>();
 
         let (focus_chain_watcher, focus_chain_provider_stream) =
-            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<focus::FocusChainProviderMarker>();
         let (focus_chain_provider_publisher, focus_chain_provider_stream_handler) =
             focus_chain_provider::make_publisher_and_stream_handler();
         focus_chain_provider_stream_handler

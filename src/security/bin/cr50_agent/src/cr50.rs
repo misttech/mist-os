@@ -475,15 +475,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_get_version() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<TpmDeviceMarker>();
         let tpm = FakeTpm::new();
         fasync::Task::spawn(tpm.serve(stream)).detach();
 
         let cr50 = Cr50::new(proxy, None);
 
-        let (pinweaver, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PinWeaverMarker>().unwrap();
+        let (pinweaver, stream) = fidl::endpoints::create_proxy_and_stream::<PinWeaverMarker>();
         fasync::Task::spawn(async move {
             cr50.handle_pinweaver_stream(stream).await.expect("Handle pinweaver stream ok");
         })

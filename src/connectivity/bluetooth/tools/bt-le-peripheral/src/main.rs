@@ -460,8 +460,7 @@ mod tests {
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_listen() {
-        let (proxy, stream) = create_proxy_and_stream::<PeripheralMarker>()
-            .expect("failed to create Peripheral proxy");
+        let (proxy, stream) = create_proxy_and_stream::<PeripheralMarker>();
 
         let input_parameters = AdvertisingParameters {
             data: None,

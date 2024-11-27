@@ -512,7 +512,7 @@ mod test {
     impl FakeRemoteControllerProvider {
         fn new() -> FakeRemoteControllerProvider {
             let (remote_control, mut stream) =
-                create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+                create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>();
             let _task = fuchsia_async::Task::spawn(async move {
                 while let Some(request) = stream.try_next().await.unwrap() {
                     // store channels so that they do not die.
@@ -913,7 +913,7 @@ mod test {
     #[fuchsia::test]
     async fn test_early_boot_profile() {
         let (remote_control, mut stream) =
-            create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+            create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>();
         let task = fuchsia_async::Task::spawn(async move {
             let mut once = false;
             while let Some(request) = stream.try_next().await.unwrap() {

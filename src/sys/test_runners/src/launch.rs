@@ -280,8 +280,7 @@ mod tests {
             options: zx::ProcessOptions::empty(),
             config_vmo: None,
         };
-        let (mock_proxy, mut mock_stream) = create_proxy_and_stream::<fproc::LauncherMarker>()
-            .expect("failed to create mock handles");
+        let (mock_proxy, mut mock_stream) = create_proxy_and_stream::<fproc::LauncherMarker>();
         let mock_fut = async move {
             let mut all_handles = vec![];
             while let Some(request) =

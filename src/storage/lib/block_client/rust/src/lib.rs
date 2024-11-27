@@ -1268,8 +1268,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_block_flush_is_called() {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<block::BlockMarker>()
-            .expect("create_proxy failed");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<block::BlockMarker>();
 
         struct Interface {
             flush_called: Arc<AtomicBool>,

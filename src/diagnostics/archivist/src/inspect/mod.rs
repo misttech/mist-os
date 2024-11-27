@@ -569,7 +569,7 @@ mod tests {
 
         let identity = Arc::new(ComponentIdentity::new(component_id, TEST_URL));
 
-        let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+        let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>();
         proxy
             .publish(InspectSinkPublishRequest { tree: Some(tree_client), ..Default::default() })
             .unwrap();
@@ -780,8 +780,7 @@ mod tests {
             Arc::clone(&stats),
             trace_id,
         );
-        let (consumer, batch_iterator_requests) =
-            create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
+        let (consumer, batch_iterator_requests) = create_proxy_and_stream::<BatchIteratorMarker>();
         (
             consumer,
             Task::spawn(async {

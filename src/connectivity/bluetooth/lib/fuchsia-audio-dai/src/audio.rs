@@ -275,8 +275,7 @@ mod tests {
 
     async fn setup_audio_stream_proxy(dai: &mut DaiAudioDevice) -> StreamConfigProxy {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>()
-                .expect("proxy creation to work");
+            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>();
 
         let _ = dai.config(SUPPORTED_DAI_FORMAT, SUPPORTED_PCM_FORMAT).unwrap();
 
@@ -303,8 +302,7 @@ mod tests {
     #[fuchsia::test]
     async fn start_enumerator_registration(mut dai: DaiAudioDevice) {
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>()
-                .expect("proxy creation to work");
+            fidl::endpoints::create_proxy_and_stream::<AudioDeviceEnumeratorMarker>();
 
         // start without config doesn't work
         let _ = dai

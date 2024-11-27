@@ -1889,8 +1889,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
-        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("create Wlanix proxy should succeed");
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
         let (wifi_proxy, wifi_server_end) = create_proxy::<fidl_wlanix::WifiMarker>();
         let result = wlanix_proxy.get_wifi(fidl_wlanix::WlanixGetWifiRequest {
             wifi: Some(wifi_server_end),
@@ -2527,8 +2526,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
-        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("create Wlanix proxy should succeed");
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
         let (supplicant_proxy, supplicant_server_end) =
             create_proxy::<fidl_wlanix::SupplicantMarker>();
         let result = wlanix_proxy.get_supplicant(fidl_wlanix::WlanixGetSupplicantRequest {
@@ -2632,8 +2630,7 @@ mod tests {
     #[test]
     fn get_nl80211() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
-            .expect("Failed to get proxy and req stream");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -2654,8 +2651,7 @@ mod tests {
     #[test]
     fn unsupported_mcast_group() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
@@ -2708,8 +2704,7 @@ mod tests {
         }
 
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2741,8 +2736,7 @@ mod tests {
     #[test]
     fn get_interface() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2775,8 +2769,7 @@ mod tests {
     #[test]
     fn get_station() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2805,8 +2798,7 @@ mod tests {
     #[test]
     fn trigger_scan() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2847,8 +2839,7 @@ mod tests {
     #[test]
     fn trigger_scan_no_iface_arg() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2872,8 +2863,7 @@ mod tests {
     #[test]
     fn trigger_scan_invalid_iface() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2899,8 +2889,7 @@ mod tests {
     #[test_case(Err(format_err!("scan ended unexpectedly")); "Scan fails with error")]
     fn scan_abort(scan_result: Result<ScanEnd, Error>) {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let (iface_manager, scan_end_sender) =
@@ -2939,8 +2928,7 @@ mod tests {
     #[test]
     fn get_scan_results() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2970,8 +2958,7 @@ mod tests {
     #[test]
     fn get_scan_results_no_iface_args() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
@@ -2995,8 +2982,7 @@ mod tests {
     #[test]
     fn get_reg() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, stream) =
-            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>();
 
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());

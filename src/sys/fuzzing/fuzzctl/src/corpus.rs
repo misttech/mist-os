@@ -119,7 +119,7 @@ mod tests {
         let cloned = corpus.clone();
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fuzz::CorpusReaderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fuzz::CorpusReaderMarker>();
         let read_fut = read(stream, &corpus_dir);
         let send_fut = || async move {
             for input in corpus.iter() {

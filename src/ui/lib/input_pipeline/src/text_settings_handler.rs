@@ -297,7 +297,7 @@ mod tests {
             TextSettingsHandler::new(None, None, &test_node, metrics::MetricsLogger::default());
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsettings::KeyboardMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fsettings::KeyboardMarker>();
 
         // Serve a specific keyboard setting.
         serve_into(

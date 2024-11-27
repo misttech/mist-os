@@ -241,9 +241,9 @@ mod tests {
     fn watch_scan_results_lifetime() {
         let mut exec = fasync::TestExecutor::new();
         let (central, _central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let (watch_client, mut watch_server) =
-            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>();
 
         let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
         let server_fut = pin!(watch_server.next());
@@ -265,9 +265,9 @@ mod tests {
     fn watch_scan_results_empty_reply_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (central, _central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let (watch_client, mut watch_server) =
-            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>();
 
         let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
         let server_fut = pin!(watch_server.next());
@@ -354,7 +354,7 @@ mod tests {
 
         let id = PeerId(123);
         let (central_client, mut central_server) =
-            fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CentralMarker>();
         let connect_fut = try_connect(id, &central_client);
         let mut connect_fut = pin!(connect_fut);
 

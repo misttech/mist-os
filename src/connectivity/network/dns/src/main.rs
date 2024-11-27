@@ -1305,8 +1305,7 @@ mod tests {
 
     async fn setup_namelookup_service() -> (fname::LookupProxy, impl futures::Future<Output = ()>) {
         let (name_lookup_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                .expect("failed to create NamelookupProxy");
+            fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
 
         let mut resolver_opts = ResolverOpts::default();
         resolver_opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
@@ -1317,8 +1316,7 @@ mod tests {
         );
         let stats = Arc::new(QueryStats::new());
         let (routes_proxy, routes_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                .expect("failed to create routes.StateProxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
         let routes_fut =
             routes_stream.try_for_each(|req| -> futures::future::Ready<Result<(), fidl::Error>> {
                 panic!("Should not call routes/State. Received request {:?}", req)
@@ -1563,12 +1561,10 @@ mod tests {
             R: Fn(fnet_routes::StateRequest),
         {
             let (name_lookup_proxy, name_lookup_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                    .expect("failed to create LookupProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
 
             let (routes_proxy, routes_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                    .expect("failed to create routes.StateProxy");
+                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
 
             let (sender, recv) = mpsc::channel(MAX_PARALLEL_REQUESTS);
             let Self { shared_resolver, config_state: _, stats } = self;
@@ -1588,8 +1584,7 @@ mod tests {
             F: FnOnce(fname::LookupAdminProxy) -> Fut,
         {
             let (lookup_admin_proxy, lookup_admin_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupAdminMarker>()
-                    .expect("failed to create AdminResolverProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupAdminMarker>();
             let Self { shared_resolver, config_state, stats: _ } = self;
             let ((), ()) = futures::future::try_join(
                 run_lookup_admin(shared_resolver, config_state, lookup_admin_stream)
@@ -2481,8 +2476,7 @@ mod tests {
         // requests to be used for testing.
         let requests = {
             let (name_lookup_proxy, name_lookup_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>()
-                    .expect("failed to create LookupProxy");
+                fidl::endpoints::create_proxy_and_stream::<fname::LookupMarker>();
             const NUM_REQUESTS: usize = MAX_PARALLEL_REQUESTS * 2 + 2;
             for _ in 0..NUM_REQUESTS {
                 // Don't await on this future because we are using these
@@ -2539,8 +2533,7 @@ mod tests {
             ));
             let stats = Arc::new(QueryStats::new());
             let (routes_proxy, _routes_stream) =
-                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                    .expect("failed to create routes.StateProxy");
+                fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
             async move { create_ip_lookup_fut(&resolver, stats.clone(), routes_proxy, recv).await }
                 .fuse()
         });
@@ -2827,8 +2820,7 @@ mod tests {
             std_ip!("2001::2"),
         ];
         let (routes_proxy, routes_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>()
-                .expect("failed to create routes.StateProxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes::StateMarker>();
         let routes_fut =
             routes_stream.map(|r| r.context("stream FIDL error")).try_for_each(|req| {
                 let (destination, responder) = assert_matches!(

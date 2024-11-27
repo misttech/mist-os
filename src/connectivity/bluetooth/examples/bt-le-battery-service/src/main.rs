@@ -213,7 +213,7 @@ mod tests {
     fn read_battery_level() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));
@@ -235,7 +235,7 @@ mod tests {
     fn battery_level_change_notifications() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));
@@ -277,7 +277,7 @@ mod tests {
     fn write_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<gatt::LocalServiceMarker>();
         let service_notification_handle = server.control_handle();
         let state = BatteryState::new(service_notification_handle);
         let mut gatt_server_fut = pin!(gatt_service_delegate(&state, server));

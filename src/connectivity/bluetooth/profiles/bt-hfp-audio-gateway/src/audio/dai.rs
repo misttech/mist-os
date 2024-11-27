@@ -204,8 +204,7 @@ mod tests {
     #[fuchsia::test]
     async fn fails_if_all_devices_not_found() {
         let (proxy, _requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let setup_result = DaiAudioControl::setup(vec![], proxy.clone()).await;
         assert!(matches!(setup_result, Err(AudioError::DiscoveryFailed)));
@@ -229,8 +228,7 @@ mod tests {
     #[fuchsia::test]
     async fn starts_dai() {
         let (proxy, audio_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let (send, mut new_client_recv) = mpsc::channel(1);
         let _audio_req_task = fasync::Task::spawn(handle_audio_requests(audio_requests, send));
@@ -275,8 +273,7 @@ mod tests {
     #[fuchsia::test]
     async fn stop_dai() {
         let (proxy, audio_requests) =
-            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
-                .expect("endpoints");
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
         let (send, mut new_client_recv) = mpsc::channel(1);
         let _audio_req_task = fasync::Task::spawn(handle_audio_requests(audio_requests, send));

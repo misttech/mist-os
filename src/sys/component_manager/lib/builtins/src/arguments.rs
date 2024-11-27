@@ -283,7 +283,7 @@ mod tests {
     use fuchsia_fs::file::{close, write};
 
     fn serve_bootargs(args: Arc<Arguments>) -> Result<fboot::ArgumentsProxy, Error> {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fboot::ArgumentsMarker>()?;
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fboot::ArgumentsMarker>();
         fasync::Task::local(
             args.serve(stream)
                 .unwrap_or_else(|e| panic!("Error while serving arguments service: {}", e)),

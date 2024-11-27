@@ -569,7 +569,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_graphical_presenter_request_stream_present_view_gfx_errors() -> Result<(), Error>
     {
-        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>();
         let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
         let mock_scene_manager = Arc::clone(&scene_manager);
         fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))
@@ -601,7 +601,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn handle_graphical_presenter_request_stream_presents_view_flatland() -> Result<(), Error>
     {
-        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>();
         let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
         let mock_scene_manager = Arc::clone(&scene_manager);
         fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))

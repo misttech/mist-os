@@ -228,8 +228,7 @@ fn mock_dai_device(
 /// Builds and returns a DigitalAudioInterface for testing scenarios. Returns the
 /// `TestHandle` associated with this device which can be used to validate behavior.
 pub fn test_digital_audio_interface(as_input: bool) -> (DigitalAudioInterface, TestHandle) {
-    let (proxy, requests) =
-        fidl::endpoints::create_proxy_and_stream::<DaiMarker>().expect("proxy creation");
+    let (proxy, requests) = fidl::endpoints::create_proxy_and_stream::<DaiMarker>();
 
     let (handler, handle) = mock_dai_device(as_input, requests);
     fasync::Task::spawn(handler).detach();

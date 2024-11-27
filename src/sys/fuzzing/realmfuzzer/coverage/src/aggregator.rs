@@ -374,8 +374,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_collector_initialize() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()
-            .context("failed to create proxy and/or stream")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
 
         // Send a fake instrumented process and get the options.
         let initialize = async move {
@@ -407,8 +406,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_collector_add_inline_8bit_counters() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()
-            .context("failed to create proxy and/or stream")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
 
         // Send a fake inline 8 bit counters.
         let add_inline_8bit_counters = async move {
@@ -428,8 +426,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_provider_set_options() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()
-            .context("failed to create proxy and/or stream")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
 
         // Set the options.
         let set_options = async move {
@@ -460,8 +457,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_coverage_data_provider_watch_coverage_data() -> Result<()> {
-        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()
-            .context("failed to create proxy and/or stream")?;
+        let (proxy, stream) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
 
         // The initial "hanging-get" returns an empty vector immediately.
         let watch_coverage_data = async move {
@@ -481,8 +477,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_single_producer_and_consumer() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
 
         // Wrap the futures in `async move` to ensure the streams are dropped on completion.
         let produce_data = async move { producer(&proxy1, 2).await };
@@ -500,9 +496,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_multiple_producers_single_consumer() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
-        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
+        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
 
         // Wrap the futures in `async move` to ensure the streams are dropped on completion.
         let produce_data1 = async move { producer(&proxy1, 1).await };
@@ -523,8 +519,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_coverage_multiple_producers_serial_consumers() -> Result<()> {
         let aggregator = Aggregator::new();
-        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>()?;
-        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
+        let (proxy1, stream1) = create_proxy_and_stream::<fuzz::CoverageDataCollectorMarker>();
+        let (proxy2, stream2) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
 
         // Wrap the last future in `async move` to ensure its stream is dropped on completion.
         let produce_fut = producer(&proxy1, 2).fuse();
@@ -547,7 +543,7 @@ mod tests {
         }
 
         // Now reconnect. The consumer should get the same results from the connected producers.
-        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>()?;
+        let (proxy3, stream3) = create_proxy_and_stream::<fuzz::CoverageDataProviderMarker>();
         let provide_fut = provide_data(stream3, &aggregator).fuse();
         let consume_fut = async move { consumer(&proxy3, 2).await };
         let consume_fut = consume_fut.fuse();

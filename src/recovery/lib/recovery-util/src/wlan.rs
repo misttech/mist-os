@@ -196,9 +196,9 @@ mod tests {
     {
         // Create FIDL endpoints for ClientController and ClientStateUpdates protocols.
         let (client_controller_proxy, client_controller_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>();
         let (client_state_updates_proxy, client_state_updates_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>();
 
         // Spawn handler.
         fasync::Task::local(handler(client_controller_request_stream, client_state_updates_proxy))

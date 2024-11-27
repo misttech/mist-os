@@ -281,8 +281,7 @@ mod tests {
     #[test]
     fn service_advertisement_result_is_no_op() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
@@ -325,8 +324,7 @@ mod tests {
     #[test]
     fn connection_request_relayed_to_stream() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
@@ -425,8 +423,7 @@ mod tests {
     #[test]
     fn responds_to_search_results() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut profile = ProfileClient::new(proxy);
 
@@ -507,8 +504,7 @@ mod tests {
     #[test]
     fn waker_gets_awoken_when_search_added() {
         let mut exec = fasync::TestExecutor::new();
-        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
-            .expect("Profile proxy should be created");
+        let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>();
 
         let mut profile = ProfileClient::new(proxy);
 

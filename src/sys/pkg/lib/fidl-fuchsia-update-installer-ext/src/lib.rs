@@ -288,8 +288,7 @@ mod tests {
             should_write_recovery: true,
         };
 
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let (_reboot_controller, reboot_controller_server_end) =
             fidl::endpoints::create_proxy::<RebootControllerMarker>();
@@ -343,8 +342,7 @@ mod tests {
             should_write_recovery: true,
         };
 
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let (_reboot_controller, reboot_controller_server_end) =
             fidl::endpoints::create_proxy::<RebootControllerMarker>();
@@ -387,8 +385,7 @@ mod tests {
             should_write_recovery: true,
         };
 
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let installer_fut = async move {
             match start_update(&pkgurl, opts, &proxy, None).await {
@@ -417,8 +414,7 @@ mod tests {
             should_write_recovery: true,
         };
 
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let (_reboot_controller, reboot_controller_server_end) =
             fidl::endpoints::create_proxy::<RebootControllerMarker>();
@@ -477,8 +473,7 @@ mod tests {
             should_write_recovery: true,
         };
 
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let (_reboot_controller, reboot_controller_server_end) =
             fidl::endpoints::create_proxy::<RebootControllerMarker>();
@@ -542,8 +537,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn monitor_update_uses_provided_attempt_id() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let client_fut = async move {
             let _ = monitor_update(Some("id"), &proxy).await;
@@ -563,8 +557,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn monitor_update_handles_no_update_in_progress() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let client_fut = async move {
             assert_matches!(monitor_update(None, &proxy).await, Ok(None));
@@ -587,8 +580,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn monitor_update_forwards_fidl_error() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let client_fut = async move {
             assert_matches!(monitor_update(None, &proxy).await, Err(_));
@@ -606,8 +598,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn monitor_update_forwards_and_acks_progress() {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<InstallerMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<InstallerMarker>();
 
         let client_fut = async move {
             let monitor = monitor_update(None, &proxy).await.unwrap().unwrap();

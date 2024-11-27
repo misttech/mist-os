@@ -733,8 +733,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn apply_new_routers() {
         let (route_set, route_set_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_routes_admin::RouteSetV4Marker>()
-                .expect("create route set proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fnet_routes_admin::RouteSetV4Marker>();
 
         const REMOVED_ROUTER: Ipv4Addr = net_ip_v4!("1.1.1.1");
         const KEPT_ROUTER: Ipv4Addr = net_ip_v4!("2.2.2.2");
@@ -837,8 +836,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn shutdown_ext(exit_reason: Option<fnet_dhcp::ClientExitReason>) -> Result<(), Error> {
         let (client, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_dhcp::ClientMarker>()
-                .expect("create DHCP client proxy and stream");
+            fidl::endpoints::create_proxy_and_stream::<fnet_dhcp::ClientMarker>();
 
         if let Some(exit_reason) = exit_reason {
             stream.control_handle().send_on_exit(exit_reason).expect("send on exit");

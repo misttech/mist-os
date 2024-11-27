@@ -19,11 +19,11 @@ use crate::media::media_sessions::MediaSessionId;
 use crate::media::media_state::tests::*;
 
 fn setup_target_handler() -> (TargetHandlerProxy, TargetHandlerRequestStream) {
-    create_proxy_and_stream::<TargetHandlerMarker>().expect("Should work")
+    create_proxy_and_stream::<TargetHandlerMarker>()
 }
 
 fn setup_sessions_watcher() -> (SessionsWatcherProxy, SessionsWatcherRequestStream) {
-    create_proxy_and_stream::<SessionsWatcherMarker>().expect("Should work")
+    create_proxy_and_stream::<SessionsWatcherMarker>()
 }
 
 /// Makes a call to TargetHandler::WatchNotification to generate a FIDL
@@ -248,8 +248,7 @@ async fn setup(
     let (target_proxy, target_request_stream) = setup_target_handler();
 
     // Media
-    let (discovery, discovery_request_stream) =
-        create_proxy_and_stream::<DiscoveryMarker>().expect("Couldn't create discovery service");
+    let (discovery, discovery_request_stream) = create_proxy_and_stream::<DiscoveryMarker>();
     let (watcher_client, watcher_request_stream) = setup_sessions_watcher();
 
     // Mock two sessions.

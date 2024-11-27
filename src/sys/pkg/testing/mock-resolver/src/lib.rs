@@ -247,8 +247,7 @@ impl MockResolverService {
     }
 
     pub fn spawn_resolver_service(self: Arc<Self>) -> PackageResolverProxy {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageResolverMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageResolverMarker>();
 
         fasync::Task::spawn(self.run_resolver_service(stream).unwrap_or_else(|e| {
             panic!("error running package resolver service: {:#}", anyhow!(e))

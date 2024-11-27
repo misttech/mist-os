@@ -704,8 +704,7 @@ mod tests {
 
     impl MockPackageCache {
         fn new() -> (Client, Self) {
-            let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
             (Client::from_proxy(proxy), Self { stream })
         }
 
@@ -904,8 +903,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn constructor() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>();
         let client = Client::from_proxy(proxy);
 
         drop(stream);
@@ -1166,10 +1164,9 @@ mod tests {
         }
 
         fn new() -> (NeededBlob, Self) {
-            let (blob_proxy, blob) =
-                fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+            let (blob_proxy, blob) = fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>();
             let (needed_blobs_proxy, needed_blobs) =
-                fidl::endpoints::create_proxy_and_stream::<fpkg::NeededBlobsMarker>().unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fpkg::NeededBlobsMarker>();
             (
                 NeededBlob {
                     blob: Blob {

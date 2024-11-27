@@ -332,8 +332,7 @@ mod tests {
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (_generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let device_info = fidl_mlme::DeviceInfo {
             role: fidl_common::WlanMacRole::unknown(),
             ..test_utils::fake_device_info([0; 6].into())
@@ -361,8 +360,7 @@ mod tests {
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let (_mlme_req_stream, serve_fut) = create_sme(
             crate::Config::default(),
             mlme_event_stream,
@@ -410,8 +408,7 @@ mod tests {
         let (persistence_req_sender, persistence_stream) =
             test_utils::create_inspect_persistence_channel();
         let (generic_sme_proxy, generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("failed to create MlmeProxy");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
         let device_info =
             fidl_mlme::DeviceInfo { role, ..test_utils::fake_device_info([0; 6].into()) };
         let (mlme_req_stream, serve_fut) = create_sme(

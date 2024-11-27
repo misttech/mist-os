@@ -596,8 +596,7 @@ mod tests {
     }
 
     fn serve_host_vsock_endpoints(device: Rc<VsockDevice>) -> HostVsockEndpointProxy {
-        let (proxy, stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
         fasync::Task::local(async move {
             stream
                 .for_each_concurrent(None, |request| {
@@ -697,8 +696,7 @@ mod tests {
         let guest_port = 123;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let device = VsockDevice::new();
 
@@ -833,8 +831,7 @@ mod tests {
         let guest_port = 12345;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let device = VsockDevice::new();
 

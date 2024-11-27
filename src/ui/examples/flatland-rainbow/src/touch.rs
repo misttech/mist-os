@@ -283,8 +283,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_spawn_touch_source_watcher() -> Result<(), anyhow::Error> {
-        let (touch_proxy, touch_stream) = create_proxy_and_stream::<fptr::TouchSourceMarker>()
-            .expect("failed to create TouchSource proxy and stream");
+        let (touch_proxy, touch_stream) = create_proxy_and_stream::<fptr::TouchSourceMarker>();
 
         let (internal_sender, mut internal_receiver) = unbounded::<InternalMessage>();
 

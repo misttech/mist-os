@@ -732,7 +732,7 @@ pub(crate) mod tests {
     /// on the PlayerRequestStream.
     async fn test_handle_avc_passthrough_command() {
         let (session_proxy, session_request_stream) =
-            create_proxy_and_stream::<SessionControlMarker>().expect("Should work");
+            create_proxy_and_stream::<SessionControlMarker>();
         let media_state = MediaState::new(session_proxy);
 
         // 1. Valid, but unsupported control request.
@@ -761,7 +761,7 @@ pub(crate) mod tests {
     /// returned.
     async fn test_handle_set_player_application_settings_command() {
         let (session_proxy, session_request_stream) =
-            create_proxy_and_stream::<SessionControlMarker>().expect("Should work");
+            create_proxy_and_stream::<SessionControlMarker>();
         let media_state = MediaState::new(session_proxy);
 
         // 1. Equalizer is unsupported.

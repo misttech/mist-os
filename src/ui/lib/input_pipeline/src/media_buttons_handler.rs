@@ -343,8 +343,7 @@ mod tests {
         handler: Rc<MediaButtonsHandler>,
     ) -> fidl_ui_policy::DeviceListenerRegistryProxy {
         let (device_listener_proxy, device_listener_stream) =
-            create_proxy_and_stream::<fidl_ui_policy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+            create_proxy_and_stream::<fidl_ui_policy::DeviceListenerRegistryMarker>();
 
         fasync::Task::local(async move {
             let _ = handler
@@ -380,8 +379,7 @@ mod tests {
         expected_time: i64,
     ) -> Option<interaction_observation::AggregatorProxy> {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
 
         fasync::Task::local(async move {
             if let Some(request) = stream.next().await {
@@ -433,8 +431,7 @@ mod tests {
 
         // Set up DeviceListenerRegistry.
         let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
+            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>();
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
             aggregator_proxy: Some(aggregator_proxy),
             inner: RefCell::new(MediaButtonsHandlerInner {

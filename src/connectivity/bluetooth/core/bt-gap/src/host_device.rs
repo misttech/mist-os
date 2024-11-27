@@ -376,8 +376,7 @@ impl HostDevice {
         id: HostId,
     ) -> (fidl_fuchsia_bluetooth_host::HostRequestStream, HostDevice) {
         let (host_proxy, host_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_host::HostMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_bluetooth_host::HostMarker>();
         let id_val = id.0 as u8;
         let address = Address::Public([id_val; 6]);
         let path = format!("/dev/host{}", id_val);

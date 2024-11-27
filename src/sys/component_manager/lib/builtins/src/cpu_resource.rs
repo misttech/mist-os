@@ -53,7 +53,7 @@ mod tests {
         let cpu_resource = get_cpu_resource().await?;
 
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::CpuResourceMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<fkernel::CpuResourceMarker>();
         fasync::Task::local(
             CpuResource::new(cpu_resource)
                 .unwrap_or_else(|e| panic!("Error while creating CPU resource service: {}", e))

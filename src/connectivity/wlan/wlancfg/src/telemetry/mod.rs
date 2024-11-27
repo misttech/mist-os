@@ -4599,11 +4599,9 @@ mod tests {
         // Boilerplate for creating a Telemetry struct
         let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
         let (monitor_svc_proxy, _monitor_svc_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-                .expect("failed to create DeviceMonitor proxy");
+            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
         let (cobalt_1dot1_proxy, _cobalt_1dot1_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                .expect("failed to create MetricsEventLogger proxy");
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
         let external_inspect_node = inspector.root().create_child("external");
@@ -8023,8 +8021,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (factory_proxy, mut factory_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
-        >()
-        .expect("failed to create proxy and stream.");
+        >();
 
         let fut = create_metrics_logger(&factory_proxy, experiment_id.clone());
         let mut fut = pin!(fut);
@@ -8463,8 +8460,7 @@ mod tests {
 
         // Construct a StatsLogger
         let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                .expect("failed to create MetricsEventLogger proxy");
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
@@ -10120,12 +10116,10 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (monitor_svc_proxy, monitor_svc_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-                .expect("failed to create DeviceMonitor proxy");
+            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
 
         let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
-            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-                .expect("failed to create MetricsEventLogger proxy");
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");

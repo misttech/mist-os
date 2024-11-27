@@ -378,7 +378,7 @@ mod tests {
         fn connect_to_service<P: DiscoverableProtocolMarker>(
             &self,
         ) -> Result<P::Proxy, anyhow::Error> {
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>();
             match P::PROTOCOL_NAME {
                 ArgumentsMarker::PROTOCOL_NAME => {
                     self.handle_arguments_stream(stream.cast_stream())
@@ -467,7 +467,7 @@ mod tests {
         fn connect_to_service<P: DiscoverableProtocolMarker>(
             &self,
         ) -> Result<P::Proxy, anyhow::Error> {
-            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
+            let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<P>();
             assert_eq!(P::PROTOCOL_NAME, RepositoryManagerMarker::PROTOCOL_NAME);
             let mut stream: RepositoryManagerRequestStream = stream.cast_stream();
             let channels = self.channels.clone();

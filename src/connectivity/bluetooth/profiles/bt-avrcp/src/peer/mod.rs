@@ -942,7 +942,7 @@ pub(crate) mod tests {
     fn setup_remote_peer(
         id: PeerId,
     ) -> (RemotePeerHandle, Arc<TargetDelegate>, ProfileRequestStream) {
-        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>();
         let target_delegate = Arc::new(TargetDelegate::new());
         let peer_handle = RemotePeerHandle::spawn_peer(id, target_delegate.clone(), profile_proxy);
 

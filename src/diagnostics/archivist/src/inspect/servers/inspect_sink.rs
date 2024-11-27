@@ -192,8 +192,7 @@ mod tests {
             let scope = fasync::Scope::new();
             let server = Arc::new(InspectSinkServer::new(Arc::clone(&repo), scope.new_child()));
             for id in identity.into_iter() {
-                let (proxy, request_stream) =
-                    create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+                let (proxy, request_stream) = create_proxy_and_stream::<InspectSinkMarker>();
 
                 Arc::clone(&server).handle(Event {
                     timestamp: zx::BootInstant::get(),

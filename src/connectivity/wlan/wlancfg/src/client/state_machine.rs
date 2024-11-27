@@ -1988,8 +1988,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(init_ap_state.clone()),
@@ -2138,8 +2137,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2228,8 +2226,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2429,8 +2426,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -2480,8 +2476,7 @@ mod tests {
         };
 
         let (connect_txn_proxy, _connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(first_ap_state.clone()),
@@ -2676,8 +2671,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2739,8 +2733,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2797,8 +2790,7 @@ mod tests {
         exec.set_fake_time(start_time);
 
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
@@ -2917,8 +2909,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3017,8 +3008,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3101,8 +3091,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3201,8 +3190,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
@@ -3294,8 +3282,7 @@ mod tests {
 
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
         let options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),

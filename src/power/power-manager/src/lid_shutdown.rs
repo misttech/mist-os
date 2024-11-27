@@ -458,7 +458,7 @@ mod tests {
             let report_event_clone =
                 report_event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-            let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
 
             let server_task = fasync::Task::local(async move {
                 while let Ok(req) = stream.try_next().await {
@@ -501,8 +501,7 @@ mod tests {
     // Creates a mock device proxy that receives GetReportDesc requests and returns the supplied
     // HID descriptor.
     fn mock_device_proxy(desc: Vec<u8>) -> DeviceProxy {
-        let (device_proxy, mut stream) =
-            create_proxy_and_stream::<DeviceMarker>().expect("Failed to create proxy and stream");
+        let (device_proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
         fasync::Task::spawn(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

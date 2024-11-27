@@ -174,8 +174,7 @@ mod test {
     }
 
     async fn create_and_drop_raw_pty(original_feature: u32) {
-        let (pty_device_proxy, pty_device_stream) = create_proxy_and_stream::<fpty::DeviceMarker>()
-            .expect("failed to create pty proxy and stream");
+        let (pty_device_proxy, pty_device_stream) = create_proxy_and_stream::<fpty::DeviceMarker>();
 
         let mut mock_pty = MockPty::new(original_feature, pty_device_stream);
         assert_eq!(mock_pty.features, original_feature);
@@ -222,8 +221,7 @@ mod test {
 
     #[fuchsia::test]
     async fn get_window_size_test() {
-        let (pty_device_proxy, pty_device_stream) = create_proxy_and_stream::<fpty::DeviceMarker>()
-            .expect("failed to create pty proxy and stream");
+        let (pty_device_proxy, pty_device_stream) = create_proxy_and_stream::<fpty::DeviceMarker>();
 
         let mut mock_pty = MockPty::new(0, pty_device_stream);
 

@@ -21,8 +21,7 @@ impl TestBatteryManager {
     }
 
     pub async fn make_battery_client_with_test_manager() -> (BatteryClient, TestBatteryManager) {
-        let (c, mut s) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>().unwrap();
+        let (c, mut s) = fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>();
 
         let battery_client =
             BatteryClient::register_updates(c).expect("can register battery client");

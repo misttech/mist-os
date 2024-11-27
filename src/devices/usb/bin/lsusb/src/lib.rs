@@ -524,8 +524,7 @@ mod test {
     async fn smoke_test() {
         let (device, stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_hardware_usb_device::DeviceMarker,
-        >()
-        .unwrap();
+        >();
 
         let server_task = run_usb_server(stream).fuse();
         let test_task = async move {

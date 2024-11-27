@@ -330,7 +330,7 @@ where
     F: FnMut(Request<P::Protocol>) -> Fut + 'static,
     Fut: Future<Output = ()> + 'static,
 {
-    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>()?;
+    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::local(for_each_or_log(stream, f)).detach();
     Ok(proxy)
 }
@@ -344,7 +344,7 @@ where
     F: FnMut(Request<P::Protocol>) -> Fut + 'static + Send,
     Fut: Future<Output = ()> + 'static + Send,
 {
-    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>()?;
+    let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::spawn(for_each_or_log(stream, f)).detach();
     Ok(proxy)
 }
@@ -616,17 +616,16 @@ pub fn try_create_request_stream<T: ProtocolMarker>(
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
+pub fn create_proxy_and_stream<T: ProtocolMarker>() -> (T::Proxy, T::RequestStream) {
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_proxy(), server.into_stream()))
+    (client.into_proxy(), server.into_stream())
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
 // TODO(https://fxbug.dev/319159026) delete this function
 pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
 ) -> Result<(T::Proxy, T::RequestStream), Error> {
-    create_proxy_and_stream::<T>()
+    Ok(create_proxy_and_stream::<T>())
 }
 
 /// Create a request stream and synchronous proxy connected to one another.

@@ -305,8 +305,7 @@ mod test {
         response_handler: F,
     ) {
         let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fntr::ControllerMarker>()
-                .expect("create_proxy_and_stream failed");
+            fidl::endpoints::create_proxy_and_stream::<fntr::ControllerMarker>();
         let op = handle_command(controller, command);
         let op_response = async {
             let request = requests

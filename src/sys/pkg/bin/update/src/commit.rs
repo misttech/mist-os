@@ -119,7 +119,7 @@ mod tests {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>();
         let (p, p_stream) = EventPair::create();
         fasync::Task::spawn(async move {
             while let Some(req) = stream.try_next().await.unwrap() {

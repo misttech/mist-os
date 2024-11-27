@@ -233,7 +233,7 @@ mod tests {
     fn spawn_avrcp_target() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -294,7 +294,7 @@ mod tests {
     fn spawn_avrcp_controllers() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -303,8 +303,7 @@ mod tests {
         let (spawn_browse_controller_fn, mut spawned_browse_controller_receiver) =
             make_service_spawn_fn::<BrowseControllerRequestStream>();
 
-        let (profile_proxy, _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
         let (_c_proxy, controller_server) = create_proxy();
         let (_bc_proxy, bcontroller_server) = create_proxy();
@@ -379,7 +378,7 @@ mod tests {
     fn spawn_avrcp_extension_controllers() {
         let mut exec = fasync::TestExecutor::new();
         let (peer_manager_ext_proxy, peer_manager_ext_requests) =
-            create_proxy_and_stream::<PeerManagerExtMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerExtMarker>();
 
         let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
@@ -388,8 +387,7 @@ mod tests {
         let (spawn_browse_controller_fn, mut spawned_browse_controller_receiver) =
             make_service_spawn_fn::<BrowseControllerExtRequestStream>();
 
-        let (profile_proxy, _profile_requests) =
-            create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, _profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
         let (_c_proxy, controller_server) = create_proxy();
         let (_bc_proxy, bcontroller_server) = create_proxy();
@@ -463,12 +461,12 @@ mod tests {
     ) -> (PeerManager, ProfileRequestStream, PeerManagerProxy, mpsc::Receiver<ServiceRequest>) {
         let (client_sender, service_request_receiver) = mpsc::channel(2);
 
-        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile_proxy, profile_requests) = create_proxy_and_stream::<ProfileMarker>();
 
         let peer_manager = PeerManager::new(profile_proxy);
 
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
 
         fasync::Task::spawn(async move {
             let _ = handle_peer_manager_requests(
@@ -668,8 +666,8 @@ mod tests {
         let mut expected_commands: i64 = 0;
 
         let (peer_manager_proxy, peer_manager_requests) =
-            create_proxy_and_stream::<PeerManagerMarker>().unwrap();
-        let (ext_proxy, ext_requests) = create_proxy_and_stream::<PeerManagerExtMarker>().unwrap();
+            create_proxy_and_stream::<PeerManagerMarker>();
+        let (ext_proxy, ext_requests) = create_proxy_and_stream::<PeerManagerExtMarker>();
 
         let (client_sender, mut peer_controller_request_receiver) = mpsc::channel(512);
 

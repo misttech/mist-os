@@ -118,7 +118,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_streamer(allocations: HashMap<u64, u64>) {
         let (receiver_proxy, receiver_stream) =
-            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
         // Transmit a snapshot with the given `allocations`, all referencing the same thread info

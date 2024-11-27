@@ -85,8 +85,7 @@ impl TestHarness {
             LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
         let log_server = LogServer::new(Arc::clone(&log_manager), scope.new_child());
 
-        let (log_proxy, log_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
+        let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
         log_server.spawn(log_stream);
 
         Self {
@@ -300,7 +299,7 @@ impl DefaultLogReader {
 impl LogReader for DefaultLogReader {
     fn handle_request(&self) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
         let container = self.log_manager.get_log_container(Arc::clone(&self.identity));
         container.handle_log_sink(log_sink_stream, self.scope.clone());
         log_sink_proxy
@@ -361,7 +360,7 @@ impl EventStreamLogReader {
 impl LogReader for EventStreamLogReader {
     fn handle_request(&self) -> LogSinkProxy {
         let (event_stream_proxy, mut event_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>();
         let (log_sink_proxy, log_sink_server_end) =
             fidl::endpoints::create_proxy::<LogSinkMarker>();
 
@@ -426,7 +425,7 @@ pub async fn debuglog_test(
     let lm =
         LogsRepository::new(1_000_000, std::iter::empty(), inspector.root(), scope.new_child());
     let log_server = LogServer::new(Arc::clone(&lm), scope);
-    let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
+    let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>();
     log_server.spawn(log_stream);
     lm.drain_debuglog(debug_log);
 

@@ -685,8 +685,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_info() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         futures::join!(
             async {
@@ -735,8 +734,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_attach_vmo() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
         let koid = vmo.get_koid().unwrap();
@@ -838,8 +836,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_close() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let mut server = std::pin::pin!(async {
             let block_server = BlockServer::new(BLOCK_SIZE, Arc::new(MockInterface::default()));
@@ -953,8 +950,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_io() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         futures::join!(
             async {
@@ -1056,8 +1052,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_io_errors() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         futures::join!(
             async {
@@ -1153,8 +1148,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_args() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         futures::join!(
             async {
@@ -1275,8 +1269,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_concurrent_requests() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let waiting_readers = Arc::new(Mutex::new(Vec::new()));
         let waiting_readers_clone = waiting_readers.clone();
@@ -1379,8 +1372,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_groups() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         futures::join!(
             async move {
@@ -1446,8 +1438,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_group_error() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let counter = Arc::new(AtomicU64::new(0));
         let counter_clone = counter.clone();
@@ -1552,8 +1543,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_group_with_two_lasts() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let (tx, rx) = oneshot::channel();
 
@@ -1652,8 +1642,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_requests_dont_block_sessions() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
 
         let (tx, rx) = oneshot::channel();
 

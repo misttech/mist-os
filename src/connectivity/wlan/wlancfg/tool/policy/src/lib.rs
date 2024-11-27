@@ -731,12 +731,10 @@ mod tests {
 
     fn client_test_setup() -> ClientTestValues {
         let (client_proxy, client_stream) =
-            endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>()
-                .expect("failed to create ClientController proxy");
+            endpoints::create_proxy_and_stream::<wlan_policy::ClientControllerMarker>();
 
         let (listener_proxy, listener_stream) =
-            endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>()
-                .expect("failed to create ClientController proxy");
+            endpoints::create_proxy_and_stream::<wlan_policy::ClientStateUpdatesMarker>();
 
         ClientTestValues {
             client_proxy: client_proxy,
@@ -859,12 +857,10 @@ mod tests {
 
     fn ap_test_setup() -> ApTestValues {
         let (ap_proxy, ap_stream) =
-            endpoints::create_proxy_and_stream::<wlan_policy::AccessPointControllerMarker>()
-                .expect("failed to create AccessPointController proxy");
+            endpoints::create_proxy_and_stream::<wlan_policy::AccessPointControllerMarker>();
 
         let (listener_proxy, listener_stream) =
-            endpoints::create_proxy_and_stream::<wlan_policy::AccessPointStateUpdatesMarker>()
-                .expect("failed to create AccessPointController proxy");
+            endpoints::create_proxy_and_stream::<wlan_policy::AccessPointStateUpdatesMarker>();
 
         ApTestValues {
             ap_proxy,
@@ -1976,8 +1972,7 @@ mod tests {
         let mut exec = TestExecutor::new();
 
         let (configurator_proxy, mut configurator_stream) =
-            endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>()
-                .expect("failed to create DeprecatedConfigurator proxy");
+            endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>();
         let mac = MacAddress::from_bytes(&[0, 1, 2, 3, 4, 5]).unwrap();
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
         let mut suggest_fut = pin!(suggest_fut);
@@ -2001,8 +1996,7 @@ mod tests {
         let mut exec = TestExecutor::new();
 
         let (configurator_proxy, mut configurator_stream) =
-            endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>()
-                .expect("failed to create DeprecatedConfigurator proxy");
+            endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>();
         let mac = MacAddress::from_bytes(&[0, 1, 2, 3, 4, 5]).unwrap();
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
         let mut suggest_fut = pin!(suggest_fut);

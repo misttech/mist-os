@@ -257,7 +257,7 @@ mod tests {
     fn create_mock_peer(
         id: PeerId,
     ) -> Result<(MockPeer, bredr_test::PeerObserverRequestStream), Error> {
-        let (proxy, stream) = create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<bredr_test::PeerObserverMarker>();
         Ok((MockPeer::new(id, Some(proxy)), stream))
     }
 
@@ -268,8 +268,7 @@ mod tests {
         mock_peer: &mut MockPeer,
         id: bredr::ServiceClassProfileIdentifier,
     ) -> (bredr::SearchResultsRequestStream, impl Future<Output = ()>) {
-        let (client, stream) = create_proxy_and_stream::<bredr::SearchResultsMarker>()
-            .expect("couldn't create endpoints");
+        let (client, stream) = create_proxy_and_stream::<bredr::SearchResultsMarker>();
         let search_fut = mock_peer.new_search(id, vec![], client);
         (stream, search_fut)
     }
@@ -289,8 +288,7 @@ mod tests {
         let (a2dp_def, expected_record) = a2dp_service_definition(Psm::new(bredr::PSM_AVDTP));
 
         // Register the service.
-        let (receiver, stream) =
-            create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (receiver, stream) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let (registered, svc_ids, closed_fut) =
             mock_peer.new_advertisement(vec![a2dp_def], receiver).expect("advertisement is ok");
         assert_eq!(expected_record.service_ids().clone(), svc_ids);
@@ -583,8 +581,7 @@ mod tests {
         // Register some RFCOMM service with a random channel number.
         let (rfcomm_def, _) =
             rfcomm_service_definition(ServerChannel::try_from(4).expect("valid channel"));
-        let (receiver, mut stream) =
-            create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+        let (receiver, mut stream) = create_proxy_and_stream::<bredr::ConnectionReceiverMarker>();
         let _adv_args =
             mock_peer.new_advertisement(vec![rfcomm_def], receiver).expect("valid advertisement");
 

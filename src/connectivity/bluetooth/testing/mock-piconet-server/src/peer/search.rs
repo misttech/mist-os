@@ -244,7 +244,7 @@ mod tests {
 
         let search_id1 = ServiceClassProfileIdentifier::AudioSink;
         let attrs1 = vec![0, 1, 2];
-        let (proxy1, mut server) = create_proxy_and_stream::<SearchResultsMarker>().unwrap();
+        let (proxy1, mut server) = create_proxy_and_stream::<SearchResultsMarker>();
         let _handle1 = search_mgr.add(search_id1, attrs1, proxy1);
 
         let server_fut = server.next();

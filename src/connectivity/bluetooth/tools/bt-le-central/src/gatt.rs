@@ -789,7 +789,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_by_type() {
-        let (client, _stream) = create_proxy_and_stream::<ClientMarker>().unwrap();
+        let (client, _stream) = create_proxy_and_stream::<ClientMarker>();
         let gatt_client = GattClient::new(client);
 
         let args = vec!["0000180d-0000-1000-8000-00805f9b34fb"];

@@ -1985,8 +1985,7 @@ mod handle_driver_event_tests {
 
             let (fullmac_ifc_proxy, fullmac_ifc_request_stream) =
                 fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>(
-                )
-                .unwrap();
+                );
 
             let mocks = fake_device.mocks.clone();
             let main_loop = MlmeMainLoop {

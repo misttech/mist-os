@@ -166,7 +166,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_rpc_success() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -227,7 +227,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_no_displays() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -269,7 +269,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_error_opening_coordinator() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {
@@ -298,7 +298,7 @@ mod tests {
     #[fuchsia::test]
     async fn display_client_error_waiting_for_display_info() {
         let (provider, mut provider_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<display::ProviderMarker>();
         let provider_client = DisplayProviderClient { provider };
 
         let test_future = async move {

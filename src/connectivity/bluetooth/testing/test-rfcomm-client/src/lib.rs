@@ -419,10 +419,9 @@ mod tests {
         F: FnOnce(TestFixture) -> Fut,
         Fut: futures::Future<Output = ()>,
     {
-        let (profile, profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile, profile_server) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let (rfcomm_test, rfcomm_test_server) =
-            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<RfcommTestMarker>();
 
         let rfcomm_mgr = RfcommManager::from_proxy(profile, rfcomm_test);
         test((rfcomm_mgr, profile_server, rfcomm_test_server)).await

@@ -33,8 +33,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_delete_all() -> Result<()> {
         let (storage_admin_proxy, mut stream) =
-            create_proxy_and_stream::<<StorageAdminProxy as Proxy>::Protocol>()
-                .expect("create proxy and stream failed");
+            create_proxy_and_stream::<<StorageAdminProxy as Proxy>::Protocol>();
         // Setup fake admin
         fuchsia_async::Task::local(async move {
             let request = stream.try_next().await;

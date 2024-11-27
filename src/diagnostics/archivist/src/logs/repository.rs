@@ -628,8 +628,7 @@ mod tests {
         container: Arc<LogsArtifactsContainer>,
         scope: fasync::ScopeHandle,
     ) {
-        let (log_sink, stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().expect("create log sink");
+        let (log_sink, stream) = fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
         container.handle_log_sink(stream, scope);
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, expected_severity);

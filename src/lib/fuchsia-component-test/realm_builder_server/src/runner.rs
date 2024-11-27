@@ -256,12 +256,12 @@ mod tests {
         let runner = Runner::new();
 
         let (client_runner_proxy, mut client_runner_request_stream) =
-            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>();
         let LocalComponentId(local_component_id) =
             runner.register_local_component(Arc::new(Mutex::new(Some(client_runner_proxy)))).await;
 
         let (server_runner_proxy, server_runner_request_stream) =
-            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>();
 
         let _runner_request_stream_task = fasync::Task::local(async move {
             if let Err(e) = runner.handle_runner_request_stream(server_runner_request_stream).await
@@ -342,7 +342,7 @@ mod tests {
             .await;
 
         let (server_runner_proxy, server_runner_request_stream) =
-            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+            create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>();
 
         let _runner_request_stream_task = fasync::Task::local(async move {
             if let Err(e) = runner.handle_runner_request_stream(server_runner_request_stream).await

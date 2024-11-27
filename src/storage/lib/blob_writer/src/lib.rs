@@ -171,7 +171,7 @@ mod tests {
         data: &[u8],
         writes: &[(usize, usize)],
     ) {
-        let (proxy, mut stream) = create_proxy_and_stream::<BlobWriterMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BlobWriterMarker>();
         let count = Arc::new(Mutex::new(0));
         let count_clone = count.clone();
         let expected_count = writes.len();

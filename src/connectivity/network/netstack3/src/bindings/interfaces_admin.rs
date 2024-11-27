@@ -2085,8 +2085,7 @@ mod tests {
 
         let (device_control_proxy, device_control_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::DeviceControlMarker>(
-            )
-            .expect("create address proxy and stream");
+            );
 
         let device_control_task = fuchsia_async::Task::spawn(run_device_control(
             test_stack.netstack(),

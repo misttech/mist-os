@@ -162,8 +162,7 @@ mod tests {
     use std::pin::pin;
 
     fn connected_dai() -> (DigitalAudioInterface, DaiRequestStream) {
-        let (proxy, requests) =
-            fidl::endpoints::create_proxy_and_stream::<DaiMarker>().expect("proxy");
+        let (proxy, requests) = fidl::endpoints::create_proxy_and_stream::<DaiMarker>();
         let dai = DigitalAudioInterface::from_proxy(proxy);
         (dai, requests)
     }

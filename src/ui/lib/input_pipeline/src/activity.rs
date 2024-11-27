@@ -329,8 +329,7 @@ mod tests {
     fn create_interaction_aggregator_proxy(
         activity_manager: Rc<ActivityManager>,
     ) -> AggregatorProxy {
-        let (aggregator_proxy, aggregator_stream) = create_proxy_and_stream::<AggregatorMarker>()
-            .expect("Failed to create aggregator proxy");
+        let (aggregator_proxy, aggregator_stream) = create_proxy_and_stream::<AggregatorMarker>();
 
         Task::local(async move {
             if activity_manager
@@ -347,8 +346,7 @@ mod tests {
     }
 
     fn create_interaction_notifier_proxy(activity_manager: Rc<ActivityManager>) -> NotifierProxy {
-        let (notifier_proxy, notifier_stream) =
-            create_proxy_and_stream::<NotifierMarker>().expect("Failed to create notifier proxy");
+        let (notifier_proxy, notifier_stream) = create_proxy_and_stream::<NotifierMarker>();
 
         let stream_fut =
             activity_manager.clone().handle_interaction_notifier_request_stream(notifier_stream);
@@ -364,8 +362,7 @@ mod tests {
     }
 
     fn fake_activity_governor_server() -> ActivityGovernorProxy {
-        let (proxy, mut stream) = create_proxy_and_stream::<ActivityGovernorMarker>()
-            .expect("Failed to create activity governor proxy");
+        let (proxy, mut stream) = create_proxy_and_stream::<ActivityGovernorMarker>();
         Task::local(async move {
             while let Some(request) = stream.next().await {
                 match request {

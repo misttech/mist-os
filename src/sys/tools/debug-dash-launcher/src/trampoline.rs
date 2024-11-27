@@ -335,8 +335,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_pkg_dirs_test() {
-        let (resolver, mut stream) =
-            create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
+        let (resolver, mut stream) = create_proxy_and_stream::<fpkg::PackageResolverMarker>();
         // Spawn a task to handle the stream of requests
         fasync::Task::spawn(async move {
             while let Some(Ok(request)) = stream.next().await {

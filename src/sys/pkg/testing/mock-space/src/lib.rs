@@ -21,8 +21,7 @@ impl MockSpaceService {
 
     pub fn spawn_space_service(self: &Arc<Self>) -> fidl_fuchsia_space::ManagerProxy {
         let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_space::ManagerMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_space::ManagerMarker>();
 
         fasync::Task::spawn(
             Arc::clone(self)

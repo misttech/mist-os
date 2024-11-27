@@ -137,7 +137,7 @@ mod tests {
         assigned_slice_count: u64,
         expected_extend_slice_count: u64,
     ) -> Result<u64, Error> {
-        let (proxy, mut stream) = create_proxy_and_stream::<VolumeMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<VolumeMarker>();
         let mock_device = async {
             while let Some(request) = stream.next().await {
                 match request {

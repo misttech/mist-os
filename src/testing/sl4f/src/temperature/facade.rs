@@ -165,7 +165,7 @@ mod tests {
     /// returns the expected temperature value.
     #[fasync::run_singlethreaded(test)]
     async fn test_get_temperature_celsius() {
-        let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>();
         let facade = TemperatureFacade { device_proxy: Some(proxy), logger_proxy: None };
         let facade_fut = async move {
             assert_eq!(
@@ -195,7 +195,7 @@ mod tests {
         let query_interval_ms = 500;
         let query_duration_ms = 10_000;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
@@ -244,7 +244,7 @@ mod tests {
     async fn test_start_logging_forever() {
         let query_interval_ms = 500;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
@@ -284,7 +284,7 @@ mod tests {
     /// Tests that the `stop_logging` method correctly queries the logger.
     #[fasync::run_singlethreaded(test)]
     async fn test_stop_logging() {
-        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {

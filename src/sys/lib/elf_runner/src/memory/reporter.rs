@@ -140,7 +140,7 @@ mod tests {
 
         let runner = new_elf_runner_for_test();
         let (snapshot_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
         runner.serve_memory_reporter(snapshot_request_stream);
 
         // Run a component.

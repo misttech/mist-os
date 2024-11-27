@@ -71,7 +71,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_acquire_then_release() -> Result<()> {
-        let (client, stream) = create_proxy_and_stream::<fsystem::ActivityGovernorMarker>()?;
+        let (client, stream) = create_proxy_and_stream::<fsystem::ActivityGovernorMarker>();
         let (wake_lease_active_tx, mut wake_lease_active_rx) = mpsc::unbounded::<bool>();
 
         // Create a FakeActivityGovernor server and run it in the background.

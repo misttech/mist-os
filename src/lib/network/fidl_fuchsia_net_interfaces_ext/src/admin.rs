@@ -558,11 +558,9 @@ mod test {
     // the same time, the state is yielded first.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn assignment_state_stream_state_before_event() {
-        let (address_state_provider, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<
-                fnet_interfaces_admin::AddressStateProviderMarker,
-            >()
-            .expect("failed to create proxy");
+        let (address_state_provider, mut request_stream) = fidl::endpoints::create_proxy_and_stream::<
+            fnet_interfaces_admin::AddressStateProviderMarker,
+        >();
 
         const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces::AddressAssignmentState =
             fnet_interfaces::AddressAssignmentState::Assigned;
@@ -606,8 +604,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn control_terminal_event() {
         let (control, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>();
         let control = super::Control::new(control);
         const EXPECTED_EVENT: fnet_interfaces_admin::InterfaceRemovedReason =
             fnet_interfaces_admin::InterfaceRemovedReason::BadPort;
@@ -643,8 +640,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn control_missing_terminal_event() {
         let (control, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>();
         let control = super::Control::new(control);
         let ((), ()) = futures::future::join(
             async move {
@@ -679,8 +675,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn control_pipelined_error() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>();
         let control = super::Control::new(control);
         const CLOSE_REASON: fnet_interfaces_admin::InterfaceRemovedReason =
             fnet_interfaces_admin::InterfaceRemovedReason::BadPort;
@@ -711,8 +706,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn control_wait_termination() {
         let (control, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>();
         let control = super::Control::new(control);
         const CLOSE_REASON: fnet_interfaces_admin::InterfaceRemovedReason =
             fnet_interfaces_admin::InterfaceRemovedReason::BadPort;
@@ -731,8 +725,7 @@ mod test {
     async fn control_respond_and_drop() {
         const ID: u64 = 15;
         let (control, mut request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>()
-                .expect("create proxy");
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::ControlMarker>();
         let control = super::Control::new(control);
         let ((), ()) = futures::future::join(
             async move {

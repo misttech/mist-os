@@ -1103,8 +1103,7 @@ mod tests {
     async fn guest_initiated_generator() -> VsockConnectionState {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, _stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, _stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         VsockConnectionState::GuestInitiated(GuestInitiated::new(
@@ -1118,8 +1117,7 @@ mod tests {
     async fn client_initiated_generator() -> VsockConnectionState {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         fasync::Task::local(async move {
             let _ = proxy.connect(10).await;
@@ -1372,8 +1370,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         let state =
@@ -1407,8 +1404,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>();
 
         let response_fut = proxy.accept(DEFAULT_GUEST_CID, key.guest_port, key.host_port);
         let state =
@@ -1442,8 +1438,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let mut fut = proxy.connect(key.guest_port);
         assert!(executor.run_until_stalled(&mut fut).is_pending());
@@ -1480,8 +1475,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let mut executor = fasync::TestExecutor::new();
-        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
-            .expect("failed to create HostVsockEndpoint proxy/stream");
+        let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>();
 
         let mut fut = proxy.connect(key.guest_port);
         assert!(executor.run_until_stalled(&mut fut).is_pending());

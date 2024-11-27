@@ -63,7 +63,7 @@ mod tests {
     }
 
     fn open_reverser() -> Result<ReverserProxy, Error> {
-        let (proxy, _stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>()?;
+        let (proxy, _stream) = fidl::endpoints::create_proxy_and_stream::<ReverserMarker>();
         let _reverser = ReverserServer::new();
         // CODELAB: Uncomment this line to return a real reverser connection.
         // reverser.spawn(stream);

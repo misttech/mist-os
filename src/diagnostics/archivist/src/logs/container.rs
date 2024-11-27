@@ -685,8 +685,7 @@ mod tests {
             None,
         ));
         // Connect out LogSink under test and take its events channel.
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().expect("create log sink");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>();
         container.handle_log_sink(stream, scope);
         (container, proxy)
     }

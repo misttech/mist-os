@@ -189,7 +189,7 @@ mod tests {
     #[fuchsia::test]
     async fn message_stream_receives_data() {
         let (profile, mut profile_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
         let mut message_stream = MessageStream::new(profile);
 
         // Expect the RFCOMM advertisement.

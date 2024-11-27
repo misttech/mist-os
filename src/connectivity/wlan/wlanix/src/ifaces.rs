@@ -861,8 +861,7 @@ mod tests {
     ) {
         let exec = fasync::TestExecutor::new();
         let (monitor_svc, monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
         (
             exec,
             monitor_stream,
@@ -884,15 +883,13 @@ mod tests {
     ) {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc, monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
         let manager = DeviceMonitorIfaceManager {
             monitor_svc: monitor_svc.clone(),
             ifaces: Mutex::new(HashMap::new()),
             pb_topology_svc: None,
         };
-        let (sme_proxy, sme_stream) =
-            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+        let (sme_proxy, sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let phy_id = rand::random();
         let iface = exec.run_singlethreaded(SmeClientIface::new(
             phy_id,
@@ -912,8 +909,7 @@ mod tests {
     fn test_query_interface() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc, mut monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
         let manager = DeviceMonitorIfaceManager {
             monitor_svc,
             pb_topology_svc: None,
@@ -959,11 +955,9 @@ mod tests {
         // pb_topology_proxy to be present.
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc, mut monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
         let (pb_topology_proxy, mut pb_stream) =
-            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>()
-                .expect("Failed to create proxy");
+            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>();
 
         let manager = DeviceMonitorIfaceManager {
             monitor_svc,
@@ -1116,10 +1110,8 @@ mod tests {
         // sme_proxy and monitor_svc to create the interface.
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc, mut monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
-        let (sme_proxy, _sme_stream) =
-            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
+        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let manager = DeviceMonitorIfaceManager {
             monitor_svc: monitor_svc.clone(),
             pb_topology_svc: None,
@@ -1401,10 +1393,8 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let (monitor_svc, _monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
-        let (sme_proxy, mut sme_stream) =
-            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let manager = DeviceMonitorIfaceManager {
             monitor_svc: monitor_svc.clone(),
             pb_topology_svc: None,
@@ -1645,13 +1635,10 @@ mod tests {
     fn test_set_power_mode(sequence: Vec<(PowerCall, fidl_common::PowerSaveType)>) {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc, _monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
-                .expect("Failed to create device monitor service");
-        let (sme_proxy, _sme_stream) =
-            create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
+        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
         let (pb_topology_proxy, mut pb_stream) =
-            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>()
-                .expect("Failed to create proxy");
+            create_proxy_and_stream::<fidl_power_broker::TopologyMarker>();
         let phy_id = rand::random();
 
         // Create the interface with a power broker channel

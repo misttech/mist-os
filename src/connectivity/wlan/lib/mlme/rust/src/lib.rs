@@ -654,8 +654,7 @@ mod tests {
         // Create a `WlanSoftmacIfcBridge` proxy and stream in order to send a `StopBridgedDriver`
         // message and extract its responder.
         let (softmac_ifc_bridge_proxy, mut softmac_ifc_bridge_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                .unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
 
         let mut stop_response_fut = softmac_ifc_bridge_proxy.stop_bridged_driver();
         assert_variant!(

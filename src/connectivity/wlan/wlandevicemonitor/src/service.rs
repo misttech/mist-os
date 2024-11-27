@@ -1876,8 +1876,7 @@ mod tests {
         let phy_id = 10u16;
         test_values.phys.insert(phy_id, phy);
         let (generic_sme_proxy, mut generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("Failed to create generic SME proxy and stream");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
 
         test_values.ifaces.insert(
             42,
@@ -1977,8 +1976,7 @@ mod tests {
         let phy_id = 10u16;
         test_values.phys.insert(phy_id, phy);
         let (generic_sme_proxy, mut generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("Failed to create generic SME proxy and stream");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
 
         let (_feature_support_proxy, feature_support_server) =
             create_proxy::<fidl_sme::FeatureSupportMarker>();
@@ -2012,8 +2010,7 @@ mod tests {
         let phy_id = 10u16;
         test_values.phys.insert(phy_id, phy);
         let (generic_sme_proxy, mut generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
-                .expect("Failed to create generic SME proxy and stream");
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
 
         test_values.ifaces.insert(
             42,

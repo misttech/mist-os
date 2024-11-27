@@ -666,14 +666,12 @@ mod tests {
     ) {
         let state = State { config: Config::example_config(), personalized_name: None };
 
-        let (peripheral_proxy, peripheral_server) =
-            create_proxy_and_stream::<PeripheralMarker>().unwrap();
+        let (peripheral_proxy, peripheral_server) = create_proxy_and_stream::<PeripheralMarker>();
         let advertiser = LowEnergyAdvertiser::from_proxy(peripheral_proxy);
 
         let (gatt, local_service_proxy) = setup_gatt_service().await;
 
-        let (watcher_client, watcher_server) =
-            create_proxy_and_stream::<HostWatcherMarker>().unwrap();
+        let (watcher_client, watcher_server) = create_proxy_and_stream::<HostWatcherMarker>();
         let host_watcher = HostWatcher::new(watcher_client);
 
         let (pairing, mock_pairing) = MockPairing::new_with_manager().await;
@@ -682,7 +680,7 @@ mod tests {
         let (mock_upstream, c) = MockUpstreamClient::new();
         let upstream = FastPairConnectionManager::new_with_upstream(c);
 
-        let (profile, _profile_server) = create_proxy_and_stream::<ProfileMarker>().unwrap();
+        let (profile, _profile_server) = create_proxy_and_stream::<ProfileMarker>();
         let message_stream = MessageStream::new(profile);
 
         let this = Provider {
@@ -1581,8 +1579,7 @@ mod tests {
         let (mut sender, _provider_server) = server_task(provider);
 
         // Simulate a new FIDL client trying to set the Pairing Delegate.
-        let (delegate, mut delegate_server) =
-            create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+        let (delegate, mut delegate_server) = create_proxy_and_stream::<PairingDelegateMarker>();
         let client =
             PairingArgs { input: InputCapability::None, output: OutputCapability::None, delegate };
         let _ = sender
@@ -1611,7 +1608,7 @@ mod tests {
 
         // Shutting down and dropping the existing upstream delegate indicates client termination.
         let (delegate, new_upstream_delegate_server) =
-            create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+            create_proxy_and_stream::<PairingDelegateMarker>();
         let upstream_delegate_server = std::mem::replace(
             &mut mock_pairing.upstream_delegate_server,
             new_upstream_delegate_server,

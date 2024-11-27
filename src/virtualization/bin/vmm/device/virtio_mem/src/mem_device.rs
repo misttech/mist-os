@@ -345,7 +345,7 @@ mod tests {
             let inspector = Inspector::default();
 
             let state = TestQueue::new(32, mem);
-            let (proxy, stream) = create_proxy_and_stream::<VirtioMemMarker>().unwrap();
+            let (proxy, stream) = create_proxy_and_stream::<VirtioMemMarker>();
             let vmo_size = region_size + vmo_virt_queues_aligned_size;
             let vmo = zx::Vmo::create(vmo_size).unwrap();
             let device = MemDevice::new(

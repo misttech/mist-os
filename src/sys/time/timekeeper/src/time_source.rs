@@ -580,7 +580,7 @@ mod test {
     #[fuchsia::test]
     async fn push_time_source_events() {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>();
 
         let _task = fasync::Task::spawn(async move {
             while let Some(Ok(request)) = requests.next().await {
@@ -621,7 +621,7 @@ mod test {
     #[fuchsia::test]
     async fn push_time_source_failure() {
         let (proxy, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftexternal::PushSourceMarker>();
 
         let _task = fasync::Task::spawn(async move {
             while let Some(Ok(request)) = requests.next().await {

@@ -336,7 +336,7 @@ mod test {
     #[fuchsia::test]
     async fn test_no_delegate_rejects() -> Result<(), anyhow::Error> {
         let (proxy, requests) =
-            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>();
 
         let peer = simple_test_peer(PeerId(0));
 
@@ -345,7 +345,7 @@ mod test {
 
         // Create a dispatcher with a closed upstream
         let (upstream, upstream_server) =
-            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>();
         let (mut dispatcher, _handle) =
             PairingDispatcher::new(upstream, InputCapability::None, OutputCapability::None);
         // We directly insert the proxy to avoid the indirection of having to provide an
@@ -375,7 +375,7 @@ mod test {
     #[fuchsia::test]
     async fn test_bad_delegate_drops_stream() -> Result<(), Error> {
         let (proxy, requests) =
-            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>();
 
         let peer = simple_test_peer(PeerId(0));
 
@@ -418,7 +418,7 @@ mod test {
         Fut: Future<Output = Result<(), fidl::Error>> + Send + Sync + 'static,
     {
         let (upstream, requests) =
-            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>();
 
         let (dispatcher, handle) =
             PairingDispatcher::new(upstream, InputCapability::None, OutputCapability::None);
@@ -430,7 +430,7 @@ mod test {
     #[fuchsia::test]
     async fn test_success_notifies_responder() -> Result<(), Error> {
         let (proxy, requests) =
-            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>()?;
+            fidl::endpoints::create_proxy_and_stream::<sys::PairingDelegateMarker>();
 
         let peer = simple_test_peer(PeerId(0));
         let passkey = 42;
@@ -487,8 +487,7 @@ mod test {
             // Create a fake Host connection
             let (host_proxy, mut host_requests) = fidl::endpoints::create_proxy_and_stream::<
                 fidl_fuchsia_bluetooth_host::HostMarker,
-            >()
-            .expect("Creating Host channel should not fail");
+            >();
             // Tell the dispatcher to add our host
             handle.add_host(HostId(1), host_proxy);
 

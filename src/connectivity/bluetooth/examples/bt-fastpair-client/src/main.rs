@@ -101,7 +101,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (pairing_client, pairing_server) =
-            fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>();
         let pairing_fut = process_pairing_events(pairing_server);
         pin_mut!(pairing_fut);
         exec.run_until_stalled(&mut pairing_fut).expect_pending("server active");
@@ -138,7 +138,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (provider_client, provider_server) =
-            fidl::endpoints::create_proxy_and_stream::<ProviderWatcherMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ProviderWatcherMarker>();
         let provider_fut = process_provider_events(provider_server);
         pin_mut!(provider_fut);
         exec.run_until_stalled(&mut provider_fut).expect_pending("server active");

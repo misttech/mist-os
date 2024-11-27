@@ -590,7 +590,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_get() {
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         fasync::Task::local(async move {
             let value_to_get = TestStruct { value: VALUE1 };
@@ -624,7 +624,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_get_default() {
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         fasync::Task::local(async move {
             #[allow(clippy::single_match)]
@@ -654,7 +654,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_invalid_stash() {
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         fasync::Task::local(async move {
             #[allow(clippy::single_match)]
@@ -689,7 +689,7 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         let inspector = component::inspector();
         let logger_handle = Rc::new(Mutex::new(StashInspectLogger::new(inspector.root())));
@@ -766,7 +766,7 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
@@ -823,7 +823,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_write_with_mismatch_type_returns_error() {
         let (stash_proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         let spawned = fasync::Task::local(async move {
             while let Some(request) = stream.next().await {
@@ -872,7 +872,7 @@ mod tests {
         executor.set_fake_time(start_time);
 
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
@@ -1036,7 +1036,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_corrupt_get_returns_default() {
         let (stash_proxy, mut stash_stream) =
-            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>();
 
         fasync::Task::local(async move {
             #[allow(clippy::single_match)]

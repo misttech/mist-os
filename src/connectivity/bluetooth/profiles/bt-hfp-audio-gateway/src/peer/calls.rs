@@ -782,8 +782,7 @@ mod tests {
     /// endpoints.
     fn setup_ongoing_call() -> (Calls, PeerHandlerRequestStream, CallRequestStream, CallIdx, Number)
     {
-        let (proxy, peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+        let (proxy, peer_stream) = fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
         let (client_end, call_stream) = fidl::endpoints::create_request_stream();
         let num = Number::from("1");
@@ -1057,7 +1056,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.
@@ -1095,7 +1094,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.
@@ -1139,7 +1138,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
-            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>();
         let mut calls = Calls::new(Some(proxy));
 
         // No active call when there are no calls.

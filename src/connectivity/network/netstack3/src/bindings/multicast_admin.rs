@@ -721,8 +721,7 @@ mod tests {
         let ctx = netstack.netstack.ctx;
 
         let (client, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
-                .expect("should be able to create table controller fidl endpoints");
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>();
         ctx.bindings_ctx().multicast_admin.sink::<I>().serve_multicast_admin_client(request_stream);
 
         let worker_fut = netstack.multicast_admin_workers.run(ctx.clone()).boxed();
@@ -747,11 +746,9 @@ mod tests {
         let ctx = netstack.netstack.ctx;
 
         let (client1, request_stream1) =
-            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
-                .expect("should be able to create table controller fidl endpoints");
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>();
         let (client2, request_stream2) =
-            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
-                .expect("should be able to create table controller fidl endpoints");
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>();
 
         // Install client2 after client1; client 2 should be rejected.
         ctx.bindings_ctx()
@@ -798,8 +795,7 @@ mod tests {
         // Create a client, and verify multicast forwarding becomes enabled.
         // NB: Poll the worker fut to ensure it connects the new client.
         let (client, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
-                .expect("should be able to create table controller fidl endpoints");
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>();
         ctx.bindings_ctx().multicast_admin.sink::<I>().serve_multicast_admin_client(request_stream);
         assert_eq!(poll!(&mut worker_fut), Poll::Pending);
         assert!(!ctx.api().multicast_forwarding().enable(), "shouldn't be newly enabled");
@@ -858,8 +854,7 @@ mod tests {
             UnicastSourceAndMulticastDestination { unicast_source, multicast_destination };
 
         let (client, request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
-                .expect("should be able to create table controller fidl endpoints");
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>();
         test_stack
             .ctx()
             .bindings_ctx()

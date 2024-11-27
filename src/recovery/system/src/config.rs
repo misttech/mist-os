@@ -401,7 +401,7 @@ mod tests {
         args: HashMap<String, Option<String>>,
     ) -> ArgumentsProxy {
         let mock = Arc::new(MockBootArgumentsService::new(args));
-        let (proxy, stream) = create_proxy_and_stream::<ArgumentsMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<ArgumentsMarker>();
         fasync::Task::spawn(mock.handle_request_stream(stream)).detach();
         proxy
     }
@@ -456,7 +456,7 @@ mod tests {
     // Resolve version from proxy tests
     #[fuchsia::test]
     async fn resolve_version_from_proxy() {
-        let (proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>();
         fasync::Task::local(async move {
             match stream.next().await.unwrap() {
                 Ok(BuildInfoRequest::GetBuildInfo { responder }) => {
@@ -485,7 +485,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_version_from_json_override() {
-        let (build_info_proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>().unwrap();
+        let (build_info_proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>();
         fasync::Task::local(async move {
             let _ = stream.next().await.unwrap();
             panic!("Runtime version should not be queried if override provided");
@@ -506,7 +506,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn error_when_no_version_available() {
-        let (build_info_proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>().unwrap();
+        let (build_info_proxy, mut stream) = create_proxy_and_stream::<BuildInfoMarker>();
         fasync::Task::local(async move {
             match stream.next().await.unwrap() {
                 Ok(BuildInfoRequest::GetBuildInfo { responder }) => {

@@ -439,9 +439,9 @@ mod tests {
     fn test_attribute_memory() {
         let mut exec = fasync::TestExecutor::new();
         let (root_provider, snapshot_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
         let (introspector, mut introspector_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fcomponent::IntrospectorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcomponent::IntrospectorMarker>();
 
         let root_job_koid = zx::Koid::from_raw(1);
         let attribution_client = AttributionClient::new(root_provider, introspector, root_job_koid);

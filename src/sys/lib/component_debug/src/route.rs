@@ -240,7 +240,7 @@ mod test {
         reports: Vec<fsys::RouteReport>,
     ) -> fsys::RouteValidatorProxy {
         let (route_validator, mut stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>();
         fasync::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { .. } => {

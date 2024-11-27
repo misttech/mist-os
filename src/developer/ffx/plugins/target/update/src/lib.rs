@@ -539,8 +539,7 @@ mod tests {
         O: Fn(String),
     {
         let (proxy, mut stream) =
-            create_proxy_and_stream::<fidl_fuchsia_update_channelcontrol::ChannelControlMarker>()
-                .unwrap();
+            create_proxy_and_stream::<fidl_fuchsia_update_channelcontrol::ChannelControlMarker>();
         let mut buf = Vec::new();
         let fut = async {
             assert_matches!(handle_channel_control_cmd(&argument, proxy, &mut buf).await, Ok(()));

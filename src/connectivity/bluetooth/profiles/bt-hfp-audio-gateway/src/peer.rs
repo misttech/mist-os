@@ -372,7 +372,7 @@ mod tests {
     }
 
     fn make_peer(id: PeerId) -> (PeerImpl, mpsc::Receiver<hfp::Event>) {
-        let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap().0;
+        let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().0;
         let (send, recv) = mpsc::channel(1);
         let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
         let audio_control = new_audio_control();

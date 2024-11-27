@@ -97,8 +97,7 @@ pub(crate) mod test {
     }
 
     fn setup_fake_daemon_server(succeed: bool, info: VersionInfo) -> ffx::DaemonProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffx::DaemonMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ffx::DaemonMarker>();
         fuchsia_async::Task::local(async move {
             let info = serialization::to_ffx_version_info(info);
             #[allow(clippy::never_loop)]
@@ -124,8 +123,7 @@ pub(crate) mod test {
     }
 
     fn setup_hanging_daemon_server(waiter: Shared<Receiver<()>>) -> ffx::DaemonProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<ffx::DaemonMarker>().unwrap();
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ffx::DaemonMarker>();
         fuchsia_async::Task::local(async move {
             #[allow(clippy::never_loop)]
             while let Ok(Some(req)) = stream.try_next().await {

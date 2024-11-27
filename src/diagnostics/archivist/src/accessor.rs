@@ -789,7 +789,7 @@ mod tests {
     async fn logs_only_accept_basic_component_selectors() {
         let scope = fasync::Scope::new();
         let (accessor, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo =
@@ -850,7 +850,7 @@ mod tests {
     async fn accessor_skips_invalid_selectors() {
         let scope = fasync::Scope::new();
         let (accessor, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo =
@@ -894,8 +894,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn buffered_iterator_handles_two_consecutive_buffer_waits() {
-        let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>();
         let _fut = client.get_next();
         let mut server = server.peekable();
         assert_matches!(server.wait_for_buffer().await, Ok(()));
@@ -904,8 +903,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn buffered_iterator_handles_peer_closed() {
-        let (client, server) =
-            fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>();
         let mut server = server.peekable();
         drop(client);
         assert_matches!(
@@ -962,7 +960,7 @@ mod tests {
     fn batch_iterator_terminates_on_client_disconnect() {
         let mut executor = fasync::TestExecutor::new();
         let (batch_iterator_proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>();
         // Create a batch iterator that uses a hung stream to serve logs.
         let batch_iterator = BatchIterator::new(
             futures::stream::pending::<diagnostics_data::Data<diagnostics_data::Logs>>(),
@@ -995,7 +993,7 @@ mod tests {
     async fn batch_iterator_on_ready_is_called() {
         let scope = fasync::Scope::new();
         let (accessor, stream) =
-            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
         let log_repo =
