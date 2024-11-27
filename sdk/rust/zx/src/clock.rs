@@ -63,8 +63,8 @@ impl<Output: Timeline> Clock<BootTimeline, Output> {
     ///
     /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
     pub fn create(opts: ClockOpts, backstop: Option<Instant<Output>>) -> Result<Self, Status> {
-        // TODO(https://fxbug.dev/328306129) add the boot clock reference option
         let mut out = 0;
+        let opts = opts | ClockOpts::BOOT;
         let status = match backstop {
             Some(backstop) => {
                 // When using backstop time, use the API v1 args struct.
@@ -183,6 +183,9 @@ bitflags! {
         /// clock monotonic. Users may still update the clock within the limits defined by the
         /// other options, the handle rights, and the backstop time of the clock.
         const AUTO_START = sys::ZX_CLOCK_OPT_AUTO_START;
+
+        // When set, creates a clock object that uses the boot timeline as its reference timeline.
+        const BOOT = sys::ZX_CLOCK_OPT_BOOT;
     }
 }
 

@@ -276,6 +276,11 @@ impl SignalPacket {
         self.0.count
     }
 
+    // The timestamp at which the packet was enqueued.
+    pub fn timestamp(&self) -> sys::zx_time_t {
+        self.0.timestamp
+    }
+
     /// Get a reference to the raw underlying packet.
     pub fn raw_packet(&self) -> &sys::zx_packet_signal_t {
         &self.0
@@ -554,6 +559,10 @@ bitflags! {
     pub struct WaitAsyncOpts: u32 {
         /// When set, causes the system to capture a timestamp when the wait triggered.
         const TIMESTAMP = sys::ZX_WAIT_ASYNC_TIMESTAMP;
+
+        /// When set, causes the system to capture a boot timestamp when the wait triggered.
+        const BOOT_TIMESTAMP = sys::ZX_WAIT_ASYNC_BOOT_TIMESTAMP;
+
         // When set, causes the port to not enqueue a packet for signals active at
         // the time of the zx_object_wait_async() call.
         const EDGE_TRIGGERED = sys::ZX_WAIT_ASYNC_EDGE;

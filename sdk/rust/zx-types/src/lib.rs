@@ -527,6 +527,7 @@ multiconst!(u64, [
     ZX_CLOCK_OPT_MONOTONIC = 1 << 0;
     ZX_CLOCK_OPT_CONTINUOUS = 1 << 1;
     ZX_CLOCK_OPT_AUTO_START = 1 << 2;
+    ZX_CLOCK_OPT_BOOT = 1 << 3;
 
     // v1 clock update flags
     ZX_CLOCK_UPDATE_OPTION_VALUE_VALID = 1 << 0;
@@ -912,10 +913,12 @@ pub struct zx_packet_signal_t {
     pub trigger: zx_signals_t,
     pub observed: zx_signals_t,
     pub count: u64,
+    pub timestamp: zx_time_t,
 }
 
 pub const ZX_WAIT_ASYNC_TIMESTAMP: u32 = 1;
 pub const ZX_WAIT_ASYNC_EDGE: u32 = 2;
+pub const ZX_WAIT_ASYNC_BOOT_TIMESTAMP: u32 = 4;
 
 // Actually a union of different integer types, but this should be good enough.
 pub type zx_packet_user_t = [u8; 32];

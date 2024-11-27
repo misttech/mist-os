@@ -190,6 +190,7 @@ impl Executor {
                         trigger: trigger.bits(),
                         observed: sigs.bits(),
                         count: 1,
+                        timestamp: 1234,
                     };
 
                     handler(dispatcher as *mut std::ffi::c_void, wait_ptr, ZX_OK, &packet);
