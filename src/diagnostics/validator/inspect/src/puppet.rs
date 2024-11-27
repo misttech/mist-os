@@ -152,7 +152,7 @@ impl Connection {
             validate::InitializationParams { vmo_size: Some(VMO_SIZE), ..Default::default() };
         let response = fidl.initialize_tree(&params).await;
         if let Ok((Some(tree_client_end), validate::TestResult::Ok)) = response {
-            tree_client_end.into_proxy().ok()
+            Some(tree_client_end.into_proxy())
         } else {
             None
         }

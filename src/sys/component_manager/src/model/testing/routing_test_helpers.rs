@@ -1450,7 +1450,7 @@ pub mod capability_util {
         dir_path: &NamespacePath,
     ) -> fio::DirectoryProxy {
         let mut ns = namespace.lock().await;
-        ns.remove(dir_path).unwrap().into_proxy().unwrap()
+        ns.remove(dir_path).unwrap().into_proxy()
     }
 
     /// Adds `dir_proxy` back to the namespace. Useful for restoring the namespace after a call

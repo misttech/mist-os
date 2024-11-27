@@ -92,7 +92,7 @@ pub async fn handle_fullmac_startup(
                 }))
                 .expect("Failed to respond to Init");
             let ifc = payload.ifc.expect("Init response missing ifc");
-            ifc.into_proxy().expect("Could not turn fullmac_ifc_channel into proxy")
+            ifc.into_proxy()
         }
     );
 

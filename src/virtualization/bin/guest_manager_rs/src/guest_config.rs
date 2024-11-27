@@ -296,7 +296,7 @@ mod tests {
     // Read contents of file attached to blockspec to string.
     async fn read_block_to_string(bs: BlockSpec) -> Result<String, Error> {
         if let BlockFormat::File(clientend) = bs.format {
-            let proxy = clientend.into_proxy()?;
+            let proxy = clientend.into_proxy();
             Ok(file::read_to_string(&proxy).await?)
         } else {
             // Not handled: reading from Qcow or raw block devices
@@ -357,7 +357,7 @@ mod tests {
         assert_eq!(guest_cfg.kernel_type, Some(KernelType::Linux));
         assert_eq!(guest_cfg.guest_memory, Some(2 * (1u64 << 30)));
         assert_eq!(
-            &file::read_to_string(&guest_cfg.kernel.unwrap().into_proxy()?).await?,
+            &file::read_to_string(&guest_cfg.kernel.unwrap().into_proxy()).await?,
             kernel_content
         );
         Ok(())

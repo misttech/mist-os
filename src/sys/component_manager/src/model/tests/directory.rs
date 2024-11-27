@@ -99,7 +99,7 @@ async fn starting_directory_using_target_component_does_not_start_source() {
     {
         let mut namespace = namespace.lock().await;
         let client_end = namespace.remove(&"/data".parse().unwrap()).unwrap();
-        let dir = client_end.into_proxy().unwrap();
+        let dir = client_end.into_proxy();
         fuchsia_fs::directory::readdir(&dir).await.unwrap();
     }
 
@@ -173,7 +173,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
         let namespace = test.mock_runner.get_namespace("test:///b_resolved").unwrap();
         let mut namespace = namespace.lock().await;
         let client_end = namespace.remove(&"/data".parse().unwrap()).unwrap();
-        let dir = client_end.into_proxy().unwrap();
+        let dir = client_end.into_proxy();
 
         // Make a few open calls.
         for _ in 0..10 {

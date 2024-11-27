@@ -50,8 +50,7 @@ impl LocalComponentHandles {
                 namespace_entry
                     .directory
                     .ok_or_else(|| format_err!("namespace entry missing directory handle"))?
-                    .into_proxy()
-                    .expect("failed to convert handle to proxy"),
+                    .into_proxy(),
             );
         }
         let numbered_handles =
@@ -460,7 +459,7 @@ mod tests {
         component_to_start: String,
     ) -> RunnerAndHandles {
         let (component_runner_client_end, runner_task) = runner_builder.build().await.unwrap();
-        let component_runner_proxy = component_runner_client_end.into_proxy().unwrap();
+        let component_runner_proxy = component_runner_client_end.into_proxy();
 
         let (runtime_dir_proxy, runtime_dir_server_end) = create_proxy().unwrap();
         let (outgoing_dir_proxy, outgoing_dir_server_end) = create_proxy().unwrap();

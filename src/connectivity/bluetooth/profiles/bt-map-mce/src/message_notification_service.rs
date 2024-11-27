@@ -89,7 +89,7 @@ impl Session {
         if mas_instances.len() == 0 {
             return Err(Error::InvalidParameters);
         }
-        let relayer_proxy = relayer_client.into_proxy().map_err(|e| Error::Other(e.into()))?;
+        let relayer_proxy = relayer_client.into_proxy();
         *lock = State::Requested {
             mas_instances,
             relayer_proxy: Some(relayer_proxy),

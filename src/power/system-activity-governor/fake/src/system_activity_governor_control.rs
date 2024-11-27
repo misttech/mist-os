@@ -30,12 +30,8 @@ type StateHangingGet =
     HangingGet<fctrl::SystemActivityGovernorState, fctrl::StateWatchResponder, NotifyFn>;
 
 async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::LeaseControlProxy> {
-    let lease_control = controller
-        .lessor
-        .lease(level)
-        .await?
-        .map_err(|e| anyhow::anyhow!("{e:?}"))?
-        .into_proxy()?;
+    let lease_control =
+        controller.lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy();
 
     let mut lease_status = LeaseStatus::Unknown;
     while lease_status != LeaseStatus::Satisfied {
@@ -108,7 +104,7 @@ impl SystemActivityGovernorControl {
             .unwrap()
             .unwrap()
             .into_iter()
-            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
             .collect();
 
         let es_status = status_endpoints.remove("execution_state").unwrap();

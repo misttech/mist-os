@@ -127,7 +127,7 @@ impl BlobfsRamdiskBuilder {
             None => (Ramdisk::start().await.context("creating backing ramdisk for blobfs")?, true),
         };
 
-        let ramdisk_controller = ramdisk.client.open_controller()?.into_proxy()?;
+        let ramdisk_controller = ramdisk.client.open_controller()?.into_proxy();
 
         // Spawn blobfs on top of the ramdisk.
         let mut fs = match implementation {
@@ -329,7 +329,7 @@ impl BlobfsRamdisk {
 
     /// Returns a new connection to blobfs's root directory as a DirectoryProxy.
     pub fn root_dir_proxy(&self) -> Result<fio::DirectoryProxy, Error> {
-        Ok(self.root_dir_handle()?.into_proxy()?)
+        Ok(self.root_dir_handle()?.into_proxy())
     }
 
     /// Returns a new connection to blobfs's root directory as a openat::Dir.
@@ -424,7 +424,7 @@ impl BlobfsRamdisk {
                         return Err(anyhow!("create blob error {:?}", e));
                     }
                 };
-                let writer = writer_client_end.into_proxy()?;
+                let writer = writer_client_end.into_proxy();
                 let mut blob_writer =
                     blob_writer::BlobWriter::create(writer, compressed_data.len() as u64)
                         .await
@@ -667,7 +667,7 @@ mod tests {
         for block_count in [1, 2, 3, 16] {
             let ramdisk = Ramdisk::builder().block_count(block_count).start().await.unwrap();
             let client_end = ramdisk.client.open().unwrap();
-            let proxy = client_end.into_proxy().unwrap();
+            let proxy = client_end.into_proxy();
             let info = proxy.get_info().await.unwrap().unwrap();
             assert_eq!(info.block_count, block_count);
         }
@@ -725,12 +725,10 @@ mod tests {
 
         let blob_creator = blobfs.blob_creator_proxy().unwrap().unwrap();
         let blob_writer = blob_creator.create(&hash, false).await.unwrap().unwrap();
-        let mut blob_writer = blob_writer::BlobWriter::create(
-            blob_writer.into_proxy().unwrap(),
-            compressed_data.len() as u64,
-        )
-        .await
-        .unwrap();
+        let mut blob_writer =
+            blob_writer::BlobWriter::create(blob_writer.into_proxy(), compressed_data.len() as u64)
+                .await
+                .unwrap();
         let () = blob_writer.write(&compressed_data).await.unwrap();
 
         assert_eq!(list_blobs(&root), vec![hash.to_string()]);

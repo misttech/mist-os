@@ -14,7 +14,7 @@ impl Directory {
     /// Turn the [Directory] into a remote VFS node.
     pub(crate) fn into_remote(self) -> Arc<impl RemoteLike + DirectoryEntry> {
         let client_end = ClientEnd::<fio::DirectoryMarker>::from(self);
-        vfs::remote::remote_dir(client_end.into_proxy().unwrap())
+        vfs::remote::remote_dir(client_end.into_proxy())
     }
 }
 

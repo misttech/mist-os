@@ -84,7 +84,7 @@ mod tests {
         assert!(ex.run_until_stalled(&mut fut).is_pending());
 
         let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let node: fio::NodeProxy = client_end.into_proxy();
         let result = ex.run_singlethreaded(node.take_event_stream().next()).unwrap();
         assert_matches!(
             result,
@@ -130,7 +130,7 @@ mod tests {
         assert!(ex.run_until_stalled(&mut fut).is_pending());
 
         let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
-        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let node: fio::NodeProxy = client_end.into_proxy();
         let result = ex.run_singlethreaded(node.take_event_stream().next()).unwrap();
         assert_matches!(
             result,

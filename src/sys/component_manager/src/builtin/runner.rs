@@ -166,7 +166,7 @@ mod tests {
                 fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
             client.start(sample_start_info("xxx://failing"), server_controller)?;
             let actual = client_controller
-                .into_proxy()?
+                .into_proxy()
                 .take_event_stream()
                 .next()
                 .await

@@ -317,7 +317,7 @@ pub fn merged_configuration_stream(
     client_end: fidl::endpoints::ClientEnd<fnet_dhcp::ClientMarker>,
     shutdown_future: impl Future<Output = ()> + 'static,
 ) -> impl Stream<Item = Result<Configuration, Error>> + 'static {
-    let client = client_end.into_proxy().expect("into_proxy is infallible");
+    let client = client_end.into_proxy();
     let event_stream = client.take_event_stream();
 
     let proxy_for_shutdown = client.clone();

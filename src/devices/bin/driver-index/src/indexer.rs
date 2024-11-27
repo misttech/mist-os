@@ -180,14 +180,7 @@ impl Indexer {
     }
 
     pub fn set_notifier(&self, notifier: fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>) {
-        match notifier.into_proxy() {
-            Ok(proxy) => {
-                *self.driver_notifier.borrow_mut() = Some(proxy);
-            }
-            Err(e) => {
-                tracing::warn!("Could not set the driver notifier {:?}", e)
-            }
-        }
+        *self.driver_notifier.borrow_mut() = Some(notifier.into_proxy());
     }
 
     pub fn take_notifier(&self) -> Option<fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>> {

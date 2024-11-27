@@ -30,7 +30,7 @@ pub struct RemoteBackend {
 
 impl RemoteBackend {
     pub async fn new(client_end: fidl::endpoints::ClientEnd<BlockMarker>) -> Result<Self, Error> {
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         let block_client = RemoteBlockClient::new(proxy).await?;
         Ok(Self { block_client })
     }

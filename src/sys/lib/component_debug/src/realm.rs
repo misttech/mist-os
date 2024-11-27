@@ -321,7 +321,7 @@ pub async fn get_all_instances(
         Err(_) => return Err(GetAllInstancesError::UnknownError),
     };
 
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     let mut instances = vec![];
 
     loop {
@@ -358,7 +358,7 @@ pub async fn get_resolved_declaration(
         Err(_) => Err(GetDeclarationError::UnknownError),
     }?;
 
-    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy()).await?;
     let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
     let manifest = manifest.fidl_into_native();
     Ok(manifest)
@@ -407,7 +407,7 @@ pub async fn resolve_declaration(
             _ => GetDeclarationError::UnknownError,
         })?;
 
-    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
+    let bytes = drain_manifest_bytes_iterator(iterator.into_proxy()).await?;
     let manifest = fidl::unpersist::<fcdecl::Component>(&bytes)?;
     cm_fidl_validator::validate(&manifest)?;
     let manifest = manifest.fidl_into_native();

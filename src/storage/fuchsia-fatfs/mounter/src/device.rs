@@ -218,7 +218,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await
@@ -240,7 +240,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await
@@ -262,7 +262,7 @@ pub mod test {
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
 
-        let dir = local.into_proxy().expect("into proxy");
+        let dir = local.into_proxy();
 
         let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
             .await

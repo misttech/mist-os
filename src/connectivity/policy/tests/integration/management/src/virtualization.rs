@@ -133,8 +133,7 @@ impl<'a> Guest<'a> {
         ep.set_link_up(true).await.expect("failed to enable endpoint");
 
         let (device, port_id) = ep.get_netdevice().await.expect("failed to get netdevice");
-        let device =
-            device.into_proxy().expect("fuchsia.hardware.network/Device into_proxy failed");
+        let device = device.into_proxy();
         let (port, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
         device.get_port(&port_id, server_end).expect("get_port");

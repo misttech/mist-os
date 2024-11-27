@@ -162,7 +162,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                 // Get the device this port belongs to, and install it on the netstack.
                 let (device, server_end) =
                     fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
-                let port = port.into_proxy().expect("client end into proxy");
+                let port = port.into_proxy();
                 port.get_device(server_end)
                     .context("call get device")
                     .map_err(errors::Error::NonFatal)?;

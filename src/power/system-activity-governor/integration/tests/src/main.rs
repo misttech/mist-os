@@ -124,12 +124,8 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<Arc<PowerEl
 }
 
 async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::LeaseControlProxy> {
-    let lease_control = controller
-        .lessor
-        .lease(level)
-        .await?
-        .map_err(|e| anyhow::anyhow!("{e:?}"))?
-        .into_proxy()?;
+    let lease_control =
+        controller.lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy();
 
     let mut lease_status = LeaseStatus::Unknown;
     while lease_status != LeaseStatus::Satisfied {
@@ -1476,7 +1472,7 @@ async fn test_element_info_provider() -> Result<()> {
         .await?
         .unwrap()
         .into_iter()
-        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
         .collect();
 
     let es_status = status_endpoints.get("execution_state").unwrap();
@@ -1573,7 +1569,7 @@ async fn test_execution_state_always_starts_at_active_power_level() -> Result<()
         .await?
         .unwrap()
         .into_iter()
-        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
         .collect();
 
     let es_status = status_endpoints.get("execution_state").unwrap();
@@ -1602,7 +1598,7 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
         .await?
         .unwrap()
         .into_iter()
-        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
         .collect();
 
     let es_status = status_endpoints.get("execution_state").unwrap();
@@ -1673,7 +1669,7 @@ async fn test_activity_governor_take_application_activity_lease() -> Result<()> 
         .await?
         .unwrap()
         .into_iter()
-        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy()))
         .collect();
 
     let aa_status = status_endpoints.get("application_activity").unwrap();

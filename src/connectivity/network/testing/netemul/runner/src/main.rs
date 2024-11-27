@@ -61,8 +61,7 @@ async fn test_setup(
         })
         .context("/svc directory not in namespace")?
         .context("directory field not set for /svc namespace entry")?
-        .into_proxy()
-        .context("client end into proxy")?;
+        .into_proxy();
 
     let lifecycle_controller =
         connect_to_protocol_at_dir_root::<fsys2::LifecycleControllerMarker>(&svc_dir)

@@ -1115,7 +1115,7 @@ mod tests {
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
 
-        let storage_admin = client.into_proxy().unwrap();
+        let storage_admin = client.into_proxy();
         let status = StorageAdmin::get_storage_status(&storage_admin).await.unwrap();
 
         assert_eq!(status.used_size.unwrap(), used);

@@ -1030,7 +1030,7 @@ mod tests {
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
-        let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
+        let proxy = stream_config.client.take().expect("Must have a client").into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
@@ -1089,7 +1089,7 @@ mod tests {
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Default::default() };
         let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
-        let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
+        let proxy = stream_config.client.take().expect("Must have a client").into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(&ring_buffer_format, server)?;
 
@@ -1363,7 +1363,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let properties = match exec.run_until_stalled(&mut proxy.get_properties()) {
             Poll::Ready(Ok(v)) => v,
@@ -1392,7 +1392,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let gain_state = match exec.run_until_stalled(&mut proxy.watch_gain_state()) {
             Poll::Ready(Ok(v)) => v,
@@ -1410,7 +1410,7 @@ mod tests {
         mut stream_config: StreamConfig,
     ) {
         let client = stream_config.client.take().expect("Must have client");
-        let proxy = client.into_proxy().expect("Client should be available");
+        let proxy = client.into_proxy();
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         let plug_state = match exec.run_until_stalled(&mut proxy.watch_plug_state()) {
             Poll::Ready(Ok(v)) => v,
@@ -1619,11 +1619,8 @@ mod tests {
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
         let stream_config_inner = stream_config.inner.clone();
         let _codec_plug_detect_task = fasync::Task::spawn(async move {
-            DefaultConfigurator::watch_plug_detect(
-                codec_client.into_proxy().expect("Must have proxy"),
-                stream_config_inner,
-            )
-            .await;
+            DefaultConfigurator::watch_plug_detect(codec_client.into_proxy(), stream_config_inner)
+                .await;
         });
 
         {
@@ -1636,7 +1633,7 @@ mod tests {
         }
 
         let stream_config_client = stream_config.client.take().expect("Must have client");
-        let proxy = stream_config_client.into_proxy().expect("Client should be available");
+        let proxy = stream_config_client.into_proxy();
         let _stream_config_task = fasync::Task::spawn(stream_config.process_stream_requests());
 
         // First get plugged with time 0 since there is no plug state before this first watch.
@@ -1687,7 +1684,7 @@ mod tests {
                 is_input: false,
             };
             let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-            let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+            let codec_proxy = codec_client.into_proxy();
             let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
             configurator.process_new_codec(codec_interface).await?;
         }
@@ -1757,7 +1754,7 @@ mod tests {
             is_input: false, // Make the device to be of type output.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
@@ -1774,7 +1771,7 @@ mod tests {
             is_input: true, // Make the device to be of type input.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
@@ -1791,7 +1788,7 @@ mod tests {
             is_input: true, // Make the device to be of type input.
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         configurator.process_new_codec(codec_interface).await?;
 
@@ -1834,7 +1831,7 @@ mod tests {
             is_input: false,
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
-        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_proxy = codec_client.into_proxy();
         let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
         let proxy = codec_interface.get_proxy()?.clone();
         configurator.process_new_codec(codec_interface).await?;
@@ -1923,11 +1920,8 @@ mod tests {
         let _codec_task = fasync::Task::spawn(codec.process_codec_requests());
         let stream_config_inner = stream_config.inner.clone();
         let _codec_plug_detect_task = fasync::Task::spawn(async move {
-            DefaultConfigurator::watch_plug_detect(
-                codec_client.into_proxy().expect("Must have proxy"),
-                stream_config_inner,
-            )
-            .await;
+            DefaultConfigurator::watch_plug_detect(codec_client.into_proxy(), stream_config_inner)
+                .await;
         });
 
         {
@@ -1940,7 +1934,7 @@ mod tests {
         }
 
         let stream_config_client = stream_config.client.take().expect("Must have client");
-        let proxy = stream_config_client.into_proxy().expect("Client should be available");
+        let proxy = stream_config_client.into_proxy();
         let _stream_config_task = fasync::Task::spawn(stream_config.process_stream_requests());
 
         let plug_state = match exec.run_until_stalled(&mut proxy.watch_plug_state()) {

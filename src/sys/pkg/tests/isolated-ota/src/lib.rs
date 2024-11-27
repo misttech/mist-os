@@ -133,10 +133,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             .await
             .unwrap();
 
-        let paver_dir_proxy = params
-            .paver_connector
-            .into_proxy()
-            .expect("failed to convert paver dir client end to proxy");
+        let paver_dir_proxy = params.paver_connector.into_proxy();
         let paver_child = realm_builder
             .add_local_child(
                 "paver",
@@ -223,12 +220,12 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             }
         };
 
-        let blobfs_proxy = blobfs_handle.into_proxy().unwrap();
+        let blobfs_proxy = blobfs_handle.into_proxy();
         let (blobfs_client_end_clone, remote) =
             fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         blobfs_proxy.clone2(remote.into_channel().into()).unwrap();
 
-        let blobfs_proxy_clone = blobfs_client_end_clone.into_proxy().unwrap();
+        let blobfs_proxy_clone = blobfs_client_end_clone.into_proxy();
         let blobfs_vfs = vfs::remote::remote_dir(blobfs_proxy_clone);
         let blobfs_reflector = realm_builder
             .add_local_child(

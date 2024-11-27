@@ -718,7 +718,7 @@ mod tests {
             .context("failed to convert server end to controller")?;
         Ok((
             Controller::new(fake_component, controller_stream, control),
-            client_endpoint.into_proxy().expect("conversion to proxy failed."),
+            client_endpoint.into_proxy(),
         ))
     }
 

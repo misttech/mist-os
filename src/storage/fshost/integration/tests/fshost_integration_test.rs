@@ -470,7 +470,7 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
         .await
         .expect("transport error on BlobCreator.Create")
         .expect("failed to create blob");
-    let writer = writer_client_end.into_proxy().unwrap();
+    let writer = writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
         .await
         .expect("failed to create BlobWriter");
@@ -1097,7 +1097,7 @@ async fn delivery_blob_support_fxblob() {
         .expect("transport error on create")
         .expect("failed to create blob");
 
-    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let writer = blob_writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, payload.len() as u64)
         .await
         .expect("failed to create BlobWriter");

@@ -155,8 +155,7 @@ mod tests {
         inspector: Inspector,
         settings: TreeServerSendPreference,
     ) -> Result<(fasync::Task<()>, TreeProxy), Error> {
-        spawn_tree_server(inspector, settings)
-            .map(|(t, p)| (t, p.into_proxy().expect("ClientEnd is convertible to TreeProxy")))
+        spawn_tree_server(inspector, settings).map(|(t, p)| (t, p.into_proxy()))
     }
 
     #[fuchsia::test]

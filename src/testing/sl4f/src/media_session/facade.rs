@@ -60,7 +60,6 @@ impl MediaSessionFacade {
         if let Some(session_control_marker) = session {
             let info_delta = session_control_marker
                 .into_proxy()
-                .map_err(|e| format_err!("Failed to get session control proxy: {}", e))?
                 .watch_status()
                 .await
                 .map_err(|e| format_err!("Failed to watch session status: {}", e))?;

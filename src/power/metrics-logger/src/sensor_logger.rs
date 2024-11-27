@@ -1238,7 +1238,7 @@ pub mod tests {
             while let Some(Ok(req)) = provider_stream.next().await {
                 match req {
                     factivity::ProviderRequest::WatchState { listener, .. } => {
-                        listener_proxy2.set(listener.into_proxy().unwrap()).unwrap();
+                        listener_proxy2.set(listener.into_proxy()).unwrap();
                     }
                 }
             }

@@ -70,7 +70,7 @@ async fn triage_detect_test(test_data: TestData) -> Result<(), Error> {
         .await
         .expect("connection failed");
 
-    let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy()?;
+    let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy();
     let mut event_stream = event_proxy.take_event_stream();
     let fake_clock_control_proxy =
         connect_into_realm::<fake_clock_fidl::FakeClockControlMarker>(&realm_proxy).await;

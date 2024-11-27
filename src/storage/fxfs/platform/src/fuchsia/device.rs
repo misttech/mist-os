@@ -529,9 +529,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -574,9 +572,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -610,9 +606,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -672,9 +666,7 @@ mod tests {
         join!(
             async {
                 let block_client = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel)
-                        .into_proxy()
-                        .expect("create proxy"),
+                    ClientEnd::<BlockMarker>::new(client_channel).into_proxy(),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
@@ -704,9 +696,8 @@ mod tests {
         let file_size = 2 * 1024 * 1024;
         join!(
             async {
-                let original_block_device = ClientEnd::<VolumeMarker>::new(client_channel)
-                    .into_proxy()
-                    .expect("convert into proxy failed");
+                let original_block_device =
+                    ClientEnd::<VolumeMarker>::new(client_channel).into_proxy();
                 let info = original_block_device
                     .get_info()
                     .await

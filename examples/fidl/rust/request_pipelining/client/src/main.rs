@@ -21,7 +21,7 @@ async fn main() -> Result<(), Error> {
         let client_end = echo_launcher.get_echo("not pipelined").await?;
         // "Upgrade" the client end in the response into an Echo proxy, and
         // make an EchoString request on it
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         proxy.echo_string("hello").map_ok(|val| println!("Got echo response {}", val)).await
     };
 

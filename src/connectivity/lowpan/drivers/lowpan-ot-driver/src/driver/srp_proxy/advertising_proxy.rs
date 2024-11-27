@@ -369,7 +369,7 @@ impl AdvertisingProxyInner {
                     srp_host.full_name_cstr().to_owned(),
                     AdvertisingProxyHost {
                         services: Default::default(),
-                        service_publisher: client.into_proxy()?,
+                        service_publisher: client.into_proxy(),
                         addresses,
                     },
                 );

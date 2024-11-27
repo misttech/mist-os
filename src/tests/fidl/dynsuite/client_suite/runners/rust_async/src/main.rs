@@ -44,7 +44,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         //      Closed target methods
         // =====================================================================
         RunnerRequest::CallTwoWayNoPayload { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_no_payload().await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -53,7 +53,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayStructPayload { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_struct_payload().await {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
@@ -64,7 +64,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayTablePayload { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_table_payload().await {
                 Ok(payload) => {
                     responder.send(&TableResultClassification::Success(payload)).unwrap()
@@ -75,7 +75,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayUnionPayload { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_union_payload().await {
                 Ok(payload) => {
                     responder.send(&UnionResultClassification::Success(payload)).unwrap()
@@ -86,7 +86,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayStructPayloadErr { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_struct_payload_err().await {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
@@ -102,7 +102,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayStructRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_struct_request(request.some_field).await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -111,7 +111,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayTableRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_table_request(&request).await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -120,7 +120,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallTwoWayUnionRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.two_way_union_request(&request).await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -129,7 +129,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallOneWayNoRequest { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.one_way_no_request() {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -138,7 +138,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallOneWayStructRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.one_way_struct_request(request.some_field) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -147,7 +147,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallOneWayTableRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.one_way_table_request(&request) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -156,7 +156,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallOneWayUnionRequest { target, request, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.one_way_union_request(&request) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -169,7 +169,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         //      Open target methods
         // =====================================================================
         RunnerRequest::CallStrictOneWay { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.strict_one_way() {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -178,7 +178,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallFlexibleOneWay { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.flexible_one_way() {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -187,7 +187,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallStrictTwoWay { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.strict_two_way().await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -196,7 +196,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallStrictTwoWayFields { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.strict_two_way_fields().await {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
@@ -207,7 +207,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallStrictTwoWayErr { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.strict_two_way_err().await {
                 Ok(Ok(())) => {
                     responder.send(&EmptyResultWithErrorClassification::Success(Empty)).unwrap()
@@ -221,7 +221,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallStrictTwoWayFieldsErr { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.strict_two_way_fields_err().await {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
@@ -239,7 +239,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallFlexibleTwoWay { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.flexible_two_way().await {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
@@ -248,7 +248,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallFlexibleTwoWayFields { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.flexible_two_way_fields().await {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
@@ -259,7 +259,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallFlexibleTwoWayErr { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.flexible_two_way_err().await {
                 Ok(Ok(())) => {
                     responder.send(&EmptyResultWithErrorClassification::Success(Empty)).unwrap()
@@ -273,7 +273,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             }
         }
         RunnerRequest::CallFlexibleTwoWayFieldsErr { target, responder } => {
-            let client = target.into_proxy().unwrap();
+            let client = target.into_proxy();
             match client.flexible_two_way_fields_err().await {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
@@ -297,8 +297,8 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveClosedEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for ClosedTarget events...");
-                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
-                let reporter = reporter.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().take_event_stream();
+                let reporter = reporter.into_proxy();
                 while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => {
@@ -337,8 +337,8 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveAjarEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for AjarTarget events...");
-                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
-                let reporter = reporter.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().take_event_stream();
+                let reporter = reporter.into_proxy();
                 while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => println!("Received AjarTarget event: {}", method_name(event)),
@@ -366,8 +366,8 @@ async fn handle_runner_request(request: RunnerRequest) {
         RunnerRequest::ReceiveOpenEvents { target, reporter, responder } => {
             fasync::Task::spawn(async move {
                 println!("Listening for OpenTarget events...");
-                let mut event_stream = target.into_proxy().unwrap().take_event_stream();
-                let reporter = reporter.into_proxy().unwrap();
+                let mut event_stream = target.into_proxy().take_event_stream();
+                let reporter = reporter.into_proxy();
                 while let Some(event) = event_stream.next().await {
                     match &event {
                         Ok(event) => println!("Received OpenTarget event: {}", method_name(&event)),

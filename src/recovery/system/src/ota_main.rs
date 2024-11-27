@@ -166,7 +166,7 @@ mod tests {
         );
         fasync::Task::local(async move { scope.wait().await }).detach();
 
-        Ok(client.into_proxy()?)
+        Ok(client.into_proxy())
     }
 
     #[fuchsia::test]

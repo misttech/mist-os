@@ -8,7 +8,7 @@ use crate::gtest::*;
 use crate::helpers::*;
 use crate::ltp::*;
 use crate::selinux::*;
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_test::{self as ftest};
 use frunner::{ComponentRunnerMarker, ComponentRunnerProxy, ComponentStartInfo};
@@ -100,8 +100,7 @@ pub async fn handle_suite_requests(
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
                 debug!(?tests, "running tests");
-                let run_listener_proxy =
-                    listener.into_proxy().context("Can't convert run listener channel to proxy")?;
+                let run_listener_proxy = listener.into_proxy();
 
                 if tests.is_empty() {
                     debug!("no tests listed, returning");
@@ -281,7 +280,7 @@ mod tests {
         })
         .detach();
 
-        iterator_client_end.into_proxy().expect("Failed to create proxy")
+        iterator_client_end.into_proxy()
     }
 
     /// Spawns a `ComponentRunnerRequestStream` server that immediately closes all incoming
@@ -369,7 +368,7 @@ mod tests {
                     ..Default::default()
                 },
                 frunner::ComponentStartInfo { ns: Some(vec![]), ..Default::default() },
-                &run_listener.into_proxy().expect("Couldn't create proxy."),
+                &run_listener.into_proxy(),
                 &component_runner,
             )
             .await;

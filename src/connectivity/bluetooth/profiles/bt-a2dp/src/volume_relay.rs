@@ -418,7 +418,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
         let audio_watch_responder = expect_audio_watch(&mut exec, audio_request_stream);
 
-        (handler.into_proxy().expect("absolute volume handler proxy"), audio_watch_responder)
+        (handler.into_proxy(), audio_watch_responder)
     }
 
     /// Test that the relay sets up the connection to AVRCP and Sessions and stops on the stop

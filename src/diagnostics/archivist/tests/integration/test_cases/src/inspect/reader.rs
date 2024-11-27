@@ -45,8 +45,7 @@ async fn read_components_inspect() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.set_health_ok().await.unwrap();
 
@@ -85,8 +84,7 @@ async fn read_same_named_trees_from_single_component() {
         })
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     let writer2 = child_puppet
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest {
@@ -95,8 +93,7 @@ async fn read_same_named_trees_from_single_component() {
         })
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer1.record_string("prop1", "val1").await.unwrap();
     writer2.record_string("prop2", "val2").await.unwrap();
@@ -141,12 +138,11 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
         })
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.record_string("child", "value").await?;
 
-    let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy()?;
+    let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy();
     lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
 
     writer.record_int("int", 3).await?;
@@ -187,8 +183,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_a.set_health_ok().await.unwrap();
 
@@ -196,8 +191,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer_b.set_health_ok().await.unwrap();
 
@@ -236,8 +230,7 @@ async fn unified_reader() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.emit_example_inspect_data().await.unwrap();
 
@@ -307,8 +300,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.emit_example_inspect_data().await.unwrap();
 
@@ -368,8 +360,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.emit_example_inspect_data().await.unwrap();
 
@@ -393,8 +384,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.emit_example_inspect_data().await.unwrap();
 
@@ -421,8 +411,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.emit_example_inspect_data().await.unwrap();
 

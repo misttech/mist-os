@@ -183,7 +183,7 @@ impl ListTool {
         self.repos
             .list_registered_targets(server)
             .map_err(|e| bug!("error communicating with daemon: {e}"))?;
-        let registered_targets = client.into_proxy().map_err(|e| bug!("{e}"))?;
+        let registered_targets = client.into_proxy();
 
         let mut items: HashMap<String, RepositoryInfo> = HashMap::new();
 

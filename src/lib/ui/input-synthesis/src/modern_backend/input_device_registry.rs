@@ -280,8 +280,7 @@ mod tests {
                 InputDeviceRegistryRequest::Register { device, .. } => device,
                 InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { device, .. } => device,
             }
-            .into_proxy()
-            .context("converting client_end to proxy")?;
+            .into_proxy();
 
             // Send a `GetDescriptor` request to `input_device`, and verify that the device
             // is as keyboard.

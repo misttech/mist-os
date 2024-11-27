@@ -434,7 +434,7 @@ impl VulkanRenderer {
         )?;
 
         // Temporarily transform this from a `ClientEnd` to a `Proxy` in order to make a duplicate.
-        let mut buffer_collection_token = buffer_collection_token.into_proxy()?;
+        let mut buffer_collection_token = buffer_collection_token.into_proxy();
         let buffer_collection_token_for_vulkan =
             duplicate_buffer_collection_token(&mut buffer_collection_token).await?;
 

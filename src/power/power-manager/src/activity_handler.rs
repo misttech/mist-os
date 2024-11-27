@@ -277,7 +277,7 @@ mod tests {
                     .expect("Provider request stream yielded Some(Err)")
                 {
                     factivity::ProviderRequest::WatchState { listener, .. } => {
-                        listener.into_proxy().expect("Failed to convert ClientEnd into proxy")
+                        listener.into_proxy()
                     }
                 };
 

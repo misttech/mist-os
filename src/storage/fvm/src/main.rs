@@ -859,7 +859,7 @@ impl Component {
         device: ClientEnd<BlockMarker>,
         _options: StartOptions,
     ) -> Result<(), Error> {
-        let mut fvm = Fvm::open(RemoteBlockClient::new(device.into_proxy()?).await?).await?;
+        let mut fvm = Fvm::open(RemoteBlockClient::new(device.into_proxy()).await?).await?;
 
         for (&index, partition) in &fvm.inner.get_mut().metadata.partitions {
             self.add_volume_to_volumes_directory(index, &partition.name()).unwrap();
@@ -992,7 +992,7 @@ impl Component {
         };
 
         let key = if let Some(crypt) = options.crypt {
-            let crypt_proxy = crypt.into_proxy().unwrap();
+            let crypt_proxy = crypt.into_proxy();
             Some(if format {
                 zxcrypt::Key::format(&fvm, partition_index, &crypt_proxy).await.unwrap()
             } else {

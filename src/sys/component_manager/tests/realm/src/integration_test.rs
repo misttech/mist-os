@@ -10,7 +10,7 @@ use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys, fuchsia_a
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
 
     let mut bytes = vec![];
 
@@ -273,7 +273,7 @@ pub async fn will_not_resolve() {
 pub async fn get_all_instances() {
     let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let iterator = query.get_all_instances().await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     let mut instances = vec![];
 
     loop {

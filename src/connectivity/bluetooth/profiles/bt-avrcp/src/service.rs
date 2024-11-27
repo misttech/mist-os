@@ -90,35 +90,27 @@ where
             }
             PeerManagerRequest::SetAbsoluteVolumeHandler { handler, responder } => {
                 info!("Received client request to set absolute volume handler");
-                match handler.into_proxy() {
-                    Ok(absolute_volume_handler) => {
-                        let (response, register_absolute_volume_handler_request) =
-                            ServiceRequest::new_register_absolute_volume_handler_request(
-                                absolute_volume_handler,
-                            );
-                        sender.try_send(register_absolute_volume_handler_request)?;
-                        match response.into_future().await? {
-                            Ok(_) => responder.send(Ok(()))?,
-                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
-                        }
-                    }
-                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
-                };
+                let absolute_volume_handler = handler.into_proxy();
+                let (response, register_absolute_volume_handler_request) =
+                    ServiceRequest::new_register_absolute_volume_handler_request(
+                        absolute_volume_handler,
+                    );
+                sender.try_send(register_absolute_volume_handler_request)?;
+                match response.into_future().await? {
+                    Ok(_) => responder.send(Ok(()))?,
+                    Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
+                }
             }
             PeerManagerRequest::RegisterTargetHandler { handler, responder } => {
                 info!("Received client request for registering Target Handler");
-                match handler.into_proxy() {
-                    Ok(target_handler) => {
-                        let (response, register_target_handler_request) =
-                            ServiceRequest::new_register_target_handler_request(target_handler);
-                        sender.try_send(register_target_handler_request)?;
-                        match response.into_future().await? {
-                            Ok(_) => responder.send(Ok(()))?,
-                            Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
-                        }
-                    }
-                    Err(_) => responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?,
-                };
+                let target_handler = handler.into_proxy();
+                let (response, register_target_handler_request) =
+                    ServiceRequest::new_register_target_handler_request(target_handler);
+                sender.try_send(register_target_handler_request)?;
+                match response.into_future().await? {
+                    Ok(_) => responder.send(Ok(()))?,
+                    Err(_) => responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()))?,
+                }
             }
         }
     }

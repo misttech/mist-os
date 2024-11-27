@@ -33,18 +33,13 @@ fn handle_pairing_client_connection(
         while let Some(request) = stream.next().await {
             match request {
                 Ok(PairingRequest::SetPairingDelegate { input, output, delegate, .. }) => {
-                    match delegate.into_proxy() {
-                        Ok(delegate) => {
-                            let client = PairingArgs { input, output, delegate };
+                            let client = PairingArgs { input, output, delegate: delegate.into_proxy() };
                             if let Err(e) = sender.send(ServiceRequest::Pairing(client)).await {
                                 warn!(
                                     "Couldn't relay SetPairingDelegate request to component: {:?}",
                                     e
                                 );
                             }
-                        }
-                        Err(e) => warn!("Couldn't obtain PairingDelegate client: {:?}", e),
-                    }
                 }
                 Ok(PairingRequest::SetDelegate { .. }) => {
                     warn!("Pairing.SetDelegate received, unimplemented, ignoring (will drop delegate)");
@@ -68,16 +63,17 @@ fn handle_fastpair_client_connection(
     async move {
         while let Some(request) = stream.next().await {
             match request {
-                Ok(ProviderRequest::Enable { watcher, responder }) => match watcher.into_proxy() {
-                    Ok(watcher) => {
-                        if let Err(e) =
-                            sender.send(ServiceRequest::EnableFastPair { watcher, responder }).await
-                        {
-                            warn!("Couldn't relay Fast Pair enable request to component: {:?}", e);
-                        }
+                Ok(ProviderRequest::Enable { watcher, responder }) => {
+                    if let Err(e) = sender
+                        .send(ServiceRequest::EnableFastPair {
+                            watcher: watcher.into_proxy(),
+                            responder,
+                        })
+                        .await
+                    {
+                        warn!("Couldn't relay Fast Pair enable request to component: {:?}", e);
                     }
-                    Err(e) => warn!("Couldn't obtain FastPair Provider client: {:?}", e),
-                },
+                }
                 Err(e) => {
                     warn!("Error in fastpair.Provider stream: {:?}. Closing connection", e);
                     break;

@@ -105,7 +105,7 @@ impl AdvertiseStatus {
 fn get_parameters_from_advertise_request(
     payload: bredr::ProfileAdvertiseRequest,
 ) -> Result<(bredr::ConnectionReceiverProxy, ChannelParameters), Error> {
-    let receiver = payload.receiver.unwrap().into_proxy()?;
+    let receiver = payload.receiver.unwrap().into_proxy();
     let parameters = ChannelParameters::try_from(&payload.parameters.unwrap_or_default())?;
     Ok((receiver, parameters))
 }
@@ -737,7 +737,7 @@ mod tests {
                 ..
             }) => {
                 let _ = responder.send(Ok(&advertise_response(services.unwrap())));
-                receiver.unwrap().into_proxy().unwrap()
+                receiver.unwrap().into_proxy()
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         }
@@ -1096,7 +1096,7 @@ mod tests {
             }) => {
                 assert_eq!(services.len(), n1);
                 let _ = responder.send(Ok(&advertise_response(services)));
-                receiver.unwrap().into_proxy().unwrap()
+                receiver.unwrap().into_proxy()
             }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
@@ -1141,7 +1141,7 @@ mod tests {
             }) => {
                 assert_eq!(services.len(), n1 + n2);
                 let _ = responder.send(Ok(&advertise_response(services)));
-                receiver.unwrap().into_proxy().unwrap()
+                receiver.unwrap().into_proxy()
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         };
@@ -1322,7 +1322,7 @@ mod tests {
                     ..Default::default()
                 };
                 let _ = responder.send(Ok(&advertise_response(services)));
-                receiver.unwrap().into_proxy().unwrap()
+                receiver.unwrap().into_proxy()
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         };
@@ -1382,7 +1382,7 @@ mod tests {
                     ..Default::default()
                 };
                 let _ = responder.send(Ok(&advertise_response(services)));
-                receiver.unwrap().into_proxy().unwrap()
+                receiver.unwrap().into_proxy()
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         };

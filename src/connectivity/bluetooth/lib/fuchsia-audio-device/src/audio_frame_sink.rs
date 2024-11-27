@@ -147,7 +147,7 @@ mod tests {
             zx::MonotonicDuration::from_millis(100),
         )
         .expect("should always build");
-        test(exec, client.into_proxy().expect("channel should be available"), frame_sink)
+        test(exec, client.into_proxy(), frame_sink)
     }
 
     #[fixture(with_audio_frame_sink)]

@@ -37,7 +37,7 @@ async fn handle_connection(host_socket: fidl::Socket) -> Result<()> {
 fn make_con() -> Result<(fidl::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
     let (client_socket, server_socket) = fidl::Socket::create_stream();
     let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
-    let client_end = client_end.into_proxy()?;
+    let client_end = client_end.into_proxy();
     let con = ConnectionTransport { data: server_socket, con: server_end };
     Ok((client_socket, client_end, con))
 }

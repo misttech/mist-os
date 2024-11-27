@@ -44,7 +44,7 @@ pub fn map_to_raw_status(e: Error) -> zx::sys::zx_status_t {
 }
 
 pub async fn new_block_client(remote: ClientEnd<BlockMarker>) -> Result<RemoteBlockClient, Error> {
-    Ok(RemoteBlockClient::new(remote.into_proxy()?).await?)
+    Ok(RemoteBlockClient::new(remote.into_proxy()).await?)
 }
 
 /// Runs Fxfs as a component.

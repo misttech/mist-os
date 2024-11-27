@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there is exactly one protocol inside the svc directory.
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         assert_eq!(
             entries,
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(ns[0].path.to_string(), "/svc");
 
         // Check that there are exactly two protocols inside the svc directory.
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let mut entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         let mut expectation = vec![
             DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },
@@ -381,14 +381,14 @@ mod tests {
 
         // Check that there are one protocol inside each directory.
         {
-            let dir = svc1.pop().unwrap().directory.into_proxy().unwrap();
+            let dir = svc1.pop().unwrap().directory.into_proxy();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir).await.unwrap(),
                 vec![DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },]
             );
         }
         {
-            let dir = svc2.pop().unwrap().directory.into_proxy().unwrap();
+            let dir = svc2.pop().unwrap().directory.into_proxy();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir).await.unwrap(),
                 vec![DirEntry { name: "b".to_string(), kind: fio::DirentType::Service },]
@@ -411,7 +411,7 @@ mod tests {
         assert_eq!(ns.len(), 1);
         assert_eq!(ns[0].path.to_string(), "/svc");
 
-        let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = ns.pop().unwrap().directory.into_proxy();
         let (client_end, server_end) = zx::Channel::create();
         let _ = fdio::service_connect_at(
             &dir.into_channel().unwrap().into_zx_channel(),
@@ -513,7 +513,7 @@ mod tests {
         namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
-        let dir_proxy = dir_proxy.into_proxy().unwrap();
+        let dir_proxy = dir_proxy.into_proxy();
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
             .open3(
@@ -592,7 +592,7 @@ mod tests {
         namespace.add_entry(dir.into(), &ns_path("/dir")).unwrap();
         let mut ns = namespace.serve().unwrap();
         let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
-        let dir_proxy = dir_proxy.into_proxy().unwrap();
+        let dir_proxy = dir_proxy.into_proxy();
 
         // Try to open as executable. Should fail (ACCESS_DENIED)
         let (node, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
@@ -604,7 +604,7 @@ mod tests {
                 server_end.into_channel(),
             )
             .unwrap();
-        let node = node.into_proxy().unwrap();
+        let node = node.into_proxy();
         let mut node = node.take_event_stream();
         assert_matches!(
             node.try_next().await,

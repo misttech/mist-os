@@ -169,7 +169,7 @@ impl BufferCollectionAllocator {
         })?;
 
         Ok(BufferCollectionAllocator {
-            token: Some(local_token.into_proxy()?),
+            token: Some(local_token.into_proxy()),
             width,
             height,
             pixel_format,
@@ -203,7 +203,7 @@ impl BufferCollectionAllocator {
             buffer_collection_request: Some(collection_request),
             ..Default::default()
         })?;
-        let collection_client = collection_client.into_proxy()?;
+        let collection_client = collection_client.into_proxy();
         self.allocate_buffers_proxy(collection_client, set_constraints).await
     }
 

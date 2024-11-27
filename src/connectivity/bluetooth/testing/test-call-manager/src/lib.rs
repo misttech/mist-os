@@ -705,7 +705,7 @@ impl TestCallManager {
             }
             PeerHandlerRequest::GainControl { control, .. } => {
                 let this = self.clone();
-                let proxy = control.into_proxy()?;
+                let proxy = control.into_proxy();
                 let proxy_ = proxy.clone();
                 let task = fasync::Task::spawn(async move {
                     let mut speaker_gain_stream =

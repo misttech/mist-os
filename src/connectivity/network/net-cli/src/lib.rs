@@ -1532,7 +1532,7 @@ async fn print_neigh_entries(
 ) -> Result<(), Error> {
     let (it_client, it_server) =
         fidl::endpoints::create_endpoints::<fneighbor::EntryIteratorMarker>();
-    let it = it_client.into_proxy().context("error creating proxy to entry iterator")?;
+    let it = it_client.into_proxy();
 
     let () = view
         .open_entry_iterator(it_server, &fneighbor::EntryIteratorOptions::default())

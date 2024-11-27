@@ -360,7 +360,7 @@ mod tests {
         // concurrently.
         let server = streamer.service_payload_stream_requests(stream, status_callback);
 
-        return Ok((client_end.into_proxy()?, server));
+        return Ok((client_end.into_proxy(), server));
     }
 
     async fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {

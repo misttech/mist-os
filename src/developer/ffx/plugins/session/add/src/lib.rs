@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_add_args::SessionAddCommand;
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
@@ -44,7 +44,7 @@ pub async fn add_impl<W: std::io::Write>(
     writeln!(writer, "Add {} to the current session", &cmd.url)?;
     let (controller_client, controller_server) = if cmd.interactive {
         let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>();
-        let client = client.into_proxy().context("converting client end to proxy")?;
+        let client = client.into_proxy();
         (Some(client), Some(server))
     } else {
         (None, None)

@@ -325,11 +325,11 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
     connect_to_protocol::<CountersConnectorMarker>()?.connect(&name, counters_server)?;
     connect_to_protocol::<TelemetryProviderConnectorMarker>()?.connect(&name, telemetry_server)?;
 
-    let device = device_client.into_proxy().context("into_proxy() failed")?;
-    let device_extra = device_extra_client.into_proxy().context("into_proxy() failed")?;
-    let device_test = device_test_client.into_proxy().context("into_proxy() failed")?;
-    let counters = counters_client.into_proxy().context("into_proxy() failed")?;
-    let telemetry = telemetry_client.into_proxy().context("into_proxy() failed")?;
+    let device = device_client.into_proxy();
+    let device_extra = device_extra_client.into_proxy();
+    let device_test = device_test_client.into_proxy();
+    let counters = counters_client.into_proxy();
+    let telemetry = telemetry_client.into_proxy();
 
     {
         // "iface-*/counters" node

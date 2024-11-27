@@ -56,7 +56,7 @@ impl MockCoordinator {
         listener_client_end: ClientEnd<CoordinatorListenerMarker>,
     ) -> Result<MockCoordinator> {
         let coordinator_stream = coordinator_server_end.into_stream()?;
-        let listener_proxy = listener_client_end.into_proxy()?;
+        let listener_proxy = listener_client_end.into_proxy();
         Ok(MockCoordinator { coordinator_stream, listener_proxy, displays: HashMap::new() })
     }
 

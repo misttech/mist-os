@@ -239,7 +239,7 @@ async fn create_realm_instance(
                 })?
             }
             fnetemul::ChildSource::Mock(dir) => {
-                let dir = dir.into_proxy().expect("failed to create proxy from channel");
+                let dir = dir.into_proxy();
                 builder
                     .add_local_child(
                         &name,
@@ -744,7 +744,7 @@ impl ManagedRealm {
                 ManagedRealmRequest::AddDevice { path, device, responder } => {
                     // ClientEnd::into_proxy should only return an Err when there is no executor, so
                     // this is not expected to ever cause a panic.
-                    let device = device.into_proxy().expect("failed to get device proxy");
+                    let device = device.into_proxy();
                     let devfs = devfs.clone();
                     let response = (|| async move {
                         let (parent_path, device_name) =
@@ -1716,10 +1716,7 @@ mod tests {
             .await
             .expect("calling create endpoint");
         let () = zx::Status::ok(status).expect("endpoint creation");
-        let endpoint = endpoint
-            .expect("endpoint creation")
-            .into_proxy()
-            .expect("failed to create endpoint proxy");
+        let endpoint = endpoint.expect("endpoint creation").into_proxy();
         assert_eq!(endpoint.get_name().await.expect("calling get name"), name);
         assert_eq!(
             endpoint.get_config().await.expect("calling get config"),
@@ -2237,7 +2234,7 @@ mod tests {
         let (status, endpoint) =
             endpoint_mgr.create_endpoint(name, &config).await.expect("calling create endpoint");
         let () = zx::Status::ok(status).expect("endpoint creation");
-        endpoint.expect("endpoint creation").into_proxy().expect("failed to create endpoint proxy")
+        endpoint.expect("endpoint creation").into_proxy()
     }
 
     fn get_device_proxy(
@@ -2326,7 +2323,6 @@ mod tests {
             .expect("failed to create proxy");
         let () = get_device_proxy(&endpoint)
             .into_proxy()
-            .expect("failed to create device proxy from client end")
             .serve_controller(server_end)
             .expect("failed to serve device");
         let path = controller

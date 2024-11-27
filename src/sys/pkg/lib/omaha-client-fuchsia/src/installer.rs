@@ -604,7 +604,7 @@ mod tests {
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
                     responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
@@ -703,7 +703,7 @@ mod tests {
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
                     responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
                             info: Some(UpdateInfo {
@@ -841,7 +841,7 @@ mod tests {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
                     responder.send(Ok("00000000-0000-0000-0000-000000000002")).unwrap();
 
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::FailPrepare(FailPrepareData {
                             reason: Some(
@@ -876,7 +876,7 @@ mod tests {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
                     responder.send(Ok("00000000-0000-0000-0000-000000000003")).unwrap();
 
-                    let monitor = monitor.into_proxy().unwrap();
+                    let monitor = monitor.into_proxy();
                     let () = monitor
                         .on_state(&State::Prepare(
                             fidl_fuchsia_update_installer::PrepareData::default(),

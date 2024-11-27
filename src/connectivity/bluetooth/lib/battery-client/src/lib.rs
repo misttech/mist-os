@@ -244,9 +244,7 @@ mod tests {
             let fut = stream.next();
             let mut fut = pin!(fut);
             match exec.run_until_stalled(&mut fut).expect("fut is ready").unwrap() {
-                Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => {
-                    watcher.into_proxy().unwrap()
-                }
+                Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => watcher.into_proxy(),
                 x => panic!("Expected Watch request, got: {:?}", x),
             }
         };

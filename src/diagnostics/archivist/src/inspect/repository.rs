@@ -120,7 +120,7 @@ impl InspectRepository {
             self.add_inspect_artifacts(
                 guard,
                 component,
-                InspectHandle::tree(tree.into_proxy().unwrap(), name.clone()),
+                InspectHandle::tree(tree.into_proxy(), name.clone()),
                 None,
             );
         }

@@ -110,7 +110,7 @@ impl ActorInstance {
 
     async fn get_actions(&self) -> Result<Vec<String>> {
         let action_iterator = self.actor_proxy.get_actions().await?;
-        let action_iterator = action_iterator.into_proxy()?;
+        let action_iterator = action_iterator.into_proxy();
         let mut actions = vec![];
 
         loop {
@@ -157,7 +157,7 @@ fn connect_to_realm_proxy(ns: Vec<ComponentNamespaceEntry>) -> Result<RealmProxy
             if path == "/svc" {
                 let dir =
                     entry.directory.ok_or(format_err!("No directory for 'svc' namespace entry"))?;
-                let dir = dir.into_proxy()?;
+                let dir = dir.into_proxy();
                 return connect_to_protocol_at_dir_root::<RealmMarker>(&dir);
             }
         }

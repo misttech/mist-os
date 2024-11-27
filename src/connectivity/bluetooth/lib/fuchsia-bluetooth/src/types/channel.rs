@@ -268,8 +268,8 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
             flush_timeout: Arc::new(Mutex::new(
                 fidl.flush_timeout.map(zx::MonotonicDuration::from_nanos),
             )),
-            audio_direction_ext: fidl.ext_direction.and_then(|e| e.into_proxy().ok()),
-            l2cap_parameters_ext: fidl.ext_l2cap.and_then(|e| e.into_proxy().ok()),
+            audio_direction_ext: fidl.ext_direction.map(|e| e.into_proxy()),
+            l2cap_parameters_ext: fidl.ext_l2cap.map(|e| e.into_proxy()),
             terminated: false,
         })
     }

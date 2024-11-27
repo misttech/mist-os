@@ -41,7 +41,7 @@ pub async fn serve(
 async fn collect_blob_ids(
     iterator: ClientEnd<BlobIdIteratorMarker>,
 ) -> Result<Vec<fuchsia_hash::Hash>, Error> {
-    let iterator_proxy = iterator.into_proxy()?;
+    let iterator_proxy = iterator.into_proxy();
     let mut ids = HashSet::new();
     loop {
         let chunk = iterator_proxy.next().await?;

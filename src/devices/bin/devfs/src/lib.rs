@@ -46,7 +46,7 @@ pub async fn main(
         if !expose.remove(path) {
             continue;
         }
-        fs.add_entry_at(path, remote::remote_dir(entry.directory.into_proxy().unwrap()));
+        fs.add_entry_at(path, remote::remote_dir(entry.directory.into_proxy()));
     }
     if !expose.is_empty() {
         let missing = expose.into_iter().collect::<Vec<_>>().join(",");

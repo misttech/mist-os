@@ -37,8 +37,7 @@ impl DriverContext {
     /// arguments.
     pub fn take_node(&mut self) -> Result<Node, Status> {
         let node_client = self.start_args.node.take().ok_or(Status::INVALID_ARGS)?;
-        // TODO(https://fxbug.dev/319159026): when this is infallible the expect can be removed.
-        Ok(Node::from(node_client.into_proxy().expect("into_proxy failed")))
+        Ok(Node::from(node_client.into_proxy()))
     }
 
     /// Serves the given [`ServiceFs`] on the node's outgoing directory. This can only be called

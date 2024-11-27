@@ -422,10 +422,7 @@ mod tests {
                     service::spawn_tree_server(inspector_dup, TreeServerSendPreference::default())
                         .unwrap();
                 servers.push(server);
-                clients
-                    .entry(component_name.clone())
-                    .or_default()
-                    .push(client.into_proxy().unwrap());
+                clients.entry(component_name.clone()).or_default().push(client.into_proxy());
             }
         }
 

@@ -615,13 +615,10 @@ async fn main() -> Result<(), Error> {
 
     // setup repl
 
-    let controller = c_client.into_proxy().expect("error obtaining controller client proxy");
-    let test_controller =
-        t_client.into_proxy().expect("error obtaining test controller client proxy");
-    let browse_controller =
-        bc_client.into_proxy().expect("error obtaining browse controller client proxy");
-    let test_browse_controller =
-        tb_client.into_proxy().expect("error obtaining test browse controller client proxy");
+    let controller = c_client.into_proxy();
+    let test_controller = t_client.into_proxy();
+    let browse_controller = bc_client.into_proxy();
+    let test_browse_controller = tb_client.into_proxy();
 
     let evt_stream = controller.clone().take_event_stream();
 

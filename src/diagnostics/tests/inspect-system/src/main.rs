@@ -102,7 +102,7 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
             }
             ftest::SuiteRequest::Run { tests, listener, .. } => {
                 info!("{} Starting Run", rid);
-                let proxy = listener.into_proxy().expect("into proxy");
+                let proxy = listener.into_proxy();
                 task_tx
                     .send(fasync::Task::spawn(async move {
                         if let Err(e) = handle_run(rid, tests, proxy).await {

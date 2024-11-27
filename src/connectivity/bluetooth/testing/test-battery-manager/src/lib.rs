@@ -27,9 +27,7 @@ impl TestBatteryManager {
         let battery_client =
             BatteryClient::register_updates(c).expect("can register battery client");
         let watcher_client = match s.next().await.expect("valid fidl request") {
-            Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => {
-                watcher.into_proxy().unwrap()
-            }
+            Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => watcher.into_proxy(),
             x => panic!("Expected watch request, got: {:?}", x),
         };
 

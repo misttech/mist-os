@@ -314,7 +314,7 @@ mod test {
     fn setup_fake_target_collection_server(num_tests: usize) -> ffx::TargetCollectionProxy {
         fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::ListTargets { query, reader, .. } => {
-                let reader = reader.into_proxy().unwrap();
+                let reader = reader.into_proxy();
                 let fidl_values: Vec<FidlTargetInfo> =
                     if query.string_matcher.as_deref().map(|s| s.is_empty()).unwrap_or(true) {
                         (0..num_tests)

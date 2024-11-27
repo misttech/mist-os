@@ -86,8 +86,7 @@ async fn start_runner(
                 .detach();
             }
             ftest::SuiteRequest::Run { tests, options, listener, control_handle: _ } => {
-                let parent_listener =
-                    listener.into_proxy().context("creating RunListener proxy for parent")?;
+                let parent_listener = listener.into_proxy();
                 for invocation in tests {
                     let name = invocation.name.unwrap();
                     let tag = invocation.tag;

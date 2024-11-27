@@ -1668,10 +1668,8 @@ mod tests {
         };
 
         // Use a persistent store with the invalid file name and legacy stash which returns errors.
-        let store = PolicyStorage::new_with_stash_proxy_and_id(
-            stash_client.into_proxy().unwrap(),
-            store_path_str,
-        );
+        let store =
+            PolicyStorage::new_with_stash_proxy_and_id(stash_client.into_proxy(), store_path_str);
 
         // Initialize the saved networks manager with the file that should cause write errors, the
         // legacy stash that will load nothing, and empty legacy known ess store file.

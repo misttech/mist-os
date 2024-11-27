@@ -346,7 +346,7 @@ impl AttributionClient {
                             client.attribution_state.lock().add_new_provider(child_id);
                             Self::attribute_memory(
                                 child_id,
-                                child_provider.into_proxy().unwrap(),
+                                child_provider.into_proxy(),
                                 client.clone(),
                             );
                         };

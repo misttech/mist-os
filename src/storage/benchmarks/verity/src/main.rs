@@ -19,7 +19,7 @@ async fn main() {
     let root_dir = fuchsia_fs::directory::open_in_namespace("/data", fio::PERM_READABLE).unwrap();
     let mut results = wait_for_results(&root_dir, &results_file_name(ENABLE_BENCHMARK_NAME)).await;
     let fxfs_admin_proxy = connect_to_protocol::<TestFxfsAdminMarker>().unwrap();
-    let new_root_dir = fxfs_admin_proxy.clear_cache().await.unwrap().unwrap().into_proxy().unwrap();
+    let new_root_dir = fxfs_admin_proxy.clear_cache().await.unwrap().unwrap().into_proxy();
 
     // Connecting to the fuchsia_component::Binder protocol launches the read_verified_file
     // component.

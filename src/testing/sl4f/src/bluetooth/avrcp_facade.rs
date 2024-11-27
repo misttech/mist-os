@@ -79,8 +79,7 @@ impl AvrcpFacade {
         let _status = avrcp_service_proxy
             .get_controller_for_target(&PeerId { value: id }, cont_server)
             .await?;
-        self.inner.write().controller_proxy =
-            Some(cont_client.into_proxy().expect("Error obtaining controller client proxy"));
+        self.inner.write().controller_proxy = Some(cont_client.into_proxy());
         Ok(())
     }
 

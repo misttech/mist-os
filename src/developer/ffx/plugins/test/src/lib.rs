@@ -130,7 +130,7 @@ async fn early_boot_profile<W: 'static + Write + Send + Sync>(
         &run_test_suite_lib::output::DirectoryArtifactType::Debug,
         None,
     ) {
-        Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy()?, o).await,
+        Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy(), o).await,
         Err(e) => {
             writeln!(writer, "Cannot create output directory: {}", e)?;
             return Err(e.into());

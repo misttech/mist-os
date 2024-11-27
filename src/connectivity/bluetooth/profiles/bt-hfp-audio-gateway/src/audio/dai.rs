@@ -376,7 +376,7 @@ mod tests {
                     let dev = TestAudioClient {
                         _name: device_name.to_owned(),
                         is_input,
-                        client: channel.into_proxy().unwrap(),
+                        client: channel.into_proxy(),
                     };
                     if let Err(e) = stream_proxies.feed(dev).await {
                         panic!("Couldn't send new device: {:?}", e);

@@ -101,10 +101,7 @@ impl ResolvedDriver {
             tracing::warn!("{}: Missing package directory", component_url);
             zx::Status::NOT_FOUND
         })?;
-        let proxy = package.into_proxy().map_err(|e| {
-            tracing::warn!("Failed to create package proxy: {:?}", e);
-            zx::Status::INTERNAL
-        })?;
+        let proxy = package.into_proxy();
         let package_dir = PackageDirectory::from_proxy(proxy);
         let package_hash = package_dir.merkle_root().await.map_err(|e| {
             tracing::warn!("Failed to read package directory's hash: {}", e);

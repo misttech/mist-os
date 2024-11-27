@@ -76,7 +76,7 @@ async fn test_example() {
     let sample_reference = zx::BootInstant::get();
 
     // Convert to a proxy so we can send RPCs.
-    let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");
+    let push_source_puppet = push_source_puppet_client_end.into_proxy();
 
     // Let's tell Timekeeper to set a UTC time sample.
     //

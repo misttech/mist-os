@@ -132,8 +132,7 @@ impl NetdeviceWorker {
         ctx: Ctx,
         device: fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>,
     ) -> Result<Self, Error> {
-        let device =
-            netdevice_client::Client::new(device.into_proxy().expect("must be in executor"));
+        let device = netdevice_client::Client::new(device.into_proxy());
         // Enable rx lease watching when suspension is enabled.
         let watch_rx_leases = ctx.bindings_ctx().config.suspend_enabled;
         let (session, task) = device

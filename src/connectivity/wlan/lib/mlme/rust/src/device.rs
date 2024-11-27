@@ -1027,7 +1027,7 @@ pub mod test_utils {
                 return mock_start_result;
             }
 
-            state.wlan_softmac_ifc_bridge_proxy = Some(ifc_bridge.into_proxy().unwrap());
+            state.wlan_softmac_ifc_bridge_proxy = Some(ifc_bridge.into_proxy());
             Ok(state.usme_bootstrap_server_end.take().unwrap().into_channel())
         }
 

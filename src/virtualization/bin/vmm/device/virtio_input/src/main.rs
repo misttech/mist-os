@@ -56,10 +56,9 @@ async fn run_virtio_input(
                 .into_stream()
                 .context("Failed to create stream from KeyboardListener server end")?,
         )),
-        InputType::Mouse(mouse_source) => Box::new(MouseDevice::new(
-            input_device,
-            mouse_source.into_proxy().context("Failed to create MouseSourceProxy")?,
-        )),
+        InputType::Mouse(mouse_source) => {
+            Box::new(MouseDevice::new(input_device, mouse_source.into_proxy()))
+        }
     };
 
     ready_responder.send()?;

@@ -1401,7 +1401,7 @@ pub(crate) mod test {
                     match gatt_server.next().await {
                         Some(Ok(Server_Request::PublishService { info, service, responder })) => {
                             info!("Captured publish of GAS Service: {:?}", info);
-                            gas_endpoints.service = Some(service.into_proxy().unwrap());
+                            gas_endpoints.service = Some(service.into_proxy());
                             let _ = responder.send(Ok(()));
                         }
                         x => error!("Got unexpected GAS Server request: {:?}", x),

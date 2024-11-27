@@ -323,7 +323,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
 async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> Option<String> {
     // Enumerate the instances until we find the starnix kernel.
     let iterator = realm_query.get_all_instances().await.unwrap().unwrap();
-    let iterator = iterator.into_proxy().unwrap();
+    let iterator = iterator.into_proxy();
     while let Ok(instances) = iterator.next().await {
         for instance in instances {
             if let Some(url) = instance.url {

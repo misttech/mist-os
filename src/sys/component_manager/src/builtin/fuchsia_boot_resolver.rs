@@ -588,7 +588,7 @@ mod tests {
         let ResolvedPackage { url: package_url, directory: package_dir, .. } = package.unwrap();
         assert_eq!(package_url, "fuchsia-boot:///");
 
-        let dir_proxy = package_dir.into_proxy().unwrap();
+        let dir_proxy = package_dir.into_proxy();
         let path = "meta/hello-world-rust.cm";
         let file_proxy =
             fuchsia_fs::directory::open_file_async(&dir_proxy, path, fio::PERM_READABLE)
@@ -637,8 +637,7 @@ mod tests {
             .await
             .expect("failed to open capability");
         // Create a client-side resolver proxy to submit resolve requests with.
-        let resolver_proxy =
-            client_channel.into_proxy().expect("failed converting endpoint into proxy");
+        let resolver_proxy = client_channel.into_proxy();
         // Test that the client resolve request is served by the CapabilityProvider successfully.
         assert!(resolver_proxy.resolve("fuchsia-boot:///#meta/hello-world-rust.cm").await.is_ok());
     }

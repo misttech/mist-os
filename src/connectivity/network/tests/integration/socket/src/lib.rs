@@ -363,7 +363,7 @@ async fn setup_fastudp_network<'a>(
             .expect("create datagram socket");
         match datagram_socket {
             fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(socket) => {
-                socket.into_proxy().expect("failed to create proxy")
+                socket.into_proxy()
             }
             socket => panic!("unexpected datagram socket variant: {:?}", socket),
         }
@@ -1355,7 +1355,7 @@ async fn udp_recv_msg_postflight_fidl<N: Netstack>(
         socket => panic!("unexpected datagram socket variant: {:?}", socket),
     };
 
-    let proxy = datagram_socket.into_proxy().expect("failed to create proxy");
+    let proxy = datagram_socket.into_proxy();
 
     // Expect no cmsgs requested by default.
     let response = proxy
@@ -3497,12 +3497,8 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
                 .await
                 .expect("call stream socket")
                 .expect("request stream socket");
-            let fposix_socket::StreamSocketDescribeResponse { socket, .. } = socket
-                .into_proxy()
-                .expect("client end into proxy")
-                .describe()
-                .await
-                .expect("call describe");
+            let fposix_socket::StreamSocketDescribeResponse { socket, .. } =
+                socket.into_proxy().describe().await.expect("call describe");
             socket
         }
         ProtocolWithZirconSocket::FastUdp => {
@@ -3520,12 +3516,8 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
                 }
                 fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(socket) => socket,
             };
-            let fposix_socket::DatagramSocketDescribeResponse { socket, .. } = socket
-                .into_proxy()
-                .expect("client end into proxy")
-                .describe()
-                .await
-                .expect("call describe");
+            let fposix_socket::DatagramSocketDescribeResponse { socket, .. } =
+                socket.into_proxy().describe().await.expect("call describe");
             socket
         }
     };

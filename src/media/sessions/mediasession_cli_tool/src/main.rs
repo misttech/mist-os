@@ -112,7 +112,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Command::Control(control) => {
             let (session_client, session_request) = create_endpoints();
-            let proxy: SessionControlProxy = session_client.into_proxy()?;
+            let proxy: SessionControlProxy = session_client.into_proxy();
             match control.command {
                 ControlCommand::Play(_) => proxy.play()?,
                 ControlCommand::Pause(_) => proxy.pause()?,

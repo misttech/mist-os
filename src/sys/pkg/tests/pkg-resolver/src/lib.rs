@@ -507,7 +507,7 @@ where
 
         let local_child_out_dir = vfs::pseudo_directory! {
             "blob" => vfs::remote::remote_dir(
-                blobfs.root_dir_handle().into_proxy().unwrap()
+                blobfs.root_dir_handle().into_proxy()
             ),
             "data" => vfs::remote::remote_dir(
                 mounts.pkg_resolver_data.to_proxy(fio::RW_STAR_DIR)

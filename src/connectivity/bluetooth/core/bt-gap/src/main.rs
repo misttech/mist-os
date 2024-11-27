@@ -90,7 +90,7 @@ async fn run_receiver_server(
     while let Some(request) = stream.try_next().await? {
         match request {
             ReceiverRequest::AddHost { request, control_handle } => {
-                if let Err(e) = hd_ref.add_host_component(request.into_proxy()?).await {
+                if let Err(e) = hd_ref.add_host_component(request.into_proxy()).await {
                     info!("Error while adding host to bt-gap: {e:?}");
                     control_handle.shutdown();
                 }

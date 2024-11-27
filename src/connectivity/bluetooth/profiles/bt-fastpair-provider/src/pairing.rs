@@ -911,7 +911,7 @@ pub(crate) mod tests {
                 .expect("fidl request")
                 .into_set_pairing_delegate()
                 .unwrap();
-            let downstream_delegate_client = delegate.into_proxy().unwrap();
+            let downstream_delegate_client = delegate.into_proxy();
 
             let mock = MockPairing {
                 pairing_svc,
@@ -930,7 +930,7 @@ pub(crate) mod tests {
                 .expect("fidl request")
                 .into_set_pairing_delegate()
                 .unwrap();
-            self.downstream_delegate_client = delegate.into_proxy().unwrap();
+            self.downstream_delegate_client = delegate.into_proxy();
         }
 
         pub async fn expect_on_pairing_complete(&mut self, id: PeerId) {

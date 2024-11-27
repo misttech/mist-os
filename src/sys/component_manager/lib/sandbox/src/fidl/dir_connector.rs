@@ -18,7 +18,7 @@ impl DirConnector {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = DirReceiver::new(receiver);
         let receiver_task =
-            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy().unwrap()));
+            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy()));
         Self::new_internal(sender, Some(Arc::new(receiver_task)))
     }
 }

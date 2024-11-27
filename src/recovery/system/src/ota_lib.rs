@@ -480,7 +480,6 @@ mod tests {
 
                 log_listener
                     .into_proxy()
-                    .expect("create log_listener proxy")
                     .log(&flog::LogMessage {
                         pid: 0,
                         tid: 0,

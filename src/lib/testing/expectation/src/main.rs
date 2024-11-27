@@ -156,8 +156,7 @@ impl ExpectationsComparer {
         let (skipped, not_skipped): (Vec<_>, Vec<_>) = tests_and_expects
             .partition(|(_invocation, outcome)| matches!(outcome, Some(Outcome::Skip)));
 
-        let listener_proxy =
-            listener.into_proxy().context("error turning RunListener client end into proxy")?;
+        let listener_proxy = listener.into_proxy();
         for (invocation, _) in skipped {
             let (case_listener_proxy, case_listener_server_end) =
                 fidl::endpoints::create_proxy().context("error creating case listener proxy")?;

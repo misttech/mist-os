@@ -265,7 +265,7 @@ mod test {
         let task = fasync::Task::local(async move { serve_directory(&dir_path, send).await });
         let proxy = recv.next().await.map(|event| {
             let RunEventPayload::DebugData(client) = event.into_payload();
-            client.into_proxy().expect("into proxy")
+            client.into_proxy()
         });
         (proxy, task)
     }
@@ -378,7 +378,7 @@ mod test {
             fasync::Task::local(async move { serve_directory_for_suite(&dir_path, send).await });
         let proxy = recv.next().await.map(|event| {
             if let SuiteEventPayload::DebugData(client) = event.unwrap().into_payload() {
-                Some(client.into_proxy().expect("into proxy"))
+                Some(client.into_proxy())
             } else {
                 None // Event is not a DebugData
             }

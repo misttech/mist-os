@@ -1868,7 +1868,7 @@ mod test {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     TargetCollectionRequest::ListTargets { query, reader, .. } => {
-                        let reader = reader.into_proxy().unwrap();
+                        let reader = reader.into_proxy();
                         let list_closure = list_closure.clone();
                         let results = (list_closure)(query);
                         if !results.is_empty() {

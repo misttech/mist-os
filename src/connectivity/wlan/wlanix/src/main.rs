@@ -271,7 +271,7 @@ async fn handle_wifi_request<I: IfaceManager>(
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
             info!("fidl_wlanix::WifiRequest::RegisterEventCallback");
             if let Some(callback) = payload.callback {
-                state.lock().callbacks.push(callback.into_proxy()?);
+                state.lock().callbacks.push(callback.into_proxy());
             }
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
@@ -790,7 +790,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
-                sta_iface_state.lock().callbacks.push(callback.into_proxy()?);
+                sta_iface_state.lock().callbacks.push(callback.into_proxy());
             } else {
                 warn!("Empty callback field in received RegisterCallback request.")
             }
@@ -1385,19 +1385,9 @@ async fn serve_nl80211<I: IfaceManager>(
             Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
                 if let Some(multicast) = payload.multicast {
                     if payload.group == Some("scan".to_string()) {
-                        match multicast.into_proxy() {
-                            Ok(proxy) => {
-                                state.lock().scan_multicast_proxy.replace(proxy);
-                            }
-                            Err(e) => error!("Failed to create scan multicast proxy: {}", e),
-                        }
+                        state.lock().scan_multicast_proxy.replace(multicast.into_proxy());
                     } else if payload.group == Some("mlme".to_string()) {
-                        match multicast.into_proxy() {
-                            Ok(proxy) => {
-                                state.lock().mlme_multicast_proxy.replace(proxy);
-                            }
-                            Err(e) => error!("Failed to create mlme multicast proxy: {}", e),
-                        }
+                        state.lock().mlme_multicast_proxy.replace(multicast.into_proxy());
                     } else {
                         warn!(
                             "Dropping channel for unsupported multicast group {:?}",

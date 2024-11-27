@@ -196,16 +196,7 @@ impl RealmBuilderFactory {
                         responder.send(Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
                         continue;
                     }
-                    let pkg_dir = match pkg_dir_handle
-                        .into_proxy()
-                        .context("Failed to convert `pkg_dir` ClientEnd to proxy.")
-                    {
-                        Ok(pkg_dir) => pkg_dir,
-                        Err(err) => {
-                            responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
-                            return Err(err);
-                        }
-                    };
+                    let pkg_dir = pkg_dir_handle.into_proxy();
                     if let Err(e) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
@@ -239,9 +230,7 @@ impl RealmBuilderFactory {
                     builder_server_end,
                     responder,
                 } => {
-                    let pkg_dir = pkg_dir_handle
-                        .into_proxy()
-                        .context("Failed to convert `pkg_dir` ClientEnd to proxy.")?;
+                    let pkg_dir = pkg_dir_handle.into_proxy();
                     if let Err(err) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
@@ -366,9 +355,7 @@ impl Builder {
                         continue;
                     }
 
-                    let runner_proxy = runner
-                        .into_proxy()
-                        .context("failed to convert runner ClientEnd into proxy")?;
+                    let runner_proxy = runner.into_proxy();
                     *self.runner_proxy_placeholder.lock().await = Some(Clone::clone(&runner_proxy));
                     let res = self
                         .realm_node

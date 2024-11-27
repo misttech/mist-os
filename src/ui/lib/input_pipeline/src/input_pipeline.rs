@@ -547,7 +547,7 @@ impl InputPipeline {
                     ..
                 } => {
                     // Add a binding if the device is a type being tracked
-                    let device_proxy = device.into_proxy().expect("Error getting device proxy.");
+                    let device_proxy = device.into_proxy();
 
                     let device_id = get_next_device_id();
 
@@ -569,7 +569,7 @@ impl InputPipeline {
                     responder,
                     .. } => {
                     // Add a binding if the device is a type being tracked
-                    let device_proxy = device.into_proxy().expect("Error getting device proxy.");
+                    let device_proxy = device.into_proxy();
 
                     let device_id = get_next_device_id();
 

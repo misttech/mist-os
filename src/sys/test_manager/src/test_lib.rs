@@ -331,7 +331,7 @@ impl TestBuilder {
                         ftest_manager::Artifact::DebugData(iterator),
                     ) => {
                         if !self.filter_debug_data {
-                            let proxy = iterator.into_proxy().context("Create proxy")?;
+                            let proxy = iterator.into_proxy();
                             loop {
                                 let data = match get_compressed_debug_data {
                                     true => proxy.get_next_compressed().await?,
@@ -855,7 +855,7 @@ impl FidlSuiteEventProcessor {
                     let component_moniker = custom_artifact.component_moniker.unwrap();
                     let mut sender_clone = sender.clone();
                     fasync::Task::spawn(async move {
-                        let directory = directory.into_proxy().unwrap();
+                        let directory = directory.into_proxy();
                         let entries: Vec<_> =
                             fuchsia_fs::directory::readdir_recursive(&directory, None)
                                 .try_collect()
@@ -1065,7 +1065,7 @@ impl FidlSuiteEventProcessor {
                         let component_moniker = custom_artifact.component_moniker.unwrap();
                         let mut sender_clone = sender.clone();
                         fasync::Task::spawn(async move {
-                            let directory = directory.into_proxy().unwrap();
+                            let directory = directory.into_proxy();
                             let entries: Vec<_> =
                                 fuchsia_fs::directory::readdir_recursive(&directory, None)
                                     .try_collect()
@@ -1100,7 +1100,7 @@ impl FidlSuiteEventProcessor {
                     ftest_manager::Artifact::DebugData(iterator) => {
                         if !filter_debug_data {
                             let mut sender_clone = sender.clone();
-                            let proxy = iterator.into_proxy().context("Create proxy")?;
+                            let proxy = iterator.into_proxy();
                             fasync::Task::spawn(async move {
                                 loop {
                                     let data = match compressed_debug_data {

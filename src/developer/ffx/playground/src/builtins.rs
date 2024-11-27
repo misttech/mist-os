@@ -629,9 +629,8 @@ mod test {
                 let Value::ClientEnd(endpoint, _) = value else {
                     panic!();
                 };
-                let proxy = fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::from(endpoint)
-                    .into_proxy()
-                    .unwrap();
+                let proxy =
+                    fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::from(endpoint).into_proxy();
                 let mut dirs = fuchsia_fs::directory::readdir(&proxy).await.unwrap();
                 dirs.sort_by(|x, y| x.name.cmp(&y.name));
                 let [foo, neils_philosophy] = dirs.try_into().unwrap();
@@ -654,8 +653,7 @@ mod test {
                 panic!();
             };
             let endpoint = i.take_client(Some("fuchsia.io/Node")).unwrap();
-            let proxy =
-                fidl::endpoints::ClientEnd::<fio::NodeMarker>::from(endpoint).into_proxy().unwrap();
+            let proxy = fidl::endpoints::ClientEnd::<fio::NodeMarker>::from(endpoint).into_proxy();
             let event = proxy.take_event_stream().next().await.unwrap().unwrap();
             let fio::NodeEvent::OnOpen_ { s: _, info } = event else { panic!() };
             let info = *info.unwrap();

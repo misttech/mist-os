@@ -74,7 +74,7 @@ where
             let directory_artifact = reporter
                 .new_directory_artifact(&DirectoryArtifactType::Custom, component_moniker)?;
             Ok(async move {
-                let directory = directory.into_proxy()?;
+                let directory = directory.into_proxy();
                 let result =
                     artifacts::copy_custom_artifact_directory(directory, directory_artifact).await;
                 // TODO(https://fxbug.dev/42165719): Remove this signal once Overnet
@@ -90,7 +90,7 @@ where
         ftest_manager::Artifact::DebugData(iterator) => {
             let output_directory = reporter
                 .new_directory_artifact(&DirectoryArtifactType::Debug, None /* moniker */)?;
-            Ok(artifacts::copy_debug_data(iterator.into_proxy()?, output_directory)
+            Ok(artifacts::copy_debug_data(iterator.into_proxy(), output_directory)
                 .map(|()| Ok(None))
                 .named("debug_data")
                 .boxed())

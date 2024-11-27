@@ -21,7 +21,7 @@ async fn main() -> Result<(), Error> {
             ))
             .ok_or_else(|| anyhow!("missing device handle"))?,
         ))
-        .into_proxy()?,
+        .into_proxy(),
         &binary,
         args,
     )

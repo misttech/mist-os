@@ -53,7 +53,7 @@ fn add_entry(entry: io_test::DirectoryEntry, dest: &Arc<Simple>) -> Result<(), E
             remote_client,
             ..
         }) => {
-            dest.add_entry(name, remote_dir(remote_client.into_proxy()?))?;
+            dest.add_entry(name, remote_dir(remote_client.into_proxy()))?;
         }
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
             let new_file = vmo::read_only(contents);

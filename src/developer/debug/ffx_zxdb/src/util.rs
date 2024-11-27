@@ -25,7 +25,7 @@ pub async fn get_all_debug_agents(launcher_proxy: &fdebugger::LauncherProxy) -> 
     let mut agents = iter.get_next().await?;
     while !agents.is_empty() {
         for agent in agents.into_iter() {
-            let debug_agent_proxy = agent.client_end.into_proxy()?;
+            let debug_agent_proxy = agent.client_end.into_proxy();
             let (iter_proxy, iter_server) =
                 fidl::endpoints::create_proxy::<fdebugger::AttachedProcessIteratorMarker>()?;
             debug_agent_proxy.get_attached_processes(iter_server)?;

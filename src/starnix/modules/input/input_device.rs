@@ -1285,7 +1285,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1320,7 +1320,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1353,7 +1353,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1392,7 +1392,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1431,7 +1431,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1509,7 +1509,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1686,7 +1686,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");

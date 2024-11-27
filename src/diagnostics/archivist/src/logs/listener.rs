@@ -67,9 +67,7 @@ impl Listener {
         debug!("New listener with options {:?}", &options);
         Ok(Self {
             status: Status::Fine,
-            listener: log_listener
-                .into_proxy()
-                .map_err(|source| ListenerError::CreatingListenerProxy { source })?,
+            listener: log_listener.into_proxy(),
             filter: MessageFilter::new(options)?,
         })
     }

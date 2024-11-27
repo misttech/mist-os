@@ -226,7 +226,7 @@ impl Program {
     pub fn mock_from_controller(
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
-        let controller = ComponentController::new(controller.into_proxy().unwrap(), None);
+        let controller = ComponentController::new(controller.into_proxy(), None);
         let (runtime_dir, _runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         Program { controller, runtime_dir }

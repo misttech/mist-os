@@ -290,7 +290,7 @@ pub(crate) mod tests {
         match exec.run_until_stalled(&mut profile_requests).expect("Should have request") {
             Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
                 let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse::default()));
-                payload.receiver.unwrap().into_proxy().unwrap()
+                payload.receiver.unwrap().into_proxy()
             }
             x => panic!("Expected Advertise request, got: {x:?}"),
         }

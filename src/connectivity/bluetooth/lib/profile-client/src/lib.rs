@@ -389,10 +389,7 @@ mod tests {
                 assert_eq!(payload.services.unwrap(), expected_defs);
                 assert_eq!(payload.parameters, expected_params);
                 assert!(payload.receiver.is_some());
-                (
-                    payload.receiver.unwrap().into_proxy().expect("proxy for connection receiver"),
-                    responder,
-                )
+                (payload.receiver.unwrap().into_proxy(), responder)
             }
             x => panic!("Expected ready advertisement request, got {:?}", x),
         }
@@ -419,7 +416,7 @@ mod tests {
                 let attr_ids = attr_ids.unwrap_or_default();
                 assert_eq!(&attr_ids[..], search_attrs);
                 assert_eq!(service_uuid, search_uuid);
-                results.into_proxy().expect("proxy from client end")
+                results.into_proxy()
             }
             x => panic!("Expected ready request for a search, got: {:?}", x),
         }

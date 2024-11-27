@@ -160,7 +160,7 @@ impl RamdiskClientBuilder {
             let (outgoing, event) =
                 ramdisk_controller.create(options).await?.map_err(|s| zx::Status::from_raw(s))?;
 
-            RamdiskClient::new_v2(outgoing.into_proxy()?, event)
+            RamdiskClient::new_v2(outgoing.into_proxy(), event)
         } else {
             let dev_root = if let Some(dev_root) = dev_root {
                 dev_root
@@ -508,7 +508,7 @@ mod tests {
     #[fuchsia::test]
     async fn create_open_destroy() {
         let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let client = ramdisk.open().unwrap().into_proxy().unwrap();
+        let client = ramdisk.open().unwrap().into_proxy();
         client.get_info().await.expect("get_info failed").unwrap();
         ramdisk.destroy().await.expect("failed to destroy the ramdisk");
         // The ramdisk will be scheduled to be unbound, so `client` may be valid for some time.
@@ -517,7 +517,7 @@ mod tests {
     #[fuchsia::test]
     async fn create_open_forget() {
         let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let client = ramdisk.open().unwrap().into_proxy().unwrap();
+        let client = ramdisk.open().unwrap().into_proxy();
         client.get_info().await.expect("get_info failed").unwrap();
         assert!(ramdisk.forget().is_ok());
         // We should succeed calling `get_info` as the ramdisk should still exist.

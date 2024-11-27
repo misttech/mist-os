@@ -52,7 +52,7 @@ async fn test_read_write<'a>(
 fn make_con() -> Result<(fasync::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
     let (data_stream, server_socket) = make_socket_pair()?;
     let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
-    let client_end = client_end.into_proxy().unwrap();
+    let client_end = client_end.into_proxy();
     let con = ConnectionTransport { data: server_socket, con: server_end };
     Ok((data_stream, client_end, con))
 }

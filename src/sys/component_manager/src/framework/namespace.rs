@@ -271,7 +271,7 @@ mod tests {
         // can access the Echo protocol (served by the Receiver) through this node.
         let entry = namespace_entries.remove(0);
         assert_matches!(entry.path, Some(p) if p == "/svc");
-        let dir = entry.directory.unwrap().into_proxy().unwrap();
+        let dir = entry.directory.unwrap().into_proxy();
         let echo = client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(&dir).unwrap();
         let response = echo.echo_string(None).await.unwrap();
         assert_matches!(response, Some(m) if m == "first");
@@ -279,7 +279,7 @@ mod tests {
         let entry = namespace_entries.remove(0);
         assert!(namespace_entries.is_empty());
         assert_matches!(entry.path, Some(p) if p == "/zzz/svc");
-        let dir = entry.directory.unwrap().into_proxy().unwrap();
+        let dir = entry.directory.unwrap().into_proxy();
         let echo = client::connect_to_protocol_at_dir_root::<fecho::EchoMarker>(&dir).unwrap();
         let response = echo.echo_string(None).await.unwrap();
         assert_matches!(response, Some(m) if m == "second");

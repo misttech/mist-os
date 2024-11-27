@@ -38,7 +38,7 @@ impl From<RealmProxy_Proxy> for RealmProxyClient {
 
 impl From<ClientEnd<RealmProxy_Marker>> for RealmProxyClient {
     fn from(value: ClientEnd<RealmProxy_Marker>) -> Self {
-        let inner = value.into_proxy().expect("ClientEnd::into_proxy");
+        let inner = value.into_proxy();
         Self { inner }
     }
 }
@@ -78,7 +78,7 @@ impl RealmProxyClient {
     ) -> Result<T::Proxy, anyhow::Error> {
         let (client, server) = create_endpoints::<T>();
         self.connect_server_end_to_named_protocol(protocol_name, server).await?;
-        Ok(client.into_proxy()?)
+        Ok(client.into_proxy())
     }
 
     // Connects the `server_end` to the protocol with the given name, via the proxy.
@@ -114,7 +114,7 @@ impl RealmProxyClient {
             bail!("{:?}", op_err);
         }
 
-        Ok(client.into_proxy()?)
+        Ok(client.into_proxy())
     }
 
     // Connects to the given service instance, via the proxy.
@@ -137,7 +137,7 @@ impl RealmProxyClient {
         }
 
         Ok(T::Proxy::from_member_opener(Box::new(
-            fuchsia_component::client::ServiceInstanceDirectory(client.into_proxy()?),
+            fuchsia_component::client::ServiceInstanceDirectory(client.into_proxy()),
         )))
     }
 }

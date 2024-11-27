@@ -193,7 +193,7 @@ fn open_hci_transport(device_path: &str) -> Result<HciTransportProxy, Error> {
     >(device_path)?;
     let proxy = block_on(interface.open_hci_transport())?
         .map_err(|_| format_err!("open_hci_transport failed"))?
-        .into_proxy()?;
+        .into_proxy();
     Ok(proxy)
 }
 

@@ -222,7 +222,7 @@ impl Inner {
             .open_session(name, session_info)
             .await?
             .map_err(|raw| Error::Open(name.to_owned(), zx::Status::from_raw(raw)))?;
-        let proxy = client.into_proxy()?;
+        let proxy = client.into_proxy();
         let rx = fasync::Fifo::from_fifo(rx);
         let tx = fasync::Fifo::from_fifo(tx);
 

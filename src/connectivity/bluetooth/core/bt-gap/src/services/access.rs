@@ -63,15 +63,8 @@ async fn handler(
     match request {
         AccessRequest::SetPairingDelegate { input, output, delegate, .. } => {
             warn!("fuchsia.bluetooth.sys.Access.SetPairingDelegate({:?}, {:?})", input, output);
-            match delegate.into_proxy() {
-                Ok(proxy) => {
-                    if let Err(e) = hd.set_pairing_delegate(proxy, input, output) {
-                        warn!("Couldn't set PairingDelegate: {e:?}");
-                    }
-                }
-                Err(e) => {
-                    warn!("Invalid Pairing Delegate passed to SetPairingDelegate: {e:?}");
-                }
+            if let Err(e) = hd.set_pairing_delegate(delegate.into_proxy(), input, output) {
+                warn!("Couldn't set PairingDelegate: {e:?}");
             }
             Ok(())
         }

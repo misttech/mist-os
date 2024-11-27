@@ -108,7 +108,7 @@ impl Config {
             "Unable to set server-side FIDL channel via spinel_device_setup_proxy.set_channel()",
         )?;
 
-        Ok(client_side.into_proxy()?)
+        Ok(client_side.into_proxy())
     }
 
     fn get_backbone_netif_index_by_config(&self) -> Option<ot::NetifIndex> {

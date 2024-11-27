@@ -82,7 +82,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                 .detach();
             }
             ftest::SuiteRequest::Run { tests, listener, .. } => {
-                let listener = listener.into_proxy()?;
+                let listener = listener.into_proxy();
 
                 for invocation in tests {
                     let (case_listener, server_end) = create_proxy::<ftest::CaseListenerMarker>()?;

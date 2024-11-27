@@ -493,10 +493,7 @@ where
 
         // Attach the monitor if passed for current update.
         if let Some(monitor) = monitor {
-            let monitor_proxy = monitor.into_proxy().map_err(|e| {
-                error!("error getting proxy from monitor: {:?}", e);
-                CheckNotStartedReason::InvalidOptions
-            })?;
+            let monitor_proxy = monitor.into_proxy();
             let mut single_monitor_queue = server.borrow().single_monitor_queue.clone();
             single_monitor_queue.add_client(StateNotifier { proxy: monitor_proxy }).await.map_err(
                 |e| {
@@ -513,7 +510,7 @@ where
         server: Rc<RefCell<Self>>,
         attempts_monitor: ClientEnd<AttemptsMonitorMarker>,
     ) -> Result<(), Error> {
-        let proxy = attempts_monitor.into_proxy()?;
+        let proxy = attempts_monitor.into_proxy();
         let mut attempt_monitor_queue = server.borrow().attempt_monitor_queue.clone();
         let control_handle = server.borrow().single_monitor_queue.clone();
         attempt_monitor_queue.add_client(AttemptNotifier { proxy, control_handle }).await?;

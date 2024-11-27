@@ -307,8 +307,7 @@ mod tests {
                     device
                 }
             }
-            .into_proxy()
-            .expect("converting client_end to proxy");
+            .into_proxy();
 
             input_device_proxy
         };

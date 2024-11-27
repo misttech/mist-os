@@ -87,7 +87,7 @@ impl Inner {
             return Err(zx::Status::ALREADY_BOUND);
         }
         // TODO(surajmalhotra): Reset all connections on observing PEER_CLOSED.
-        self.callbacks = Some(cb.into_proxy().unwrap());
+        self.callbacks = Some(cb.into_proxy());
         Ok(())
     }
 

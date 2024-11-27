@@ -109,11 +109,7 @@ impl FidlServer {
 
                 // Transform FIDL request params into types the install manager can understand.
                 let config = Config::from_url_and_options(url.url.parse()?, options.try_into()?);
-                let notifier = UpdateStateNotifier::new(
-                    monitor
-                        .into_proxy()
-                        .context("while converting monitor ClientEnd into proxy")?,
-                );
+                let notifier = UpdateStateNotifier::new(monitor.into_proxy());
 
                 // If a reboot controller is specified, set up a task that fowards reboot controller
                 // requests to the update attempt task.
@@ -153,11 +149,7 @@ impl FidlServer {
             }
             InstallerRequest::MonitorUpdate { attempt_id, monitor, responder } => {
                 let mut install_manager_ch = self.install_manager_ch.clone();
-                let notifier = UpdateStateNotifier::new(
-                    monitor
-                        .into_proxy()
-                        .context("while converting monitor ClientEnd into proxy")?,
-                );
+                let notifier = UpdateStateNotifier::new(monitor.into_proxy());
 
                 // Forward to the install manager to deal with this.
                 let response = install_manager_ch.monitor_update(attempt_id, notifier).await?;

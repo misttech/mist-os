@@ -73,7 +73,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
                 assert_eq!(tests.len(), 1);
                 assert_eq!(tests[0].name, Some("EchoTest".to_string()));
 
-                let proxy = listener.into_proxy().expect("Can't convert listener channel to proxy");
+                let proxy = listener.into_proxy();
                 let mut result =
                     ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() };
 

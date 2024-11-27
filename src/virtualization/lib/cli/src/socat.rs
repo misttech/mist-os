@@ -262,12 +262,7 @@ mod test {
                 .expect("Unexpected call to Guest Proxy");
             assert_eq!(port, 0);
             responder.send(Ok(())).expect("Failed to send status code to client");
-            let _ = acceptor
-                .into_proxy()
-                .expect("Failed to convert client end into proxy")
-                .accept(0, 0, 1)
-                .await
-                .expect("Failed to accept listener");
+            let _ = acceptor.into_proxy().accept(0, 0, 1).await.expect("Failed to accept listener");
         };
 
         let client = handle_socat_listen(proxy, 0);

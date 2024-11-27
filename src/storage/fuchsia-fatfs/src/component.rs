@@ -207,7 +207,7 @@ impl Component {
             } else {
                 Box::new(std::iter::empty())
             };
-        if block_adapter::run(device.into_proxy()?, "/pkg/bin/mkfs-msdosfs", args).await? == 0 {
+        if block_adapter::run(device.into_proxy(), "/pkg/bin/mkfs-msdosfs", args).await? == 0 {
             Ok(())
         } else {
             bail!(zx::Status::IO)
@@ -222,7 +222,7 @@ impl Component {
         // Pass the '-n' flag so that it never modifies which remains consistent with other
         // filesystems.
         if block_adapter::run(
-            device.into_proxy()?,
+            device.into_proxy(),
             "/pkg/bin/fsck-msdosfs",
             ["-n".to_string()].into_iter(),
         )

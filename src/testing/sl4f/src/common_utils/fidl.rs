@@ -20,7 +20,7 @@ pub fn connect_in_paths<T: ProtocolMarker>(glob_paths: &[&str]) -> Result<Option
                     let (client, server) = zx::Channel::create();
                     fdio::service_connect(path.to_string_lossy().as_ref(), server)?;
                     let client_end = ClientEnd::<T>::new(client);
-                    Ok(Some(client_end.into_proxy()?))
+                    Ok(Some(client_end.into_proxy()))
                 }
                 None => Ok(None),
             }

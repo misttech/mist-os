@@ -198,7 +198,7 @@ mod tests {
         /// Wraps the given monitor proxy in a helper type that verifies sending state to the
         /// remote end of the Monitor results in state being acknowledged as expected.
         fn new(monitor_client_end: ClientEnd<MonitorMarker>) -> Self {
-            let proxy = monitor_client_end.into_proxy().unwrap();
+            let proxy = monitor_client_end.into_proxy();
 
             Self { proxy }
         }

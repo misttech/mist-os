@@ -82,7 +82,7 @@ impl HostArchiveReader {
                         OpenFlags::empty(),
                     )
                     .await??;
-                Cow::Owned(client.into_proxy()?)
+                Cow::Owned(client.into_proxy())
             }
             None => Cow::Borrowed(&self.diagnostics_proxy),
         };

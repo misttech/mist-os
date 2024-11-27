@@ -386,15 +386,18 @@ impl<T> ClientEnd<T> {
 
 impl<T: ProtocolMarker> ClientEnd<T> {
     /// Convert the `ClientEnd` into a `Proxy` through which FIDL calls may be made.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
-    pub fn into_proxy(self) -> Result<T::Proxy, Error> {
-        Ok(T::Proxy::from_channel(AsyncChannel::from_channel(self.inner)))
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    pub fn into_proxy(self) -> T::Proxy {
+        T::Proxy::from_channel(AsyncChannel::from_channel(self.inner))
     }
 
     /// Soft-transition affordance for https://fxbug.dev/319159026.
     // TODO(https://fxbug.dev/319159026) delete this function
     pub fn try_into_proxy(self) -> Result<T::Proxy, Error> {
-        self.into_proxy()
+        Ok(self.into_proxy())
     }
 
     /// Convert the `ClientEnd` into a `SynchronousProxy` through which thread-blocking FIDL calls
@@ -569,7 +572,7 @@ pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
 // TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
     let (client, server) = create_endpoints();
-    Ok((client.into_proxy()?, server))
+    Ok((client.into_proxy(), server))
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
@@ -621,7 +624,7 @@ pub fn try_create_request_stream<T: ProtocolMarker>(
 // TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_proxy()?, server.into_stream()?))
+    Ok((client.into_proxy(), server.into_stream()?))
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.

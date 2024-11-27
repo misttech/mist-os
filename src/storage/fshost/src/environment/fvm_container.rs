@@ -286,7 +286,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_keys() {
         with_crypt_service(|crypt| async {
-            let crypt = crypt.into_proxy().unwrap();
+            let crypt = crypt.into_proxy();
             let (_, key, unwrapped_key) = crypt
                 .create_key(0, fidl_fuchsia_fxfs::KeyPurpose::Data)
                 .await

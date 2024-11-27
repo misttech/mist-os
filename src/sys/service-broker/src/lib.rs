@@ -146,7 +146,7 @@ pub async fn main(
     let Some(program) = program else {
         bail!("No program section provided");
     };
-    let svc = svc.directory.into_proxy().unwrap();
+    let svc = svc.directory.into_proxy();
     let mut fs = ServiceFs::new();
     match get_program_string(&program, "policy")? {
         "first_instance_to_protocol" => {

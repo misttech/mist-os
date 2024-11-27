@@ -214,7 +214,7 @@ impl Player {
         let inspect_state = inspect_handle.create_child("state");
         Ok(Player {
             id,
-            inner: client_end.into_proxy()?,
+            inner: client_end.into_proxy(),
             state: ValidPlayerInfoDelta::default(),
             registration: ValidPlayerRegistration::try_from(registration)?,
             hanging_get: None,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use futures::channel::oneshot;
 use futures::{pin_mut, select, FutureExt, StreamExt};
@@ -110,7 +110,7 @@ impl FuzzRegistry {
             }
             _ => {
                 // For anything else, replace it with the running provider.
-                let provider = provider.into_proxy().context("failed to create proxy")?;
+                let provider = provider.into_proxy();
                 *entry = ProviderStatus::Running(provider);
             }
         };

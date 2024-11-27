@@ -583,7 +583,7 @@ mod tests {
     ) {
         match request {
             HostVsockEndpointRequest::Listen { port, acceptor, responder } => {
-                let result = device.listen(port, acceptor.into_proxy().unwrap());
+                let result = device.listen(port, acceptor.into_proxy());
                 responder
                     .send(result.map_err(|err| err.into_raw()))
                     .expect("failed to send listen response");

@@ -691,7 +691,7 @@ pub mod test {
                     let (client, server) = fidl::endpoints::create_endpoints::<
                         fidl_fuchsia_net_filter_deprecated::FilterMarker,
                     >();
-                    let client = client.into_proxy().expect("failed to convert client to proxy");
+                    let client = client.into_proxy();
                     let server_fut = server
                         .into_stream()
                         .expect("failed to get request stream")
@@ -712,13 +712,8 @@ pub mod test {
                     let (control_client, control_server) = fidl::endpoints::create_endpoints::<
                         fidl_fuchsia_net_filter::ControlMarker,
                     >();
-                    let client_fut = FilterControl::new(
-                        None,
-                        Some(
-                            control_client.into_proxy().expect("failed to convert client to proxy"),
-                        ),
-                    )
-                    .map(|result| result.expect("error creating controller"));
+                    let client_fut = FilterControl::new(None, Some(control_client.into_proxy()))
+                        .map(|result| result.expect("error creating controller"));
                     let mut control_stream =
                         control_server.into_stream().expect("failed to get request stream");
                     let control_server_fut = control_stream.next().map(|req| {

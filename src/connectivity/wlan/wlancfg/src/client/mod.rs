@@ -102,7 +102,7 @@ async fn handle_provider_request(
 ) -> Result<(), fidl::Error> {
     match req {
         fidl_policy::ClientProviderRequest::GetController { requests, updates, .. } => {
-            register_listener(update_sender, updates.into_proxy()?);
+            register_listener(update_sender, updates.into_proxy());
             handle_client_requests(
                 iface_manager,
                 scan_requester,
@@ -440,7 +440,7 @@ async fn handle_listener_request(
 ) -> Result<(), fidl::Error> {
     match req {
         fidl_policy::ClientListenerRequest::GetListener { updates, .. } => {
-            register_listener(update_sender, updates.into_proxy()?);
+            register_listener(update_sender, updates.into_proxy());
             Ok(())
         }
     }

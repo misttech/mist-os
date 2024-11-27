@@ -175,7 +175,7 @@ impl TunWorker {
 
         let (tun_port, server_end) = fidl::endpoints::create_endpoints::<fnet_tun::PortMarker>();
 
-        let tun_device = tun_device.into_proxy().expect("into proxy");
+        let tun_device = tun_device.into_proxy();
         tun_device
             .add_port(
                 &fnet_tun::DevicePortConfig {
@@ -212,7 +212,7 @@ impl TunWorker {
                 starnix_uapi::errno!(ENOENT, format!("adding fuchsia.net.tun Port failed, {e:?}"))
             })?;
 
-        let tun_port = tun_port.into_proxy().expect("into proxy");
+        let tun_port = tun_port.into_proxy();
         let (hw_port, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
         tun_port.get_port(server_end).map_err(|e| {
@@ -221,7 +221,7 @@ impl TunWorker {
                 format!("getting fuchsia.hardware.networkn Port failed: {e:?}")
             )
         })?;
-        let hw_port = hw_port.into_proxy().expect("into proxy");
+        let hw_port = hw_port.into_proxy();
         let port_info = hw_port.get_info().await.map_err(|e| {
             starnix_uapi::errno!(
                 ENOENT,
@@ -249,7 +249,7 @@ impl TunWorker {
 
         let (interface_control, server_end) =
             fidl::endpoints::create_endpoints::<fnet_interfaces_admin::ControlMarker>();
-        let device_control = device_control.into_proxy().expect("into proxy");
+        let device_control = device_control.into_proxy();
         device_control
             .create_interface(
                 &port_info
@@ -269,7 +269,7 @@ impl TunWorker {
                 )
             })?;
 
-        let interface_control = interface_control.into_proxy().expect("into proxy");
+        let interface_control = interface_control.into_proxy();
         let interface_control = fnet_interfaces_ext::admin::Control::new(interface_control);
 
         // Get the NICID that the netstack allocates for this interface. This

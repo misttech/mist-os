@@ -64,7 +64,7 @@ impl<S: Spawn> LowpanService<S> {
         name: &str,
         driver: fidl::endpoints::ClientEnd<DriverMarker>,
     ) -> Result<(), ZxStatus> {
-        let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
+        let driver = driver.into_proxy();
 
         if !DEVICE_NAME_REGEX.is_match(name) {
             error!("Attempted to register LoWPAN device with invalid name {:?}", name);
@@ -328,7 +328,7 @@ mod factory {
             name: &str,
             driver: fidl::endpoints::ClientEnd<FactoryDriverMarker>,
         ) -> Result<(), ZxStatus> {
-            let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
+            let driver = driver.into_proxy();
 
             if !DEVICE_NAME_REGEX.is_match(name) {
                 error!("Attempted to register LoWPAN device with invalid name {:?}", name);

@@ -537,7 +537,7 @@ pub(crate) mod tests {
             zx::MonotonicDuration::from_millis(50),
         )
         .expect("should always build");
-        test(exec, client.into_proxy().expect("channel should be available"), frame_stream)
+        test(exec, client.into_proxy(), frame_stream)
     }
 
     #[fuchsia::test]

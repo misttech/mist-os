@@ -1394,7 +1394,7 @@ mod tests {
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
-        let proxy = client_ep.into_proxy().unwrap();
+        let proxy = client_ep.into_proxy();
 
         let client_future = async move {
             let command = "help";
@@ -1419,7 +1419,7 @@ mod tests {
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
-        let proxy = client_ep.into_proxy().unwrap();
+        let proxy = client_ep.into_proxy();
 
         let client_future = async move {
             let (client_ep, server_ep) = create_endpoints::<EnergyScanResultStreamMarker>();
@@ -1427,7 +1427,7 @@ mod tests {
 
             assert_matches!(proxy.start_energy_scan(&params, server_ep), Ok(()));
 
-            let scanner = client_ep.into_proxy().unwrap();
+            let scanner = client_ep.into_proxy();
             let mut results = vec![];
 
             loop {
@@ -1457,7 +1457,7 @@ mod tests {
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
-        let proxy = client_ep.into_proxy().unwrap();
+        let proxy = client_ep.into_proxy();
 
         let client_future = async move {
             let (client_ep, server_ep) = create_endpoints::<BeaconInfoStreamMarker>();
@@ -1465,7 +1465,7 @@ mod tests {
 
             assert_matches!(proxy.start_network_scan(&params, server_ep), Ok(()));
 
-            let scanner = client_ep.into_proxy().unwrap();
+            let scanner = client_ep.into_proxy();
             let mut results = vec![];
 
             loop {
@@ -1495,7 +1495,7 @@ mod tests {
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
-        let proxy = client_ep.into_proxy().unwrap();
+        let proxy = client_ep.into_proxy();
 
         let client_future = async move {
             assert_matches!(
@@ -1526,7 +1526,7 @@ mod tests {
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
-        let proxy = client_ep.into_proxy().unwrap();
+        let proxy = client_ep.into_proxy();
 
         let client_future = async move {
             assert_eq!(
@@ -1551,7 +1551,7 @@ mod tests {
         };
 
         let client_future = async move {
-            let proxy = client_ep.into_proxy().unwrap();
+            let proxy = client_ep.into_proxy();
             assert_matches!(
                 proxy.attach_all_nodes_to(&[0, 0, 0, 0, 0, 0, 0, 0]).await,
                 Err(fidl::Error::ClientChannelClosed { status: ZxStatus::NOT_SUPPORTED, .. })

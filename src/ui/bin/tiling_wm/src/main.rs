@@ -486,16 +486,7 @@ fn handle_graphical_presenter_request(
             responder,
         } => {
             // "Unwrap" the optional element::AnnotationControllerProxy.
-            let annotation_controller = match annotation_controller {
-                Some(proxy) => match proxy.into_proxy() {
-                    Ok(proxy) => Some(proxy),
-                    Err(e) => {
-                        warn!("Failed to obtain AnnotationControllerProxy: {}", e);
-                        None
-                    }
-                },
-                None => None,
-            };
+            let annotation_controller = annotation_controller.map(|proxy| proxy.into_proxy());
             // "Unwrap" the optional element::ViewControllerRequestStream.
             let view_controller_request_stream = match view_controller_request {
                 Some(request_stream) => match request_stream.into_stream() {

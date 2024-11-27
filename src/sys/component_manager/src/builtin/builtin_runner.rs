@@ -209,7 +209,7 @@ impl BuiltinRunner {
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
                         let Some(svc) = ns_entries.into_iter().find_map(|e| {
                             if e.path == "/svc" {
-                                Some(e.directory.into_proxy().unwrap())
+                                Some(e.directory.into_proxy())
                             } else {
                                 None
                             }

@@ -141,7 +141,7 @@ async fn new_host_harness(realm: Arc<HostRealm>) -> Result<(HostHarness, Emulato
         .await
         .context("Error publishing emulator hci device")?;
 
-    let host = HostRealm::create_bt_host_in_collection(&realm, &device_path).await?.into_proxy()?;
+    let host = HostRealm::create_bt_host_in_collection(&realm, &device_path).await?.into_proxy();
     let host_info = host
         .watch_state()
         .await

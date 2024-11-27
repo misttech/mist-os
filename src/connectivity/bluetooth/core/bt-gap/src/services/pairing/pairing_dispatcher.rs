@@ -499,8 +499,7 @@ mod test {
                 .into_set_pairing_delegate()
                 .expect("Should be SetPairingDelegate")
                 .2
-                .into_proxy()
-                .expect("Host ClientEnd should become Proxy");
+                .into_proxy();
             let peer = simple_test_peer(PeerId(0));
             let result =
                 proxy.on_pairing_request(&(&peer).into(), sys::PairingMethod::Consent, 0).await;

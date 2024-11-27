@@ -140,13 +140,13 @@ impl ShutdownWatcher {
                             watcher,
                             control_handle: _,
                         } => {
-                            self.add_reboot_watcher(watcher.into_proxy()?);
+                            self.add_reboot_watcher(watcher.into_proxy());
                         }
                         fpower::RebootMethodsWatcherRegisterRequest::RegisterWithAck {
                             watcher,
                             responder,
                         } => {
-                            self.add_reboot_watcher(watcher.into_proxy()?);
+                            self.add_reboot_watcher(watcher.into_proxy());
                             let _ = responder.send();
                         }
                     }

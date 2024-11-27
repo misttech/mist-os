@@ -385,8 +385,7 @@ impl TestSetup {
             .await
             .unwrap_or_else(|e| panic!("get endpoint {ep_name}: {e:?}"))
             .unwrap_or_else(|| panic!("failed to retrieve endpoint {ep_name}"))
-            .into_proxy()
-            .expect("into proxy");
+            .into_proxy();
 
         let (port, server_end) = fidl::endpoints::create_proxy().expect("create proxy");
         ep.get_port(server_end).expect("get port");

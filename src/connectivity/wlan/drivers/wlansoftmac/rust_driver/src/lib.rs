@@ -685,13 +685,8 @@ mod tests {
             Poll::Pending
         ));
 
-        let usme_bootstrap_proxy = fake_device_state
-            .lock()
-            .usme_bootstrap_client_end
-            .take()
-            .unwrap()
-            .into_proxy()
-            .unwrap();
+        let usme_bootstrap_proxy =
+            fake_device_state.lock().usme_bootstrap_client_end.take().unwrap().into_proxy();
 
         let sent_legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
@@ -794,9 +789,7 @@ mod tests {
     fn bootstrap_generic_sme_proxy_and_inspect_vmo(
         usme_bootstrap_client_end: fidl::endpoints::ClientEnd<fidl_sme::UsmeBootstrapMarker>,
     ) -> (fidl_sme::GenericSmeProxy, impl Future<Output = Result<Vmo, fidl::Error>>) {
-        let usme_client_proxy = usme_bootstrap_client_end
-            .into_proxy()
-            .expect("Failed to set up the USME client proxy.");
+        let usme_client_proxy = usme_bootstrap_client_end.into_proxy();
 
         let legacy_privacy_support =
             fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };

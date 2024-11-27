@@ -278,29 +278,9 @@ impl StatusCommand {
                     self.report_interface_error(name, e);
                 }
 
-                let device = match client.into_proxy() {
-                    Ok(x) => x,
-                    Err(err) => {
-                        self.report_interface_error(name, err);
-                        continue;
-                    }
-                };
-
-                let device_extra = match client_extra.into_proxy() {
-                    Ok(x) => x,
-                    Err(err) => {
-                        self.report_interface_error(name, err);
-                        continue;
-                    }
-                };
-
-                let device_diags = match client_test.into_proxy() {
-                    Ok(x) => x,
-                    Err(err) => {
-                        self.report_interface_error(name, err);
-                        continue;
-                    }
-                };
+                let device = client.into_proxy();
+                let device_extra = client_extra.into_proxy();
+                let device_diags = client_test.into_proxy();
 
                 match self.format {
                     StatusFormat::Standard => {

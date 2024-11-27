@@ -104,7 +104,7 @@ pub async fn forward_port(
         .stream_socket(domain, fsock::StreamSocketProtocol::Tcp)
         .await?
         .map_err(|e| anyhow!("Error creating stream socket: {e:?}"))?;
-    let socket_fidl = socket_fidl.into_proxy()?;
+    let socket_fidl = socket_fidl.into_proxy();
     socket_fidl
         .connect(&SocketAddressExt(target_addr).into())
         .await?
@@ -137,7 +137,7 @@ pub async fn reverse_port(
         .stream_socket(domain, fsock::StreamSocketProtocol::Tcp)
         .await?
         .map_err(|e| anyhow!("Error creating stream socket: {e:?}"))?;
-    let listen_socket = listen_socket.into_proxy()?;
+    let listen_socket = listen_socket.into_proxy();
     listen_socket
         .bind(&SocketAddressExt(listen_addr).into())
         .await?
@@ -186,15 +186,7 @@ pub async fn reverse_port(
                             continue;
                         };
 
-                        let socket_fidl = match got_socket.into_proxy() {
-                            Ok(got_socket) => got_socket,
-                            Err(e) => {
-                                tracing::warn!(
-                                "Reverse forward could not turn socket client into proxy: {e:?}"
-                            );
-                                continue;
-                            }
-                        };
+                        let socket_fidl = got_socket.into_proxy();
 
                         let socket = match socket_fidl.describe().await {
                             Ok(socket) => socket,

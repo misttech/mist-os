@@ -160,34 +160,33 @@ impl MediaButtonsHandler {
                     listener,
                     responder,
                 } => {
-                    if let Ok(proxy) = listener.into_proxy() {
-                        // Add the listener to the registry.
-                        self.inner
-                            .borrow_mut()
-                            .listeners
-                            .insert(proxy.as_channel().raw_handle(), proxy.clone());
-                        let proxy_clone = proxy.clone();
+                    let proxy = listener.into_proxy();
+                    // Add the listener to the registry.
+                    self.inner
+                        .borrow_mut()
+                        .listeners
+                        .insert(proxy.as_channel().raw_handle(), proxy.clone());
+                    let proxy_clone = proxy.clone();
 
-                        // Send the listener the last media button event.
-                        if let Some(event) = &self.inner.borrow().last_event {
-                            let event_to_send = event.clone();
-                            let fut = async move {
-                                match proxy_clone.on_event(&event_to_send).await {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        tracing::info!(
-                                            "Failed to send media buttons event to listener {:?}",
-                                            e
-                                        )
-                                    }
+                    // Send the listener the last media button event.
+                    if let Some(event) = &self.inner.borrow().last_event {
+                        let event_to_send = event.clone();
+                        let fut = async move {
+                            match proxy_clone.on_event(&event_to_send).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::info!(
+                                        "Failed to send media buttons event to listener {:?}",
+                                        e
+                                    )
                                 }
-                            };
-                            let metrics_logger_clone = self.metrics_logger.clone();
-                            self.inner
-                                .borrow()
-                                .send_event_task_tracker
-                                .track(metrics_logger_clone, fasync::Task::local(fut));
-                        }
+                            }
+                        };
+                        let metrics_logger_clone = self.metrics_logger.clone();
+                        self.inner
+                            .borrow()
+                            .send_event_task_tracker
+                            .track(metrics_logger_clone, fasync::Task::local(fut));
                     }
                     let _ = responder.send();
                 }

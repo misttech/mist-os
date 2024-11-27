@@ -185,7 +185,7 @@ impl DhcpV6Pd {
             )
             .context("dhcpv6pd.start")?;
 
-        let prefix_control = client.into_proxy().context("dhcpv6pd.start")?;
+        let prefix_control = client.into_proxy();
         let watcher = prefix_control.watch_prefix();
 
         let mut inner = self.inner.lock();

@@ -1114,7 +1114,7 @@ mod tests {
             serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         // List the outer directory and verify the contents.
-        let dir = dir_client_end.into_proxy().unwrap();
+        let dir = dir_client_end.into_proxy();
         assert_eq!(
             fuchsia_fs::directory::readdir(&dir).await.unwrap(),
             vec![directory::DirEntry {
@@ -1140,8 +1140,7 @@ mod tests {
         let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
         let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
             .unwrap()
-            .into_proxy()
-            .unwrap();
+            .into_proxy();
         let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .expect("failed to create watcher");
@@ -1220,8 +1219,7 @@ mod tests {
         let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
         let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
             .unwrap()
-            .into_proxy()
-            .unwrap();
+            .into_proxy();
         let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .expect("failed to create watcher");

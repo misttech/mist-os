@@ -42,7 +42,7 @@ impl TpmProtocol {
     /// Constructs a new `TpmProtocol` instance wrapping the provided
     /// `device_client_end` in a mutex.
     pub fn new(device_client_end: ClientEnd<TpmDeviceMarker>) -> Result<Arc<Self>, Error> {
-        Ok(Arc::new(Self { device_proxy: Mutex::new(device_client_end.into_proxy()?) }))
+        Ok(Arc::new(Self { device_proxy: Mutex::new(device_client_end.into_proxy()) }))
     }
 
     /// Handles a stream of command requests in the order received one at a

@@ -83,7 +83,7 @@ impl TestProfileServer {
         let request = self.profile_request_stream.next().await;
         match request {
             Some(Ok(bredr::ProfileRequest::Search { payload, .. })) => {
-                self.search_results_proxy = Some(payload.results.unwrap().into_proxy().unwrap());
+                self.search_results_proxy = Some(payload.results.unwrap().into_proxy());
             }
             _ => panic!(
                 "unexpected result on profile request stream while waiting for search: {:?}",
@@ -96,8 +96,7 @@ impl TestProfileServer {
         let request = self.profile_request_stream.next().await;
         match request {
             Some(Ok(bredr::ProfileRequest::Advertise { payload, responder, .. })) => {
-                self.connection_receiver_proxy =
-                    Some(payload.receiver.unwrap().into_proxy().unwrap());
+                self.connection_receiver_proxy = Some(payload.receiver.unwrap().into_proxy());
                 if let Some(_old_responder) = self.advertise_responder.replace(responder) {
                     panic!("Got new advertise request before old request is complete.");
                 }

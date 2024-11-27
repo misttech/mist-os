@@ -127,15 +127,10 @@ impl LightRealm {
                                     listener,
                                     responder,
                                 } => {
-                                    if let Ok(proxy) = listener.into_proxy() {
-                                        listener_sender
-                                            .try_send(proxy)
-                                            .expect("test should listen");
-                                        // Acknowledge the registration.
-                                        responder
-                                            .send()
-                                            .expect("failed to ack RegisterListener call");
-                                    }
+                                    let proxy = listener.into_proxy();
+                                    listener_sender.try_send(proxy).expect("test should listen");
+                                    // Acknowledge the registration.
+                                    responder.send().expect("failed to ack RegisterListener call");
                                 }
                                 _ => {
                                     panic!("Unsupported request {request:?}")

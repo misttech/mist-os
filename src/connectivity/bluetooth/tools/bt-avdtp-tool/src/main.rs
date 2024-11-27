@@ -36,7 +36,7 @@ async fn peer_manager_listener(
         match evt {
             PeerManagerEvent::OnPeerConnected { peer_id } => {
                 let (client, server) = create_endpoints::<PeerControllerMarker>();
-                let peer = client.into_proxy().expect("Error: Couldn't obtain peer client proxy");
+                let peer = client.into_proxy();
 
                 match peer_map.write().entry(peer_id.value.to_string()) {
                     Entry::Occupied(mut entry) => {

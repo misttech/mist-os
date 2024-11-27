@@ -164,7 +164,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("create_network failed")?;
         let network = network
             .ok_or_else(|| anyhow::anyhow!("create_network didn't return a valid network"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestNetwork { network, name, sandbox: self })
     }
 
@@ -178,7 +178,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("setup failed")?;
         let handle = handle
             .ok_or_else(|| anyhow::anyhow!("setup didn't return a valid handle"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestNetworkSetup { _setup: handle, _sandbox: self })
     }
 
@@ -207,7 +207,7 @@ impl TestSandbox {
         let () = zx::Status::ok(status).context("create_endpoint failed")?;
         let endpoint = endpoint
             .ok_or_else(|| anyhow::anyhow!("create_endpoint didn't return a valid endpoint"))?
-            .into_proxy()?;
+            .into_proxy();
         Ok(TestEndpoint { endpoint, name, _sandbox: self })
     }
 }
@@ -959,7 +959,7 @@ impl<'a> TestFakeEndpoint<'a> {
 async fn to_netdevice_inner(
     port: fidl::endpoints::ClientEnd<fnetwork::PortMarker>,
 ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
-    let port = port.into_proxy()?;
+    let port = port.into_proxy();
     let (device, server_end) = fidl::endpoints::create_endpoints::<fnetwork::DeviceMarker>();
     let () = port.get_device(server_end)?;
     let port_id = port

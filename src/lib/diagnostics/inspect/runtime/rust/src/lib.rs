@@ -149,13 +149,7 @@ pub fn publish(
                 return None;
             }
         },
-        Some(client_end) => match client_end.into_proxy() {
-            Ok(proxy) => proxy,
-            Err(err) => {
-                error!(%err, "failed to convert ClientEnd to Proxy");
-                return None;
-            }
-        },
+        Some(client_end) => client_end.into_proxy(),
     };
 
     // unwrap: safe since we have a valid tree handle coming from the server we spawn.
@@ -353,7 +347,7 @@ mod tests {
 
         assert_matches!(tree, Ok(InspectSinkRequest::Publish {
             payload: finspect::InspectSinkPublishRequest { tree: Some(tree), .. }, ..}) => {
-                let hierarchy = read(&tree.into_proxy().unwrap()).await.unwrap();
+                let hierarchy = read(&tree.into_proxy()).await.unwrap();
                 assert_json_diff!(hierarchy, root: {
                     hello: "world"
                 });

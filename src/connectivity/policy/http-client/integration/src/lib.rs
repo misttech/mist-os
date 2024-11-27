@@ -627,7 +627,7 @@ async fn test_fetch_http_long_start_call_blocks_stop(behavior: &str) {
 
         // Connect to the loader with a buffered `Start` call.
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<http::LoaderMarker>();
-        let loader = client_end.into_proxy().unwrap();
+        let loader = client_end.into_proxy();
         let (tx, rx) = fidl::endpoints::create_endpoints();
         let () = loader
             .start(make_request("GET", format!("http://{}{}", addr, LOOP1), None), tx)

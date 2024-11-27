@@ -109,10 +109,7 @@ pub(crate) mod tests {
 
             (
                 fut,
-                ServiceRequest::EnableFastPair {
-                    watcher: watcher.into_proxy().unwrap(),
-                    responder,
-                },
+                ServiceRequest::EnableFastPair { watcher: watcher.into_proxy(), responder },
                 mock_client,
             )
         }

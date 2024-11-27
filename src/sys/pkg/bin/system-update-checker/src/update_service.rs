@@ -63,9 +63,7 @@ impl UpdateService {
                     };
 
                     let monitor = if let Some(monitor) = monitor {
-                        Some(RealStateNotifier {
-                            proxy: monitor.into_proxy().context("CheckNow monitor into_proxy")?,
-                        })
+                        Some(RealStateNotifier { proxy: monitor.into_proxy() })
                     } else {
                         None
                     };
@@ -99,7 +97,7 @@ impl UpdateService {
         &mut self,
         attempts_monitor: ClientEnd<AttemptsMonitorMarker>,
     ) -> Result<(), Error> {
-        let proxy = attempts_monitor.into_proxy().context("MonitorAllUpdates into proxy")?;
+        let proxy = attempts_monitor.into_proxy();
         let callback =
             Box::new(move |control_handle| RealAttemptNotifier { proxy, control_handle });
         self.update_manager.handle_all_these_updates(callback).await;

@@ -373,7 +373,7 @@ mod tests {
             .run_until_stalled(&mut allocator_requests.next())
         {
             Poll::Ready(Some(Ok(AllocatorRequest::BindSharedCollection { payload, .. }))) => (
-                payload.token.unwrap().into_proxy().unwrap(),
+                payload.token.unwrap().into_proxy(),
                 payload
                     .buffer_collection_request
                     .unwrap()
@@ -411,7 +411,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut allocation).is_pending());
 
         let token_client_2 = match receiver.try_recv() {
-            Ok(Some(token)) => token.into_proxy().unwrap(),
+            Ok(Some(token)) => token.into_proxy(),
             x => panic!("Should have a token sent to the fn, got {:?}", x),
         };
 

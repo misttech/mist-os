@@ -85,7 +85,7 @@ pub(crate) mod test_server {
                         if self.is_registration_complete() {
                             panic!("unexpected second advertise request");
                         }
-                        self.receiver = Some(payload.receiver.unwrap().into_proxy().unwrap());
+                        self.receiver = Some(payload.receiver.unwrap().into_proxy());
                         let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
                             services: payload.services.clone(),
                             ..Default::default()
@@ -98,7 +98,7 @@ pub(crate) mod test_server {
                         if self.is_registration_complete() {
                             panic!("unexpected second search request");
                         }
-                        self.results = Some(payload.results.unwrap().into_proxy().unwrap());
+                        self.results = Some(payload.results.unwrap().into_proxy());
                         if self.is_registration_complete() {
                             break;
                         }

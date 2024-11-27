@@ -308,7 +308,7 @@ macro_rules! create_event {
                                 let $client_protocol_name: $client_protocol_ty = payload.$client_protocol_name.ok_or(
                                     format_err!("Missing {} from {} object",
                                         stringify!($client_protocol_name), stringify!($event_type))
-                                )?.into_proxy()?;
+                                )?.into_proxy();
                             )*
                             $(
                                 let $server_protocol_name: Option<zx::Channel> =

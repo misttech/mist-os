@@ -230,7 +230,7 @@ impl MockUpdateManagerService {
                     attempts_monitor,
                     control_handle: _,
                 } => {
-                    let proxy = attempts_monitor.into_proxy().unwrap();
+                    let proxy = attempts_monitor.into_proxy();
                     let mut receiver = self.states_receiver.lock().await;
                     while let Some(states) = receiver.next().await {
                         let (monitor, server_end) =

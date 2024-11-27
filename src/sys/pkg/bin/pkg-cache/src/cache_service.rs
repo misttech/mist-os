@@ -966,7 +966,7 @@ mod serve_needed_blobs_tests {
     impl BlobWriterExt for Box<fpkg::BlobWriter> {
         fn unwrap_file(self) -> fio::FileProxy {
             match *self {
-                fpkg::BlobWriter::File(file) => file.into_proxy().unwrap(),
+                fpkg::BlobWriter::File(file) => file.into_proxy(),
                 fpkg::BlobWriter::Writer(_) => panic!("should be file"),
             }
         }

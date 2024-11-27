@@ -113,7 +113,7 @@ async fn handle_update(
                     attribute_memory(
                         identifier_id.clone(),
                         principal_name.clone(),
-                        client.into_proxy().unwrap(),
+                        client.into_proxy(),
                         state.introspector.clone(),
                     )
                     .boxed(),

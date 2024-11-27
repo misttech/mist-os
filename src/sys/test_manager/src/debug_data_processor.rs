@@ -323,7 +323,7 @@ mod test {
         let req = stream.try_next().await.expect("get first request").unwrap();
         let dir = match req {
             ftest_debug::DebugDataProcessorRequest::SetDirectory { directory, .. } => {
-                directory.into_proxy().expect("convert to proxy")
+                directory.into_proxy()
             }
             other => panic!("First request should be SetDirectory but got {:?}", other),
         };
@@ -474,7 +474,7 @@ mod test {
             let mut events: Vec<_> = event_recv.collect().await;
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
-            let iterator_proxy = iterator.into_proxy().unwrap();
+            let iterator_proxy = iterator.into_proxy();
             let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                 .and_then(|debug_data| async move {
                     Ok((
@@ -540,7 +540,7 @@ mod test {
             if let SuiteEventPayload::DebugData(iterator) =
                 events.pop().unwrap().unwrap().into_payload()
             {
-                let iterator_proxy = iterator.into_proxy().unwrap();
+                let iterator_proxy = iterator.into_proxy();
                 let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                     .and_then(|debug_data| async move {
                         Ok((
@@ -612,7 +612,7 @@ mod test {
             let mut events: Vec<_> = event_recv.collect().await;
             assert_eq!(events.len(), 1);
             let RunEventPayload::DebugData(iterator) = events.pop().unwrap().into_payload();
-            let iterator_proxy = iterator.into_proxy().unwrap();
+            let iterator_proxy = iterator.into_proxy();
             let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                 .and_then(|debug_data| async move {
                     Ok((
@@ -683,7 +683,7 @@ mod test {
             if let SuiteEventPayload::DebugData(iterator) =
                 events.pop().unwrap().unwrap().into_payload()
             {
-                let iterator_proxy = iterator.into_proxy().unwrap();
+                let iterator_proxy = iterator.into_proxy();
                 let files: HashSet<_> = stream_fn(move || iterator_proxy.get_next_compressed())
                     .and_then(|debug_data| async move {
                         Ok((

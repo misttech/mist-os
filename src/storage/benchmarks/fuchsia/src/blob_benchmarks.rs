@@ -74,7 +74,7 @@ macro_rules! open_and_get_vmo_benchmark {
                 fs.clear_cache().await;
                 let pkgdir_client_end =
                     fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
-                let mut pkgdir = pkgdir_client_end.into_proxy().unwrap();
+                let mut pkgdir = pkgdir_client_end.into_proxy();
 
                 const SAMPLES: usize = 10;
                 let mut durations = Vec::with_capacity(SAMPLES);
@@ -88,7 +88,7 @@ macro_rules! open_and_get_vmo_benchmark {
                             .await
                             .unwrap()
                             .unwrap();
-                        pkgdir = pkgdir_client_end.into_proxy().unwrap();
+                        pkgdir = pkgdir_client_end.into_proxy();
                     }
                 }
                 durations

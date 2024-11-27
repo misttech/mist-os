@@ -33,7 +33,7 @@ impl PairingMock {
             PairingRequest::SetPairingDelegate { input, output, delegate, control_handle: _ }
                 if input == expected_input_cap && output == expected_output_cap =>
             {
-                Ok(Status::Satisfied(delegate.into_proxy()?))
+                Ok(Status::Satisfied(delegate.into_proxy()))
             }
             _ => Ok(Status::Pending),
         })

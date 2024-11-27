@@ -73,11 +73,8 @@ async fn test_lifecycle(_: ()) {
         emulator.publish_and_wait_for_device_path(Emulator::default_settings()).await.unwrap();
 
     // Create bt-host component in HostRealm after device is published
-    let host = HostRealm::create_bt_host_in_collection(&realm, &device_path)
-        .await
-        .unwrap()
-        .into_proxy()
-        .unwrap();
+    let host =
+        HostRealm::create_bt_host_in_collection(&realm, &device_path).await.unwrap().into_proxy();
     let info: HostInfo = host
         .watch_state()
         .await

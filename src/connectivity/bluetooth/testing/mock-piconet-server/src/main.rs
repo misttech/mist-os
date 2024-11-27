@@ -81,7 +81,7 @@ impl MockPiconetServer {
             .detach();
         });
 
-        let observer = observer.into_proxy()?;
+        let observer = observer.into_proxy();
         let mock_peer = MockPeer::new(id, Some(observer));
 
         fasync::Task::spawn(peer_service_fs.collect()).detach();
@@ -140,11 +140,7 @@ impl MockPiconetServer {
                     let _ = responder.send(Err(ErrorCode::InvalidArguments));
                     return;
                 }
-                let proxy = payload
-                    .receiver
-                    .unwrap()
-                    .into_proxy()
-                    .expect("couldn't get connection receiver");
+                let proxy = payload.receiver.unwrap().into_proxy();
                 self.new_advertisement(id, payload.services.unwrap(), proxy, responder);
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
@@ -164,7 +160,7 @@ impl MockPiconetServer {
                     panic!("invalid parameters");
                 };
                 let attr_ids = attr_ids.unwrap_or_default();
-                let proxy = results.into_proxy().expect("couldn't get connection receiver");
+                let proxy = results.into_proxy();
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }
             bredr::ProfileRequest::ConnectSco { payload, .. } => {

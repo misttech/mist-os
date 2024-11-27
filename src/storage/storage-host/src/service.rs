@@ -155,7 +155,7 @@ impl StorageHostService {
                 fstartup::StartupRequest::Start { device, options: _, responder } => {
                     responder
                         .send(
-                            self.start(device.into_proxy().unwrap())
+                            self.start(device.into_proxy())
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )

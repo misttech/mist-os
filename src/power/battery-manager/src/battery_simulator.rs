@@ -214,7 +214,7 @@ mod tests {
     async fn test_observer_relationship() {
         let (watcher_client_end, mut stream) =
             create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher = watcher_client_end.into_proxy().unwrap();
+        let watcher = watcher_client_end.into_proxy();
 
         let battery_manager = Arc::new(BatteryManager::new());
         battery_manager.add_watcher(watcher).await;

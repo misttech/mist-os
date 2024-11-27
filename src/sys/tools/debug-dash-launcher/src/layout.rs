@@ -86,7 +86,7 @@ pub async fn instance_namespace_is_root(
         let directory = entry.directory.unwrap();
 
         if path == "/svc" {
-            let svc_dir = directory.into_proxy().unwrap();
+            let svc_dir = directory.into_proxy();
             let svc_dir = inject_process_launcher_and_resolver(svc_dir).await;
             name_infos.push(to_name_info(&path, svc_dir));
         } else {
@@ -232,7 +232,7 @@ mod tests {
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
 
             // These directories must contain a file with the same name
@@ -271,7 +271,7 @@ mod tests {
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
 
             // These directories must contain a file with the same name
@@ -302,7 +302,7 @@ mod tests {
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
 
             // These directories must contain a file with the same name
@@ -330,7 +330,7 @@ mod tests {
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
 
             // These directories must contain a file with the same name

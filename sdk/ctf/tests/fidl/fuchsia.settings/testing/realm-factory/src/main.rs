@@ -157,5 +157,5 @@ fn spawn_vfs(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         vfs::path::Path::dot(),
         ServerEnd::new(server_end.into_channel()),
     );
-    client_end.into_proxy().unwrap()
+    client_end.into_proxy()
 }

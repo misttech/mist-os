@@ -48,7 +48,7 @@ impl TryFrom<NextCall> for CallEntry {
             NextCall {
                 call: Some(c), remote: Some(n), state: Some(s), direction: Some(d), ..
             } => {
-                let proxy = c.into_proxy()?;
+                let proxy = c.into_proxy();
                 Ok(CallEntry::new(proxy, n.into(), s, d.into()))
             }
             _ => Err(Error::MissingParameter("Missing fidl in NextCall table".into())),

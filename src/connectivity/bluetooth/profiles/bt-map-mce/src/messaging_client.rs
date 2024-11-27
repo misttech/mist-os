@@ -677,7 +677,7 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let accessor_fut = pin!(accessor_fut);
 
         // Incoming FIDL request for listing all MAS instances.
@@ -712,7 +712,7 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let accessor_fut = pin!(accessor_fut);
 
         // Drop the connection to the MAS instance.
@@ -741,7 +741,7 @@ mod tests {
             .expect("should be ok")
             .expect("should have response");
 
-        let accessor_proxy = response.accessor.expect("should exist").into_proxy().unwrap();
+        let accessor_proxy = response.accessor.expect("should exist").into_proxy();
         let mut accessor_fut = pin!(accessor_fut);
 
         // Case 1: SetNotificationRegistration with mas_instance_ids.

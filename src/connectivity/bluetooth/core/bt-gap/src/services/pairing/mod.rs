@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_bluetooth_sys::{PairingRequest, PairingRequestStream};
 use futures::stream::TryStreamExt;
 use tracing::{info, warn};
@@ -22,21 +21,13 @@ pub async fn run(hd: HostDispatcher, mut stream: PairingRequestStream) -> Result
 
 async fn handler(hd: HostDispatcher, request: PairingRequest) {
     match request {
-        PairingRequest::SetPairingDelegate { input, output, delegate, control_handle } => {
+        PairingRequest::SetPairingDelegate { input, output, delegate, control_handle: _ } => {
             info!("fuchsia.bluetooth.sys.Pairing.SetPairingDelegate({:?}, {:?})", input, output);
-            match delegate.into_proxy() {
-                Ok(proxy) => {
-                    // Attempt to set the pairing delegate for the HostDispatcher. The
-                    // HostDispatcher will reject if there is currently an active delegate; in this
-                    // case `proxy` will be dropped, closing the channel.
-                    if let Err(e) = hd.set_pairing_delegate(proxy, input, output) {
-                        warn!("Couldn't set PairingDelegate: {e:?}");
-                    }
-                }
-                Err(err) => {
-                    warn!("Invalid Pairing Delegate passed to SetPairingDelegate: {}", err);
-                    control_handle.shutdown()
-                }
+            // Attempt to set the pairing delegate for the HostDispatcher. The
+            // HostDispatcher will reject if there is currently an active delegate; in this
+            // case `proxy` will be dropped, closing the channel.
+            if let Err(e) = hd.set_pairing_delegate(delegate.into_proxy(), input, output) {
+                warn!("Couldn't set PairingDelegate: {e:?}");
             }
         }
         PairingRequest::SetDelegate { .. } => {

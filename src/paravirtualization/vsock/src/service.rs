@@ -313,7 +313,7 @@ impl Vsock {
         acceptor: fidl::endpoints::ClientEnd<fidl_fuchsia_vsock::AcceptorMarker>,
         local_port: u32,
     ) -> Result<(), Error> {
-        let acceptor = acceptor.into_proxy().map_err(|x| Error::ClientCommunication(x.into()))?;
+        let acceptor = acceptor.into_proxy();
         let stream = self.listen_port(local_port)?;
         self.borrow_mut().tasks.local(
             self.clone()

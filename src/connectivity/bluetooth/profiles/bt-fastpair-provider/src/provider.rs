@@ -775,7 +775,7 @@ mod tests {
         // Provider server should cancel the existing advertisement and attempt to advertise
         // Account Keys.
         // Simulate upstream server detecting this.
-        let adv_client = adv_client.into_proxy().unwrap();
+        let adv_client = adv_client.into_proxy();
         let _ = adv_client.on_closed().await;
         let _ = responder.send(Ok(())).unwrap();
 
@@ -795,7 +795,7 @@ mod tests {
         let _ = watch_responder.send(not_active).unwrap();
 
         // Provider server should cancel the existing advertisement.
-        let adv_client = adv_client.into_proxy().unwrap();
+        let adv_client = adv_client.into_proxy();
         let _ = adv_client.on_closed().await;
         let _ = responder.send(Ok(())).unwrap();
     }
@@ -822,7 +822,7 @@ mod tests {
         assert_eq!(service_data, &expected_data.to_vec());
 
         // Advertisement should be active - e.g. not closed.
-        let advertisement = adv_client.into_proxy().unwrap();
+        let advertisement = adv_client.into_proxy();
         let advertisement_fut = advertisement.on_closed();
         assert_matches!(advertisement_fut.now_or_never(), None);
 

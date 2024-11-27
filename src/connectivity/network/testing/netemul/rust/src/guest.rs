@@ -55,10 +55,7 @@ impl Controller {
             .map_err(|err| {
                 anyhow::anyhow!(format!("create guest error for guest {}: {:?}", name, err))
             })?;
-        Ok(Controller {
-            guest: Some(guest.into_proxy().context("failed to convert guest to proxy")?),
-            name,
-        })
+        Ok(Controller { guest: Some(guest.into_proxy()), name })
     }
 
     fn proxy(&self) -> &fnetemul_guest::GuestProxy {

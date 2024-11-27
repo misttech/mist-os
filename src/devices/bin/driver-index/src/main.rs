@@ -726,7 +726,7 @@ mod tests {
             fio::PERM_READABLE | fio::PERM_EXECUTABLE,
             server_end,
         )?;
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         let component_url = url::Url::parse(component_url)?;
         let decl_file = fuchsia_fs::directory::open_file_async(
             &proxy,

@@ -179,13 +179,7 @@ impl Discovery {
         watch_options: WatchOptions,
         session_watcher: ClientEnd<SessionsWatcherMarker>,
     ) {
-        let proxy = match session_watcher.into_proxy() {
-            Ok(proxy) => proxy,
-            Err(e) => {
-                warn!(tag = LOG_TAG, "Client tried to watch session with invalid watcher: {:?}", e);
-                return;
-            }
-        };
+        let proxy = session_watcher.into_proxy();
 
         let sink = FlowControlledProxySink::from(proxy);
         self.connect_session_watcher(watch_options, sink).await;

@@ -411,7 +411,7 @@ pub struct VolumeProtocolDevice {
 impl VolumeProtocolDevice {
     pub fn new(dir: fio::DirectoryProxy, path: impl ToString) -> Result<Self, Error> {
         let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/volume"));
-        let volume_proxy = connector.connect_volume()?.into_proxy()?;
+        let volume_proxy = connector.connect_volume()?.into_proxy();
         Ok(Self {
             connector,
             volume_proxy,
@@ -498,11 +498,11 @@ impl Device for VolumeProtocolDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        self.connector.connect_block().and_then(|c| Ok(c.into_proxy()?))
+        self.connector.connect_block().and_then(|c| Ok(c.into_proxy()))
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        self.connector.connect_volume().and_then(|c| Ok(c.into_proxy()?))
+        self.connector.connect_volume().and_then(|c| Ok(c.into_proxy()))
     }
 
     async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {
@@ -531,7 +531,7 @@ pub struct RamdiskDevice {
 impl RamdiskDevice {
     pub fn new(ramdisk: RamdiskClient) -> Result<Self, Error> {
         let volume_proxy =
-            ClientEnd::<VolumeMarker>::new(ramdisk.open()?.into_channel()).into_proxy()?;
+            ClientEnd::<VolumeMarker>::new(ramdisk.open()?.into_channel()).into_proxy();
         Ok(Self { ramdisk: Arc::new(ramdisk), volume_proxy, content_format: None })
     }
 }
@@ -587,11 +587,11 @@ impl Device for RamdiskDevice {
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        Ok(self.ramdisk.open()?.into_proxy()?)
+        Ok(self.ramdisk.open()?.into_proxy())
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        Ok(ClientEnd::<VolumeMarker>::new(self.ramdisk.open()?.into_channel()).into_proxy()?)
+        Ok(ClientEnd::<VolumeMarker>::new(self.ramdisk.open()?.into_channel()).into_proxy())
     }
 
     async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {

@@ -32,8 +32,7 @@ async fn escrow_inspect_data() {
         .watch_component(PUPPET_NAME, ftest::ExitStatus::Clean)
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     // Publish some inspect in the puppet.
     let child_puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
@@ -41,8 +40,7 @@ async fn escrow_inspect_data() {
         .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
         .await
         .unwrap()
-        .into_proxy()
-        .unwrap();
+        .into_proxy();
 
     writer.set_health_ok().await.unwrap();
 

@@ -268,7 +268,7 @@ mod tests {
         assert!(!colocated_component_vmos.is_empty());
 
         // Stop the component.
-        let controller = controller.into_proxy().unwrap();
+        let controller = controller.into_proxy();
         controller.stop().unwrap();
         controller.on_closed().await.unwrap();
 

@@ -284,11 +284,8 @@ mod tests {
             exec.run_until_stalled(&mut nl80211_stream.select_next_some()),
             Poll::Ready(Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, ..})) => payload);
         assert_eq!(multicast_req.group, Some("test_group".to_string()));
-        let client_proxy: fidl_wlanix::Nl80211MulticastProxy = multicast_req
-            .multicast
-            .expect("No client endpoint")
-            .into_proxy()
-            .expect("Failed to create multicast client proxy");
+        let client_proxy: fidl_wlanix::Nl80211MulticastProxy =
+            multicast_req.multicast.expect("No client endpoint").into_proxy();
         assert_matches!(exec.run_until_stalled(&mut next_mcast_recv), Poll::Pending);
 
         let message = fidl_wlanix::Nl80211Message {

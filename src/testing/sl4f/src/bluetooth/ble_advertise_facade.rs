@@ -180,16 +180,7 @@ impl BleAdvertiseFacade {
                         );
                     }
 
-                    let proxy = match connection.into_proxy() {
-                        Ok(proxy) => proxy,
-                        Err(_) => {
-                            warn!(
-                                tag = &with_line!(tag),
-                                "error creating Connection proxy, dropping Connection"
-                            );
-                            continue;
-                        }
-                    };
+                    let proxy = connection.into_proxy();
                     let peer_id: PeerId = peer.id.unwrap().into();
                     BleAdvertiseFacade::process_new_connection(inner.clone(), proxy, peer_id);
                 }

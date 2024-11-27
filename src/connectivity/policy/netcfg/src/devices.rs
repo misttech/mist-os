@@ -96,10 +96,7 @@ impl NetworkDeviceInstance {
             Ok(device)
         };
 
-        let device = get_device()?
-            .into_proxy()
-            .context("create device proxy")
-            .map_err(errors::Error::Fatal)?;
+        let device = get_device()?.into_proxy();
 
         let (port_watcher, port_watcher_server_end) =
             fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>()

@@ -293,7 +293,7 @@ mod tests {
             })) => {
                 assert_eq!(&device_name, TEST_DEVICE_NAME, "name should match");
                 assert_eq!(is_input, true, "should be an input device");
-                channel.into_proxy().expect("make a proxy")
+                channel.into_proxy()
             }
             x => panic!("Expected AudioDevice to be added by channel, got {:?}", x),
         }

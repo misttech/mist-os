@@ -330,7 +330,7 @@ impl FidlProtocol for TargetCollectionProtocol {
         let target_collection = cx.get_target_collection().await?;
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
-                let reader = reader.into_proxy()?;
+                let reader = reader.into_proxy();
                 let query = match query.string_matcher.clone() {
                     Some(query) if !query.is_empty() => Some(TargetInfoQuery::from(query)),
                     _ => None,
@@ -416,7 +416,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config, add_target_responder, ..
             } => {
-                let add_target_responder = add_target_responder.into_proxy()?;
+                let add_target_responder = add_target_responder.into_proxy();
                 let addr = target_addr_info_to_socketaddr(ip);
                 let node = cx.overnet_node()?;
                 let do_add_target = || {

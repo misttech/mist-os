@@ -535,7 +535,7 @@ async fn resolve_component() {
     assert_eq!(mem_util::bytes_from_data(decl.as_ref().unwrap()).unwrap(), manifest);
     let fcomponent_resolution::Package { url, directory, .. } = package.unwrap();
     assert_eq!(url.unwrap(), "fuchsia-pkg://fuchsia.com/a-base-package/0");
-    let () = base_pkg.verify_contents(&directory.unwrap().into_proxy().unwrap()).await.unwrap();
+    let () = base_pkg.verify_contents(&directory.unwrap().into_proxy()).await.unwrap();
     assert_eq!(mem_util::bytes_from_data(config_values.as_ref().unwrap()).unwrap(), config_data);
     assert!(resolution_context.is_some());
     assert_eq!(abi_revision, Some(0x601665c5b1a89c7f));
@@ -598,7 +598,7 @@ async fn resolve_with_context_component() {
     assert_eq!(mem_util::bytes_from_data(decl.as_ref().unwrap()).unwrap(), manifest);
     let fcomponent_resolution::Package { url, directory, .. } = package.unwrap();
     assert_eq!(url.unwrap(), "sub-sub-package-url");
-    let () = sub_sub_pkg.verify_contents(&directory.unwrap().into_proxy().unwrap()).await.unwrap();
+    let () = sub_sub_pkg.verify_contents(&directory.unwrap().into_proxy()).await.unwrap();
     assert_eq!(config_values, None);
     assert!(resolution_context.is_some());
     assert_eq!(abi_revision, Some(0xeccea2f70acd6fc0));

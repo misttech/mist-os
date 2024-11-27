@@ -455,7 +455,7 @@ pub(crate) mod tests {
             },
             true,
         );
-        test(exec, client.into_proxy().expect("channel should be available"), codec)
+        test(exec, client.into_proxy(), codec)
     }
 
     #[fixture(with_soft_codec)]
@@ -629,7 +629,7 @@ pub(crate) mod tests {
             },
             true,
         );
-        let proxy = client.into_proxy().unwrap();
+        let proxy = client.into_proxy();
 
         let set_format_fut = proxy.set_dai_format(&fidl_fuchsia_hardware_audio::DaiFormat {
             number_of_channels: 2,

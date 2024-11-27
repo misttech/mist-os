@@ -152,17 +152,16 @@ impl TestService {
                         usage, usage_watcher, ..
                     })) = request_stream.next().await
                     {
-                        match (usage, usage_watcher.into_proxy()) {
-                            (Usage::RenderUsage(usage), Ok(usage_watcher)) => {
+                        match usage {
+                            Usage::RenderUsage(usage) => {
                                 new_usage_watchers_sink
-                                    .send((usage, usage_watcher))
+                                    .send((usage, usage_watcher.into_proxy()))
                                     .await
                                     .expect("Forwarding new UsageWatcher from service under test");
                             }
-                            (_, Ok(_)) => {
+                            _ => {
                                 println!("Service under test tried to watch a capture usage")
                             }
-                            (_, Err(e)) => println!("Service under test sent bad request: {:?}", e),
                         }
                     }
                 }));
@@ -498,7 +497,7 @@ async fn player_controls_are_proxied() -> Result<()> {
     let _watch_request = player.requests.try_next().await?;
 
     let (session_client, session_server) = create_endpoints();
-    let session: SessionControlProxy = session_client.into_proxy()?;
+    let session: SessionControlProxy = session_client.into_proxy();
     session.play()?;
     service.discovery.connect_to_session(id, session_server)?;
 
@@ -531,7 +530,7 @@ async fn player_disconnection_propagates() -> Result<()> {
     let (id, _) = updates.remove(0);
 
     let (session_client, session_server) = create_endpoints();
-    let session: SessionControlProxy = session_client.into_proxy()?;
+    let session: SessionControlProxy = session_client.into_proxy();
     service.discovery.connect_to_session(id, session_server)?;
 
     drop(player);
@@ -1025,7 +1024,7 @@ async fn active_session_initializes_clients_with_active_player() -> Result<()> {
         .await
         .context("Watching the active session")?;
     let session = session.expect("Unwrapping active session channel");
-    let session = session.into_proxy().expect("Creating session proxy");
+    let session = session.into_proxy();
     session.play().context("Sending play command to session")?;
 
     player
@@ -1076,7 +1075,7 @@ async fn active_session_falls_back_when_session_removed() -> Result<()> {
         .await
         .context("Watching the active session 2nd time")?;
     let session = session.expect("Unwrapping active session channel 2nd time");
-    let session = session.into_proxy().expect("Creating session proxy 2nd time");
+    let session = session.into_proxy();
 
     let info_delta = session.watch_status().await.expect("Watching session status");
     assert_eq!(

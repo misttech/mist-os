@@ -151,7 +151,7 @@ impl BufferSetFactory {
         let (client_token, client_token_request) =
             create_endpoints::<BufferCollectionTokenMarker>();
         let (codec_token, codec_token_request) = create_endpoints::<BufferCollectionTokenMarker>();
-        let client_token = client_token.into_proxy()?;
+        let client_token = client_token.into_proxy();
 
         let sysmem_client =
             client::connect_to_protocol::<AllocatorMarker>().context("Connecting to sysmem")?;
@@ -178,7 +178,7 @@ impl BufferSetFactory {
             buffer_collection_request: Some(collection_request),
             ..Default::default()
         })?;
-        let collection_client = collection_client.into_proxy()?;
+        let collection_client = collection_client.into_proxy();
         collection_client.sync().await.context("Syncing codec_token_request with sysmem")?;
 
         let mut collection_constraints = buffer_collection_constraints

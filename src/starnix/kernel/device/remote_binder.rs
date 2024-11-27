@@ -1271,7 +1271,7 @@ mod tests {
                 x => panic!("Expected a start request, got: {x:?}"),
             };
 
-        let lutex_controller = lutex_controller_client_end.into_proxy().expect("into_proxy");
+        let lutex_controller = lutex_controller_client_end.into_proxy();
 
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();

@@ -195,7 +195,7 @@ mod tests {
         // Expect the RFCOMM advertisement.
         let profile_event = profile_server.select_next_some().await.expect("FIDL response");
         let (request, _responder) = profile_event.into_advertise().expect("Advertise request");
-        let connect_proxy = request.receiver.unwrap().into_proxy().unwrap();
+        let connect_proxy = request.receiver.unwrap().into_proxy();
 
         // Remote peer connection.
         let id = PeerId(123);

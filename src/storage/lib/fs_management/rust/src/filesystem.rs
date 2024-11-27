@@ -278,8 +278,7 @@ impl Filesystem {
         Ok(ServingSingleVolumeFilesystem {
             component,
             exposed_dir: Some(exposed_dir),
-            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
-                .into_proxy()?,
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
             binding: None,
         })
     }
@@ -685,8 +684,7 @@ impl ServingMultiVolumeFilesystem {
             server_end,
         )?;
         Ok(self.volumes.entry(volume).or_insert(ServingVolume {
-            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
-                .into_proxy()?,
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
             binding: None,
             exposed_dir,
         }))

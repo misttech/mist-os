@@ -216,15 +216,9 @@ mod tests {
         let name3 = None;
 
         let handles = [
-            Arc::new(InspectHandle::Tree {
-                proxy: tree1.into_proxy().unwrap(),
-                name: Some("tree1".into()),
-            }),
-            Arc::new(InspectHandle::Tree {
-                proxy: tree2.into_proxy().unwrap(),
-                name: Some("tree2".into()),
-            }),
-            Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None }),
+            Arc::new(InspectHandle::Tree { proxy: tree1.into_proxy(), name: Some("tree1".into()) }),
+            Arc::new(InspectHandle::Tree { proxy: tree2.into_proxy(), name: Some("tree2".into()) }),
+            Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy(), name: None }),
         ];
         let data = populate_data_map(&handles.iter().map(Arc::downgrade).collect::<Vec<_>>()).await;
         assert_eq!(data.len(), 3);

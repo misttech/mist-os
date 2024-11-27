@@ -517,10 +517,10 @@ mod tests {
                     ..
                 })) => {
                     if is_input {
-                        audio_input_stream_config = channel.into_proxy().unwrap();
+                        audio_input_stream_config = channel.into_proxy();
                         break;
                     } else {
-                        _audio_output_stream_config = channel.into_proxy().unwrap();
+                        _audio_output_stream_config = channel.into_proxy();
                     }
                 }
                 x => panic!("Expected audio device by channel, got {x:?}"),
@@ -614,10 +614,10 @@ mod tests {
                     ..
                 })) => {
                     if !is_input {
-                        audio_output_stream_config = channel.into_proxy().unwrap();
+                        audio_output_stream_config = channel.into_proxy();
                         break;
                     } else {
-                        _audio_input_stream_config = channel.into_proxy().unwrap();
+                        _audio_input_stream_config = channel.into_proxy();
                     }
                 }
                 x => panic!("Expected audio device by channel, got {x:?}"),
@@ -695,10 +695,10 @@ mod tests {
                     ..
                 })) => {
                     if !is_input {
-                        audio_output_stream_config = channel.into_proxy().unwrap();
+                        audio_output_stream_config = channel.into_proxy();
                         break;
                     } else {
-                        _audio_input_stream_config = channel.into_proxy().unwrap();
+                        _audio_input_stream_config = channel.into_proxy();
                     }
                 }
                 x => panic!("Expected audio device by channel, got {x:?}"),
@@ -766,10 +766,10 @@ mod tests {
                     ..
                 })) => {
                     if !is_input {
-                        audio_output_stream_config = channel.into_proxy().unwrap();
+                        audio_output_stream_config = channel.into_proxy();
                         break;
                     } else {
-                        _audio_input_stream_config = channel.into_proxy().unwrap();
+                        _audio_input_stream_config = channel.into_proxy();
                     }
                 }
                 x => panic!("Expected audio device by channel, got {x:?}"),
@@ -838,10 +838,10 @@ mod tests {
                     ..
                 })) => {
                     if !is_input {
-                        audio_output_stream_config = channel.into_proxy().unwrap();
+                        audio_output_stream_config = channel.into_proxy();
                         break;
                     } else {
-                        _audio_input_stream_config = channel.into_proxy().unwrap();
+                        _audio_input_stream_config = channel.into_proxy();
                     }
                 }
                 x => panic!("Expected audio device by channel, got {x:?}"),

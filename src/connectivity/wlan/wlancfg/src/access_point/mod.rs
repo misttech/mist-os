@@ -120,7 +120,7 @@ impl AccessPoint {
             fidl_policy::AccessPointProviderRequest::GetController {
                 requests, updates, ..
             } => {
-                self.register_listener(updates.into_proxy()?);
+                self.register_listener(updates.into_proxy());
                 self.handle_ap_requests(internal_msg_sink, ap_provider_guard, requests).await?;
                 Ok(())
             }
@@ -254,7 +254,7 @@ impl AccessPoint {
     ) -> Result<(), fidl::Error> {
         match req {
             fidl_policy::AccessPointListenerRequest::GetListener { updates, .. } => {
-                self.register_listener(updates.into_proxy()?);
+                self.register_listener(updates.into_proxy());
                 Ok(())
             }
         }

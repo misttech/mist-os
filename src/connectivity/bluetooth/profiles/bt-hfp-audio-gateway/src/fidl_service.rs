@@ -43,7 +43,7 @@ async fn handle_hfp_client_connection_result(
     while let Some(request) = stream.try_next().await.context("hfp FIDL client error")? {
         let HfpRequest::Register { manager, .. } = request;
         info!("Registering call manager");
-        let proxy = manager.into_proxy().context("hfp FIDL client error")?;
+        let proxy = manager.into_proxy();
         call_manager.send(proxy).await.context("component main loop halted")?;
     }
     Ok(())

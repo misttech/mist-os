@@ -322,7 +322,7 @@ mod tests {
         if let Some(server) = server {
             fasync::Task::spawn(server.run_server(calls_tx)).detach();
         }
-        let client = client.into_proxy().unwrap();
+        let client = client.into_proxy();
         let (cobalt_client, cobalt_events) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerMarker,
         >()

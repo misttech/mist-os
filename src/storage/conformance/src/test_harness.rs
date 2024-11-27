@@ -78,7 +78,7 @@ impl TestHarness {
     pub async fn open_service_directory(&self) -> fio::DirectoryProxy {
         assert!(self.config.supports_services);
         let client_end = self.proxy.open_service_directory().await.unwrap();
-        client_end.into_proxy().unwrap()
+        client_end.into_proxy()
     }
 
     /// Returns the abilities [`io_test::File`] objects should have for the harness.

@@ -458,10 +458,7 @@ mod tests {
             Path::validate_and_split("e/c/d").unwrap(),
             server,
         );
-        assert_read!(
-            ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy().unwrap(),
-            "foo"
-        );
+        assert_read!(ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy(), "foo");
     }
 
     #[fuchsia::test]

@@ -66,7 +66,7 @@ impl MockActivityService {
                 let factivity::ProviderRequest::WatchState { listener, .. } =
                     stream.try_next().await.unwrap().unwrap();
                 info!("MockActivityService: received WatchState request");
-                let listener = listener.into_proxy().unwrap();
+                let listener = listener.into_proxy();
                 while let Some(state) = this.state_receiver.lock().await.next().await {
                     info!("MockActivityService: sending activity state: {:?}", state);
                     let _ = listener.on_state_changed(state, 0).await;

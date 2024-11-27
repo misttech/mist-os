@@ -494,7 +494,7 @@ pub(crate) mod tests {
                 let _ = responder.send(Ok(()));
                 // Publish service request should resolve.
                 let gatt_service = publish_fut.await.expect("should resolve ok");
-                (gatt_service, local_service_client.into_proxy().unwrap())
+                (gatt_service, local_service_client.into_proxy())
             }
         }
     }

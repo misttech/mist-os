@@ -196,13 +196,7 @@ impl TryFrom<ResolvedPackage> for Package {
     type Error = ResolveActionError;
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
-        Ok(Self {
-            _package_url: package.url,
-            package_dir: package
-                .directory
-                .into_proxy()
-                .map_err(|err| ResolveActionError::PackageDirProxyCreateError { err })?,
-        })
+        Ok(Self { _package_url: package.url, package_dir: package.directory.into_proxy() })
     }
 }
 

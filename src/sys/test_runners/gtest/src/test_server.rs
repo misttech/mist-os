@@ -838,8 +838,7 @@ mod tests {
             fidl::endpoints::create_request_stream::<SuiteMarker>()
                 .context("failed to create suite")?;
 
-        let suite_proxy =
-            test_suite_client.into_proxy().context("can't convert suite into proxy")?;
+        let suite_proxy = test_suite_client.into_proxy();
         fasync::Task::spawn(async move {
             server
                 .serve_test_suite(test_suite, weak_component)

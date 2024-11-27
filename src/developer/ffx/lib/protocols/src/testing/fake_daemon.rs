@@ -182,7 +182,7 @@ impl DaemonProtocolProvider for FakeDaemon {
                 }
             })
             .detach();
-            Ok(client.into_proxy()?)
+            Ok(client.into_proxy())
         } else {
             Err(anyhow!("FakeDaemon was not provided with an RCS implementation"))
         }

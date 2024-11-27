@@ -147,7 +147,7 @@ async fn handle_client_request(
         })) => {
             info!("Start request from client: {follow:?}, {host_device:?}");
 
-            let Some(client) = client.map(|client| client.into_proxy().unwrap()) else {
+            let Some(client) = client.map(|client| client.into_proxy()) else {
                 warn!("No client delivered, skipping");
                 return Ok(true);
             };

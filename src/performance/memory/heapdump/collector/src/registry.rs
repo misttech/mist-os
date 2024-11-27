@@ -79,7 +79,7 @@ impl Registry {
                 fheapdump_client::CollectorRequest::TakeLiveSnapshot { payload, .. } => {
                     let process_selector = payload.process_selector;
                     let receiver =
-                        payload.receiver.context("missing required receiver")?.into_proxy()?;
+                        payload.receiver.context("missing required receiver")?.into_proxy();
                     let with_contents = payload.with_contents.unwrap_or(false);
 
                     let process = match process_selector {
@@ -172,7 +172,7 @@ impl Registry {
                     let snapshot_id =
                         payload.snapshot_id.context("missing required snapshot_id")?;
                     let receiver =
-                        payload.receiver.context("missing required receiver")?.into_proxy()?;
+                        payload.receiver.context("missing required receiver")?.into_proxy();
 
                     let snapshot = self.snapshot_storage.lock().await.get_snapshot(snapshot_id);
                     start_detached_task(async move {

@@ -50,7 +50,7 @@ impl InspectSinkServer {
                     ..
                 } => repo.add_inspect_handle(
                     Arc::clone(&component),
-                    InspectHandle::tree(tree.into_proxy()?, name),
+                    InspectHandle::tree(tree.into_proxy(), name),
                 ),
                 finspect::InspectSinkRequest::Publish {
                     payload: finspect::InspectSinkPublishRequest { tree: None, name, .. },

@@ -128,7 +128,7 @@ mod test {
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config: _, add_target_responder, ..
             } => {
-                let add_target_responder = add_target_responder.into_proxy().unwrap();
+                let add_target_responder = add_target_responder.into_proxy();
                 test(ip);
                 add_target_responder.success().unwrap();
             }

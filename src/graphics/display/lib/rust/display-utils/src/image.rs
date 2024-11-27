@@ -243,7 +243,7 @@ async fn allocate_image_buffer_helper(
             buffer_collection_request: Some(remote),
             ..Default::default()
         })?;
-        local.into_proxy()?
+        local.into_proxy()
     };
 
     // Set local constraints and allocate buffers.

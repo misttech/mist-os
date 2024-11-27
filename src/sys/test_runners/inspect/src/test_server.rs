@@ -212,9 +212,7 @@ impl TestServer {
                             .detach();
                         }
                         ftest::SuiteRequest::Run { tests, options, listener, .. } => {
-                            let proxy = listener
-                                .into_proxy()
-                                .expect("Can't convert listener channel to proxy");
+                            let proxy = listener.into_proxy();
 
                             let mut tasks = vec![];
                             let parallel = options.parallel.unwrap_or(DEFAULT_PARALLEL);

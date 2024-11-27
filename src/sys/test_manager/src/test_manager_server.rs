@@ -72,17 +72,7 @@ pub async fn run_test_manager_run_builder_server(
                 controller,
                 control_handle,
             } => {
-                let realm_proxy = match realm.into_proxy() {
-                    Ok(r) => r,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid realm. Closing connection. error: {}",
-                            test_url, e
-                        );
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                        break;
-                    }
-                };
+                let realm_proxy = realm.into_proxy();
                 let controller = match controller.into_stream() {
                     Ok(c) => c,
                     Err(e) => {
@@ -188,17 +178,7 @@ pub async fn run_test_manager_query_server(
                 iterator,
                 responder,
             } => {
-                let realm_proxy = match realm.into_proxy() {
-                    Ok(r) => r,
-                    Err(e) => {
-                        warn!(
-                            "Cannot add suite {}, invalid realm. Closing connection. error: {}",
-                            test_url, e
-                        );
-                        responder.send(Err(LaunchError::InvalidArgs)).ok();
-                        break;
-                    }
-                };
+                let realm_proxy = realm.into_proxy();
                 let offers = match map_offers(offers) {
                     Ok(offers) => offers,
                     Err(e) => {
@@ -375,7 +355,7 @@ pub async fn run_test_manager_test_case_enumerator_server(
                 let realm = if let Some(realm_options) = options.realm_options {
                     let realm_proxy = match realm_options
                         .realm
-                        .map(|r| r.into_proxy())
+                        .map(|r| Ok(r.into_proxy()))
                         .unwrap_or(Err(Error::NotNullable))
                     {
                         Ok(r) => r,
@@ -547,7 +527,7 @@ pub async fn run_test_manager_suite_runner_server(
                 let realm = if let Some(realm_options) = options.realm_options {
                     let realm_proxy = match realm_options
                         .realm
-                        .map(|r| r.into_proxy())
+                        .map(|r| Ok(r.into_proxy()))
                         .unwrap_or(Err(Error::NotNullable))
                     {
                         Ok(r) => r,

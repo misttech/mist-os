@@ -312,7 +312,7 @@ impl FlatlandViewStrategy {
                 server_end,
             )?;
 
-            let touch_proxy = touch_client.into_proxy()?;
+            let touch_proxy = touch_client.into_proxy();
             let touch_sender = app_sender.clone();
 
             fasync::Task::local(async move {
@@ -354,7 +354,7 @@ impl FlatlandViewStrategy {
             })
             .detach();
 
-            let mouse_proxy = mouse_client.into_proxy()?;
+            let mouse_proxy = mouse_client.into_proxy();
             let mouse_sender = app_sender.clone();
 
             fasync::Task::local(async move {
@@ -382,7 +382,7 @@ impl FlatlandViewStrategy {
             })
             .detach();
 
-            let view_ref_focused_proxy = view_ref_focused_client.into_proxy()?;
+            let view_ref_focused_proxy = view_ref_focused_client.into_proxy();
             let view_ref_focused_sender = app_sender.clone();
 
             fasync::Task::local(async move {

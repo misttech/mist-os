@@ -283,7 +283,7 @@ mod tests {
             panic!("Should have provided a codec client");
         };
 
-        let codec_proxy = codec_client.into_proxy().unwrap();
+        let codec_proxy = codec_client.into_proxy();
 
         test(codec_proxy, codec).await
     }

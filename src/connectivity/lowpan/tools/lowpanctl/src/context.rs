@@ -37,7 +37,7 @@ macro_rules! impl_get_protocol_method {
                 .context("Failed to connect")?
                 .connect(&self.device_name, server)?;
 
-            client.into_proxy().context("into_proxy() failed")
+            Ok(client.into_proxy())
         }
     };
 }
@@ -105,6 +105,6 @@ impl LowpanCtlContext {
 
         lookup.lookup(&self.device_name, server)?;
 
-        client.into_proxy().context("into_proxy() failed")
+        Ok(client.into_proxy())
     }
 }

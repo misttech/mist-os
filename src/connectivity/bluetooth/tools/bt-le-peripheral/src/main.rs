@@ -207,7 +207,7 @@ async fn await_connected(
     responder.send()?;
 
     eprintln!("Connected to central: {}", Peer::try_from(peer)?);
-    Ok(connection.into_proxy()?)
+    Ok(connection.into_proxy())
 }
 
 // This functions implements the main behavior of this tool which involves:
@@ -442,7 +442,7 @@ mod tests {
                     ..Default::default()
                 };
 
-                let proxy = advertised_peripheral.into_proxy()?;
+                let proxy = advertised_peripheral.into_proxy();
                 let _ = proxy.on_connected(&peer, conn_client_end).await;
 
                 responder.send(Ok(()))?;

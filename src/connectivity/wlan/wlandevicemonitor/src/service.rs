@@ -336,18 +336,12 @@ async fn create_iface(
     // with the USME device.
     let (usme_bootstrap_client, usme_bootstrap_server) =
         create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
-    let usme_bootstrap_proxy = usme_bootstrap_client.into_proxy().map_err(|e| {
-        error!("Error creating UsmeBootstrapProxy: {}", e);
-        zx::Status::INTERNAL
-    })?;
+    let usme_bootstrap_proxy = usme_bootstrap_client.into_proxy();
 
     // Create a GenericSme channel. This channel will be used for continued communication with
     // the USME driver and hence will be persisted.
     let (generic_sme_client, generic_sme_server) = create_endpoints::<fidl_sme::GenericSmeMarker>();
-    let generic_sme_proxy = generic_sme_client.into_proxy().map_err(|e| {
-        error!("Error creating GenericSmeProxy: {}", e);
-        zx::Status::INTERNAL
-    })?;
+    let generic_sme_proxy = generic_sme_client.into_proxy();
 
     let legacy_privacy_support = fidl_sme::LegacyPrivacySupport {
         wep_supported: cfg.wep_supported,

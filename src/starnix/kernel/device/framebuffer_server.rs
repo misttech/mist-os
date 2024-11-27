@@ -355,7 +355,7 @@ pub fn start_presentation_loop(
                 felement::GraphicalPresenterMarker,
             >()
             .map_err(|_| errno!(ENOENT))
-            .expect("Failed to connect to GraphicalPresenter").into_proxy().expect("Failed to convert GraphicalPresenter to proxy")
+            .expect("Failed to connect to GraphicalPresenter").into_proxy()
             };
 
 

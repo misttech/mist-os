@@ -93,8 +93,7 @@ impl FfxMain for DeregisterTool {
 async fn list_repositories(repos_proxy: RepositoryRegistryProxy) -> Result<Vec<RepositoryConfig>> {
     let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
     repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
-    let client =
-        client.into_proxy().map_err(|e| bug!("error creating repository iterator proxy: {e}"))?;
+    let client = client.into_proxy();
 
     let mut repos = vec![];
     loop {

@@ -479,7 +479,7 @@ impl From<fidl_test_time_realm::RtcOptions> for RtcOptions {
     fn from(value: fidl_test_time_realm::RtcOptions) -> Self {
         match value {
             fidl_test_time_realm::RtcOptions::DevClassRtc(h) => {
-                RtcOptions::InjectedRtc(h.into_proxy().expect("can be converted to proxy"))
+                RtcOptions::InjectedRtc(h.into_proxy())
             }
             fidl_test_time_realm::RtcOptions::InitialRtcTime(t) => {
                 RtcOptions::InitialRtcTime(zx::SyntheticInstant::from_nanos(t))
@@ -573,7 +573,7 @@ async fn setup_rtc(
                             ServerEnd::new(server_end.into_channel()),
                         );
                         let mut fs = ServiceFs::new();
-                        fs.add_remote("dev", client_end.into_proxy().unwrap());
+                        fs.add_remote("dev", client_end.into_proxy());
                         fs.serve_connection(handles.outgoing_dir)
                             .expect("failed to serve fake RTC ServiceFs");
                         fs.collect::<()>().await;

@@ -134,8 +134,7 @@ pub trait SuiteServer: Sized + Sync + Send {
                         break;
                     }
 
-                    let listener =
-                        listener.into_proxy().map_err(FidlError::ClientEndToProxy).unwrap();
+                    let listener = listener.into_proxy();
 
                     self.run_tests(tests, options, component.unwrap(), &listener).await?;
                     listener.on_finished().map_err(RunTestError::SendFinishAllTests).unwrap();

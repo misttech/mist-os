@@ -131,10 +131,7 @@ async fn configure_interface(
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fhardware_network::DeviceMarker>()
                     .context("create proxy")?;
-            device_instance
-                .into_proxy()
-                .context("client end into proxy")?
-                .get_device(server_end)?;
+            device_instance.into_proxy().get_device(server_end)?;
             proxy
         };
         let mut port_events = {

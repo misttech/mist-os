@@ -605,7 +605,7 @@ mod tests {
 
         // Initialize the store but switch out with the stash we made to act corrupted.
         let mut store = PolicyStorage::new_with_id(&store_id).await;
-        let proxy_fn = client.into_proxy().unwrap();
+        let proxy_fn = client.into_proxy();
         store.legacy_stash = StashStore::from_secure_store_proxy(&store_id, proxy_fn);
 
         // Try and load the config. It should provide empty config.
@@ -649,7 +649,7 @@ mod tests {
     fn stash_for_test() -> (Result<StashStore, Error>, fidl_stash::SecureStoreRequestStream) {
         let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
             .expect("create_request_stream failed");
-        let proxy_fn = client.into_proxy().unwrap();
+        let proxy_fn = client.into_proxy();
         let id = rand_string();
         let legacy_stash = StashStore::from_secure_store_proxy(&id, proxy_fn);
 

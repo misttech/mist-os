@@ -97,7 +97,7 @@ where
                                 options,
                             } => {
                                 assert_eq!(options, None);
-                                log_listener.into_proxy().expect("create proxy")
+                                log_listener.into_proxy()
                             }
                             r @ fidl_fuchsia_logger::LogRequest::ListenSafeWithSelectors {
                                 ..
@@ -213,10 +213,7 @@ where
                                 payload,
                                 responder,
                             } => {
-                                let () = process_streamed_payload(
-                                    payload.into_proxy().expect("failed to get proxy"),
-                                )
-                                .await;
+                                let () = process_streamed_payload(payload.into_proxy()).await;
                                 responder.send(zx::Status::OK.into_raw())
                             }
                             r => panic!("unexpected request {:?}", r),
@@ -1423,7 +1420,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
         .await
         .expect("add virtual device");
 
-    let netdevice = netdevice.into_proxy().expect("netdevice proxy");
+    let netdevice = netdevice.into_proxy();
     let netdevice = &netdevice;
     let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
         match r.expect("connector error") {

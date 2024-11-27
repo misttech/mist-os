@@ -184,15 +184,7 @@ async fn process_bss_updates<C: BssCache>(
                 stations,
                 control_handle: _,
             }) => {
-                let update_result = bss_cache
-                    .lock()
-                    .await
-                    .update(
-                        stations
-                            .into_proxy()
-                            .context("failed to get proxy for scan result iterator")?,
-                    )
-                    .await;
+                let update_result = bss_cache.lock().await.update(stations.into_proxy()).await;
                 report_bss_update_metrics(update_result, &mut cobalt_api);
                 update_result.context("failed to apply base station update")?
             }

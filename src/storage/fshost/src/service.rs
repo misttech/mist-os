@@ -512,8 +512,7 @@ async fn shred_data_volume(
                         tracing::error!(?error, "connect_block failed");
                         zx::Status::INTERNAL
                     })?
-                    .into_proxy()
-                    .unwrap(),
+                    .into_proxy(),
             )
             .await;
             if format != DiskFormat::Fxfs {

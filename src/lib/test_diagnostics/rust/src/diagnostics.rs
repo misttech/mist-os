@@ -97,7 +97,7 @@ mod fuchsia {
         pub fn from_client_end(
             client_end: ClientEnd<BatchIteratorMarker>,
         ) -> Result<Self, fidl::Error> {
-            Ok(Self { subscription: Subscription::new(client_end.into_proxy()?) })
+            Ok(Self { subscription: Subscription::new(client_end.into_proxy()) })
         }
     }
 

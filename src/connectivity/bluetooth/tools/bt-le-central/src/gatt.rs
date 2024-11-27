@@ -851,7 +851,7 @@ mod tests {
         let (register_result, expect_register_result) = join!(register_fut, expect_register_fut);
         register_result.expect("failed to register notifier");
         let notifier_client = expect_register_result.expect("expect register failed");
-        let notifier = notifier_client.into_proxy().expect("failed to turn notifier into proxy");
+        let notifier = notifier_client.into_proxy();
 
         let notification_value = ReadValue {
             handle: Some(Handle { value: 2 }),

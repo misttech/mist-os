@@ -181,7 +181,7 @@ async fn should_stop_after_fidl_error() -> Result<(), Error> {
     let client_fut = async move {
         // Write an invalid request.
         client.channel().write(&[0xab, 0xcd, 0xef], &mut []).unwrap();
-        let client = client.into_proxy().unwrap();
+        let client = client.into_proxy();
         assert!(client.echo_string("message 2").await.unwrap_err().is_closed());
         assert!(client.echo_string("message 3").await.unwrap_err().is_closed());
     };

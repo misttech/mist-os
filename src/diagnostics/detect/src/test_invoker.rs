@@ -100,7 +100,7 @@ mod test {
             server_end.into_stream().expect("convert to stream"),
             detection_runner,
         ));
-        client_end.into_proxy().expect("Client end converts to proxy")
+        client_end.into_proxy()
     }
 
     /// Make sure that the FIDL server doesn't hang or crash, and does call run_detection

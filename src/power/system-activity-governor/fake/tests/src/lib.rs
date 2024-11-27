@@ -232,7 +232,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .lease(1)
         .await?
         .map_err(|e| anyhow::anyhow!("{e:?}"))?
-        .into_proxy()?;
+        .into_proxy();
 
     assert_eq!(
         LeaseStatus::Pending,

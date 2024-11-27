@@ -454,7 +454,7 @@ impl SystemActivityGovernor {
             .await
             .expect("Failed to request boot control lease")
             .expect("Failed to acquire boot control lease")
-            .into_proxy()?;
+            .into_proxy();
 
         // TODO(https://fxbug.dev/333947976): Use RequiredLevel when LeaseStatus is removed.
         let mut lease_status = fbroker::LeaseStatus::Unknown;
@@ -693,7 +693,7 @@ impl SystemActivityGovernor {
                 Ok(fsystem::ActivityGovernorRequest::RegisterListener { responder, payload }) => {
                     match payload.listener {
                         Some(listener) => {
-                            self.listeners.borrow_mut().push(listener.into_proxy().unwrap());
+                            self.listeners.borrow_mut().push(listener.into_proxy());
                         }
                         None => tracing::warn!("No listener provided in request"),
                     }
@@ -780,8 +780,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
             .await
             .expect("Failed to request ExecutionState lease")
             .expect("Failed to acquire ExecutionState lease")
-            .into_proxy()
-            .expect("Failed to convert the ExecutionState lease ClientEnd into a Proxy");
+            .into_proxy();
 
         // TODO(https://fxbug.dev/333947976): Use RequiredLevel when LeaseStatus is removed.
         let mut lease_status = fbroker::LeaseStatus::Unknown;

@@ -211,7 +211,7 @@ mod tests {
                 vertical_size_mm: 0,
                 using_fallback_size: false,
             }];
-            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy();
             coordinator_listener_proxy.on_displays_changed(added_displays, &[]).unwrap();
 
             match coordinator_request_stream.next().await.unwrap() {
@@ -264,7 +264,7 @@ mod tests {
                     request => panic!("Unexpected request to Provider: {:?}", request),
                 };
 
-            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy();
             coordinator_listener_proxy.on_displays_changed(&[], &[]).unwrap();
         };
         futures::join!(test_future, provider_service_future);

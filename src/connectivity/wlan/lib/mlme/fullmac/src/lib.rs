@@ -614,12 +614,8 @@ mod tests {
             let exec = fasync::TestExecutor::new();
 
             let (mut fake_device, _driver_calls) = FakeFullmacDevice::new();
-            let usme_bootstrap_proxy = fake_device
-                .usme_bootstrap_client_end
-                .take()
-                .unwrap()
-                .into_proxy()
-                .expect("converting into UsmeBootstrapProxy should succeed");
+            let usme_bootstrap_proxy =
+                fake_device.usme_bootstrap_client_end.take().unwrap().into_proxy();
 
             let (generic_sme_proxy, generic_sme_server_end) =
                 fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()

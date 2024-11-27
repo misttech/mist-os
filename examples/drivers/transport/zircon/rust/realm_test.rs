@@ -44,7 +44,7 @@ async fn test_sample_driver() -> Result<()> {
         node_iter_server,
         true,
     )?;
-    let node_iter = node_iter.into_proxy()?;
+    let node_iter = node_iter.into_proxy();
     let nodes = node_iter.get_next().await?;
     let Some(node) = nodes.into_iter().next() else {
         panic!("could not find the 'transport-child' node");

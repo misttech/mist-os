@@ -323,7 +323,7 @@ impl BatteryManager {
                             responder.send(&info)?;
                         }
                         fpower::BatteryManagerRequest::Watch { watcher, .. } => {
-                            let watcher = watcher.into_proxy()?;
+                            let watcher = watcher.into_proxy();
                             debug!("::battery_manager_request:: handle Watch request");
                             self.add_watcher(watcher.clone()).await;
 
@@ -414,7 +414,7 @@ mod tests {
 
         let (watcher_client_end, mut stream) =
             create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher = watcher_client_end.into_proxy().unwrap();
+        let watcher = watcher_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher]));
 
@@ -447,11 +447,11 @@ mod tests {
 
         let (watcher1_client_end, mut stream1) =
             create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher1 = watcher1_client_end.into_proxy().unwrap();
+        let watcher1 = watcher1_client_end.into_proxy();
 
         let (watcher2_client_end, mut stream2) =
             create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
-        let watcher2 = watcher2_client_end.into_proxy().unwrap();
+        let watcher2 = watcher2_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher1, watcher2]));
 

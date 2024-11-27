@@ -406,7 +406,7 @@ mod tests {
             })
             .detach();
 
-            Ok(client.into_proxy().unwrap())
+            Ok(client.into_proxy())
         }
 
         async fn open_protocol(&self, _name: String) -> Result<fidl::Channel> {
@@ -456,7 +456,6 @@ mod tests {
 
         client
             .into_proxy()
-            .unwrap()
             .forward_port("dummy_target", &host_address(), &target_address())
             .await
             .unwrap()
@@ -480,7 +479,6 @@ mod tests {
 
         client
             .into_proxy()
-            .unwrap()
             .reverse_port("dummy_target", &host_address(), &target_address())
             .await
             .unwrap()

@@ -27,7 +27,7 @@ pub struct FileBackend {
 
 impl FileBackend {
     pub fn new(file: ClientEnd<FileMarker>) -> Result<Self, Error> {
-        let file = file.into_proxy()?;
+        let file = file.into_proxy();
         Ok(Self { file, semaphore: Semaphore::new(MAX_INFLIGHT_REQUESTS) })
     }
 

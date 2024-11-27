@@ -419,7 +419,7 @@ async fn loader_server(
                                 .unwrap_or_default(),
                             request
                         );
-                        Loader::new(request, scope).await?.start(client.into_proxy()?).await?;
+                        Loader::new(request, scope).await?.start(client.into_proxy()).await?;
                         control_handle.shutdown();
                     }
                 }

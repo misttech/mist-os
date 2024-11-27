@@ -106,7 +106,7 @@ impl Snooper {
 
     pub fn from_client(client: ClientEnd<SnoopMarker>, path: &str) -> Snooper {
         let device_name = path.to_owned();
-        let proxy = client.into_proxy().unwrap();
+        let proxy = client.into_proxy();
         let event_stream = proxy.take_event_stream();
         Snooper { device_name, proxy, event_stream, is_terminated: false }
     }

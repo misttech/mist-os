@@ -288,7 +288,7 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
 
-    ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
+    Ok(ClientEnd::<P>::new(client.into_channel()).into_proxy())
 }
 
 /// Opens a new connection to the given `directory`. The cloned connection has the same permissions.

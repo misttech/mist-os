@@ -76,7 +76,7 @@ impl WriteBlobError {
 async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), WriteBlobError> {
     match blob {
         fpkg::BlobWriter::File(file) => {
-            let file = file.into_proxy().unwrap();
+            let file = file.into_proxy();
             let () = file
                 .resize(contents.len() as u64)
                 .await
@@ -94,7 +94,7 @@ async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), Write
         }
         fpkg::BlobWriter::Writer(writer) => {
             let () = blob_writer::BlobWriter::create(
-                writer.into_proxy().unwrap(),
+                writer.into_proxy(),
                 contents.len().try_into().unwrap(),
             )
             .await

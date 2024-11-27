@@ -220,7 +220,7 @@ async fn exec_client(
     responder: triangle::ConscriptIssueResponder,
 ) -> Result<(), Error> {
     tracing::info!(node_id = node_id.0, "CLIENT SEND REQUEST: {:?}", text);
-    let response = client.into_proxy()?.echo_string(text.as_deref()).await.unwrap();
+    let response = client.into_proxy().echo_string(text.as_deref()).await.unwrap();
     tracing::info!(node_id = node_id.0, "CLIENT GETS RESPONSE: {:?}", response);
     responder.send(response.as_deref())?;
     Ok(())

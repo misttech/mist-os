@@ -444,11 +444,11 @@ mod tests {
         while let Some(req) = profile.next().await {
             match req {
                 Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
-                    let connect_proxy = payload.receiver.unwrap().into_proxy().unwrap();
+                    let connect_proxy = payload.receiver.unwrap().into_proxy();
                     advertisement = Some((connect_proxy, responder));
                 }
                 Ok(bredr::ProfileRequest::Search { payload, .. }) => {
-                    search_request = Some(payload.results.unwrap().into_proxy().unwrap())
+                    search_request = Some(payload.results.unwrap().into_proxy())
                 }
                 x => panic!("Expected one Advertise and Search but got: {:?}", x),
             }

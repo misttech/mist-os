@@ -30,7 +30,7 @@ async fn test_sample_driver() -> Result<()> {
     let manager = instance.root.connect_to_protocol_at_exposed_dir::<ManagerMarker>()?;
     let (node_iter, node_iter_server) = create_endpoints();
     manager.get_node_info(&["dev.simple_child".to_owned()], node_iter_server, true)?;
-    let node_iter = node_iter.into_proxy()?;
+    let node_iter = node_iter.into_proxy();
     let nodes = node_iter.get_next().await?;
     let Some(node) = nodes.into_iter().next() else {
         panic!("could not find the 'simple_child' node");

@@ -277,12 +277,7 @@ fn get_custom_artifacts_directory(
 ) -> Result<fio::DirectoryProxy, Error> {
     for entry in namespace {
         if entry.path.as_ref().unwrap() == "/custom_artifacts" {
-            return entry
-                .directory
-                .take()
-                .unwrap()
-                .into_proxy()
-                .map_err(|_| anyhow!("Couldn't grab proxy."));
+            return Ok(entry.directory.take().unwrap().into_proxy());
         }
     }
 
@@ -330,7 +325,7 @@ pub async fn read_file_from_component_ns(
     for entry in start_info.ns.as_mut().ok_or(anyhow!("Component NS is not set"))?.iter_mut() {
         if entry.path == Some("/pkg".to_string()) {
             let dir = entry.directory.take().ok_or(anyhow!("NS entry directory is not set"))?;
-            let dir_proxy = dir.into_proxy()?;
+            let dir_proxy = dir.into_proxy();
 
             let result = read_file_from_dir(&dir_proxy, path).await;
 

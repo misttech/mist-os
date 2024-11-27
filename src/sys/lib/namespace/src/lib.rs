@@ -145,7 +145,7 @@ impl TryFrom<Namespace> for vfs::tree_builder::TreeBuilder {
         let mut builder = vfs::tree_builder::TreeBuilder::empty_dir();
         for Entry { path, directory } in namespace.flatten().into_iter() {
             let path: Vec<&str> = path.iter_segments().map(|s| s.as_str()).collect();
-            builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy().unwrap()))?;
+            builder.add_entry(path, vfs::remote::remote_dir(directory.into_proxy()))?;
         }
         Ok(builder)
     }
@@ -391,7 +391,7 @@ mod tests {
 
         async fn verify(entry: Entry) {
             assert_eq!(entry.path.to_string(), "/data");
-            let dir = entry.directory.into_proxy().unwrap();
+            let dir = entry.directory.into_proxy();
             let file = fuchsia_fs::directory::open_file(&dir, "foo/bar", fio::PERM_READABLE)
                 .await
                 .unwrap();

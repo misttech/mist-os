@@ -238,7 +238,7 @@ pub async fn write_test_blob_fxblob(blob_creator: BlobCreatorProxy, data: &[u8])
         .expect("transport error on create")
         .expect("failed to create blob");
 
-    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let writer = blob_writer_client_end.into_proxy();
     let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
         .await
         .expect("failed to create BlobWriter");

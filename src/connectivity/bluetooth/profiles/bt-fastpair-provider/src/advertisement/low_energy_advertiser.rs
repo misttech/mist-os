@@ -94,13 +94,7 @@ impl LowEnergyAdvertisement {
         };
 
         // Keep the `connection` handle alive so that the LE connection is persisted.
-        let connection = match connection.into_proxy() {
-            Ok(conn) => conn,
-            Err(e) => {
-                warn!("ConnectionProxy already closed: {:?}", e);
-                return None;
-            }
-        };
+        let connection = connection.into_proxy();
 
         let id = peer.id;
         // Resolves when the remote peer disconnects.
@@ -373,7 +367,7 @@ mod tests {
             .unwrap();
         let (_, adv_peripheral_client, responder) =
             adv_request.into_advertise().expect("Peripheral.Advertise");
-        (adv_peripheral_client.into_proxy().unwrap(), responder)
+        (adv_peripheral_client.into_proxy(), responder)
     }
 
     #[fuchsia::test]

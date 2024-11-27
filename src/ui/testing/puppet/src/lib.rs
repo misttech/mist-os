@@ -73,36 +73,24 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
             match request {
                 PuppetFactoryRequest::Create { payload, responder, .. } => {
                     info!("create puppet");
-                    let flatland = payload
-                        .flatland_client
-                        .expect("missing flatland client")
-                        .into_proxy()
-                        .expect("failed to generate proxy");
-                    let keyboard = payload
-                        .keyboard_client
-                        .expect("missing keyboard client")
-                        .into_proxy()
-                        .expect("failed to generate proxy");
+                    let flatland =
+                        payload.flatland_client.expect("missing flatland client").into_proxy();
+                    let keyboard =
+                        payload.keyboard_client.expect("missing keyboard client").into_proxy();
                     let view_token =
                         payload.view_token.expect("missing puppet viewport creation token");
                     let puppet_server = payload.server_end.expect("missing puppet server endpoint");
                     let touch_listener = match payload.touch_listener {
                         None => None,
-                        Some(touch_listener) => {
-                            Some(touch_listener.into_proxy().expect("failed to generate proxy"))
-                        }
+                        Some(touch_listener) => Some(touch_listener.into_proxy()),
                     };
                     let mouse_listener = match payload.mouse_listener {
                         None => None,
-                        Some(mouse_listener) => {
-                            Some(mouse_listener.into_proxy().expect("failed to generate proxy"))
-                        }
+                        Some(mouse_listener) => Some(mouse_listener.into_proxy()),
                     };
                     let keyboard_listener = match payload.keyboard_listener {
                         None => None,
-                        Some(keyboard_listener) => {
-                            Some(keyboard_listener.into_proxy().expect("failed to generate proxy"))
-                        }
+                        Some(keyboard_listener) => Some(keyboard_listener.into_proxy()),
                     };
                     let device_pixel_ratio =
                         payload.device_pixel_ratio.expect("missing device_pixel_ratio");

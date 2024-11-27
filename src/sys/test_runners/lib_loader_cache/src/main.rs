@@ -47,13 +47,7 @@ async fn start_builder(
                 cache: server_end,
                 ..
             } => {
-                let lib_proxy = match lib_directory.into_proxy() {
-                    Ok(p) => p,
-                    Err(e) => {
-                        warn!("cannot convert lib directory to proxy: {:?}", e);
-                        continue;
-                    }
-                };
+                let lib_proxy = lib_directory.into_proxy();
                 let cache = loader_cache::LibraryLoaderCache::new(lib_proxy.into());
                 fasync::Task::spawn(
                     async move { loader_cache::serve_cache(cache, server_end).await }.map(

@@ -882,7 +882,7 @@ mod tests {
         test.model.start().await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
-        let iterator = iterator.into_proxy().unwrap();
+        let iterator = iterator.into_proxy();
 
         let mut bytes = vec![];
 
@@ -1152,7 +1152,7 @@ mod tests {
         // Test resolvers provide a pkg dir with a fake file
         let pkg_entry = ns.remove(0);
         assert_eq!(pkg_entry.path.unwrap(), "/pkg");
-        let pkg_dir = pkg_entry.directory.unwrap().into_proxy().unwrap();
+        let pkg_dir = pkg_entry.directory.unwrap().into_proxy();
 
         let entries = fuchsia_fs::directory::readdir(&pkg_dir).await.unwrap();
         assert_eq!(
@@ -1166,7 +1166,7 @@ mod tests {
         // The component requested the `foo` protocol.
         let svc_entry = ns.remove(0);
         assert_eq!(svc_entry.path.unwrap(), "/svc");
-        let svc_dir = svc_entry.directory.unwrap().into_proxy().unwrap();
+        let svc_dir = svc_entry.directory.unwrap().into_proxy();
 
         let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
         assert_eq!(

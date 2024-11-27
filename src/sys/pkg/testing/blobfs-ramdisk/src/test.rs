@@ -559,13 +559,13 @@ async fn fxblob_concurrent_creation_succeeds() {
     let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
     let compressed_len: u64 = compressed.len().try_into().unwrap();
 
-    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy();
     let vmo0 = writer0.get_vmo(compressed_len).await.unwrap().unwrap();
     let () = vmo0.write(&compressed, 0).unwrap();
     let () = writer0.bytes_ready(compressed_len - 1).await.unwrap().unwrap();
     assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::new());
 
-    let writer1 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let writer1 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy();
     let vmo1 = writer1.get_vmo(compressed_len).await.unwrap().unwrap();
     let () = vmo1.write(&compressed, 0).unwrap();
     let () = writer1.bytes_ready(compressed_len).await.unwrap().unwrap();
@@ -584,7 +584,7 @@ async fn fxblob_create_already_present_returns_already_exists() {
     let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
     let compressed_len: u64 = compressed.len().try_into().unwrap();
 
-    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy();
     let vmo0 = writer0.get_vmo(compressed_len).await.unwrap().unwrap();
     let () = vmo0.write(&compressed, 0).unwrap();
     let () = writer0.bytes_ready(compressed_len).await.unwrap().unwrap();
@@ -612,7 +612,7 @@ async fn fxblob_readdirents_only_returns_valid_blobs() {
     // Blob doesn't appear until it is fully written.
     assert_eq!(blobfs_server.list_blobs().unwrap(), BTreeSet::new());
 
-    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy();
     assert_eq!(blobfs_server.list_blobs().unwrap(), BTreeSet::new());
 
     let vmo0 = writer0.get_vmo(compressed_len).await.unwrap().unwrap();

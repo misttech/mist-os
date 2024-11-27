@@ -161,7 +161,7 @@ impl InputEventsRelay {
                     )
                 }
                 EventProxyMode::None => (
-                    touch_source_client_end.into_proxy().expect("Failed to create proxy"),
+                    touch_source_client_end.into_proxy(),
                     None,
                 ),
             };
@@ -867,7 +867,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -943,7 +943,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1081,7 +1081,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");
@@ -1143,7 +1143,7 @@ mod test {
                 responder,
             })) => {
                 let _ = responder.send();
-                listener.into_proxy().expect("Failed to create proxy")
+                listener.into_proxy()
             }
             _ => {
                 panic!("Failed to get event");

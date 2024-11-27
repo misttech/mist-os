@@ -610,7 +610,7 @@ mod tests {
         assert_eq!(builder.vmo, None);
 
         let (vmm_side, device_side) = fidl::endpoints::create_endpoints::<VirtioDeviceMarker>();
-        let vmm_side = vmm_side.into_proxy()?;
+        let vmm_side = vmm_side.into_proxy();
         let mut device_side = device_side.into_stream()?;
 
         let device_fut = config_builder_from_stream(builder, &mut device_side, &(0..=1), &mem);
@@ -635,7 +635,7 @@ mod tests {
             DeviceBuilder::new(None, None).map_notify(|_| Ok(NotificationCounter::new())).unwrap();
 
         let (vmm_side, device_side) = fidl::endpoints::create_endpoints::<VirtioDeviceMarker>();
-        let vmm_side = vmm_side.into_proxy()?;
+        let vmm_side = vmm_side.into_proxy();
         let mut device_side = device_side.into_stream()?;
 
         let device_fut = config_builder_from_stream(builder, &mut device_side, &(0..=1), &mem)

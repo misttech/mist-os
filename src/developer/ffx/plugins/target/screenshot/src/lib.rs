@@ -139,7 +139,7 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
     let img_size = screenshot_response.size.expect("no data size returned from screenshot");
     let client_end = screenshot_response.file.expect("no file returned from screenshot");
 
-    let file_proxy = client_end.into_proxy().expect("could not create file proxy");
+    let file_proxy = client_end.into_proxy();
 
     let mut img_data = read_data(&file_proxy).await?;
     // VMO in |file_proxy| may be padded for alignment.

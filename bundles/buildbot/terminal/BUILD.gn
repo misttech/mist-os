@@ -18,6 +18,10 @@ group("terminal") {
     "//src/tests/end_to_end/sl4f:test",
     "//src/tests/end_to_end/time_sync:test",
 
+    # Doesn't have any tests that are included in bundles.
+    "//src/ui/bin/tiles-session",
+    "//src/ui/bin/tiling_wm",
+
     # General end to end dependencies.
     "//src/tests/end_to_end/bundles:end_to_end_deps",
   ]

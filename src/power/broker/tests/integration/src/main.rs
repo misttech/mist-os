@@ -164,7 +164,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(
                 parent_required_fut.await.unwrap(),
@@ -325,7 +325,7 @@ mod tests {
         let element_a_status = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_a_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
         let element_b_token = zx::Event::create();
         let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
@@ -366,7 +366,7 @@ mod tests {
         let element_b_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_b_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
         let (element_c_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_c_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
@@ -401,7 +401,7 @@ mod tests {
         let element_c_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_c_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
         let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
@@ -426,7 +426,7 @@ mod tests {
         let element_d_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_d_element_control.open_status_channel(server)?;
-            client.into_proxy()?
+            client.into_proxy()
         };
 
         // Initial required level for each element should be OFF.
@@ -470,7 +470,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(
                 element_a_required_fut.await.unwrap(),
@@ -820,7 +820,7 @@ mod tests {
         // C2's required level should remain 0.
         let lease_child_1 = executor.run_singlethreaded(async {
             child1_lessor.lease(5).await.unwrap().expect("Lease response not ok").into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(200));
         });
@@ -904,13 +904,7 @@ mod tests {
         // C2's required level should become 3 because its dependencies are already satisfied.
         // C1's lease @ 5 is still satisfied.
         let lease_child_2 = executor.run_singlethreaded(async {
-            child2_lessor
-                .lease(3)
-                .await
-                .unwrap()
-                .expect("Lease response not ok")
-                .into_proxy()
-                .unwrap()
+            child2_lessor.lease(3).await.unwrap().expect("Lease response not ok").into_proxy()
         });
         assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
@@ -1322,7 +1316,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
@@ -1350,7 +1344,7 @@ mod tests {
                 .unwrap()
                 .expect("Lease response not ok")
                 .into_proxy()
-        })?;
+        });
         executor.run_singlethreaded(async {
             assert_eq!(required_a_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
         });

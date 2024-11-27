@@ -526,7 +526,7 @@ mod tests {
         assert_eq!(entry.path.to_str().unwrap(), "/svc");
 
         // Check that there are the expected two protocols inside the svc directory.
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let mut entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
         let mut expectation = vec![
             DirEntry { name: "fuchsia.Normal".to_string(), kind: fio::DirentType::Service },
@@ -583,7 +583,7 @@ mod tests {
         let entry = processargs.namespace_entries.pop().unwrap();
         assert_eq!(entry.path.to_str().unwrap(), "/svc");
 
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let dir = dir.into_channel().unwrap().into_zx_channel();
 
         // Connect to the protocol using namespace functionality.
@@ -652,7 +652,7 @@ mod tests {
         // No request yet. Not until we write to the client endpoint.
         assert_matches!(exec.run_until_stalled(&mut receiver.recv()), Poll::Pending);
 
-        let dir = entry.directory.into_proxy().unwrap();
+        let dir = entry.directory.into_proxy();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         let (client_end, server_end) = zx::Channel::create();
 
