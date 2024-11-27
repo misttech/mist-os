@@ -445,12 +445,7 @@ fn do_writev(
     }
 
     let file = current_task.files.get(fd)?;
-    // Try to minimize how far arch32 impacts the system
-    let iovec = if current_task.thread_state.arch_width.is_arch32() {
-        current_task.read_iovec32(iovec_addr, iovec_count)?
-    } else {
-        current_task.read_iovec(iovec_addr, iovec_count)?
-    };
+    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     let res = if let Some(offset) = offset {
         file.write_at(
@@ -651,7 +646,7 @@ impl From<StatxFlags> for LookupFlags {
     }
 }
 
-pub fn lookup_at<L>(
+fn lookup_at<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,

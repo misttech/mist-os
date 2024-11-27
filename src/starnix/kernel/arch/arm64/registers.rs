@@ -35,20 +35,13 @@ impl RegisterState {
     /// Returns the register that indicates the single-machine-word return value from a
     /// function call.
     pub fn instruction_pointer_register(&self) -> u64 {
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[15]
-        } else {
-            self.real_registers.pc
-        }
+        self.real_registers.pc
     }
 
     /// Sets the register that indicates the single-machine-word return value from a
     /// function call.
     pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
         self.real_registers.pc = new_ip;
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[15] = new_ip;
-        }
     }
 
     /// Returns the register that indicates the single-machine-word return value from a
@@ -65,19 +58,12 @@ impl RegisterState {
 
     /// Gets the register that indicates the current stack pointer.
     pub fn stack_pointer_register(&self) -> u64 {
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[13]
-        } else {
-            self.real_registers.sp
-        }
+        self.real_registers.sp
     }
 
     /// Sets the register that indicates the current stack pointer.
     pub fn set_stack_pointer_register(&mut self, sp: u64) {
         self.real_registers.sp = sp;
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[13] = sp;
-        }
     }
 
     /// Sets the register that indicates the TLS.
@@ -102,17 +88,12 @@ impl RegisterState {
 
     /// Returns the register that contains the syscall number.
     pub fn syscall_register(&self) -> u64 {
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[7]
-        } else {
-            self.real_registers.r[8]
-        }
+        self.real_registers.r[8]
     }
 
     /// Resets the register that contains the application status flags.
     pub fn reset_flags(&mut self) {
-        // Reset all the flags except the aarch32 and thumb bits.
-        self.real_registers.cpsr = self.real_registers.cpsr & 0x30;
+        self.real_registers.cpsr = 0;
     }
 
     /// Executes the given predicate on the register.
@@ -125,12 +106,7 @@ impl RegisterState {
             return error!(EINVAL);
         }
         if offset == memoffset::offset_of!(user_regs_struct, sp) {
-            // For arm, sp is register 13
-            let ret = f(&mut self.real_registers.sp);
-            if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-                self.real_registers.r[13] = self.real_registers.sp;
-            }
-            ret
+            f(&mut self.real_registers.sp)
         } else if offset == memoffset::offset_of!(user_regs_struct, pc) {
             f(&mut self.real_registers.pc)
         } else if offset == memoffset::offset_of!(user_regs_struct, pstate) {
@@ -139,13 +115,7 @@ impl RegisterState {
             == memoffset::offset_of!(user_regs_struct, regs) + 30 * std::mem::size_of::<u64>()
         {
             // The 30th register is stored as lr in self.real_registers
-            let ret = f(&mut self.real_registers.lr);
-            if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-                // The 14th register is stored as lr in self.real_registers for
-                // arm
-                self.real_registers.r[14] = self.real_registers.lr;
-            }
-            ret
+            f(&mut self.real_registers.lr)
         } else if offset % std::mem::align_of::<u64>() == 0 {
             let index = (offset - memoffset::offset_of!(user_regs_struct, regs)) >> 3;
             f(&mut self.real_registers.r[index])
@@ -178,17 +148,6 @@ impl std::ops::DerefMut for RegisterState {
 
 impl From<RegisterState> for zx::sys::zx_thread_state_general_regs_t {
     fn from(register_state: RegisterState) -> Self {
-        // This is primarily called when returning from restricted mode.
-        // We should synchronize the stack pointer with the aarch32 registers.
-        if register_state.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK != 0 {
-            let mut regs = register_state.real_registers;
-            // The PC appears to advance properly and _not_ prefer r[15]
-            // TODO(https://fxbug.dev/380402551): Make sure this isn't because of anything
-            // done in zircon.
-            regs.sp = regs.r[13];
-            regs
-        } else {
-            register_state.real_registers
-        }
+        register_state.real_registers
     }
 }

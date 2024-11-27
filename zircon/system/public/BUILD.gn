@@ -18,7 +18,6 @@ source_set("public") {
     "zircon/limits.h",
     "zircon/rights.h",
     "zircon/syscalls/object.h",
-    "zircon/time.h",
     "zircon/types.h",
   ]
 

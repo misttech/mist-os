@@ -323,10 +323,8 @@ fn process_restricted_exit(
             current_task.thread_state.registers =
                 zx::sys::zx_thread_state_general_regs_t::from(&*state).into();
 
-            let syscall_decl = SyscallDecl::from_number(
-                current_task.thread_state.registers.syscall_register(),
-                current_task.thread_state.arch_width,
-            );
+            let syscall_decl =
+                SyscallDecl::from_number(current_task.thread_state.registers.syscall_register());
 
             if let Some(new_error_context) =
                 execute_syscall(&mut locked, current_task, syscall_decl)
@@ -832,11 +830,7 @@ pub fn process_completed_restricted_exit(
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
-                prepare_to_restart_syscall(
-                    &mut current_task.thread_state.registers,
-                    None,
-                    current_task.thread_state.arch_width,
-                );
+                prepare_to_restart_syscall(&mut current_task.thread_state.registers, None);
             }
         }
 
