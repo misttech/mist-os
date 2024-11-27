@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use fidl_fuchsia_virtualization::{
     ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
 };
@@ -142,7 +142,7 @@ pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Re
             }
             maybe_event = events.next() => {
                 let event = maybe_event
-                    .ok_or(anyhow!("LinuxManagerEvent stream unexpectedly terminated"))?
+                    .context("LinuxManagerEvent stream unexpectedly terminated")?
                     .context("LinuxManagerEvent stream encountered a fidl error")?;
                 let LinuxManagerEvent::OnGuestInfoChanged { label, info } = event;
                 if &label != TERMINA_ENVIRONMENT_NAME {
