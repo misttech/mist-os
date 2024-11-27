@@ -90,12 +90,6 @@
         "event_code": 71
     },
     {
-        "name": "Pkgfs",
-        "process": "pkgfs",
-        "vmo": "",
-        "event_code": 13
-    },
-    {
         "name": "Archivist",
         "process": "archivist\\.cm|sampler\\.cm|diagnostics-persistence\\.cm",
         "vmo": "",
