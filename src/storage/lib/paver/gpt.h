@@ -107,18 +107,6 @@ class GptDevicePartitioner {
 
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root() { return svc_root_; }
 
-  // FIDL clients for a block device that could contain a GPT.
-  struct GptClients {
-    std::string topological_path;
-    fidl::ClientEnd<fuchsia_hardware_block::Block> block;
-    fidl::ClientEnd<fuchsia_device::Controller> controller;
-  };
-
-  // Find all block devices which could contain a GPT.
-  // TODO(https://fxbug.dev/339491886): Remove this and migrate users to interact with the
-  // fuchsia.paver.Paver (or fuchsia.fshost.Admin directly) to connect to and interact with the GPT.
-  static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
-
  private:
   // Initializes GPT for a device which was explicitly provided. If |gpt_device| doesn't have a
   // valid GPT, it will initialize it with a valid one.
@@ -136,6 +124,18 @@ class GptDevicePartitioner {
     // gpt_ is only set for the legacy Devfs configuration.
     ZX_DEBUG_ASSERT(devices_.IsStorageHost() ^ gpt_ != nullptr);
   }
+
+  // FIDL clients for a block device that could contain a GPT.
+  struct GptClients {
+    std::string topological_path;
+    fidl::ClientEnd<fuchsia_hardware_block::Block> block;
+    fidl::ClientEnd<fuchsia_device::Controller> controller;
+  };
+
+  // Find all block devices which could contain a GPT.
+  // TODO(https://fxbug.dev/339491886): Remove this and migrate users to interact with the
+  // fuchsia.paver.Paver (or fuchsia.fshost.Admin directly) to connect to and interact with the GPT.
+  static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
 
   // Detects if the system has storage-host.
   // If not, the below Legacy methods will substitute their matching method.

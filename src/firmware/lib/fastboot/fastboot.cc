@@ -650,11 +650,6 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(const std::string& command,
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
-zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> Fastboot::FindGptDevices() {
-  auto fd = fbl::unique_fd(open("/dev", O_RDONLY));
-  return paver::GptDevicePartitioner::FindGptDevices(fd);
-}
-
 zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::ConnectToDynamicDataSink(
     Transport* transport) {
   auto paver_client_res = ConnectToPaver();
@@ -664,50 +659,16 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
                          .status_value());
   }
 
-  zx::result device_result = FindGptDevices();
-  if (device_result.is_error()) {
-    return zx::error(SendResponse(ResponseType::kFail, "Failed to find gpt devices", transport,
-                                  zx::error(ZX_ERR_INTERNAL))
-                         .status_value());
+  auto data_sink_endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
+  if (data_sink_endpoints.is_error()) {
+    return zx::error(data_sink_endpoints.status_value());
   }
-  std::vector<paver::GptDevicePartitioner::GptClients> gpt_devices =
-      std::move(device_result.value());
-
-  // Filter out ramdisk block devices.
-  std::vector<paver::GptDevicePartitioner::GptClients> non_ramdisk_devices;
-  for (paver::GptDevicePartitioner::GptClients& client : gpt_devices) {
-    if (client.topological_path.find(kRamDiskString) != std::string::npos) {
-      continue;
-    }
-    non_ramdisk_devices.push_back(std::move(client));
-  }
-
-  if (non_ramdisk_devices.empty()) {
-    return zx::error(SendResponse(ResponseType::kFail, "No suitable block devices", transport,
-                                  zx::error(ZX_ERR_INTERNAL))
-                         .status_value());
-  } else if (non_ramdisk_devices.size() > 1) {
-    return zx::error(SendResponse(ResponseType::kFail, "More than one suitable devices", transport,
-                                  zx::error(ZX_ERR_INTERNAL))
-                         .status_value());
-  }
-
-  auto data_sink = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-  if (data_sink.is_error()) {
-    return zx::error(SendResponse(ResponseType::kFail, "Failed to create end points", transport,
-                                  zx::error(data_sink.status_value()))
-                         .status_value());
-  }
-  auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
-  fidl::ClientEnd block_device = std::move(non_ramdisk_devices[0].block);
-  fidl::ClientEnd controller = std::move(non_ramdisk_devices[0].controller);
-
-  auto res = paver_client_res.value()->UseBlockDevice(
-      std::move(block_device), std::move(controller),
+  auto [data_sink_local, data_sink_remote] = std::move(*data_sink_endpoints);
+  auto res = paver_client_res.value()->FindPartitionTableManager(
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(data_sink_remote.TakeChannel()));
 
   if (!res.ok()) {
-    return zx::error(SendResponse(ResponseType::kFail, "Failed to create dynamic data sink",
+    return zx::error(SendResponse(ResponseType::kFail, "Failed to find dynamic data sink",
                                   transport, zx::error(res.status()))
                          .status_value());
   }

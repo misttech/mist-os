@@ -19,7 +19,6 @@
 
 #include "fastboot_base.h"
 #include "src/developer/sshd-host/constants.h"
-#include "src/storage/lib/paver/gpt.h"
 
 namespace fastboot {
 
@@ -95,11 +94,6 @@ class __EXPORT Fastboot : public FastbootBase {
   fuchsia_mem::wire::Buffer GetWireBufferFromDownload();
 
   friend class FastbootDownloadTest;
-
-  // For test injection. Fastboot unittest doesn't have a realistic physical block device
-  // environment. Specifically, our goal is to filter out ram disk. But in test we can only create
-  // ramdisk block devices. Thus test will override this method to return fake topology path and fd.
-  virtual zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> FindGptDevices();
 };
 
 }  // namespace fastboot

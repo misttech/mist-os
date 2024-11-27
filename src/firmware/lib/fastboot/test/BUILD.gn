@@ -41,6 +41,7 @@ test("fastboot-test") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/lib/fxl",
     "//src/storage/lib/vfs/cpp",

@@ -889,45 +889,8 @@ TEST_F(FastbootFlashTest, GetVarAll) {
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
 
-// Returns a block device path that looks like a ramdisk. Fastboot GPT functionality should
-// always ignore ramdisks.
-std::string RamDiskPath(int i) { return std::string(kRamDiskString) + "-" + std::to_string(i); }
-
-// A Fastboot subclass which overrides FindGptDevices() to fake out which block devices
-// GptDevicePartitioner finds.
-class FastbootFakeGptDevices : public Fastboot {
- public:
-  // Additional param |block_topology_paths| is the list of fake GPT block devices paths to find.
-  // If unspecified, the default is to present one GPT block device and one GPT ramdisk device.
-  FastbootFakeGptDevices(size_t max_download_size, fidl::ClientEnd<fuchsia_io::Directory> svc_root,
-                         std::vector<std::string> block_topology_paths = {"block-0",
-                                                                          RamDiskPath(0)})
-      : Fastboot(max_download_size, std::move(svc_root)),
-        block_topology_paths_(std::move(block_topology_paths)) {}
-
-  zx::result<std::vector<paver::GptDevicePartitioner::GptClients>> FindGptDevices() override {
-    std::vector<paver::GptDevicePartitioner::GptClients> devices;
-    for (auto& ele : block_topology_paths_) {
-      // We need to have valid channels for the devices, but it doesn't matter what they are.
-      zx::channel block, controller;
-      if (zx_status_t status = zx::channel::create(0, &block, &controller); status != ZX_OK) {
-        return zx::error(status);
-      }
-      devices.push_back({
-          .topological_path = ele,
-          .block = fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block)),
-          .controller = fidl::ClientEnd<fuchsia_device::Controller>(std::move(controller)),
-      });
-    }
-    return zx::ok(std::move(devices));
-  }
-
- private:
-  std::vector<std::string> block_topology_paths_;
-};
-
 TEST_F(FastbootFlashTest, OemInitPartitionTables) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   std::string command = "oem init-partition-tables";
   TestTransport transport;
   transport.AddInPacket(command);
@@ -941,36 +904,8 @@ TEST_F(FastbootFlashTest, OemInitPartitionTables) {
             std::vector<paver_test::Command>{paver_test::Command::kInitPartitionTables});
 }
 
-TEST_F(FastbootFlashTest, OemInitPartitionTablesNoSuitableDevice) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()), {RamDiskPath(0), RamDiskPath(1)});
-  std::string command = "oem init-partition-tables";
-  TestTransport transport;
-  transport.AddInPacket(command);
-
-  zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_error());
-
-  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
-  ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
-}
-
-TEST_F(FastbootFlashTest, OemInitPartitionTablesMoreThanOneSuitableDevice) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()),
-                                  {"block-0", "block-1", RamDiskPath(0)});
-  std::string command = "oem init-partition-tables";
-  TestTransport transport;
-  transport.AddInPacket(command);
-  zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_error());
-
-  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
-  ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
-}
-
 TEST_F(FastbootFlashTest, OemWipePartitionTables) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   std::string command = "oem wipe-partition-tables";
   TestTransport transport;
   transport.AddInPacket(command);
@@ -1001,7 +936,7 @@ void CommandFailure(Fastboot& fastboot, TestTransport& transport, std::string_vi
 }
 
 TEST_F(FastbootFlashTest, FlashGptMeta) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   TestTransport transport;
 
   ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, kGptMetaDefault));
@@ -1011,7 +946,7 @@ TEST_F(FastbootFlashTest, FlashGptMeta) {
 }
 
 TEST_F(FastbootFlashTest, FlashGptMetaNoDownloadFailure) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   TestTransport transport;
 
   // No data downloaded should cause a failure.
@@ -1020,7 +955,7 @@ TEST_F(FastbootFlashTest, FlashGptMetaNoDownloadFailure) {
 }
 
 TEST_F(FastbootFlashTest, FlashGptMetaUnknownContentsFailure) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   TestTransport transport;
 
   ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, "default_plus_invalid_extra_contents"));
@@ -1029,7 +964,7 @@ TEST_F(FastbootFlashTest, FlashGptMetaUnknownContentsFailure) {
 }
 
 TEST_F(FastbootFlashTest, FlashGptMetaInvalidSlotFailure) {
-  FastbootFakeGptDevices fastboot(0x40000, std::move(svc_chan()));
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
   TestTransport transport;
 
   ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, kGptMetaDefault));
