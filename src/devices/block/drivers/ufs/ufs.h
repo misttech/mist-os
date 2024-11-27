@@ -130,6 +130,9 @@ struct InspectProperties {
   inspect::BoolProperty rx_termination;           // Set once by the init thread.
   inspect::UintProperty pa_hs_series;             // Set once by the init thread.
   inspect::UintProperty power_mode;               // Updated whenever power state changes.
+  // Write Protect
+  inspect::BoolProperty is_power_on_write_protect_enabled;   // Set once by the init thread.
+  inspect::BoolProperty logical_lun_power_on_write_protect;  // Set once by the init thread.
   // Background Operations
   inspect::BoolProperty is_background_op_enabled;  // Updated whenever the power state changes or an
                                                    // exception event occurs.

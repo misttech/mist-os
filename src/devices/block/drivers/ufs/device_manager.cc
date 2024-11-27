@@ -275,6 +275,24 @@ zx::result<> DeviceManager::HandleBackgroundOpEvent() {
   return zx::ok();
 }
 
+zx::result<> DeviceManager::ConfigureWriteProtect(inspect::Node &wp_node) {
+  zx::result<uint8_t> flag = ReadFlag(Flags::fPowerOnWPEn);
+  if (flag.is_error()) {
+    return flag.take_error();
+  }
+  is_power_on_write_protect_enabled_ = flag.value();
+  properties_.is_power_on_write_protect_enabled =
+      wp_node.CreateBool("is_power_on_write_protect_enabled", is_power_on_write_protect_enabled_);
+  properties_.logical_lun_power_on_write_protect =
+      wp_node.CreateBool("logical_lun_power_on_write_protect", logical_lun_power_on_write_protect_);
+  return zx::ok();
+}
+
+void DeviceManager::SetLogicalLunPowerOnWriteProtect(bool value) {
+  logical_lun_power_on_write_protect_ = value;
+  properties_.logical_lun_power_on_write_protect.Set(value);
+}
+
 zx::result<> DeviceManager::ConfigureBackgroundOp(inspect::Node &bkop_node) {
   zx::result<uint8_t> flag = ReadFlag(Flags::fBackgroundOpsEn);
   if (flag.is_error()) {
@@ -839,7 +857,11 @@ zx::result<> DeviceManager::SuspendPower() {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  // TODO(https://fxbug.dev/42075643): We need to wait for the in flight I/O.
+  // TODO(b/42075643): We need to wait for the in flight I/O.
+
+  // TODO(b/42075643): If we turn off the power(vcc off) while LogicalLunPowerOnWriteProtect is
+  // enabled, we will lose write protection. To avoid this, power should be maintained when write
+  // protect is enabled. This requires more fine-grained power control(VCC, VCCQ, VCCQ2).
 
   // TODO(b/42075643): In the case of power suspended state, we can apply a policy to perform
   // background operations in the suspended state. Currently, background operations are not
@@ -855,7 +877,7 @@ zx::result<> DeviceManager::SuspendPower() {
     return result.take_error();
   }
   if (result.value()) {
-    // TODO(https://fxbug.dev/42075643): We need to keep the power mode active until the
+    // TODO(b/42075643): We need to keep the power mode active until the
     // Writebooster flush is complete.
     FDF_LOG(WARNING, "WriteBooster buffer flush is needed");
     return zx::ok();
@@ -872,7 +894,7 @@ zx::result<> DeviceManager::SuspendPower() {
 
   DmeHibernateEnterCommand dme_hibernate_enter_command(controller_);
   if (auto result = dme_hibernate_enter_command.SendCommand(); result.is_error()) {
-    // TODO(https://fxbug.dev/42075643): Link has a problem and needs to perform error recovery.
+    // TODO(b/42075643): Link has a problem and needs to perform error recovery.
     return result.take_error();
   }
   current_link_state_ = target_link_state;

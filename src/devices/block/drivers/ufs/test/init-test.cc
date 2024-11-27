@@ -159,4 +159,33 @@ TEST_F(InitTest, WriteBoosterBufferLifeTime) {
   ASSERT_FALSE(dut_->GetDeviceManager().IsWriteBoosterEnabled());
 }
 
+TEST_F(InitTest, PowerOnWriteProtectEnable) {
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_TRUE(dut_->GetDeviceManager().IsPowerOnWritePotectEnabled());
+}
+
+TEST_F(InitTest, PowerOnWriteProtectDisable) {
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, false);
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_FALSE(dut_->GetDeviceManager().IsPowerOnWritePotectEnabled());
+}
+
+TEST_F(InitTest, LogicalLunPowerOnWriteProtectEnable) {
+  uint8_t lun = 0;
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  mock_device_.GetLogicalUnit(lun).GetUnitDesc().bLUWriteProtect =
+      LUWriteProtect::kPowerOnWriteProtect;
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_TRUE(dut_->GetDeviceManager().IsLogicalLunPowerOnWriteProtect());
+}
+
+TEST_F(InitTest, LogicalLunPowerOnWriteProtectDisable) {
+  uint8_t lun = 0;
+  mock_device_.SetFlag(Flags::fPowerOnWPEn, true);
+  mock_device_.GetLogicalUnit(lun).GetUnitDesc().bLUWriteProtect = LUWriteProtect::kNoWriteProtect;
+  ASSERT_NO_FATAL_FAILURE(StartDriver());
+  ASSERT_FALSE(dut_->GetDeviceManager().IsLogicalLunPowerOnWriteProtect());
+}
+
 }  // namespace ufs

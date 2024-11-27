@@ -695,6 +695,7 @@ zx_status_t Ufs::Init() {
   PopulateCapabilitiesInspect(&inspect_node_);
 
   auto controller_node = inspect_node_.CreateChild("controller");
+  auto wp_node = controller_node.CreateChild("write_protect");
   auto wb_node = controller_node.CreateChild("writebooster");
   auto bkop_node = controller_node.CreateChild("background_operations");
 
@@ -714,6 +715,11 @@ zx_status_t Ufs::Init() {
 
   if (zx::result<> result = device_manager_->GetControllerDescriptor(); result.is_error()) {
     FDF_LOG(ERROR, "Failed to get controller descriptor: %s", result.status_string());
+    return result.error_value();
+  }
+
+  if (zx::result<> result = device_manager_->ConfigureWriteProtect(wp_node); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to configure Write Protect %s", result.status_string());
     return result.error_value();
   }
 
@@ -757,6 +763,7 @@ zx_status_t Ufs::Init() {
       /*buckets=*/14);
 
   inspector().inspector().emplace(std::move(controller_node));
+  inspector().inspector().emplace(std::move(wp_node));
   inspector().inspector().emplace(std::move(wb_node));
   inspector().inspector().emplace(std::move(bkop_node));
   FDF_LOG(INFO, "Bind Success");
@@ -1094,6 +1101,13 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
       return zx::error(ZX_ERR_BAD_STATE);
     }
     FDF_LOG(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, desc_block_size, desc_block_count);
+
+    // Currently, we only support kPowerOnWriteProtect.
+    if (device_manager_->IsPowerOnWritePotectEnabled() &&
+        unit_descriptor->bLUWriteProtect == LUWriteProtect::kPowerOnWriteProtect &&
+        !device_manager_->IsLogicalLunPowerOnWriteProtect()) {
+      device_manager_->SetLogicalLunPowerOnWriteProtect(true);
+    }
 
     return zx::ok();
   };

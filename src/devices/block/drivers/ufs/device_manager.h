@@ -87,6 +87,12 @@ class DeviceManager {
   zx::result<> PostExceptionEventsTask();
   void HandleExceptionEvents();
 
+  // Write Protect
+  zx::result<> ConfigureWriteProtect(inspect::Node &wp_node);
+  bool IsPowerOnWritePotectEnabled() const { return is_power_on_write_protect_enabled_; }
+  bool IsLogicalLunPowerOnWriteProtect() const { return logical_lun_power_on_write_protect_; }
+  void SetLogicalLunPowerOnWriteProtect(bool value);
+
   // Background Operations
   zx::result<> HandleBackgroundOpEvent();
   zx::result<> ConfigureBackgroundOp(inspect::Node &bkop_node);
@@ -180,6 +186,10 @@ class DeviceManager {
 
   // Exception Event Control
   ExceptionEventControl exception_event_control_;
+
+  // Write Protect
+  bool is_power_on_write_protect_enabled_ = false;
+  bool logical_lun_power_on_write_protect_ = false;
 
   // Background Operations
   bool is_background_op_enabled_ = false;

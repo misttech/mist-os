@@ -38,7 +38,6 @@ and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
 * Support RPMB logical unit
-* Support write protect
 * Power management - Dynamic clock scaling
 * Interrupt aggregation
 * Implement Ufs tools
