@@ -101,14 +101,15 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
    public:
     ~Intermediate();
 
-    bool has_children() const { return !entries_by_id_.is_empty(); }
+    size_t num_children() const;
     // Returns (child, false) if a child with |name| exists, otherwise creates a new child with
     // |name| using |builder| and returns (child, true). Returns the error if |builder| fails.
     zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LookupOrInsert(
         fbl::String name, fit::function<zx::result<fbl::RefPtr<LocalVnode>>(ParentAndId)> builder);
     void RemoveEntry(LocalVnode* vn, uint64_t id);
 
-    const EntryByIdMap& GetEntriesById() const { return entries_by_id_; }
+    // See |LocalVnode::Readdir|.
+    zx::result<std::string_view> Readdir(uint64_t* last_seen) const;
 
     // Returns a child if it has the name |name|.
     // Otherwise, returns nullptr.

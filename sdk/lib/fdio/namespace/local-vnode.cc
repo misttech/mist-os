@@ -22,6 +22,8 @@
 
 namespace fdio_internal {
 
+size_t LocalVnode::Intermediate::num_children() const { return entries_by_id_.size(); }
+
 zx::result<std::tuple<fbl::RefPtr<LocalVnode>, bool>> LocalVnode::Intermediate::LookupOrInsert(
     fbl::String name, fit::function<zx::result<fbl::RefPtr<LocalVnode>>(ParentAndId)> builder) {
   auto it = entries_by_name_.find(name);
@@ -153,28 +155,31 @@ zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) const {
 
 zx::result<std::string_view> LocalVnode::Readdir(uint64_t* last_seen) const {
   return std::visit(fdio::overloaded{
-                        [&](const LocalVnode::Local& c) -> zx::result<std::string_view> {
+                        [](const LocalVnode::Local&) -> zx::result<std::string_view> {
                           // Calling readdir on a Local node is invalid.
                           return zx::error(ZX_ERR_NOT_DIR);
                         },
-                        [&](const LocalVnode::Intermediate& c) -> zx::result<std::string_view> {
-                          for (auto it = c.GetEntriesById().lower_bound(*last_seen);
-                               it != c.GetEntriesById().end(); ++it) {
-                            if (it->id() <= *last_seen) {
-                              continue;
-                            }
-                            *last_seen = it->id();
-                            return zx::ok(it->name());
-                          }
-                          return zx::error(ZX_ERR_NOT_FOUND);
+                        [&](const LocalVnode::Intermediate& c) {
+                          return c.Readdir(last_seen);
                         },
-                        [](const LocalVnode::Remote& s) -> zx::result<std::string_view> {
+                        [](const LocalVnode::Remote&) -> zx::result<std::string_view> {
                           // If we've called Readdir on a Remote node, the path
                           // was misconfigured.
                           return zx::error(ZX_ERR_BAD_PATH);
                         },
                     },
                     node_type_);
+}
+
+zx::result<std::string_view> LocalVnode::Intermediate::Readdir(uint64_t* last_seen) const {
+  for (auto it = entries_by_id_.lower_bound(*last_seen); it != entries_by_id_.end(); ++it) {
+    if (it->id() <= *last_seen) {
+      continue;
+    }
+    *last_seen = it->id();
+    return zx::ok(it->name());
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 template <typename Fn>

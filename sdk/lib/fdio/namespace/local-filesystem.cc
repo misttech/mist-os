@@ -419,7 +419,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
                 return ZX_ERR_NOT_FOUND;
               }
 
-              if (c.GetEntriesById().size() > 1) {
+              if (c.num_children() > 1) {
                 // If this node has multiple children (including something OTHER than the
                 // node we're potentially unbinding), we shouldn't try to remove it while
                 // deleting childless intermediate nodes.
@@ -518,7 +518,7 @@ zx_status_t fdio_namespace::Bind(
                             // TA_REQ annotations for lock_, and annotating the lambdas with
                             // NO_TA will prevent future internal locks from being scrutinized.
                             []() __TA_ASSERT(lock_) {}();
-                            if (c.has_children()) {
+                            if (c.num_children() != 0) {
                               // Overlay remotes are disallowed.
                               return ZX_ERR_NOT_SUPPORTED;
                             }
