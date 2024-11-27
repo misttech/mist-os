@@ -36,6 +36,28 @@ class SnapshotOn(enum.StrEnum):
     NEVER = "never"
 
 
+class TracingOn(enum.StrEnum):
+    """Tracing behavior for tests.
+
+    This user param does not support any tests that reboot the device.
+    """
+
+    # Once per test case.
+    TEARDOWN_TEST = "teardown_test"
+
+    # Once per test case on failure only.
+    TEARDOWN_TEST_ON_FAIL = "teardown_test_on_fail"
+
+    # Once per test class.
+    TEARDOWN_CLASS = "teardown_class"
+
+    # Once per test class on failure only.
+    TEARDOWN_CLASS_ON_FAIL = "teardown_class_on_fail"
+
+    # Do not collect
+    NEVER = "never"
+
+
 class FuchsiaBaseTest(base_test.BaseTestClass):
     """Fuchsia base test class.
 
@@ -44,11 +66,17 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         test_case_path: Directory pointing to a specific test case artifacts.
         snapshot_on: `snapshot_on` test param value converted into SnapshotOn
             Enum.
+        tracing_on: `tracing_on` test param value converted into TracingOn
 
     Required Mobly Test Params:
         snapshot_on (str): One of "teardown_class", "teardown_class_on_fail",
             "teardown_test", "on_fail".
             Default value is "teardown_class_on_fail".
+        tracing_on (str): One of "teardown_class", "teardown_class_on_fail",
+            "teardown_test", "on_fail", "never".
+        # TODO(b/378563090): Switch the default to `teardown_class_on_fail` after
+        # refactoring lacewing tests
+            Default value is "never".
     """
 
     def setup_class(self) -> None:
@@ -57,13 +85,22 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         It does the following things:
             * Reads user params passed to the test
             * Instantiates all fuchsia devices into self.fuchsia_devices
+            * Instantiates and starts tracing if specified in the user params
         """
         self._any_test_failed: bool = False
-        self._process_user_params()
+        self._process_metric_user_params()
 
         self.fuchsia_devices: list[
             fuchsia_device.FuchsiaDevice
         ] = self.register_controller(fuchsia_device_mobly_controller)
+
+        if (
+            self.tracing_on == TracingOn.TEARDOWN_CLASS
+            or self.tracing_on == TracingOn.TEARDOWN_CLASS_ON_FAIL
+        ):
+            for device in self.fuchsia_devices:
+                device.tracing.initialize()
+                device.tracing.start()
 
     def setup_test(self) -> None:
         """setup_test is called once before running each test.
@@ -71,6 +108,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         It does the following things:
             * Stores the current test case path into self.test_case_path
             * Logs a info message onto device that test case has started.
+            * Instantiates and starts tracing if specified in the user params
         """
         self._devices_not_healthy: bool = False
 
@@ -83,6 +121,17 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             f"Lacewing test case...",
             level=custom_types.LEVEL.INFO,
         )
+        for device in self.fuchsia_devices:
+            if (
+                not device.tracing.is_active()
+                and not device.tracing.is_session_initialized()
+            ):
+                if (
+                    self.tracing_on == TracingOn.TEARDOWN_TEST
+                    or self.tracing_on == TracingOn.TEARDOWN_TEST_ON_FAIL
+                ):
+                    device.tracing.initialize()
+                    device.tracing.start()
 
     def teardown_test(self) -> None:
         """teardown_test is called once after running each test.
@@ -97,6 +146,18 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST:
             self._collect_snapshot(directory=self.test_case_path)
+
+        for device in self.fuchsia_devices:
+            if (
+                device.tracing.is_active()
+                and device.tracing.is_session_initialized()
+            ):
+                if self.tracing_on == TracingOn.TEARDOWN_TEST:
+                    device.tracing.stop()
+                    device.tracing.terminate_and_download(
+                        directory=self.test_case_path
+                    )
+
         self._log_message_to_devices(
             message=f"Finished executing '{self.current_test_info.name}' "
             f"Lacewing test case...",
@@ -120,8 +181,31 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Takes snapshot of all the fuchsia devices and stores it under
               "<log_path>/teardown_class<_on_fail>" directory if `snapshot_on`
               test param is set to "teardown_class" or "teardown_class_on_fail".
+            * Stops, terminates and downloads the trace data for all devices and stores
+              it under "<log_path>/teardown_class<_on_fail>" directory if `tracing_on`
+              test param is set to "teardown_class" or "teardown_class_on_fail".
         """
-        self._teardown_class_artifacts: str
+        self._teardown_class_artifacts: str = f"{self.log_path}/teardown_class"
+
+        for device in self.fuchsia_devices:
+            if (
+                device.tracing.is_active()
+                and device.tracing.is_session_initialized()
+            ):
+                if self.tracing_on == TracingOn.TEARDOWN_CLASS:
+                    device.tracing.stop()
+                    device.tracing.terminate_and_download(
+                        directory=self._teardown_class_artifacts
+                    )
+                elif (
+                    self.tracing_on == TracingOn.TEARDOWN_CLASS_ON_FAIL
+                    and self._any_test_failed
+                ):
+                    device.tracing.stop()
+                    device.tracing.terminate_and_download(
+                        directory=self._teardown_class_artifacts
+                    )
+
         if self.snapshot_on == SnapshotOn.TEARDOWN_CLASS:
             self._teardown_class_artifacts = f"{self.log_path}/teardown_class"
             self._collect_snapshot(directory=self._teardown_class_artifacts)
@@ -145,6 +229,18 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         self._any_test_failed = True
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST_ON_FAIL:
             self._collect_snapshot(directory=self.test_case_path)
+
+        for device in self.fuchsia_devices:
+            if (
+                device.tracing.is_active()
+                and device.tracing.is_session_initialized()
+            ):
+                if self.tracing_on == TracingOn.TEARDOWN_TEST_ON_FAIL:
+                    for device in self.fuchsia_devices:
+                        device.tracing.stop()
+                        device.tracing.terminate_and_download(
+                            directory=self.test_case_path
+                        )
 
     def _collect_snapshot(self, directory: str) -> None:
         """Collects snapshots for all the FuchsiaDevice objects and stores them
@@ -354,32 +450,30 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                     err,
                 )
 
-    def _process_user_params(self) -> None:
-        """Reads, processes and stores the test params used by this module."""
+    def _process_metric_user_params(self) -> None:
+        """Reads, processes and stores the metric collection params used by this module.
+
+        At the moment we collect snapshots and traces.
+
+        Raises:
+            TestAbortClass: When user_params provided are invalid.
+        """
         _LOGGER.info(
             "user_params associated with the test: %s", self.user_params
         )
 
+        snapshot_on: str = self.user_params.get(
+            "snapshot_on", SnapshotOn.TEARDOWN_CLASS_ON_FAIL.value
+        ).lower()
+        tracing_on: str = self.user_params.get(
+            "tracing_on", SnapshotOn.NEVER.value
+        ).lower()
+
         try:
-            snapshot_on: str = self.user_params.get(
-                "snapshot_on", SnapshotOn.TEARDOWN_CLASS_ON_FAIL.value
-            ).lower()
             self.snapshot_on: SnapshotOn = SnapshotOn(snapshot_on)
-        except ValueError:
-            _LOGGER.warning(
-                "Invalid value '%s' passed in 'snapshot_on' test param. "
-                "Valid values for the test param are: '%s'. "
-                "Proceeding with default value: '%s'",
-                snapshot_on,
-                [member.value for member in SnapshotOn],
-                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.value,
-            )
-            self.snapshot_on = SnapshotOn.TEARDOWN_CLASS_ON_FAIL
-        _LOGGER.info(
-            "Frequency at which snapshots will be collected during this test "
-            "run is: '%s'",
-            self.snapshot_on,
-        )
+            self.tracing_on: TracingOn = TracingOn(tracing_on)
+        except ValueError as e:
+            raise signals.TestAbortClass("invalid metric user_param") from e
 
 
 if __name__ == "__main__":
