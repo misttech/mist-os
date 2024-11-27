@@ -2665,10 +2665,8 @@ impl<'a> NetCfg<'a> {
         prefix: fidl::endpoints::ServerEnd<fnet_dhcpv6::PrefixControlMarker>,
         dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), errors::Error> {
-        let (prefix_control_request_stream, control_handle) = prefix
-            .into_stream_and_control_handle()
-            .context("fuchsia.net.dhcpv6/PrefixControl server end to stream and control handle")
-            .map_err(errors::Error::NonFatal)?;
+        let (prefix_control_request_stream, control_handle) =
+            prefix.into_stream_and_control_handle();
 
         let dhcpv6_client_provider = if let Some(s) = self.dhcpv6_client_provider.as_ref() {
             s
@@ -4401,9 +4399,7 @@ mod tests {
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID.get());
                     assert_eq!(params, dhcpv4::new_client_params());
-                    request
-                        .into_stream_and_control_handle()
-                        .expect("error converting client server end to stream")
+                    request.into_stream_and_control_handle()
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                     unreachable!("only called at startup")

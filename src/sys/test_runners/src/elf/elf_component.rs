@@ -574,10 +574,7 @@ where
     .detach();
 
     let server_end = take_server_end(server_end);
-    let (controller_stream, control) =
-        server_end.into_stream_and_control_handle().map_err(|e| {
-            ComponentError::Fidl("failed to convert server end to controller".to_owned(), e)
-        })?;
+    let (controller_stream, control) = server_end.into_stream_and_control_handle();
     let controller =
         runner::component::Controller::new(component_runtime, controller_stream, control);
 

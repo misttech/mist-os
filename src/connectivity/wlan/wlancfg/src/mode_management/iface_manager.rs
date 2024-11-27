@@ -2079,7 +2079,7 @@ mod tests {
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -2347,7 +2347,7 @@ mod tests {
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -5035,7 +5035,7 @@ mod tests {
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.clone());
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );

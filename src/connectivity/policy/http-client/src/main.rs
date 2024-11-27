@@ -457,7 +457,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let lifecycle: zx::Channel = lifecycle.into();
     let lifecycle: ServerEnd<flifecycle::LifecycleMarker> = lifecycle.into();
     let (mut lifecycle_request_stream, lifecycle_control_handle) =
-        lifecycle.into_stream_and_control_handle().unwrap();
+        lifecycle.into_stream_and_control_handle();
 
     let config = Config::take_from_startup_handle();
     let idle_timeout = if config.stop_on_idle_timeout_millis >= 0 {

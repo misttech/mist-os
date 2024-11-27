@@ -302,8 +302,7 @@ impl BuiltinRunnerFactory for BuiltinRunner {
                             start_info, controller, ..
                         } => match runner.clone().start(start_info) {
                             Ok((program, on_exit)) => {
-                                let (stream, control) =
-                                    controller.into_stream_and_control_handle().unwrap();
+                                let (stream, control) = controller.into_stream_and_control_handle();
                                 let controller = Controller::new(program, stream, control);
                                 runner.task_group.spawn(controller.serve(on_exit));
                             }

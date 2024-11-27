@@ -158,8 +158,7 @@ impl FakeFile {
     }
 
     async fn handle_file_stream(self, server_end: ServerEnd<fio::FileMarker>) {
-        let (stream, ch) =
-            server_end.into_stream_and_control_handle().expect("split file server end");
+        let (stream, ch) = server_end.into_stream_and_control_handle();
 
         self.stream_handler.handle_file_stream(self.call_count, stream, ch).await;
     }

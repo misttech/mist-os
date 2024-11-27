@@ -497,9 +497,7 @@ mod test {
         const REMOVAL_REASON_INVALID: fnet_interfaces_admin::AddressRemovalReason =
             fnet_interfaces_admin::AddressRemovalReason::Invalid;
         {
-            let (mut request_stream, control_handle) = server_end
-                .into_stream_and_control_handle()
-                .expect("failed to create stream and control handle");
+            let (mut request_stream, control_handle) = server_end.into_stream_and_control_handle();
 
             const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces::AddressAssignmentState =
                 fnet_interfaces::AddressAssignmentState::Assigned;

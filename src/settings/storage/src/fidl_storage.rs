@@ -594,8 +594,7 @@ mod tests {
                             flags.intersects(fio::OpenFlags::CREATE),
                         ) {
                             Some(status) => {
-                                let (_, control_handle) =
-                                    object.into_stream_and_control_handle().unwrap();
+                                let (_, control_handle) = object.into_stream_and_control_handle();
                                 control_handle
                                     .send_on_open_(status.into_raw(), None)
                                     .expect("failed to send OnOpen event");

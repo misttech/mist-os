@@ -433,7 +433,7 @@ pub(crate) async fn serve_root(
                     let id = fnet_filter_ext::ControllerId(id);
                     inner.lock().await.connect_or_create_new_controller(id.clone());
 
-                    let (stream, control_handle) = request.into_stream_and_control_handle()?;
+                    let (stream, control_handle) = request.into_stream_and_control_handle();
                     serve_controller(&id, stream, control_handle, dispatcher, ctx.clone())
                         .await
                         .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
@@ -463,7 +463,7 @@ pub(crate) async fn serve_control(
                     let final_id =
                         inner.lock().await.new_controller(fnet_filter_ext::ControllerId(id));
 
-                    let (stream, control_handle) = request.into_stream_and_control_handle()?;
+                    let (stream, control_handle) = request.into_stream_and_control_handle();
 
                     serve_controller(&final_id, stream, control_handle, dispatcher, ctx.clone())
                         .await

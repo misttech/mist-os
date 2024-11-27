@@ -480,7 +480,7 @@ impl MockPackageCacheService {
         let behavior = *self.get_behavior.lock();
         match behavior {
             GetBehavior::AlreadyCached => {
-                let (_, control) = needed_blobs.into_stream_and_control_handle().unwrap();
+                let (_, control) = needed_blobs.into_stream_and_control_handle();
                 let () = control.shutdown_with_epitaph(zx::Status::OK);
                 let () = get_responder.send(Ok(())).unwrap();
             }

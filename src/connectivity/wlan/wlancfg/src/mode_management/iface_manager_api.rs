@@ -1836,7 +1836,7 @@ mod tests {
                 ..
             }) => {
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::Success,
@@ -1897,7 +1897,7 @@ mod tests {
                 ..
             }) => {
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,

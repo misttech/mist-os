@@ -621,7 +621,7 @@ impl GattServerFacade {
         let (service_client, service_server) =
             fidl::endpoints::create_endpoints::<LocalServiceMarker>();
         let (service_request_stream, service_control_handle) =
-            service_server.into_stream_and_control_handle()?;
+            service_server.into_stream_and_control_handle();
 
         let server_proxy = self
             .inner

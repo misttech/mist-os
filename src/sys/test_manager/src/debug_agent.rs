@@ -359,8 +359,7 @@ mod test {
     impl FakeDebugAgentService {
         // Creates a new FakeDebugAgentService.
         fn new(server_end: fidl::endpoints::ServerEnd<fdbg::DebugAgentMarker>) -> Self {
-            let (request_stream, control_handle) =
-                server_end.into_stream_and_control_handle().unwrap();
+            let (request_stream, control_handle) = server_end.into_stream_and_control_handle();
             FakeDebugAgentService { request_stream, control_handle }
         }
 

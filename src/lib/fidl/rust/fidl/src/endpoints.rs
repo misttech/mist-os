@@ -496,16 +496,15 @@ impl<T> ServerEnd<T> {
     /// # Panics
     ///
     /// If called outside the context of an active async executor.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
     pub fn into_stream_and_control_handle(
         self,
-    ) -> Result<(T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle), Error>
+    ) -> (T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle)
     where
         T: ProtocolMarker,
     {
         let stream = self.into_stream();
         let control_handle = stream.control_handle();
-        Ok((stream, control_handle))
+        (stream, control_handle)
     }
 
     /// Writes an epitaph into the underlying channel before closing it.

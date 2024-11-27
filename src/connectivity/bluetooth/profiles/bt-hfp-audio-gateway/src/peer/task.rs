@@ -1932,7 +1932,7 @@ mod tests {
                 x => panic!("Unexpected request to profile stream: {:?}", x),
             };
             tracing::info!("Got a SCO connection: {params:?}");
-            let (request_stream, control) = connection.into_stream_and_control_handle().unwrap();
+            let (request_stream, control) = connection.into_stream_and_control_handle();
             match result {
                 Ok(()) => {
                     let accepted_params = params.into_iter().find(|p| {

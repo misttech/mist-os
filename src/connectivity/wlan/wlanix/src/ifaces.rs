@@ -667,9 +667,7 @@ pub mod test_utils {
                 let (proxy, server) =
                     fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
                         .expect("Failed to create fidl endpoints");
-                let (_, handle) = server
-                    .into_stream_and_control_handle()
-                    .expect("Failed to get connect transaction control handle");
+                let (_, handle) = server.into_stream_and_control_handle();
                 *self.transaction_handle.lock() = Some(handle);
                 Ok(ConnectResult::Success(ConnectSuccess {
                     bss: Box::new(random_bss_description!(
@@ -1276,7 +1274,7 @@ mod tests {
         assert_eq!(req.bss_description, bss_description);
         assert_eq!(req.authentication, expected_authentication);
 
-        let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+        let connect_txn_handle = connect_txn.into_stream_and_control_handle().1;
         let result = connect_txn_handle.send_on_connect_result(&fidl_sme::ConnectResult {
             code: fidl_ieee80211::StatusCode::Success,
             is_credential_rejected: false,
@@ -1383,7 +1381,7 @@ mod tests {
             }
         );
 
-        let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+        let connect_txn_handle = connect_txn.into_stream_and_control_handle().1;
         let result = connect_txn_handle.send_on_connect_result(&fidl_sme::ConnectResult {
             code: fidl_ieee80211::StatusCode::RefusedExternalReason,
             is_credential_rejected: false,
@@ -1545,7 +1543,7 @@ mod tests {
             let (_req, connect_txn) = assert_variant!(
                 exec.run_until_stalled(&mut sme_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
-            let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+            let connect_txn_handle = connect_txn.into_stream_and_control_handle().1;
             let _result = connect_txn_handle.send_on_connect_result(&connect_failure);
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_r)));
         }

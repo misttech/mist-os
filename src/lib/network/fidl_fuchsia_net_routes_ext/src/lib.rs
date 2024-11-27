@@ -1802,9 +1802,8 @@ mod tests {
         // Instantiate the fake Watcher implementation.
         let (state, state_server_end) =
             fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (mut state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (mut state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
             .next()
             .then(|req| {
@@ -1865,9 +1864,8 @@ mod tests {
         // Instantiate the fake Watcher implementations.
         let (state, state_server_end) =
             fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watchers_fut = state_request_stream
             .zip(futures::stream::iter(test_data.clone()))
             .for_each_concurrent(std::usize::MAX, |(request, watcher_data)| {
@@ -1958,9 +1956,8 @@ mod tests {
         // Instantiate the fake Watcher implementation.
         let (state, state_server_end) =
             fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (mut state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (mut state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
             .next()
             .then(|req| {
@@ -1996,9 +1993,8 @@ mod tests {
         // Instantiate the fake Watcher implementation.
         let (state, state_server_end) =
             fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (mut state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (mut state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
             .next()
             .then(|req| {

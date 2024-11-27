@@ -821,7 +821,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn finalize_program() {
         let (program, server) = mocks::mock_program();
-        let (stream, control) = server.into_stream_and_control_handle().unwrap();
+        let (stream, control) = server.into_stream_and_control_handle();
         let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
 
         control

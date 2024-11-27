@@ -52,9 +52,7 @@ pub async fn fake_watcher_impl<I: FidlRouteIpExt>(
     events: impl Stream<Item = Vec<I::WatchEvent>>,
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
 ) {
-    let (request_stream, _control_handle) = server_end
-        .into_stream_and_control_handle()
-        .expect("failed to get `Watcher` request stream");
+    let (request_stream, _control_handle) = server_end.into_stream_and_control_handle();
     request_stream
         .zip(events)
         .for_each(|(request, event_batch)| {
@@ -460,9 +458,8 @@ mod tests {
         // Instantiate the fake Watcher implementation.
         let (state, state_server_end) =
             fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
-        let (mut state_request_stream, _control_handle) = state_server_end
-            .into_stream_and_control_handle()
-            .expect("failed to get `State` request stream");
+        let (mut state_request_stream, _control_handle) =
+            state_server_end.into_stream_and_control_handle();
         let watcher_fut = state_request_stream
             .next()
             .then(|req| {

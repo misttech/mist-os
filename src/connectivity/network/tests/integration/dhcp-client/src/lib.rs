@@ -883,9 +883,8 @@ async fn client_handles_address_removal<N: Netstack>(
     );
 
     {
-        let (_asp_request_stream, asp_control_handle) = address_state_provider
-            .into_stream_and_control_handle()
-            .expect("into stream should succeed");
+        let (_asp_request_stream, asp_control_handle) =
+            address_state_provider.into_stream_and_control_handle();
         // NB: We're acting as the AddressStateProvider server_end.
         // Send the removal reason and close the channel to indicate the address
         // is being removed.

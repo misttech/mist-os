@@ -208,8 +208,7 @@ impl OwnedControlHandle {
     pub(crate) fn new_unowned(
         handle: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
     ) -> OwnedControlHandle {
-        let (stream, control) =
-            handle.into_stream_and_control_handle().expect("failed to decompose control handle");
+        let (stream, control) = handle.into_stream_and_control_handle();
         OwnedControlHandle {
             request_stream: stream,
             control_handle: control,
@@ -235,8 +234,7 @@ impl OwnedControlHandle {
         futures::channel::mpsc::Receiver<OwnedControlHandle>,
     ) {
         let (mut sender, receiver) = Self::new_channel();
-        let (stream, control) =
-            handle.into_stream_and_control_handle().expect("failed to decompose control handle");
+        let (stream, control) = handle.into_stream_and_control_handle();
         sender
             .send(OwnedControlHandle {
                 request_stream: stream,
@@ -1153,9 +1151,7 @@ fn add_address(
     params: fnet_interfaces_admin::AddressParameters,
     address_state_provider: ServerEnd<fnet_interfaces_admin::AddressStateProviderMarker>,
 ) {
-    let (req_stream, control_handle) = address_state_provider
-        .into_stream_and_control_handle()
-        .expect("failed to decompose AddressStateProvider handle");
+    let (req_stream, control_handle) = address_state_provider.into_stream_and_control_handle();
     let core_addr = address.addr.into_core();
     let addr_subnet_either: AddrSubnetEither = match address.try_into_core() {
         Ok(addr) => addr,

@@ -424,7 +424,7 @@ fn prepare_client_interface(
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
         })) => {
             assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
 
             // Send back feature support information
             let security_support_req = run_while(
@@ -498,7 +498,7 @@ fn prepare_client_interface(
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
         })) => {
             assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
 
             // Send back feature support information
             let security_support_req = run_while(
@@ -780,7 +780,7 @@ fn save_and_connect(
             assert_eq!(req.ssid, TEST_SSID.clone());
             assert_eq!(test_credentials.sme.clone(), req.authentication.credentials);
             let (_stream, ctrl) = txn.expect("connect txn unused")
-                .into_stream_and_control_handle().expect("error accessing control handle");
+                .into_stream_and_control_handle();
             ctrl
         }
     );
@@ -1241,7 +1241,7 @@ fn test_connect_to_new_network() {
             assert_eq!(TEST_CREDS.wpa_pass_min.sme.clone(), req.authentication.credentials);
             assert_eq!(req.bss_description.bssid, [0, 0, 0, 0, 0, 1]);
             let (_stream, ctrl) = txn.expect("connect txn unused")
-                .into_stream_and_control_handle().expect("error accessing control handle");
+                .into_stream_and_control_handle();
             ctrl
         }
     );
@@ -1476,7 +1476,7 @@ fn test_autoconnect_to_saved_network() {
             assert_eq!(req.ssid, TEST_SSID.clone());
             assert_eq!(TEST_CREDS.wpa_pass_min.sme.clone(), req.authentication.credentials);
             let (_stream, ctrl) = txn.expect("connect txn unused")
-                .into_stream_and_control_handle().expect("error accessing control handle");
+                .into_stream_and_control_handle();
             ctrl
         }
     );
@@ -1703,7 +1703,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 assert_eq!(req.ssid, TEST_SSID.clone());
                 assert_eq!(TEST_CREDS.wpa_pass_min.sme.clone(), req.authentication.credentials);
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1917,7 +1917,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
         })) => {
             assert_eq!(iface_id, expected_iface_id);
             assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
 
             // Send back feature support information
             let security_support_req = run_while(
@@ -1968,7 +1968,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
         })) => {
             assert_eq!(iface_id, expected_iface_id);
             assert!(responder.send(Ok(())).is_ok());
-            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
+            let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle();
 
             // Send back feature support information
             let security_support_req = run_while(
@@ -2126,10 +2126,8 @@ fn reject_connect_requests(
                 match req {
                     Some(Ok(fidl_sme::ClientSmeRequest::Connect { txn, .. })) => {
                         // If there is a connect request, send back a failure.
-                        let (_, connect_txn_handle) = txn
-                            .expect("connect txn unused")
-                            .into_stream_and_control_handle()
-                            .expect("error accessing control handle");
+                        let (_, connect_txn_handle) =
+                            txn.expect("connect txn unused").into_stream_and_control_handle();
 
                         connect_txn_handle
                             .send_on_connect_result(&fidl_sme::ConnectResult {

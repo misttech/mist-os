@@ -1227,7 +1227,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1328,7 +1328,7 @@ mod tests {
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1408,7 +1408,7 @@ mod tests {
                 // Send connection response.
                 exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1549,7 +1549,7 @@ mod tests {
                 assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1615,7 +1615,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -1713,7 +1713,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     ..fake_successful_connect_result()
@@ -1807,7 +1807,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 let connect_result = fidl_sme::ConnectResult {
                     code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     is_credential_rejected: true,
@@ -1919,7 +1919,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -2371,7 +2371,7 @@ mod tests {
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -2560,7 +2560,7 @@ mod tests {
                 assert_eq!(req.ssid, second_connect_selection.target.network.ssid.clone().to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );
@@ -3510,7 +3510,7 @@ mod tests {
                 assert_eq!(req.multiple_bss_candidates, next_connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
                     .send_on_connect_result(&fake_successful_connect_result())
                     .expect("failed to send connection completion");
@@ -3594,9 +3594,7 @@ mod tests {
         // Make our own SME proxy for this test
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let (sme_req_stream, sme_control_handle) = sme_server
-            .into_stream_and_control_handle()
-            .expect("could not create SME request stream");
+        let (sme_req_stream, sme_control_handle) = sme_server.into_stream_and_control_handle();
 
         let sme_fut = sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
@@ -3688,7 +3686,7 @@ mod tests {
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req: _, txn, control_handle: _ }) => {
                 // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
-                    .into_stream_and_control_handle().expect("error accessing control handle");
+                    .into_stream_and_control_handle();
                 ctrl
             }
         );

@@ -283,8 +283,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         let (file_requests, file_control_handle) =
             ServerEnd::<fio::FileMarker>::new(object.into_channel())
-                .into_stream_and_control_handle()
-                .expect("split file server end");
+                .into_stream_and_control_handle();
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =
@@ -347,8 +346,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
         // to the backing file instead to our FailingWriteFileStreamHandler.
         let (file_requests, file_control_handle) =
             ServerEnd::<fio::FileMarker>::new(object_request.take().into_channel())
-                .into_stream_and_control_handle()
-                .map_err(|_| Status::INTERNAL)?;
+                .into_stream_and_control_handle();
 
         // Create a proxy to the actual file we'll open to proxy to.
         let (backing_node_proxy, backing_node_server_end) =

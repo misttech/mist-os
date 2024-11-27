@@ -603,7 +603,7 @@ async fn start(
         })
         .ok();
 
-    let (server_stream, control) = server_end.into_stream_and_control_handle().unwrap();
+    let (server_stream, control) = server_end.into_stream_and_control_handle();
 
     // Spawn a future that watches for the process to exit
     fasync::Task::spawn({

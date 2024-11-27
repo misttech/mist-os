@@ -198,7 +198,7 @@ mod tests {
                 };
 
             let (mut coordinator_request_stream, _) =
-                coordinator_server.into_stream_and_control_handle().unwrap();
+                coordinator_server.into_stream_and_control_handle();
 
             let added_displays = &[display::Info {
                 id: display_types::DisplayId { value: 42 },

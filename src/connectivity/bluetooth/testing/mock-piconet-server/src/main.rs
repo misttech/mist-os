@@ -163,11 +163,8 @@ impl MockPiconetServer {
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }
             bredr::ProfileRequest::ConnectSco { payload, .. } => {
-                let (_stream, control) = payload
-                    .connection
-                    .unwrap()
-                    .into_stream_and_control_handle()
-                    .expect("couldn't get sco connection");
+                let (_stream, control) =
+                    payload.connection.unwrap().into_stream_and_control_handle();
                 let _ = control.send_on_connection_complete(
                     &bredr::ScoConnectionOnConnectionCompleteRequest::Error(
                         bredr::ScoErrorCode::Failure,

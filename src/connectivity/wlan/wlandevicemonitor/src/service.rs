@@ -2102,9 +2102,8 @@ mod tests {
         test_values.new_iface_sink.unbounded_send(new_iface).expect("Failed to send new iface");
         assert_variant!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);
 
-        let (_generic_sme_stream, generic_sme_control) = generic_sme_server
-            .into_stream_and_control_handle()
-            .expect("Failed to get generic SME stream and control handle");
+        let (_generic_sme_stream, generic_sme_control) =
+            generic_sme_server.into_stream_and_control_handle();
         generic_sme_control.shutdown_with_epitaph(epitaph);
 
         assert_variant!(exec.run_until_stalled(&mut new_iface_fut), Poll::Pending);

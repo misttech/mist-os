@@ -98,7 +98,7 @@ pub async fn send_scan_results_over_fidl(
     mut scan_results: &[fidl_policy::ScanResult],
 ) -> Result<(), Error> {
     // Wait to get a request for a chunk of scan results
-    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
+    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle();
     let mut sent_some_results = false;
 
     // Verify consumer is expecting results before each batch
@@ -149,7 +149,7 @@ pub async fn send_scan_error_over_fidl(
     error_code: types::ScanError,
 ) -> Result<(), fidl::Error> {
     // Wait to get a request for a chunk of scan results
-    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle()?;
+    let (mut stream, ctrl) = output_iterator.into_stream_and_control_handle();
     if let Some(req) = stream.try_next().await? {
         let fidl_policy::ScanResultIteratorRequest::GetNext { responder } = req;
         responder.send(Err(error_code))?;

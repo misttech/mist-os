@@ -468,7 +468,7 @@ pub fn report_start_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Context, Error};
+    use anyhow::Error;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
@@ -713,9 +713,7 @@ mod tests {
             create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         // Get a proxy to the ComponentController channel.
-        let (controller_stream, control) = server_endpoint
-            .into_stream_and_control_handle()
-            .context("failed to convert server end to controller")?;
+        let (controller_stream, control) = server_endpoint.into_stream_and_control_handle();
         Ok((
             Controller::new(fake_component, controller_stream, control),
             client_endpoint.into_proxy(),

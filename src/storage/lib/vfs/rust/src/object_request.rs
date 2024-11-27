@@ -148,12 +148,10 @@ impl ObjectRequest {
             return;
         }
         if let ObjectRequestSend::OnOpen = self.what_to_send {
-            if let Ok((_, control_handle)) = ServerEnd::<fio::NodeMarker>::new(self.object_request)
-                .into_stream_and_control_handle()
-            {
-                let _ = control_handle.send_on_open_(status.into_raw(), None);
-                control_handle.shutdown_with_epitaph(status);
-            }
+            let (_, control_handle) = ServerEnd::<fio::NodeMarker>::new(self.object_request)
+                .into_stream_and_control_handle();
+            let _ = control_handle.send_on_open_(status.into_raw(), None);
+            control_handle.shutdown_with_epitaph(status);
         } else {
             let _ = self.object_request.close_with_epitaph(status);
         }

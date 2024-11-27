@@ -780,9 +780,7 @@ pub(crate) async fn serve_client(
                 .context("closing request channel with epitaph")
         }
     };
-    let (request_stream, control_handle) = request
-        .into_stream_and_control_handle()
-        .context("getting new client request stream from channel")?;
+    let (request_stream, control_handle) = request.into_stream_and_control_handle();
     let mut client = match Client::<fasync::net::UdpSocket>::start(
         duid,
         dhcpv6_core::client::transaction_id(),

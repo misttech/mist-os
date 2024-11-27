@@ -88,7 +88,7 @@ async fn handle_runner_request(
         };
         let url = start_info.resolved_url.clone().unwrap_or_else(|| "unknown url".to_string());
         info!("Colocated runner is going to start component {url}");
-        let (stream, control) = controller.into_stream_and_control_handle().unwrap();
+        let (stream, control) = controller.into_stream_and_control_handle();
         match start(start_info, resource_tracker.clone(), memory_server_handle.new_publisher()) {
             Ok((program, on_exit)) => {
                 let controller = Controller::new(program, stream, control);

@@ -469,9 +469,8 @@ async fn main() -> Result<()> {
     let lifecycle = fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(
         zx::Channel::from(lifecycle),
     );
-    let (lifecycle_request_stream, lifecycle_control_handle) = lifecycle
-        .into_stream_and_control_handle()
-        .expect("Could not convert lifecycle handle to stream and control handle.");
+    let (lifecycle_request_stream, lifecycle_control_handle) =
+        lifecycle.into_stream_and_control_handle();
 
     let config = Config::take_from_startup_handle();
     let full_resolver = if config.enable_ephemeral_drivers {

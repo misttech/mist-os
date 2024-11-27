@@ -2561,7 +2561,7 @@ mod tests {
             .expect("request should not error")
             .into_open_controller()
             .expect("client should open controller");
-        let (stream, control_handle) = request.into_stream_and_control_handle().unwrap();
+        let (stream, control_handle) = request.into_stream_and_control_handle();
         control_handle.send_on_id_assigned(&id).expect("send assigned ID");
 
         stream

@@ -529,7 +529,7 @@ impl AdvertisingProxyInner {
             let service_info_clone = service_info.clone();
 
             let (pub_responder_stream, pub_responder_control) =
-                server.into_stream_and_control_handle().unwrap();
+                server.into_stream_and_control_handle();
 
             let publish_responder_future = pub_responder_stream.map_err(Into::into).try_for_each(
                 move |ServiceInstancePublicationResponder_Request::OnPublication {

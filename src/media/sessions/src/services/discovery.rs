@@ -352,7 +352,7 @@ mod test {
         let (_observer_request_sink, observer_request_stream) = mpsc::channel(100);
         let (player_published_sink, _player_published_receiver) = oneshot::channel();
         let dummy_control_handle =
-            create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle()?.1;
+            create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle().1;
 
         let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>()?;
         let under_test = Discovery::new(player_stream, usage_reporter_proxy);

@@ -864,7 +864,6 @@ mod tests {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
                     iterator
                         .into_stream_and_control_handle()
-                        .unwrap()
                         .1
                         .shutdown_with_epitaph(Status::ADDRESS_IN_USE);
                 }
