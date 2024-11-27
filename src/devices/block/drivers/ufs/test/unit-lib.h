@@ -394,6 +394,14 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
   zx::result<uint32_t> ReadAttribute(Attributes attribute, uint8_t index = 0);
   zx::result<> WriteAttribute(Attributes attribute, uint32_t value, uint8_t index = 0);
 
+  zx::result<> DisableBackgroundOp() { return dut_->GetDeviceManager().DisableBackgroundOp(); }
+
+  // This function is a wrapper to avoid the thread annotation of ReserveAdminSlot().
+  zx::result<uint8_t> ReserveAdminSlot() {
+    std::lock_guard<std::mutex> lock(dut_->GetTransferRequestProcessor().admin_slot_lock_);
+    return dut_->GetTransferRequestProcessor().ReserveAdminSlot();
+  }
+
   ufs_mock_device::UfsMockDevice mock_device_;
 
   template <class T>

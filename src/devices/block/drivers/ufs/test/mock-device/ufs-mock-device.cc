@@ -6,6 +6,8 @@
 
 #include <lib/stdcompat/span.h>
 
+#include "src/devices/block/drivers/ufs/upiu/attributes.h"
+
 namespace ufs {
 namespace ufs_mock_device {
 
@@ -150,6 +152,8 @@ void UfsMockDevice::Init(std::unique_ptr<zx::interrupt> irq) {
                0x01);  // 0% - 10% WriteBooster Buffer life time used
   SetAttribute(Attributes::bAvailableWBBufferSize, 10);  // 100%
   SetAttribute(Attributes::dCurrentWBBufferSize, 0x01);
+  SetAttribute(Attributes::wExceptionEventStatus, 0);
+  SetAttribute(Attributes::bBackgroundOpStatus, 0);
 
   std::memset(&flags_, 0, sizeof(flags_));
 }

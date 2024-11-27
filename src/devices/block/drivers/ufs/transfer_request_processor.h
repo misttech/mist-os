@@ -46,12 +46,16 @@ class TransferRequestProcessor : public RequestProcessor {
 
   zx::result<> Init() override;
   // Allocate a slot to submit an Admin command. Use slot 31 to avoid conflicts with I/O commands.
-  zx::result<uint8_t> ReserveAdminSlot();
+  zx::result<uint8_t> ReserveAdminSlot() TA_REQ(admin_slot_lock_);
 
   uint32_t AdminRequestCompletion();
   uint32_t IoRequestCompletion() override;
 
-  // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendRequestUsingSlot.
+  zx::result<std::unique_ptr<ResponseUpiu>> SendScsiUpiuUsingSlot(
+      ScsiCommandUpiu &request, uint8_t lun, uint8_t slot, std::optional<zx::unowned_vmo> data_vmo,
+      IoCommand *io_cmd, bool is_sync);
+
+  // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendScsiUpiuUsingSlot.
   // If it is an admin command, the |io_cmd| is nullptr.
   zx::result<std::unique_ptr<ResponseUpiu>> SendScsiUpiu(
       ScsiCommandUpiu &request, uint8_t lun, std::optional<zx::unowned_vmo> data = std::nullopt,
@@ -64,6 +68,7 @@ class TransferRequestProcessor : public RequestProcessor {
   // This function is only ever used for admin commands.
   template <class RequestType, class ResponseType>
   zx::result<std::unique_ptr<ResponseType>> SendRequestUpiu(RequestType &request, uint8_t lun = 0) {
+    std::lock_guard<std::mutex> lock(admin_slot_lock_);
     zx::result<uint8_t> slot = ReserveAdminSlot();
     if (slot.is_error()) {
       return zx::error(ZX_ERR_NO_RESOURCES);
@@ -119,6 +124,11 @@ class TransferRequestProcessor : public RequestProcessor {
     UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
   }
   bool ProcessSlotCompletion(uint8_t slot_num);
+
+  // TODO(b/42075643): Background Operation uses the admin slot, causing a race condition for admin
+  // commands running on the main thread. To fix this, per-slot locking is required, but I added
+  // admin_slot_lock_ as a temporary solution.
+  std::mutex admin_slot_lock_;
 };
 
 }  // namespace ufs

@@ -83,6 +83,14 @@ class DeviceManager {
   zx::result<> GetControllerDescriptor();
   zx::result<UnitDescriptor> ReadUnitDescriptor(uint8_t lun);
 
+  // Exception Events
+  zx::result<> PostExceptionEventsTask();
+  void HandleExceptionEvents();
+
+  // Background Operations
+  zx::result<> HandleBackgroundOpEvent();
+  zx::result<> ConfigureBackgroundOp(inspect::Node &bkop_node);
+
   // WriteBooster
   zx::result<> ConfigureWriteBooster(inspect::Node &wb_node);
   bool IsWriteBoosterEnabled() const { return is_write_booster_enabled_; }
@@ -150,6 +158,12 @@ class DeviceManager {
 
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition) TA_REQ(power_lock_);
 
+  zx::result<> SetExceptionEventControl(ExceptionEventControl control);
+  zx::result<ExceptionEventStatus> GetExceptionEventStatus();
+  zx::result<> EnableBackgroundOp();
+  zx::result<> DisableBackgroundOp();
+  zx::result<BackgroundOpStatus> GetBackgroundOpStatus();
+
   zx::result<bool> IsWriteBoosterBufferLifeTimeLeft();
   zx::result<> EnableWriteBooster(inspect::Node &wb_node);
   zx::result<> DisableWriteBooster();
@@ -163,6 +177,13 @@ class DeviceManager {
   GeometryDescriptor geometry_descriptor_;
 
   uint8_t max_lun_count_;
+
+  // Exception Event Control
+  ExceptionEventControl exception_event_control_;
+
+  // Background Operations
+  bool is_background_op_enabled_ = false;
+  BackgroundOpStatus urgent_bkop_threshold_ = BackgroundOpStatus::kRequiredPerformanceImpact;
 
   // WriteBooster
   bool is_write_booster_enabled_ = false;

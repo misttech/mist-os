@@ -147,12 +147,14 @@ class UfsMockDevice {
   void SetAttribute(Attributes idn, uint32_t value) {
     attributes_[static_cast<size_t>(idn)] = value;
   }
-  void SetFlag(Flags idn, bool value) { flags_[static_cast<size_t>(idn)] = value; }
   uint32_t GetAttribute(Attributes idn) const { return attributes_[static_cast<size_t>(idn)]; }
+  void SetFlag(Flags idn, bool value) { flags_[static_cast<size_t>(idn)] = value; }
   bool GetFlag(Flags idn) const { return flags_[static_cast<size_t>(idn)]; }
 
   void SetUnitAttention(bool value) { unit_attention_ = value; }
   bool GetUnitAttention() const { return unit_attention_; }
+  void SetExceptionEventAlert(bool value) { exception_event_alert_ = value; }
+  bool GetExceptionEventAlert() const { return exception_event_alert_; }
 
   UfsLogicalUnit &GetLogicalUnit(uint8_t lun) { return logical_units_[lun]; }
   RegisterMmioProcessor &GetRegisterMmioProcessor() { return register_mmio_processor_; }
@@ -183,6 +185,7 @@ class UfsMockDevice {
   ScsiCommandProcessor scsi_command_processor_;
 
   bool unit_attention_ = false;
+  bool exception_event_alert_ = false;
 };
 
 }  // namespace ufs_mock_device

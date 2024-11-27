@@ -40,7 +40,7 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorRingRequestDoorbell) {
       .WriteTo(mock_device_.GetRegisters());
 
   // Reuse the command descriptor in admin slot.
-  auto slot_num = dut_->GetTransferRequestProcessor().ReserveAdminSlot();
+  auto slot_num = ReserveAdminSlot();
   ASSERT_TRUE(slot_num.is_ok());
 
   auto &slot = dut_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
@@ -235,7 +235,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
 
 TEST_F(RequestProcessorTest, SendRequestUpiuWithAdminSlotIsFull) {
   // Reserve admin slot.
-  ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveAdminSlot());
+  ASSERT_OK(ReserveAdminSlot());
 
   // Make request UPIU
   NopOutUpiu nop_out_upiu;
@@ -347,7 +347,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {
 TEST_F(RequestProcessorTest, SendScsiUpiuWithAdminSlotIsFull) {
   constexpr uint8_t kTestLun = 0;
 
-  ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveAdminSlot());
+  ASSERT_OK(ReserveAdminSlot());
 
   uint8_t cdb_buffer[6] = {};
   auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);

@@ -35,6 +35,11 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
   std::memcpy(response_upiu_header, command_upiu_header, sizeof(UpiuHeader));
   response_upiu_header->set_trans_code(command_upiu_header->trans_code() | (1 << 5));
 
+  if (mock_device_.GetExceptionEventAlert()) {
+    response_upiu_header->set_event_alert(true);
+    mock_device_.SetExceptionEventAlert(false);
+  }
+
   UpiuTransactionCodes opcode =
       static_cast<UpiuTransactionCodes>(command_upiu_header->trans_code());
   zx_status_t status = ZX_OK;

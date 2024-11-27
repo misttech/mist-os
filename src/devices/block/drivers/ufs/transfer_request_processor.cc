@@ -103,15 +103,9 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveAdminSlot() {
   return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
-zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu(
-    ScsiCommandUpiu &request, uint8_t lun, std::optional<zx::unowned_vmo> data_vmo,
-    IoCommand *io_cmd) {
-  const bool is_admin = io_cmd == nullptr;
-  zx::result<uint8_t> slot = is_admin ? ReserveAdminSlot() : ReserveSlot();
-  if (slot.is_error()) {
-    return zx::error(ZX_ERR_NO_RESOURCES);
-  }
-
+zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiuUsingSlot(
+    ScsiCommandUpiu &request, uint8_t lun, uint8_t slot, std::optional<zx::unowned_vmo> data_vmo,
+    IoCommand *io_cmd, bool is_sync) {
   uint32_t offset = 0;
   uint32_t length = 0;
   if (io_cmd != nullptr) {
@@ -123,19 +117,48 @@ zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu
                  ? io_cmd->device_op.op.trim.length
                  : io_cmd->device_op.op.rw.length;
   }
-  TRACE_DURATION("ufs", "SendScsiUpiu", "slot", slot.value(), "offset", offset, "length", length);
+  TRACE_DURATION("ufs", "SendScsiUpiu", "slot", slot, "offset", offset, "length", length);
 
   zx::result<void *> response;
   // Admin commands should be performed synchronously and non-admin (data) commands should be
   // performed asynchronously.
-  if (response = SendRequestUsingSlot<ScsiCommandUpiu>(
-          request, lun, slot.value(), std::move(data_vmo), io_cmd, /*is_sync*/ is_admin);
+  if (response = SendRequestUsingSlot<ScsiCommandUpiu>(request, lun, slot, std::move(data_vmo),
+                                                       io_cmd, is_sync);
       response.is_error()) {
     return response.take_error();
   }
   auto response_upiu = std::make_unique<ResponseUpiu>(response.value());
-
   return zx::ok(std::move(response_upiu));
+}
+
+zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu(
+    ScsiCommandUpiu &request, uint8_t lun, std::optional<zx::unowned_vmo> data_vmo,
+    IoCommand *io_cmd) {
+  const bool is_admin = io_cmd == nullptr;
+  zx::result<uint8_t> slot;
+  zx::result<std::unique_ptr<ResponseUpiu>> response_upiu;
+  if (is_admin) {
+    std::lock_guard<std::mutex> lock(admin_slot_lock_);
+    slot = ReserveAdminSlot();
+    if (slot.is_error()) {
+      return zx::error(ZX_ERR_NO_RESOURCES);
+    }
+    // Excute `SendScsiUpiuUsingSlot()` with a admin_slot_lock_ to avoid a race condition for the
+    // admin slot.
+    response_upiu = SendScsiUpiuUsingSlot(request, lun, slot.value(), data_vmo, io_cmd, is_admin);
+  } else {
+    slot = ReserveSlot();
+    if (slot.is_error()) {
+      return zx::error(ZX_ERR_NO_RESOURCES);
+    }
+    response_upiu = SendScsiUpiuUsingSlot(request, lun, slot.value(), data_vmo, io_cmd, is_admin);
+  }
+
+  if (response_upiu.is_error()) {
+    return response_upiu.take_error();
+  }
+
+  return zx::ok(std::move(response_upiu.value()));
 }
 
 zx::result<std::unique_ptr<QueryResponseUpiu>> TransferRequestProcessor::SendQueryRequestUpiu(
@@ -295,14 +318,15 @@ bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
   if (request_slot.state == SlotState::kScheduled) {
     if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
       zx::result<> result = zx::ok();
+      ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
+          slot_num, request_slot.response_upiu_offset));
+
       if (request_slot.is_scsi_command) {
         // Check SCSI command response.
         auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
         result = ScsiCompletion(slot_num, request_slot, descriptor);
       } else {
         // Check request command response.
-        ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
-            slot_num, request_slot.response_upiu_offset));
         if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
           FDF_LOG(ERROR, "Transfer Request command failure: response=%x",
                   response.GetHeader().response);
@@ -314,6 +338,13 @@ bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
         request_slot.io_cmd->device_op.Complete(result.status_value());
       } else {
         request_slot.result = result.status_value();
+      }
+
+      if (response.GetHeader().event_alert()) {
+        if (result = controller_.GetDeviceManager().PostExceptionEventsTask(); result.is_error()) {
+          FDF_LOG(ERROR, "Failed to handle Exception Event slot[%u]: %s", slot_num,
+                  result.status_string());
+        }
       }
 
       if (request_slot.is_sync) {

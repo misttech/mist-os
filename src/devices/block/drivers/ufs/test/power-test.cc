@@ -191,4 +191,149 @@ TEST_F(PowerTest, PowerSuspendResume) {
   EXPECT_EQ(wake_on_request_count->value(), 1);
 }
 
+TEST_F(PowerTest, BackgroundOperations) {
+  libsync::Completion sleep_complete;
+  libsync::Completion awake_complete;
+  mock_device_.GetUicCmdProcessor().SetHook(
+      UicCommandOpcode::kDmeHibernateEnter,
+      [&](UfsMockDevice& mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2, uint32_t ucmdarg3) {
+        mock_device_.GetUicCmdProcessor().DefaultDmeHibernateEnterHandler(mock_device, ucmdarg1,
+                                                                          ucmdarg2, ucmdarg3);
+        sleep_complete.Signal();
+      });
+  mock_device_.GetUicCmdProcessor().SetHook(
+      UicCommandOpcode::kDmeHibernateExit,
+      [&](UfsMockDevice& mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2, uint32_t ucmdarg3) {
+        mock_device_.GetUicCmdProcessor().DefaultDmeHibernateExitHandler(mock_device, ucmdarg1,
+                                                                         ucmdarg2, ucmdarg3);
+        awake_complete.Signal();
+      });
+
+  ASSERT_NO_FATAL_FAILURE(StartDriver(/*supply_power_framework=*/true));
+
+  // 1. Background Operation is disabled at power off
+  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+
+  ASSERT_FALSE(dut_->IsResumed());
+  UfsPowerMode power_mode = UfsPowerMode::kSleep;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  const zx::vmo inspect_vmo = dut_->inspect().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
+
+  inspect::InspectTestHelper inspector;
+  inspector.ReadInspect(inspect_vmo);
+
+  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"ufs"});
+  ASSERT_NOT_NULL(root);
+
+  const auto* power_suspended =
+      root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
+
+  const auto* bkop_node = root->GetByPath({"controller"})->GetByPath({"background_operations"});
+  const auto* is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  ASSERT_NOT_NULL(is_background_op_enabled);
+  EXPECT_FALSE(is_background_op_enabled->value());
+
+  // 2. Background Operation is enabled at power on
+  awake_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn;
+  });
+  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+
+  ASSERT_TRUE(dut_->IsResumed());
+  power_mode = UfsPowerMode::kActive;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"ufs"});
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  EXPECT_FALSE(power_suspended->value());
+
+  bkop_node = root->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_TRUE(is_background_op_enabled->value());
+
+  // 3. Background operations change from disabled to enabled when an Urgent Background Operation
+  // Exception Event occurs.
+  ASSERT_OK(DisableBackgroundOp());
+
+  inspector.ReadInspect(inspect_vmo);
+  root = inspector.hierarchy().GetByPath({"ufs"});
+  bkop_node = root->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_FALSE(is_background_op_enabled->value());
+
+  // Using Exception Event to trigger Urgent Background Operations.
+  mock_device_.SetExceptionEventAlert(true);
+  ExceptionEventStatus ee_status = {0};
+  ee_status.set_urgent_bkops(true);
+  mock_device_.SetAttribute(Attributes::wExceptionEventStatus,
+                            static_cast<uint32_t>(ee_status.value));
+  mock_device_.SetAttribute(Attributes::bBackgroundOpStatus,
+                            static_cast<uint32_t>(BackgroundOpStatus::kCritical));
+
+  // To check for an Exception Event, send a command.
+  auto attribute = ReadAttribute(Attributes::bBackgroundOpStatus);
+  EXPECT_OK(attribute);
+
+  // Wait for exception event completion
+  auto wait_for = [&]() -> bool {
+    // Check that Background Operations is enabled
+    inspector.ReadInspect(inspect_vmo);
+    root = inspector.hierarchy().GetByPath({"ufs"});
+    bkop_node = root->GetByPath({"controller"})->GetByPath({"background_operations"});
+    is_background_op_enabled =
+        bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+    return is_background_op_enabled->value();
+  };
+  fbl::String timeout_message = "Timeout waiting for enabling Background Op";
+  constexpr uint32_t kTimeoutUs = 1000000;
+  ASSERT_OK(dut_->WaitWithTimeout(wait_for, kTimeoutUs, timeout_message));
+
+  // Clean up
+  mock_device_.SetExceptionEventAlert(false);
+
+  // 4. Background Operation is disabled at power off
+  sleep_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOff;
+  });
+  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+
+  ASSERT_FALSE(dut_->IsResumed());
+  power_mode = UfsPowerMode::kSleep;
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
+  ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
+            dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"ufs"});
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  EXPECT_TRUE(power_suspended->value());
+
+  bkop_node = root->GetByPath({"controller"})->GetByPath({"background_operations"});
+  is_background_op_enabled =
+      bkop_node->node().get_property<inspect::BoolPropertyValue>("is_background_op_enabled");
+  EXPECT_FALSE(is_background_op_enabled->value());
+}
+
 }  // namespace ufs
