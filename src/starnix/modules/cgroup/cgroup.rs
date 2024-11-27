@@ -27,7 +27,10 @@ use starnix_uapi::{errno, error, pid_t};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::Deref;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
+
+const CONTROLLERS_FILE: &str = "cgroup.controllers";
+const PROCS_FILE: &str = "cgroup.procs";
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
@@ -47,12 +50,12 @@ pub trait CgroupOps: Send + Sync + 'static {
     /// child with `name` is not found.
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno>;
 
-    /// Return a `VecDirectoryEntry` for each child of the cgroup.
-    fn get_directory_entries(&self) -> Vec<VecDirectoryEntry>;
+    /// Return a `VecDirectoryEntry` for each interface file and each child.
+    fn get_entries(&self) -> Vec<VecDirectoryEntry>;
 
-    /// Find a child with the given name and return its `node`, if exists. Errors if a child with
-    /// `name` is not found.
-    fn get_child_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno>;
+    /// Find a child or interface file with the given name and return its `node`, if exists. Errors
+    /// if such a node was not found.
+    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno>;
 
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
@@ -73,20 +76,46 @@ pub trait CgroupOps: Send + Sync + 'static {
 pub struct CgroupRoot {
     /// Sub-cgroups of this cgroup.
     children: Mutex<CgroupChildren>,
+
+    /// Interface nodes of the root cgroup. Lazily by `init()` and immutable after.
+    interface_nodes: OnceLock<BTreeMap<FsString, FsNodeHandle>>,
 }
 impl CgroupRoot {
+    /// Since `CgroupRoot` is part of the `FileSystem` (see `CgroupFsV1::new_fs` and
+    /// `CgroupFsV2::new_fs`), initializing a `CgroupRoot` has two steps:
+    ///
+    /// - new() to create a `FileSystem`,
+    /// - init() to use the newly created `FileSystem` to create the `FsNode`s of the `CgroupRoot`.
     pub fn new() -> Arc<CgroupRoot> {
         Arc::new(Self::default())
     }
 
-    /// Since the `FileSystem` owns the `FsNode` of the root node, create the `FsNodeOps` so that
-    /// the `FileSystem` can create the `FsNode` of the root.
-    pub fn create_node_ops(
-        self: Arc<Self>,
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-    ) -> CgroupDirectoryHandle {
-        CgroupDirectory::new(current_task, fs, Arc::downgrade(&(self as Arc<dyn CgroupOps>)))
+    /// Populate `interface_nodes` with nodes of the cgroup root directory, then set
+    /// `CgroupDirectoryHandle` to be the root node of the `FileSystem`. Can only be called once.
+    pub fn init(self: &Arc<Self>, current_task: &CurrentTask, fs: &FileSystemHandle) {
+        let cloned = self.clone();
+        let weak_ops = Arc::downgrade(&(cloned as Arc<dyn CgroupOps>));
+        self.interface_nodes
+            .set(BTreeMap::from([
+                (
+                    PROCS_FILE.into(),
+                    fs.create_node(
+                        current_task,
+                        ControlGroupNode::new(weak_ops.clone()),
+                        FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    ),
+                ),
+                (
+                    CONTROLLERS_FILE.into(),
+                    fs.create_node(
+                        current_task,
+                        BytesFile::new_node(b"".to_vec()),
+                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    ),
+                ),
+            ]))
+            .expect("CgroupRoot is only initialized once");
+        fs.set_root(CgroupDirectory::new(weak_ops));
     }
 }
 
@@ -111,14 +140,26 @@ impl CgroupOps for CgroupRoot {
         children.remove_child(name)
     }
 
-    fn get_directory_entries(&self) -> Vec<VecDirectoryEntry> {
+    fn get_entries(&self) -> Vec<VecDirectoryEntry> {
+        let entries = self.interface_nodes.get().expect("CgroupRoot is initialized").iter().map(
+            |(name, child)| VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: name.clone(),
+                inode: Some(child.info().ino),
+            },
+        );
         let children = self.children.lock();
-        children.get_directory_entries()
+        entries.chain(children.get_entries()).collect()
     }
 
-    fn get_child_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        let children = self.children.lock();
-        children.get_node(name)
+    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
+        if let Some(node) = self.interface_nodes.get().expect("CgroupRoot is initialized").get(name)
+        {
+            Ok(node.clone())
+        } else {
+            let children = self.children.lock();
+            children.get_node(name)
+        }
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
@@ -160,19 +201,16 @@ impl CgroupChildren {
         Ok(child_entry.remove())
     }
 
-    fn get_directory_entries(&self) -> Vec<VecDirectoryEntry> {
-        self.0
-            .iter()
-            .map(|(name, child)| VecDirectoryEntry {
-                entry_type: DirectoryEntryType::DIR,
-                name: name.clone(),
-                inode: Some(child.node.info().ino),
-            })
-            .collect()
+    fn get_entries(&self) -> impl IntoIterator<Item = VecDirectoryEntry> + '_ {
+        self.0.iter().map(|(name, child)| VecDirectoryEntry {
+            entry_type: DirectoryEntryType::DIR,
+            name: name.clone(),
+            inode: Some(child.directory_node.info().ino),
+        })
     }
 
     fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        self.0.get(name).map(|child| child.node.clone()).ok_or_else(|| errno!(ENOENT))
+        self.0.get(name).map(|child| child.directory_node.clone()).ok_or_else(|| errno!(ENOENT))
     }
 }
 
@@ -201,19 +239,43 @@ pub struct Cgroup {
     state: Mutex<CgroupState>,
 
     /// The directory node associated with this control group.
-    node: FsNodeHandle,
+    directory_node: FsNodeHandle,
+
+    /// The interface nodes associated with this control group.
+    interface_nodes: BTreeMap<FsString, FsNodeHandle>,
 }
 pub type CgroupHandle = Arc<Cgroup>;
 
 impl Cgroup {
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
-            let node = fs.create_node(
-                current_task,
-                CgroupDirectory::new(current_task, fs, weak.clone() as Weak<dyn CgroupOps>),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-            );
-            Self { state: Default::default(), node }
+            let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
+            Self {
+                state: Default::default(),
+                directory_node: fs.create_node(
+                    current_task,
+                    CgroupDirectory::new(weak_ops.clone()),
+                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                ),
+                interface_nodes: BTreeMap::from([
+                    (
+                        PROCS_FILE.into(),
+                        fs.create_node(
+                            current_task,
+                            ControlGroupNode::new(weak_ops.clone()),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                        ),
+                    ),
+                    (
+                        CONTROLLERS_FILE.into(),
+                        fs.create_node(
+                            current_task,
+                            BytesFile::new_node(b"".to_vec()),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                        ),
+                    ),
+                ]),
+            }
         })
     }
 }
@@ -249,14 +311,23 @@ impl CgroupOps for Cgroup {
         state.children.remove_child(name)
     }
 
-    fn get_directory_entries(&self) -> Vec<VecDirectoryEntry> {
+    fn get_entries(&self) -> Vec<VecDirectoryEntry> {
+        let entries = self.interface_nodes.iter().map(|(name, child)| VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: name.clone(),
+            inode: Some(child.info().ino),
+        });
         let state = self.state.lock();
-        state.children.get_directory_entries()
+        entries.chain(state.children.get_entries()).collect()
     }
 
-    fn get_child_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        let state = self.state.lock();
-        state.children.get_node(name)
+    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
+        if let Some(node) = self.interface_nodes.get(name) {
+            Ok(node.clone())
+        } else {
+            let state = self.state.lock();
+            state.children.get_node(name)
+        }
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
@@ -280,33 +351,11 @@ impl CgroupOps for Cgroup {
 pub struct CgroupDirectory {
     /// The associated cgroup.
     cgroup: Weak<dyn CgroupOps>,
-
-    /// Node that backs `cgroup.procs`
-    procs_node: FsNodeHandle,
-
-    /// Node that backs `cgroup.controllers`
-    controllers_node: FsNodeHandle,
 }
 
 impl CgroupDirectory {
-    pub fn new(
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        cgroup: Weak<dyn CgroupOps>,
-    ) -> CgroupDirectoryHandle {
-        let procs_node = fs.create_node(
-            current_task,
-            ControlGroupNode::new(cgroup.clone()),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
-        );
-
-        let controllers_node = fs.create_node(
-            current_task,
-            BytesFile::new_node(b"".to_vec()),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-        );
-
-        CgroupDirectoryHandle(Arc::new(Self { cgroup, procs_node, controllers_node }))
+    pub fn new(cgroup: Weak<dyn CgroupOps>) -> CgroupDirectoryHandle {
+        CgroupDirectoryHandle(Arc::new(Self { cgroup }))
     }
 }
 
@@ -335,22 +384,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let mut entries = vec![
-            VecDirectoryEntry {
-                entry_type: DirectoryEntryType::REG,
-                name: FsString::from("cgroup.procs"),
-                inode: Some(self.procs_node.info().ino),
-            },
-            VecDirectoryEntry {
-                entry_type: DirectoryEntryType::REG,
-                name: FsString::from("cgroup.controllers"),
-                inode: Some(self.controllers_node.info().ino),
-            },
-        ];
-
-        entries.extend(self.cgroup()?.get_directory_entries());
-
-        Ok(VecDirectory::new_file(entries))
+        Ok(VecDirectory::new_file(self.cgroup()?.get_entries()))
     }
 
     fn mkdir(
@@ -366,7 +400,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         node.update_info(|info| {
             info.link_count += 1;
         });
-        Ok(child.node.clone())
+        Ok(child.directory_node.clone())
     }
 
     fn mknod(
@@ -385,7 +419,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
     fn unlink(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
+        node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
@@ -400,6 +434,10 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
         let removed = cgroup.remove_child(name)?;
         assert!(Arc::ptr_eq(&(removed as Arc<dyn CgroupOps>), &child_cgroup));
+
+        node.update_info(|info| {
+            info.link_count -= 1;
+        });
 
         Ok(())
     }
@@ -423,12 +461,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let cgroup = self.cgroup()?;
-        match &**name {
-            b"cgroup.controllers" => Ok(self.controllers_node.clone()),
-            b"cgroup.procs" => Ok(self.procs_node.clone()),
-            _ => cgroup.get_child_node(name),
-        }
+        self.cgroup()?.get_node(name)
     }
 }
 

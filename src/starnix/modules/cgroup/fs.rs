@@ -33,7 +33,7 @@ impl CgroupV1Fs {
             CgroupV1Fs { root: root.clone() },
             options,
         )?;
-        fs.set_root(root.create_node_ops(current_task, &fs));
+        root.init(current_task, &fs);
         Ok(fs)
     }
 }
@@ -70,7 +70,7 @@ impl CgroupV2Fs {
             CgroupV2Fs { root: root.clone() },
             options,
         )?;
-        fs.set_root(root.create_node_ops(current_task, &fs));
+        root.init(current_task, &fs);
         Ok(fs)
     }
 }
