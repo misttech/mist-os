@@ -582,18 +582,6 @@ mod test {
         fuchsia_async::Task::spawn(async move {
             loop {
                 match stream.next().await.unwrap().unwrap() {
-                    sys2::RealmQueryRequest::GetInstance { .. } => {
-                        panic!();
-                    }
-                    sys2::RealmQueryRequest::GetResolvedDeclaration { .. } => {
-                        panic!();
-                    }
-                    sys2::RealmQueryRequest::GetManifest { .. } => {
-                        panic!();
-                    }
-                    sys2::RealmQueryRequest::GetStructuredConfig { .. } => {
-                        panic!();
-                    }
                     sys2::RealmQueryRequest::GetAllInstances { responder } => {
                         eprintln!("GetAllInstances call");
                         let instances = instance_map.values().cloned().collect();
@@ -616,6 +604,21 @@ mod test {
                         let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                         if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                             dir.open(flags, mode, &path, object).unwrap();
+                            responder.send(Ok(())).unwrap();
+                        } else {
+                            responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();
+                        }
+                    }
+                    sys2::RealmQueryRequest::OpenDirectory {
+                        moniker,
+                        dir_type,
+                        object,
+                        responder,
+                    } => {
+                        eprintln!("OpenDirectory call for {moniker} for {dir_type:?}");
+                        let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
+                        if let Some(dir) = dirs.get(&(moniker, dir_type)) {
+                            dir.clone2(object.into_channel().into()).unwrap();
                             responder.send(Ok(())).unwrap();
                         } else {
                             responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();

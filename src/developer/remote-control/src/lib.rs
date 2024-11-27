@@ -723,6 +723,12 @@ mod tests {
 
                     responder.send(Ok(())).unwrap()
                 }
+                fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
+                    assert_eq!(moniker, "core/my_component");
+                    assert_eq!(dir_type, capability_set);
+                    setup_exposed_dir(object);
+                    responder.send(Ok(())).unwrap()
+                }
                 _ => panic!("unexpected request: {:?}", request),
             }
         })
