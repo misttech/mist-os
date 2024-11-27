@@ -1142,7 +1142,7 @@ mod tests {
         let (update_sender, update_receiver) = mpsc::unbounded();
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
+        let sme_req_stream = sme_server.into_stream();
         let saved_networks = FakeSavedNetworksManager::new();
         let saved_networks_manager = Arc::new(saved_networks);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);

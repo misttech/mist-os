@@ -45,7 +45,7 @@ impl Mocks for InputTest {
                                 request,
                                 control_handle: _,
                             } => {
-                                let mut stream = request.into_stream().unwrap();
+                                let mut stream = request.into_stream();
                                 let cam_muted = Arc::clone(&cam_muted);
                                 fasync::Task::spawn(async move {
                                     while let Some(req) = stream.try_next().await.unwrap() {

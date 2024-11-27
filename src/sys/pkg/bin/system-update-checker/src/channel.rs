@@ -476,7 +476,7 @@ mod tests {
                 while let Some(req) = stream.try_next().await.unwrap() {
                     match req {
                         RepositoryManagerRequest::List { iterator, control_handle: _ } => {
-                            let mut stream = iterator.into_stream().unwrap();
+                            let mut stream = iterator.into_stream();
                             let repos: Vec<_> = channels
                                 .iter()
                                 .map(|channel| {

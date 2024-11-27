@@ -93,7 +93,7 @@ async fn test_discovery_session() -> Result<(), Error> {
     let expect_fidl = expect_call(server.clone(), |_, request| match request {
         HostRequest::StartDiscovery { payload, .. } => {
             info_server.write().discovering = true;
-            discovery_request_stream = Some(payload.token.unwrap().into_stream().unwrap());
+            discovery_request_stream = Some(payload.token.unwrap().into_stream());
             Ok(())
         }
         _ => Err(format_err!("Unexpected!")),
@@ -166,7 +166,7 @@ async fn expect_set_bonding_delegate(
     stream: Arc<RwLock<HostRequestStream>>,
 ) -> Result<BondingDelegateRequestStream, Error> {
     expect_call(stream, |_, e| match e {
-        HostRequest::SetBondingDelegate { delegate, .. } => Ok(delegate.into_stream().unwrap()),
+        HostRequest::SetBondingDelegate { delegate, .. } => Ok(delegate.into_stream()),
         _ => Err(format_err!("Unexpected!")),
     })
     .await

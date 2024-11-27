@@ -175,7 +175,7 @@ async fn should_serve_all_requests_concurrently() -> Result<(), Error> {
 async fn should_stop_after_fidl_error() -> Result<(), Error> {
     let (client, server) = create_endpoints::<EchoMarker>();
     let server_fut = async move {
-        let server = server.into_stream().unwrap();
+        let server = server.into_stream();
         serve(server, EchoHandler).await.unwrap_err();
     };
     let client_fut = async move {

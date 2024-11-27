@@ -672,8 +672,7 @@ mod tests {
                     responder,
                     ..
                 }) => {
-                    let injector_stream =
-                        injector.into_stream().expect("Failed to get stream from server end.");
+                    let injector_stream = injector.into_stream();
                     let _ = injector_sender.send(injector_stream);
                     responder.send().expect("failed to respond");
                 }
@@ -698,8 +697,7 @@ mod tests {
             })) => (injector, responder),
             other => panic!("expected register request, but got {:?}", other),
         };
-        let injector_stream: pointerinjector::DeviceRequestStream =
-            injector.into_stream().expect("Failed to get stream from server end.");
+        let injector_stream: pointerinjector::DeviceRequestStream = injector.into_stream();
         responder.send().expect("failed to respond");
         injector_stream
             .for_each(|request| {

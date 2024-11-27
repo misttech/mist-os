@@ -281,7 +281,7 @@ async fn test_start_http(behavior: &str) {
             .start(make_request("GET", format!("http://{}", addr), None), tx)
             .expect("failed to start");
 
-        let mut rx = rx.into_stream().expect("failed to convert to stream");
+        let mut rx = rx.into_stream();
 
         let (response, responder) = rx
             .next()
@@ -328,7 +328,7 @@ async fn test_start_redirect(behavior: &str) {
             .start(make_request("GET", format!("http://{}{}", addr, TRIGGER_301), None), tx)
             .expect("failed to start");
 
-        let mut rx = rx.into_stream().expect("failed to convert to stream");
+        let mut rx = rx.into_stream();
 
         let (http::Response { status_code, redirect, .. }, responder) = rx
             .next()
@@ -396,7 +396,7 @@ async fn test_start_see_other(behavior: &str) {
             .start(make_request("POST", format!("http://{}{}", addr, SEE_OTHER), None), tx)
             .expect("failed to start");
 
-        let mut rx = rx.into_stream().expect("failed to convert to stream");
+        let mut rx = rx.into_stream();
 
         let (http::Response { status_code, redirect, .. }, responder) = rx
             .next()
@@ -472,7 +472,7 @@ async fn test_start_redirect_loop(behavior: &str) {
             .start(make_request("GET", format!("http://{}{}", addr, LOOP1), None), tx)
             .expect("failed to start");
 
-        let mut rx = rx.into_stream().expect("failed to convert to stream");
+        let mut rx = rx.into_stream();
 
         for () in std::iter::repeat(()).take(3) {
             let (http::Response { status_code, redirect, .. }, responder) = rx

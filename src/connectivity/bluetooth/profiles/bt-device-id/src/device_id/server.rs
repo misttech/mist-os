@@ -188,13 +188,7 @@ impl DeviceIdServer {
             }
         }
 
-        let client_request = match token.into_stream() {
-            Err(e) => {
-                let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
-                return Err(e.into());
-            }
-            Ok(s) => s,
-        };
+        let client_request = token.into_stream();
 
         let bredr_advertisement = match Self::advertise(&self.profile, (&service).into()) {
             Err(e) => {

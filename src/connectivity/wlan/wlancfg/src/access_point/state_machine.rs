@@ -659,7 +659,7 @@ mod tests {
         let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
+        let sme_req_stream = sme_server.into_stream();
         let sme_proxy = SmeForApStateMachine::new(sme_proxy, 123, defect_sender.clone());
 
         let deps = CommonStateDependencies {

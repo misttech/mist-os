@@ -2257,7 +2257,6 @@ mod tests {
                     .expect("request should not error");
             let fnet_filter::WatcherRequest::Watch { responder } = request
                 .into_stream()
-                .expect("get request stream")
                 .next()
                 .await
                 .expect("client should call watch")
@@ -2296,7 +2295,6 @@ mod tests {
                     .expect("request should not error");
             let fnet_filter::WatcherRequest::Watch { responder } = request
                 .into_stream()
-                .expect("get request stream")
                 .next()
                 .await
                 .expect("client should call watch")

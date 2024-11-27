@@ -497,7 +497,7 @@ pub async fn test_updater_succeeds() -> Result<(), Error> {
 
 fn launch_cloned_blobfs(end: ServerEnd<fio::NodeMarker>) {
     fasync::Task::spawn(async move {
-        serve_failing_blobfs(end.into_stream().unwrap().cast_stream())
+        serve_failing_blobfs(end.into_stream().cast_stream())
             .await
             .unwrap_or_else(|e| panic!("Failed to serve cloned blobfs handle: {e:?}"));
     })

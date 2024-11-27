@@ -445,9 +445,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::open(client).await.expect_err("load should fail");
     }
@@ -460,9 +458,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(client.clone(), vec![]).await.expect("format failed");
         Gpt::open(client).await.expect("load should succeed");
@@ -480,9 +476,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -519,9 +513,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -560,9 +552,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -615,9 +605,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -650,9 +638,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -687,9 +673,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -747,9 +731,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -800,9 +782,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(client.clone(), vec![]).await.expect("format failed");
         let manager = Gpt::open(client).await.expect("load should succeed");
@@ -822,9 +802,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(client.clone(), vec![]).await.expect("format failed");
         let mut manager = Gpt::open(client).await.expect("load should succeed");
@@ -854,9 +832,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -917,9 +893,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -963,9 +937,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -1021,9 +993,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -1087,9 +1057,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(client.clone(), partitions).await.expect("format failed");
         let mut manager = Gpt::open(client).await.expect("load should succeed");
@@ -1122,9 +1090,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -1214,9 +1180,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -1273,9 +1237,8 @@ mod tests {
             let (client, server_end) =
                 fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
             let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
-            let _task = fasync::Task::spawn(async move {
-                server.serve(server_end.into_stream().unwrap()).await
-            });
+            let _task =
+                fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
             let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
             Gpt::format(
                 client.clone(),
@@ -1303,9 +1266,7 @@ mod tests {
             ..Default::default()
         }));
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
 
         let mut manager = Gpt::open(client).await.expect("load should succeed");
@@ -1345,9 +1306,8 @@ mod tests {
             let (client, server_end) =
                 fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
             let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
-            let _task = fasync::Task::spawn(async move {
-                server.serve(server_end.into_stream().unwrap()).await
-            });
+            let _task =
+                fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
             let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
             Gpt::format(
                 client.clone(),
@@ -1375,9 +1335,7 @@ mod tests {
             ..Default::default()
         }));
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
 
         let mut manager = Gpt::open(client).await.expect("load should succeed");
@@ -1415,9 +1373,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
         Gpt::format(
             client.clone(),
@@ -1452,9 +1408,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
             .await
             .expect("load should succeed");
@@ -1522,9 +1476,7 @@ mod tests {
         ];
 
         let _task =
-            fasync::Task::spawn(
-                async move { server.serve(server_end.into_stream().unwrap()).await },
-            );
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
             .await
             .expect("load should succeed");

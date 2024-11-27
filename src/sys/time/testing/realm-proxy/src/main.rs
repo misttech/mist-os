@@ -164,7 +164,7 @@ fn serve_realm_factory(mut stream: fttr::RealmFactoryRequestStream) -> BoxFuture
                                 .expect("serve_rtc_updates should not return an error");
                         });
 
-                        let realm_request_stream = realm_server.into_stream()?;
+                        let realm_request_stream = realm_server.into_stream();
                         task_group.spawn(async move {
                             realm_proxy::service::serve(realm, realm_request_stream)
                                 .await

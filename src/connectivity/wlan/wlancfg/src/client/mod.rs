@@ -144,7 +144,7 @@ async fn handle_client_requests(
     requests: ClientRequests,
     telemetry_sender: TelemetrySender,
 ) -> Result<(), fidl::Error> {
-    let mut request_stream = requests.into_stream()?;
+    let mut request_stream = requests.into_stream();
     while let Some(request) = request_stream.try_next().await? {
         log_client_request(&request);
         match request {
@@ -409,7 +409,7 @@ async fn handle_client_request_get_networks(
             .map(fidl_policy::NetworkConfig::from)
             .collect::<Vec<fidl_policy::NetworkConfig>>()
     });
-    let mut stream = iterator.into_stream()?;
+    let mut stream = iterator.into_stream();
     for chunk in fidl_chunks {
         send_next_chunk(&mut stream, chunk).await?;
     }
@@ -721,7 +721,7 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
             .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let requests = requests.into_stream();
 
         let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create ClientSmeProxy");
@@ -1561,7 +1561,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (listener, requests) = create_proxy::<fidl_policy::ClientListenerMarker>()
             .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let requests = requests.into_stream();
 
         let (update_sender, mut listener_updates) = mpsc::unbounded();
         let serve_fut = serve_listener_requests(update_sender, requests);
@@ -1889,7 +1889,7 @@ mod tests {
         // to the behavior that occurs when a second client connects to the ClientProvider service.
         let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
             .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let requests = requests.into_stream();
 
         let second_serve_fut = serve_provider_requests(
             test_values.iface_manager.clone(),

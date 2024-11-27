@@ -272,8 +272,7 @@ async fn start<D: DeviceOps + Send + 'static>(
         usme_bootstrap_protocol_channel,
     );
 
-    let mut usme_bootstrap_stream =
-        server.into_stream().map_err(FullmacMlmeError::FailedToGetUsmeBootstrapStream)?;
+    let mut usme_bootstrap_stream = server.into_stream();
 
     let fidl_sme::UsmeBootstrapRequest::Start {
         generic_sme_server,
@@ -291,8 +290,7 @@ async fn start<D: DeviceOps + Send + 'static>(
 
     responder.send(inspect_vmo).map_err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest)?;
 
-    let generic_sme_stream =
-        generic_sme_server.into_stream().map_err(FullmacMlmeError::FailedToGetGenericSmeStream)?;
+    let generic_sme_stream = generic_sme_server.into_stream();
 
     // Create SME
     let cfg = wlan_sme::Config {

@@ -18,7 +18,7 @@ use futures::stream::{SelectAll, Stream};
 use futures::{select, StreamExt};
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
-use tracing::{info, trace, warn};
+use tracing::{info, trace};
 
 /// An interface for managing the state of streaming connections with remote peers.
 pub trait StreamController {
@@ -108,16 +108,7 @@ fn handle_suspend_request<SC: StreamController>(
     info!("Received a2dp.Controller FIDL request to suspend for peer {:?}", peer_id);
 
     let id = peer_id.map(|id| (*id).into());
-    let stream = match token.into_stream() {
-        Ok(st) => st,
-        Err(e) => {
-            if !e.is_closed() {
-                warn!("StreamSuspender channel closed with unexpected error: {:?}", e);
-            }
-            let _ = responder.send();
-            return None;
-        }
-    };
+    let stream = token.into_stream();
 
     // Request to suspend the stream via the `controller`. The lifetime of the returned Token
     // will be tied to that of the FIDL client's suspend `stream`.

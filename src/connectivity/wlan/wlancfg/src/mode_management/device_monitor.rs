@@ -175,8 +175,7 @@ mod tests {
         let iface_manager = Arc::new(Mutex::new(FakeIfaceManager::new()));
         let (monitor_proxy, monitor_requests) = create_proxy::<fidl_service::DeviceMonitorMarker>()
             .expect("failed to create DeviceMonitor proxy");
-        let monitor_stream =
-            monitor_requests.into_stream().expect("failed to convert monitor stream");
+        let monitor_stream = monitor_requests.into_stream();
 
         TestValues { phy_manager, iface_manager, monitor_proxy, monitor_stream }
     }

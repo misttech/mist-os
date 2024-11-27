@@ -418,12 +418,8 @@ mod test {
                 {
                     let close_after = close_after.map(|ca| Arc::new(AtomicU8::new(ca)));
                     responder.send(Ok(())).expect("Replying to CreateProtocol caller failed");
-                    let _ = protocol_mock(
-                        protocol.into_stream().expect("Converting ServerEnd to stream failed"),
-                        calls_made.clone(),
-                        close_after,
-                    )
-                    .await;
+                    let _ = protocol_mock(protocol.into_stream(), calls_made.clone(), close_after)
+                        .await;
                 }
             }));
         });

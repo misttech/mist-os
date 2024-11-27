@@ -206,7 +206,7 @@ async fn handle_realm_query(
     instances: Vec<fsys::Instance>,
     server_end: fidl::endpoints::ServerEnd<fsys::RealmQueryMarker>,
 ) {
-    let mut stream = server_end.into_stream().unwrap();
+    let mut stream = server_end.into_stream();
     let mut instance_map = HashMap::new();
     for instance in instances {
         let moniker = Moniker::parse_str(instance.moniker.as_ref().unwrap()).unwrap();
@@ -316,9 +316,7 @@ async fn handle_open_capability(
         ArchiveAccessorMarker::PROTOCOL_NAME => {
             assert_eq!(moniker, rcs::toolbox::MONIKER);
             handle_archive_accessor(
-                fidl::endpoints::ServerEnd::<ArchiveAccessorMarker>::from(channel)
-                    .into_stream()
-                    .unwrap(),
+                fidl::endpoints::ServerEnd::<ArchiveAccessorMarker>::from(channel).into_stream(),
                 state,
             )
             .await;
@@ -326,9 +324,7 @@ async fn handle_open_capability(
         LogSettingsMarker::PROTOCOL_NAME => {
             assert_eq!(moniker, rcs::toolbox::MONIKER);
             handle_log_settings(
-                fidl::endpoints::ServerEnd::<LogSettingsMarker>::from(channel)
-                    .into_stream()
-                    .unwrap(),
+                fidl::endpoints::ServerEnd::<LogSettingsMarker>::from(channel).into_stream(),
                 state,
             )
             .await;

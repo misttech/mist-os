@@ -177,19 +177,13 @@ impl TestService {
     fn new_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
         self.discovery.watch_sessions(&watch_options, watcher_client)?;
-        Ok(TestWatcher {
-            watcher: watcher_server.into_stream().context("Turning watcher into stream")?,
-        })
+        Ok(TestWatcher { watcher: watcher_server.into_stream() })
     }
 
     fn new_observer_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
         let (watcher_client, watcher_server) = create_endpoints();
         self.observer_discovery.watch_sessions(&watch_options, watcher_client)?;
-        Ok(TestWatcher {
-            watcher: watcher_server
-                .into_stream()
-                .context("Turning observer watcher into stream")?,
-        })
+        Ok(TestWatcher { watcher: watcher_server.into_stream() })
     }
 
     async fn dequeue_watcher(&mut self) {

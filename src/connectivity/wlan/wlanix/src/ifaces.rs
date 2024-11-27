@@ -1672,7 +1672,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_power_broker::TopologyRequest::AddElement { payload, responder }))) => {
                 assert_eq!(payload.initial_current_level, Some(StaIfacePowerLevel::NoPowerSavings as u8));
                 assert_variant!(responder.send(Ok(())), Ok(()));
-                payload.level_control_channels.unwrap().current.into_stream().unwrap()
+                payload.level_control_channels.unwrap().current.into_stream()
         });
         let iface = exec.run_singlethreaded(iface_create_fut);
 

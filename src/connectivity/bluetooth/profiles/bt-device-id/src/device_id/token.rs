@@ -172,7 +172,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, _connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, _connect_client) = make_token(responder, request_server.into_stream());
 
         // The client request should still be alive since the `token` is alive.
         exec.run_until_stalled(&mut client_fut).expect_pending("Token is still alive");
@@ -194,7 +194,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, connect_client) = make_token(responder, request_server.into_stream());
         let mut token = pin!(token);
 
         // The client request should still be alive since the `token` is alive.
@@ -222,7 +222,7 @@ mod tests {
             request.into_set_device_identification().expect("set device id request");
         let mut client_fut = pin!(client_fut);
 
-        let (token, connect_client) = make_token(responder, request_server.into_stream().unwrap());
+        let (token, connect_client) = make_token(responder, request_server.into_stream());
         let mut token = pin!(token);
 
         assert!(!token.is_terminated());

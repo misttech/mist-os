@@ -499,7 +499,7 @@ impl FidlProtocol for TracingProtocol {
                     .map_err(Into::into)
             }
             ffx::TracingRequest::Status { iterator, responder } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 let res = self
                     .tasks
                     .lock()
@@ -570,7 +570,7 @@ mod tests {
             match req {
                 trace::ProvisionerRequest::InitializeTracing { controller, output, .. } => {
                     let start_error = self.start_error;
-                    let mut stream = controller.into_stream().unwrap();
+                    let mut stream = controller.into_stream();
                     while let Ok(Some(req)) = stream.try_next().await {
                         match req {
                             trace::SessionRequest::StartTracing { responder, .. } => {
@@ -820,7 +820,7 @@ mod tests {
 
     fn spawn_fake_alert_watcher(alert: &'static str) -> trace::SessionProxy {
         let (proxy, server) = fidl::endpoints::create_proxy::<trace::SessionMarker>().unwrap();
-        let mut stream = server.into_stream().unwrap();
+        let mut stream = server.into_stream();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

@@ -32,7 +32,7 @@ async fn test_legacy_joining_mutual_exclusion() {
 
     let (client_ep, server_ep) = create_endpoints::<DriverMarker>();
 
-    let server_future = device.serve_to(server_ep.into_stream().unwrap());
+    let server_future = device.serve_to(server_ep.into_stream());
 
     let client_future = async move {
         let driver_proxy = client_ep.into_proxy();

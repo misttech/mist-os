@@ -572,7 +572,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
             async {
                 match command {
                     ExperimentalDeviceExtraRequest::JoinNetwork { params, progress, .. } => {
-                        let stream = progress.into_stream()?;
+                        let stream = progress.into_stream();
                         let control_handle = stream.control_handle();
 
                         // Convert the stream of requests (of which there is only one
@@ -613,7 +613,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                         }
                     }
                     ExperimentalDeviceExtraRequest::FormNetwork { params, progress, .. } => {
-                        let stream = progress.into_stream()?;
+                        let stream = progress.into_stream();
                         let control_handle = stream.control_handle();
 
                         // Convert the stream of requests (of which there is only one
@@ -654,7 +654,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                         }
                     }
                     ExperimentalDeviceExtraRequest::StartNetworkScan { params, stream, .. } => {
-                        let stream = stream.into_stream()?;
+                        let stream = stream.into_stream();
                         let control_handle = stream.control_handle();
 
                         // Convert the stream of requests (of which there is only one
@@ -777,7 +777,7 @@ impl<T: Driver> ServeTo<EnergyScanRequestStream> for T {
             async {
                 match command {
                     EnergyScanRequest::StartEnergyScan { params, stream, .. } => {
-                        let stream = stream.into_stream()?;
+                        let stream = stream.into_stream();
                         let control_handle = stream.control_handle();
 
                         // Convert the stream of requests (of which there is only one
@@ -1392,7 +1392,7 @@ mod tests {
 
         let (client_ep, server_ep) = create_endpoints::<FactoryDeviceMarker>();
 
-        let server_future = device.serve_to(server_ep.into_stream().unwrap());
+        let server_future = device.serve_to(server_ep.into_stream());
 
         let proxy = client_ep.into_proxy();
 
@@ -1417,7 +1417,7 @@ mod tests {
 
         let (client_ep, server_ep) = create_endpoints::<EnergyScanMarker>();
 
-        let server_future = device.serve_to(server_ep.into_stream().unwrap());
+        let server_future = device.serve_to(server_ep.into_stream());
 
         let proxy = client_ep.into_proxy();
 
@@ -1455,7 +1455,7 @@ mod tests {
 
         let (client_ep, server_ep) = create_endpoints::<ExperimentalDeviceExtraMarker>();
 
-        let server_future = device.serve_to(server_ep.into_stream().unwrap());
+        let server_future = device.serve_to(server_ep.into_stream());
 
         let proxy = client_ep.into_proxy();
 
@@ -1493,7 +1493,7 @@ mod tests {
 
         let (client_ep, server_ep) = create_endpoints::<TelemetryProviderMarker>();
 
-        let server_future = device.serve_to(server_ep.into_stream().unwrap());
+        let server_future = device.serve_to(server_ep.into_stream());
 
         let proxy = client_ep.into_proxy();
 
@@ -1524,7 +1524,7 @@ mod tests {
 
         let (client_ep, server_ep) = create_endpoints::<DeviceExtraMarker>();
 
-        let server_future = device.serve_to(server_ep.into_stream().unwrap());
+        let server_future = device.serve_to(server_ep.into_stream());
 
         let proxy = client_ep.into_proxy();
 
@@ -1547,7 +1547,7 @@ mod tests {
 
         let server_future = async move {
             let device = DummyDevice::default();
-            device.serve_to(server_ep.into_stream().unwrap()).map(|_| ()).await
+            device.serve_to(server_ep.into_stream()).map(|_| ()).await
         };
 
         let client_future = async move {

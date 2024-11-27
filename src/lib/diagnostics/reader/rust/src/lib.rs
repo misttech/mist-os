@@ -876,7 +876,7 @@ mod tests {
                         let data = data_to_send.clone();
                         fasync::Task::spawn(async move {
                             let mut called = false;
-                            let mut stream = result_stream.into_stream().expect("into stream");
+                            let mut stream = result_stream.into_stream();
                             while let Some(req) = stream.try_next().await.expect("stream request") {
                                 match req {
                                     fdiagnostics::BatchIteratorRequest::WaitForReady {

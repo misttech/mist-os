@@ -173,7 +173,7 @@ async fn test_handle_dai_requests(
                     continue;
                 }
                 handle.set_configured(dai_format, pcm_format);
-                let requests = ring_buffer.into_stream().expect("stream from server end");
+                let requests = ring_buffer.into_stream();
                 _rb_task = Some(fasync::Task::spawn(handle_ring_buffer(requests, handle.clone())));
             }
             x => unimplemented!("DAI request not implemented: {:?}", x),
@@ -240,8 +240,7 @@ pub fn test_digital_audio_interface(as_input: bool) -> (DigitalAudioInterface, T
 async fn handle_dai_connect_requests(as_input: bool, mut stream: DaiConnectorRequestStream) {
     while let Some(request) = stream.next().await {
         if let Ok(DaiConnectorRequest::Connect { dai_protocol, .. }) = request {
-            let (handler, _test_handle) =
-                mock_dai_device(as_input, dai_protocol.into_stream().unwrap());
+            let (handler, _test_handle) = mock_dai_device(as_input, dai_protocol.into_stream());
             fasync::Task::spawn(handler).detach();
         }
     }

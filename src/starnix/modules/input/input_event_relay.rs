@@ -353,9 +353,7 @@ impl InputEventsRelay {
                             );
                         (local_listener_stream, Some(local_resume_event))
                     }
-                    EventProxyMode::None => {
-                        (remote_server.into_stream().expect("Failed to create event stream"), None)
-                    }
+                    EventProxyMode::None => (remote_server.into_stream(), None),
                 };
                 slf.button_relay_loop(
                     local_listener_stream,

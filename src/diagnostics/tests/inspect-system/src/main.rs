@@ -70,7 +70,7 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
                 info!("{} Starting GetTests", rid);
                 task_tx
                     .send(fasync::Task::spawn(async move {
-                        let mut stream = iterator.into_stream().expect("convert to stream");
+                        let mut stream = iterator.into_stream();
                         let resp = match get_test_cases(rid).await {
                             Ok(v) => v,
                             Err(e) => {

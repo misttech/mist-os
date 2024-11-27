@@ -26,7 +26,7 @@ where
 
     registry.register_device(name, client_ep)?;
 
-    driver.serve_to(server_ep.into_stream()?).await?;
+    driver.serve_to(server_ep.into_stream()).await?;
 
     info!("LoWPAN Driver {:?} Stopped.", name);
 
@@ -47,10 +47,7 @@ impl<T: Driver> ServeTo<DriverRequestStream> for T {
                         macro_rules! handle_protocol {
                             ($futures:expr, $protocol:expr) => {
                                 if let Some(server_end) = $protocol {
-                                    match server_end.into_stream() {
-                                        Ok(stream) => $futures.push(self.serve_to(stream)),
-                                        Err(err) => warn!("into_stream() failed: {:?}", err),
-                                    }
+                                    $futures.push(self.serve_to(server_end.into_stream()));
                                 }
                             };
                         }
@@ -73,27 +70,23 @@ impl<T: Driver> ServeTo<DriverRequestStream> for T {
                         handle_protocol!(futures, protocols.thread_feature);
 
                         if let Some(server_end) = protocols.thread_legacy_joining {
-                            match server_end.into_stream() {
-                                Ok(stream) => {
-                                    // We only let there be one outstanding instance of this protocol.
-                                    if !legacy_joining_protocol_in_use_flag
-                                        .swap(true, Ordering::Relaxed)
-                                    {
-                                        info!("Mutually exclusive thread_legacy_joining channel requested and vended.");
-                                        let flag = legacy_joining_protocol_in_use_flag.clone();
-                                        futures.push(
-                                            self.serve_to(stream)
-                                                .inspect(move |_| {
-                                                    info!("thread_legacy_joining channel released.");
-                                                    flag.store(false, Ordering::Relaxed)
-                                                })
-                                                .boxed(),
-                                        );
-                                    } else {
-                                        warn!("Cannot vend thread_legacy_joining, one instance already outstanding.");
-                                    }
-                                }
-                                Err(err) => warn!("into_stream() failed: {:?}", err),
+                            let stream = server_end.into_stream();
+                            // We only let there be one outstanding instance of this protocol.
+                            if !legacy_joining_protocol_in_use_flag
+                                .swap(true, Ordering::Relaxed)
+                            {
+                                info!("Mutually exclusive thread_legacy_joining channel requested and vended.");
+                                let flag = legacy_joining_protocol_in_use_flag.clone();
+                                futures.push(
+                                    self.serve_to(stream)
+                                        .inspect(move |_| {
+                                            info!("thread_legacy_joining channel released.");
+                                            flag.store(false, Ordering::Relaxed)
+                                        })
+                                        .boxed(),
+                                );
+                            } else {
+                                warn!("Cannot vend thread_legacy_joining, one instance already outstanding.");
                             }
                         }
 
@@ -125,13 +118,12 @@ where
     registry.register(name, client_ep)?;
 
     server_ep
-        .into_stream()?
+        .into_stream()
         .try_for_each_concurrent(MAX_CONCURRENT, |cmd| async {
             match cmd {
                 FactoryDriverRequest::GetFactoryDevice { device_factory, .. } => {
-                    if let Ok(stream) = device_factory.into_stream() {
-                        let _ = driver.serve_to(stream).await;
-                    }
+                    let stream = device_factory.into_stream();
+                    let _ = driver.serve_to(stream).await;
                 }
             }
             Ok(())

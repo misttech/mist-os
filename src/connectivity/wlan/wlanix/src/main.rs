@@ -79,7 +79,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             info!("fidl_wlanix::WifiChipRequest::CreateStaIface");
             match payload.iface {
                 Some(iface) => {
-                    let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    let reqs = iface.into_stream();
                     let iface_id = iface_manager.create_client_iface(chip_id).await?;
                     telemetry_sender.send(TelemetryEvent::ClientIfaceCreated { iface_id });
                     responder.send(Ok(())).context("send CreateStaIface response")?;
@@ -109,7 +109,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             match payload.iface {
                 Some(iface) => {
                     // TODO(b/298030634): Use the iface name to identify the correct iface here.
-                    let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    let reqs = iface.into_stream();
                     let ifaces = iface_manager.list_ifaces();
                     if ifaces.is_empty() {
                         warn!("No iface available for GetStaIface.");
@@ -332,7 +332,7 @@ async fn handle_wifi_request<I: IfaceManager>(
             info!("fidl_wlanix::WifiRequest::GetChip - chip_id {:?}", payload.chip_id);
             match (payload.chip_id, payload.chip) {
                 (Some(chip_id), Some(chip)) => {
-                    let chip_stream = chip.into_stream().context("create WifiChip stream")?;
+                    let chip_stream = chip.into_stream();
                     match u16::try_from(chip_id) {
                         Ok(chip_id) => {
                             responder.send(Ok(())).context("send GetChip response")?;
@@ -798,9 +798,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
         fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork { payload, .. } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork");
             if let Some(supplicant_sta_network) = payload.network {
-                let supplicant_sta_network_stream = supplicant_sta_network
-                    .into_stream()
-                    .context("create SupplicantStaNetwork stream")?;
+                let supplicant_sta_network_stream = supplicant_sta_network.into_stream();
                 // TODO(https://fxbug.dev/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
                     telemetry_sender,
@@ -907,9 +905,7 @@ async fn handle_supplicant_request<I: IfaceManager>(
                     bail!("AddStaInterface but no interfaces exist.");
                 } else {
                     let client_iface = iface_manager.get_client_iface(ifaces[0]).await?;
-                    let supplicant_sta_iface_stream = supplicant_sta_iface
-                        .into_stream()
-                        .context("create SupplicantStaIface stream")?;
+                    let supplicant_sta_iface_stream = supplicant_sta_iface.into_stream();
                     serve_supplicant_sta_iface(
                         telemetry_sender,
                         supplicant_sta_iface_stream,
@@ -1417,7 +1413,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetWifi { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetWifi");
             if let Some(wifi) = payload.wifi {
-                let wifi_stream = wifi.into_stream().context("create Wifi stream")?;
+                let wifi_stream = wifi.into_stream();
                 serve_wifi(
                     wifi_stream,
                     Arc::clone(&state),
@@ -1430,8 +1426,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetSupplicant { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetSupplicant");
             if let Some(supplicant) = payload.supplicant {
-                let supplicant_stream =
-                    supplicant.into_stream().context("create Supplicant stream")?;
+                let supplicant_stream = supplicant.into_stream();
                 serve_supplicant(
                     supplicant_stream,
                     Arc::clone(&iface_manager),
@@ -1444,7 +1439,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
         fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
-                let nl80211_stream = nl80211.into_stream().context("create Nl80211 stream")?;
+                let nl80211_stream = nl80211.into_stream();
                 serve_nl80211(nl80211_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
             }
         }

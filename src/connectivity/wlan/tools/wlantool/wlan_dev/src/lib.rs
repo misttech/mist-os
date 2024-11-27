@@ -825,8 +825,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let del_fut = do_iface(IfaceCmd::Delete { iface_id: 5 }, monitor_svc_local);
         let mut del_fut = pin!(del_fut);
 
@@ -859,8 +858,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut = do_phy(PhyCmd::GetCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
@@ -886,8 +884,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut =
             do_phy(PhyCmd::SetCountry { phy_id: 45, country: "RS".to_string() }, monitor_svc_local);
         let mut fut = pin!(fut);
@@ -910,8 +907,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_svc_stream =
-            monitor_svc_remote.into_stream().expect("failed to create stream");
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
         let fut = do_phy(PhyCmd::ClearCountry { phy_id: 45 }, monitor_svc_local);
         let mut fut = pin!(fut);
 
@@ -980,7 +976,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_stream = monitor_remote.into_stream().expect("failed to create stream");
+        let mut monitor_stream = monitor_remote.into_stream();
         // SSID is one byte too long.
         let cmd = opts::ClientConnectCmd {
             iface_id: 0,
@@ -1005,7 +1001,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
-        let mut monitor_stream = monitor_remote.into_stream().expect("failed to create stream");
+        let mut monitor_stream = monitor_remote.into_stream();
         let mut stdout = Vec::new();
         {
             let fut = do_client_wmm_status(
@@ -1023,7 +1019,7 @@ mod tests {
                 }))) => {
                     assert_eq!(iface_id, 11);
                     responder.send(Ok(())).expect("failed to send GetClientSme response");
-                    sme_server.into_stream().expect("sme server stream failed")
+                    sme_server.into_stream()
                 }
             );
 

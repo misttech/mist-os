@@ -147,7 +147,7 @@ impl AccessPoint {
         ap_provider_guard: MutexGuard<'_, ()>,
         requests: ApRequests,
     ) -> Result<(), fidl::Error> {
-        let mut request_stream = requests.into_stream()?;
+        let mut request_stream = requests.into_stream();
         while let Some(request) = request_stream.try_next().await? {
             log_ap_request(&request);
             match request {
@@ -489,7 +489,7 @@ mod tests {
     fn test_setup() -> TestValues {
         let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
             .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let requests = requests.into_stream();
 
         let iface_manager = FakeIfaceManager::new();
         let iface_manager = Arc::new(Mutex::new(iface_manager));
@@ -830,7 +830,7 @@ mod tests {
         // that occurs when a second client connects to the AccessPointProvider service.
         let (provider, requests) = create_proxy::<fidl_policy::AccessPointProviderMarker>()
             .expect("failed to create AccessPointProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+        let requests = requests.into_stream();
         let second_serve_fut = test_values.ap.serve_provider_requests(requests);
         let mut second_serve_fut = pin!(second_serve_fut);
 

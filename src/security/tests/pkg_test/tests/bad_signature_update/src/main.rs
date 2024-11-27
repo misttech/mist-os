@@ -116,7 +116,7 @@ async fn attempt_update(update_url: &str) -> Result<State> {
         .unwrap()
         .unwrap();
 
-    let mut monitor_stream = monitor_server_end.into_stream().unwrap();
+    let mut monitor_stream = monitor_server_end.into_stream();
     while let Some(request) = monitor_stream.try_next().await.unwrap() {
         match request {
             MonitorRequest::OnState { state, responder } => {

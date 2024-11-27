@@ -587,7 +587,7 @@ mod tests {
     fn test_setup() -> TestValues {
         let (monitor_proxy, requests) = create_proxy::<fidl_svc::DeviceMonitorMarker>()
             .expect("failed to create DeviceMonitor proxy");
-        let monitor_req_stream = requests.into_stream().expect("failed to create request stream");
+        let monitor_req_stream = requests.into_stream();
         let (phys, phy_events) = PhyMap::new();
         let phys = Arc::new(phys);
 
@@ -622,7 +622,7 @@ mod tests {
     fn fake_phy() -> (PhyDevice, fidl_dev::PhyRequestStream) {
         let (proxy, server) =
             create_proxy::<fidl_dev::PhyMarker>().expect("fake_phy: create_proxy() failed");
-        let stream = server.into_stream().expect("fake_phy: failed to create stream");
+        let stream = server.into_stream();
         (PhyDevice { proxy, device_path: String::from("/test/path") }, stream)
     }
 
@@ -1533,8 +1533,7 @@ mod tests {
         if let Some(channel) = bootstrap_channel {
             let bootstrap_server =
                 fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
-            let mut bootstrap_stream =
-                bootstrap_server.into_stream().expect("Failed to make bootstrap stream");
+            let mut bootstrap_stream = bootstrap_server.into_stream();
 
             let responder = assert_variant!(
                 exec.run_until_stalled(&mut bootstrap_stream.next()),
@@ -1624,8 +1623,7 @@ mod tests {
             // Complete the USME bootstrap.
             let mut bootstrap_stream =
                 fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(bootstrap_channel)
-                    .into_stream()
-                    .expect("Failed to make bootstrap stream");
+                    .into_stream();
             assert_variant!(
                 exec.run_until_stalled(&mut bootstrap_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
@@ -1919,7 +1917,7 @@ mod tests {
         // Verify that the correct endpoint is served.
         let _status_req = client_sme_proxy.status();
 
-        let mut sme_stream = sme_server.into_stream().expect("Failed to get client SME stream");
+        let mut sme_stream = sme_server.into_stream();
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Status { .. })))
@@ -1952,8 +1950,7 @@ mod tests {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a client SME request with an error.
-        let mut generic_sme_stream =
-            generic_sme_server.into_stream().expect("Failed to create generic SME stream");
+        let mut generic_sme_stream = generic_sme_server.into_stream();
         assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetClientSme { responder, .. }))) => {
                 responder.send(Err(1)).expect("Failed to send response");

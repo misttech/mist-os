@@ -277,7 +277,7 @@ mod tests {
             call_chan: mpsc::UnboundedSender<CallType>,
         ) -> Pin<Box<impl Future<Output = ()>>> {
             let server = async move {
-                let mut req_stream = self.chan.into_stream().unwrap();
+                let mut req_stream = self.chan.into_stream();
                 while let Ok(request) = req_stream.try_next().await {
                     match request {
                         Some(fsys::StorageAdminRequest::DeleteAllStorageContents { responder }) => {

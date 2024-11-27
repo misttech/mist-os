@@ -38,7 +38,7 @@ pub async fn serve_controller(
                     if component.is_started().await {
                         return Err(fcomponent::Error::InstanceAlreadyStarted);
                     }
-                    let execution_controller_stream = execution_controller.into_stream().unwrap();
+                    let execution_controller_stream = execution_controller.into_stream();
                     let control_handle = execution_controller_stream.control_handle();
                     let execution_controller = ExecutionControllerTask {
                         _task: fasync::Task::spawn(execution_controller_task(

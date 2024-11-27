@@ -201,7 +201,7 @@ pub async fn serve_capability_store(
                 let result = (|| {
                     let this = get_dictionary(&store, id)?;
                     let keys = this.keys();
-                    let stream = server_end.into_stream().unwrap();
+                    let stream = server_end.into_stream();
                     let mut this = this.lock();
                     this.tasks().spawn(serve_dictionary_keys_iterator(keys, stream));
                     Ok(())
@@ -216,7 +216,7 @@ pub async fn serve_capability_store(
                 let result = (|| {
                     let this = get_dictionary(&store, id)?;
                     let items = this.enumerate();
-                    let stream = server_end.into_stream().unwrap();
+                    let stream = server_end.into_stream();
                     let mut this = this.lock();
                     this.tasks().spawn(serve_dictionary_enumerate_iterator(
                         Arc::downgrade(&outer_store),
@@ -238,7 +238,7 @@ pub async fn serve_capability_store(
                     // They are dropped if the caller does not request an iterator.
                     let items = this.drain();
                     if let Some(server_end) = server_end {
-                        let stream = server_end.into_stream().unwrap();
+                        let stream = server_end.into_stream();
                         let mut this = this.lock();
                         this.tasks().spawn(serve_dictionary_drain_iterator(
                             Arc::downgrade(&outer_store),

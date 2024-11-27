@@ -91,7 +91,7 @@ async fn make_handler(
         .entry(project_spec.project_id.unwrap_or(0))
         .or_insert_with(Default::default)
         .clone();
-    handle_metric_event_logger(logger.into_stream()?, log).await
+    handle_metric_event_logger(logger.into_stream(), log).await
 }
 
 async fn handle_metric_event_logger(

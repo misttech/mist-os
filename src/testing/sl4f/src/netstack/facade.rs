@@ -518,7 +518,7 @@ mod tests {
             let stream_fut = async move {
                 match stream.next().await {
                     Some(Ok(finterfaces::StateRequest::GetWatcher { watcher, .. })) => {
-                        let mut into_stream = watcher.into_stream().unwrap();
+                        let mut into_stream = watcher.into_stream();
                         for expected in self.expected_state {
                             let () = expected(into_stream.next().await.unwrap().unwrap());
                         }

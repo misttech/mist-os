@@ -247,9 +247,9 @@ macro_rules! create_event {
                         self.result.as_mut()
                             .ok()
                             .and_then(|payload| payload.$server_protocol_name.take())
-                            .and_then(|channel| {
+                            .map(|channel| {
                                 let server_end = ServerEnd::<T>::new(channel);
-                                server_end.into_stream().ok()
+                                server_end.into_stream()
                             })
                     }
                 )*

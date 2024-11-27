@@ -396,7 +396,7 @@ mod tests {
         let (reason, escrow) = start_rx.next().await.unwrap();
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
-        let mut outgoing = escrow.outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.outgoing_dir.into_stream();
         let dir_entry = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(dir_entry.2, "foo");
 
@@ -430,7 +430,7 @@ mod tests {
         let mut next_start = start_rx.next();
         assert_matches!(TestExecutor::poll_until_stalled(&mut next_start).await, Poll::Pending);
 
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
 
@@ -545,7 +545,7 @@ mod tests {
             )),
             Ok(())
         );
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "bar");
 
@@ -640,7 +640,7 @@ mod tests {
             }))
             .unwrap();
 
-        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream().unwrap();
+        let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
         let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
         assert_eq!(open.2, "foo");
 

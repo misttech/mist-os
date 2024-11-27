@@ -1589,7 +1589,7 @@ mod tests {
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let sme = SmeForScan::new(proxy, 0, defect_sender);
-        let mut sme_stream = server_end.into_stream().expect("failed to create SME stream");
+        let mut sme_stream = server_end.into_stream();
 
         // Construct a scan request.
         let scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
@@ -1699,8 +1699,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ack the disconnect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{
@@ -1785,8 +1784,7 @@ mod tests {
         let _ = sme.roam(&roam_request).unwrap();
 
         // Verify SME gets the request
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Roam {
@@ -1830,8 +1828,7 @@ mod tests {
         }
 
         // Ack the connect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
@@ -1892,8 +1889,7 @@ mod tests {
         }
 
         // Ack the connect request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
@@ -2016,7 +2012,7 @@ mod tests {
     fn wait_for_connect_result_ignores_other_events() {
         let mut exec = fasync::TestExecutor::new();
         let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
-        let request_handle = remote.into_stream().unwrap().control_handle();
+        let request_handle = remote.into_stream().control_handle();
         let mut response_stream = connect_txn.take_event_stream();
 
         let fut = wait_for_connect_result(&mut response_stream);
@@ -2073,8 +2069,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the start request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Start { responder, .. }) => {
@@ -2161,8 +2156,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the stop request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop { responder }) => {
@@ -2247,8 +2241,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Respond to the status request.
-        let mut sme_fut =
-            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        let mut sme_fut = pin!(sme_fut.into_stream().into_future());
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {

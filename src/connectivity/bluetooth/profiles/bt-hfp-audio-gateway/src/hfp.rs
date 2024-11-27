@@ -681,7 +681,7 @@ mod tests {
         match stream.try_next().await? {
             Some(CallManagerRequest::PeerConnected { id: _, handle, responder }) => {
                 responder.send()?;
-                let _ = handle.into_stream()?;
+                let _ = handle.into_stream();
             }
             x => anyhow::bail!("Unexpected request received: {:?}", x),
         };

@@ -555,7 +555,7 @@ impl ThermalStateHandler {
                             ..
                         } => self
                             .client_states
-                            .connect_stream_for_client(&client_type, watcher.into_stream()?)?,
+                            .connect_stream_for_client(&client_type, watcher.into_stream())?,
                     }
                 }
                 Ok(())

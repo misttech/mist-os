@@ -92,7 +92,7 @@ pub(crate) async fn serve_routes_v4(
     while let Some(req) = rs.try_next().await? {
         match req {
             fnet_root::RoutesV4Request::GlobalRouteSet { route_set, control_handle: _ } => {
-                let stream = route_set.into_stream()?;
+                let stream = route_set.into_stream();
                 let ctx = ctx.clone();
                 spawner.spawn(async {
                     serve_route_set::<Ipv4, _, _>(
@@ -117,7 +117,7 @@ pub(crate) async fn serve_routes_v6(
     while let Some(req) = rs.try_next().await? {
         match req {
             fnet_root::RoutesV6Request::GlobalRouteSet { route_set, control_handle: _ } => {
-                let stream = route_set.into_stream()?;
+                let stream = route_set.into_stream();
                 let ctx = ctx.clone();
                 spawner.spawn(async {
                     serve_route_set::<Ipv6, _, _>(

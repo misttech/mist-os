@@ -47,7 +47,7 @@ impl Service for BrightnessService {
         }
 
         let mut manager_stream =
-            ServerEnd::<fidl_fuchsia_ui_brightness::ControlMarker>::new(channel).into_stream()?;
+            ServerEnd::<fidl_fuchsia_ui_brightness::ControlMarker>::new(channel).into_stream();
 
         let auto_brightness_handle = self.auto_brightness.clone();
         let brightness_handle = self.manual_brightness.clone();

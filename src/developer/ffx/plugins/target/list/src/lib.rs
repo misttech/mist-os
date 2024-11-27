@@ -262,7 +262,7 @@ async fn list_targets(
         reader,
     )?;
     let mut res = Vec::new();
-    let mut stream = server.into_stream()?;
+    let mut stream = server.into_stream();
     while let Ok(Some(ffx::TargetCollectionReaderRequest::Next { entry, responder })) =
         stream.try_next().await
     {

@@ -315,7 +315,7 @@ impl LocalComponentRunner {
                     let (component_handles, stop_notifier) =
                         LocalComponentHandles::new(namespace, numbered_handles, outgoing_dir)?;
 
-                    let mut controller_request_stream = controller.into_stream()?;
+                    let mut controller_request_stream = controller.into_stream();
                     self.execution_scope.spawn(async move {
                         let mut local_component_implementation_fut =
                             (*local_component_implementation)(component_handles).fuse();

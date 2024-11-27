@@ -151,7 +151,7 @@ pub mod tests {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>().unwrap();
         let task = fasync::Task::spawn(async move {
-            let mut request_stream = server_end.into_stream().unwrap();
+            let mut request_stream = server_end.into_stream();
             loop {
                 if let Some(Ok(request)) = request_stream.next().await {
                     match request {

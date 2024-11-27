@@ -1587,8 +1587,7 @@ mod tests {
         let (monitor_service_proxy, monitor_service_requests) =
             create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
                 .expect("failed to create SeviceService proxy");
-        let monitor_service_stream =
-            monitor_service_requests.into_stream().expect("failed to create stream");
+        let monitor_service_stream = monitor_service_requests.into_stream();
 
         let (client_sender, client_receiver) = mpsc::unbounded();
         let (ap_sender, _) = mpsc::unbounded();
@@ -1906,7 +1905,7 @@ mod tests {
         }
         iface_manager.clients.push(client_container);
 
-        (iface_manager, server.into_stream().unwrap().into_future())
+        (iface_manager, server.into_stream().into_future())
     }
 
     fn create_ap_config(ssid: &ap_types::Ssid, password: &str) -> ap_fsm::ApConfig {
@@ -2051,7 +2050,7 @@ mod tests {
                     sme_server
                 }
             );
-            _sme_stream = sme_server.into_stream().unwrap().into_future();
+            _sme_stream = sme_server.into_stream().into_future();
 
             let mut connect_fut = pin!(connect_fut);
             match exec.run_until_stalled(&mut connect_fut) {
@@ -2320,7 +2319,7 @@ mod tests {
                     sme_server
                 }
             );
-            _sme_stream = sme_server.into_stream().unwrap().into_future();
+            _sme_stream = sme_server.into_stream().into_future();
 
             match exec.run_until_stalled(&mut connect_fut) {
                 Poll::Ready(connect_result) => match connect_result {
@@ -3182,10 +3181,7 @@ mod tests {
                 }
             );
             assert_variant!(exec.run_until_stalled(&mut start_fut), Poll::Pending);
-            let mut features_req_fut = features_server
-                .into_stream()
-                .expect("Failed to create features req stream")
-                .into_future();
+            let mut features_req_fut = features_server.into_stream().into_future();
             assert_variant!(
                 poll_service_req(&mut exec, &mut features_req_fut),
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
@@ -3696,10 +3692,7 @@ mod tests {
                 }
             );
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let mut features_req_fut = features_server
-                .into_stream()
-                .expect("Failed to create features req stream")
-                .into_future();
+            let mut features_req_fut = features_server.into_stream().into_future();
             assert_variant!(
                 poll_service_req(&mut exec, &mut features_req_fut),
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
@@ -3951,10 +3944,7 @@ mod tests {
                 }
             );
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-            let mut features_req_fut = features_server
-                .into_stream()
-                .expect("Failed to create features req stream")
-                .into_future();
+            let mut features_req_fut = features_server.into_stream().into_future();
             assert_variant!(
                 poll_service_req(&mut exec, &mut features_req_fut),
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
@@ -4618,10 +4608,7 @@ mod tests {
             }
         );
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let mut features_req_fut = features_server
-            .into_stream()
-            .expect("Failed to create features req stream")
-            .into_future();
+        let mut features_req_fut = features_server.into_stream().into_future();
         assert_variant!(
             poll_service_req(&mut exec, &mut features_req_fut),
             Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
@@ -5020,7 +5007,7 @@ mod tests {
             // The reconnect future should finish up.
             assert_variant!(exec.run_until_stalled(&mut reconnect_fut), Poll::Ready(Ok(())));
 
-            sme_server.into_stream().unwrap().into_future()
+            sme_server.into_stream().into_future()
         };
 
         // Start running the new state machine.

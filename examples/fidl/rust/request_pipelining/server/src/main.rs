@@ -62,7 +62,7 @@ async fn run_echo_launcher_server(stream: EchoLauncherRequestStream) -> Result<(
                 }
             };
             // Run the Echo server with the specified prefix
-            run_echo_server(server_end.into_stream()?, &echo_prefix).await
+            run_echo_server(server_end.into_stream(), &echo_prefix).await
         })
         .await
 }

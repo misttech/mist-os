@@ -417,7 +417,7 @@ async fn list_targets(query: Option<&str>, tc: &TargetCollectionProxy) -> Result
         reader,
     )?;
     let mut res = Vec::new();
-    let mut stream = server.into_stream()?;
+    let mut stream = server.into_stream();
     while let Ok(Some(TargetCollectionReaderRequest::Next { entry, responder })) =
         stream.try_next().await
     {
@@ -1894,7 +1894,7 @@ mod test {
         F: Fn(TargetRequest) -> () + 'static,
     {
         fuchsia_async::Task::local(async move {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
             while let Ok(Some(req)) = stream.try_next().await {
                 (handler)(req)
             }
@@ -1937,7 +1937,7 @@ mod test {
 
     fn serve_responsive_rcs(server_end: ServerEnd<RemoteControlMarker>) {
         serve_stream::<RemoteControlMarker, _, _>(
-            server_end.into_stream().unwrap(),
+            server_end.into_stream(),
             move |req| async move {
                 match req {
                     RemoteControlRequest::IdentifyHost { responder } => responder
@@ -1956,7 +1956,7 @@ mod test {
         server_end: ServerEnd<RemoteControlMarker>,
         waiter: Shared<Receiver<()>>,
     ) {
-        serve_stream::<RemoteControlMarker, _, _>(server_end.into_stream().unwrap(), move |req| {
+        serve_stream::<RemoteControlMarker, _, _>(server_end.into_stream(), move |req| {
             let waiter = waiter.clone();
             async move {
                 match req {

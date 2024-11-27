@@ -117,16 +117,7 @@ impl Discovery {
         session_id: SessionId,
         session_control_request: ServerEnd<SessionControlMarker>,
     ) {
-        let mut requests = match session_control_request.into_stream() {
-            Ok(requests) => requests,
-            Err(e) => {
-                warn!(
-                    tag = LOG_TAG,
-                    "Client attempted to connect to session with bad channel: {:?}", e
-                );
-                return;
-            }
-        };
+        let mut requests = session_control_request.into_stream();
 
         let session_info_stream = self.single_session_info_stream(session_id);
 
@@ -263,16 +254,7 @@ impl Discovery {
         session_id: SessionId,
         session_request: ServerEnd<SessionObserverMarker>,
     ) {
-        let status_request_stream = match session_request.into_stream() {
-            Ok(status_request_stream) => status_request_stream,
-            Err(e) => {
-                info!(
-                    tag = LOG_TAG,
-                    "Client tried to observe session but sent a bad handle: {:?}", e
-                );
-                return;
-            }
-        };
+        let status_request_stream = session_request.into_stream();
 
         let status_request_stream = status_request_stream
             .map(std::result::Result::ok)
@@ -378,7 +360,7 @@ mod test {
 
         // Create one watcher ahead of any players, for synchronization.
         let (watcher1_client, watcher1_server) = create_endpoints::<SessionsWatcherMarker>();
-        let mut watcher1 = watcher1_server.into_stream()?;
+        let mut watcher1 = watcher1_server.into_stream();
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
                 watch_options: Default::default(),
@@ -401,7 +383,7 @@ mod test {
             player_published_sink,
         )?;
         player_sink.send(player).await?;
-        let mut player_requests = player_server.into_stream()?;
+        let mut player_requests = player_server.into_stream();
         let info_change_responder = player_requests
             .try_next()
             .await?
@@ -424,7 +406,7 @@ mod test {
                 control_handle: dummy_control_handle.clone(),
             })
             .await?;
-        let mut watcher2 = watcher2_server.into_stream()?;
+        let mut watcher2 = watcher2_server.into_stream();
         assert_matches!(watcher2.try_next().await?.and_then(|r| r.into_session_updated()), Some(_));
 
         Ok(())

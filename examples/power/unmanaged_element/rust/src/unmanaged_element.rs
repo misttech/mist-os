@@ -141,9 +141,8 @@ mod tests {
         fasync::Task::local(async move {
             let current_level = FakeCurrentLevel { power_level_sender };
             assert!(schema.level_control_channels.is_some());
-            let stream_res = schema.level_control_channels.unwrap().current.into_stream();
-            assert!(stream_res.is_ok());
-            current_level.run(stream_res.unwrap()).await.expect("current level server teardown");
+            let stream = schema.level_control_channels.unwrap().current.into_stream();
+            current_level.run(stream).await.expect("current level server teardown");
         })
         .detach();
 

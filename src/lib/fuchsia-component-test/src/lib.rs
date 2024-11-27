@@ -2934,7 +2934,7 @@ mod tests {
                             .await
                             .unwrap();
 
-                        let child_realm_stream = child_realm.into_stream().unwrap();
+                        let child_realm_stream = child_realm.into_stream();
                         child_realm_streams.push(fasync::Task::spawn(async move {
                             handle_realm_stream(child_realm_stream, child_realm_report_requests)
                                 .await

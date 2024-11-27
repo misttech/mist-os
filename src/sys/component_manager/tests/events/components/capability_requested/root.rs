@@ -21,9 +21,7 @@ async fn main() {
         let event = event_stream.next().await.unwrap();
         if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
             let mut trigger_server =
-                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
-                    .into_stream()
-                    .unwrap();
+                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap()).into_stream();
             let request = trigger_server.next().await.unwrap().unwrap();
             match request {
                 ftest::TriggerRequest::Run { responder } => {
@@ -39,9 +37,7 @@ async fn main() {
         let event = event_stream_2.next().await.unwrap();
         if let Some(EventPayload::CapabilityRequested(payload)) = event.payload {
             let mut trigger_server =
-                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap())
-                    .into_stream()
-                    .unwrap();
+                ServerEnd::<ftest::TriggerMarker>::new(payload.capability.unwrap()).into_stream();
             let request = trigger_server.next().await.unwrap().unwrap();
             match request {
                 ftest::TriggerRequest::Run { responder } => {

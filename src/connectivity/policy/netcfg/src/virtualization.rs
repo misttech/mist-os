@@ -227,7 +227,6 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                 let shutdown_fut = async move {
                     let mut interface_closure = interface
                         .into_stream()
-                        .expect("convert server end into stream")
                         .map(|request| {
                             // `fuchsia.net.virtualization/Interface` is a protocol with no
                             // methods, so `InterfaceRequest` is an uninstantiable enum.
@@ -633,7 +632,6 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                 let close_channel_rx = close_channel_rx.shared();
                 let stream = network
                     .into_stream()
-                    .expect("convert server end into stream")
                     .filter_map(move |request| {
                         future::ready(match request {
                             Ok(request) => {
@@ -998,10 +996,7 @@ mod tests {
             const BRIDGE_IF: u64 = 99;
             let (control, server) =
                 fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
-            *bridge = Some(BridgeServer {
-                id: BRIDGE_IF,
-                _request_stream: server.into_stream().expect("get request stream"),
-            });
+            *bridge = Some(BridgeServer { id: BRIDGE_IF, _request_stream: server.into_stream() });
             events
                 .send(BridgeEvent::Created { interfaces: interfaces.collect(), upstream_interface })
                 .await

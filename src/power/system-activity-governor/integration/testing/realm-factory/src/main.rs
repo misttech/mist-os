@@ -68,7 +68,7 @@ impl SagRealm {
     }
 
     async fn serve(self, server_end: ServerEnd<RealmProxy_Marker>) {
-        realm_proxy::service::serve(self.realm, server_end.into_stream().unwrap()).await.unwrap()
+        realm_proxy::service::serve(self.realm, server_end.into_stream()).await.unwrap()
     }
 }
 

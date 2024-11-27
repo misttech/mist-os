@@ -390,8 +390,7 @@ mod tests {
             let volume_stream = fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(
                 block_server.into_channel(),
             )
-            .into_stream()
-            .unwrap();
+            .into_stream();
             let server_clone = server.clone();
             let _task = fasync::Task::spawn(async move { server_clone.serve(volume_stream).await });
             let client = Arc::new(RemoteBlockClient::new(block_client).await.unwrap());
@@ -410,8 +409,7 @@ mod tests {
             fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
         let volume_stream =
             fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(block_server.into_channel())
-                .into_stream()
-                .unwrap();
+                .into_stream();
 
         futures::join!(
             async {
@@ -483,8 +481,7 @@ mod tests {
             fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
         let volume_stream =
             fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(block_server.into_channel())
-                .into_stream()
-                .unwrap();
+                .into_stream();
 
         futures::join!(
             async {

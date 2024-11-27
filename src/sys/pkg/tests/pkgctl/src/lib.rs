@@ -229,7 +229,7 @@ impl MockEngineService {
                     control_handle: _control_handle,
                 } => {
                     self.captured_args.lock().push(CapturedEngineRequest::StartEditTransaction);
-                    let mut stream = transaction.into_stream().expect("error here");
+                    let mut stream = transaction.into_stream();
                     while let Some(sub_req) = stream.try_next().await? {
                         match sub_req {
                             EditTransactionRequest::ListDynamic {
@@ -259,7 +259,7 @@ impl MockEngineService {
         &self,
         iterator: ServerEnd<RuleIteratorMarker>,
     ) -> Result<(), Error> {
-        let mut stream = iterator.into_stream().expect("list iterator into_stream");
+        let mut stream = iterator.into_stream();
         let rules =
             self.rules.lock().clone().into_iter().map(|rule| rule.into()).collect::<Vec<_>>();
         let mut iter = rules.chunks(5).fuse();
@@ -321,7 +321,7 @@ impl MockRepositoryManagerService {
                 }
                 RepositoryManagerRequest::List { iterator, control_handle: _control_handle } => {
                     self.captured_args.lock().push(CapturedRepositoryManagerRequest::List);
-                    let mut stream = iterator.into_stream().expect("list iterator into_stream");
+                    let mut stream = iterator.into_stream();
                     let repos: Vec<_> =
                         self.repos.lock().clone().into_iter().map(|r| r.into()).collect();
                     let mut iter = repos.chunks(5).fuse();
@@ -485,7 +485,7 @@ impl MockPackageCacheService {
                 let () = get_responder.send(Ok(())).unwrap();
             }
             GetBehavior::NotCached => {
-                let mut stream = needed_blobs.into_stream().unwrap();
+                let mut stream = needed_blobs.into_stream();
                 let req = stream.next().await.unwrap().unwrap();
                 let fpkg::NeededBlobsRequest::OpenMetaBlob { responder, .. } = req else {
                     panic!("unexpected NeededBlobsRequest: {req:?}");

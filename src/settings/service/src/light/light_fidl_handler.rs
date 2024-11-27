@@ -207,8 +207,7 @@ mod tests {
         let (proxy, server) =
             fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
         let _fut = proxy.watch_light_groups();
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -230,8 +229,7 @@ mod tests {
         let (proxy, server) =
             fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
         let _fut = proxy.watch_light_group(light_name);
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -271,8 +269,7 @@ mod tests {
         let (proxy, server) =
             fidl::endpoints::create_proxy::<LightMarker>().expect("should be able to create proxy");
         let _fut = proxy.set_light_group_values("arbitrary name", &[]);
-        let mut request_stream: LightRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: LightRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

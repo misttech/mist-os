@@ -548,7 +548,7 @@ async fn test_monitor_all_updates() {
     assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
     assert_matches!(responder.send(), Ok(()));
-    let mut monitor_stream = monitor.into_stream().unwrap();
+    let mut monitor_stream = monitor.into_stream();
 
     expect_states(
         &mut monitor_stream,

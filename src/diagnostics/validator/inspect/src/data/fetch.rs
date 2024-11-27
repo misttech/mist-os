@@ -177,11 +177,11 @@ mod tests {
                     responder.send(content)?;
                 }
                 TreeRequest::ListChildNames { tree_iterator, .. } => {
-                    let request_stream = tree_iterator.into_stream()?;
+                    let request_stream = tree_iterator.into_stream();
                     spawn_tree_name_iterator_server(child_names(&name), request_stream)
                 }
                 TreeRequest::OpenChild { child_name, tree, .. } => {
-                    spawn_tree_server(child_name, Arc::clone(&vmos), tree.into_stream()?)
+                    spawn_tree_server(child_name, Arc::clone(&vmos), tree.into_stream())
                 }
                 TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
                     warn!(ordinal, ?method_type, "Unknown request");

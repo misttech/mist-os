@@ -893,7 +893,7 @@ mod tests {
         )
         .unwrap();
         let mut res = Vec::new();
-        let mut stream = server.into_stream().unwrap();
+        let mut stream = server.into_stream();
         while let Ok(Some(ffx::TargetCollectionReaderRequest::Next { entry, responder })) =
             stream.try_next().await
         {
@@ -1072,7 +1072,7 @@ mod tests {
         server: fidl::endpoints::ServerEnd<ffx::AddTargetResponder_Marker>,
     ) -> impl std::future::Future<Output = Result<(), ffx::AddTargetError>> {
         async {
-            let mut stream = server.into_stream().unwrap();
+            let mut stream = server.into_stream();
             if let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     ffx::AddTargetResponder_Request::Success { .. } => {

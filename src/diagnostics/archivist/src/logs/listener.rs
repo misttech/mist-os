@@ -277,8 +277,7 @@ mod tests {
     async fn run_and_consume_backfill(message_vec: Vec<Arc<LogsData>>) -> usize {
         let (client, server) = zx::Channel::create();
         let client_end = ClientEnd::<LogListenerSafeMarker>::new(client);
-        let mut listener_server =
-            ServerEnd::<LogListenerSafeMarker>::new(server).into_stream().unwrap();
+        let mut listener_server = ServerEnd::<LogListenerSafeMarker>::new(server).into_stream();
         let mut listener = Listener::new(client_end, None).unwrap();
 
         fasync::Task::spawn(async move {

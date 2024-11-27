@@ -457,13 +457,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
         usme_bootstrap_channel_via_iface_creation,
     );
-    let mut usme_bootstrap_stream = match server.into_stream() {
-        Ok(res) => res,
-        Err(e) => {
-            error!("Failed to create a UsmeBootstrap request stream: {}", e);
-            return Err(zx::Status::INTERNAL);
-        }
-    };
+    let mut usme_bootstrap_stream = server.into_stream();
 
     let (generic_sme_server, legacy_privacy_support, responder) =
         match usme_bootstrap_stream.next().await {
@@ -499,13 +493,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
         error!("Failed to respond to UsmeBootstrap.Start(): {}", e);
         return Err(zx::Status::INTERNAL);
     }
-    let generic_sme_request_stream = match generic_sme_server.into_stream() {
-        Ok(stream) => stream,
-        Err(e) => {
-            error!("Failed to create GenericSme request stream: {}", e);
-            return Err(zx::Status::INTERNAL);
-        }
-    };
+    let generic_sme_request_stream = generic_sme_server.into_stream();
 
     Ok(BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspector })
 }
@@ -901,7 +889,7 @@ mod tests {
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
             fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
-        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
         let softmac_ifc_bridge_channel = softmac_ifc_bridge_client.into_channel();
 
         let server_fut =
@@ -921,7 +909,7 @@ mod tests {
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
             fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
-        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
@@ -952,7 +940,7 @@ mod tests {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
-        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
@@ -974,7 +962,7 @@ mod tests {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
-        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
@@ -1013,8 +1001,7 @@ mod tests {
             let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
                 fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
                     .unwrap();
-            let softmac_ifc_bridge_request_stream =
-                softmac_ifc_bridge_server.into_stream().unwrap();
+            let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
             let (complete_mlme_sender, complete_mlme_receiver) = oneshot::channel();
             let mlme = Box::pin(async { complete_mlme_receiver.await.unwrap() });
             let (complete_sme_sender, complete_sme_receiver) = oneshot::channel();
@@ -1044,7 +1031,7 @@ mod tests {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
-        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream();
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);

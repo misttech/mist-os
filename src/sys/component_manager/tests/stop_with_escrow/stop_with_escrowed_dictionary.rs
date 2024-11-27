@@ -122,7 +122,6 @@ async fn escrow_counter_then_stop(
     let lifecycle = ServerEnd::<flifecycle::LifecycleMarker>::from(lifecycle);
     lifecycle
         .into_stream()
-        .unwrap()
         .control_handle()
         .send_on_escrow(flifecycle::LifecycleOnEscrowRequest {
             escrowed_dictionary: Some(dictionary_ref),

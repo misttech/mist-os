@@ -856,9 +856,8 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
         };
         self.scope.spawn(async move {
-            if let Ok(requests) = server_end.into_stream() {
-                connection.handle_requests(requests).await;
-            }
+            let requests = server_end.into_stream();
+            connection.handle_requests(requests).await;
         });
     }
 

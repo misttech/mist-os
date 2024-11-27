@@ -1182,7 +1182,6 @@ mod tests {
             let channel_future = async {
                 server
                     .into_stream()
-                    .expect("into_stream failed")
                     .for_each_concurrent(None, |request| async {
                         let request = request.expect("unexpected fidl error");
 
@@ -1198,7 +1197,7 @@ mod tests {
                                     .expect("send failed");
                             }
                             block::BlockRequest::OpenSession { session, control_handle: _ } => {
-                                let stream = session.into_stream().expect("into_stream failed");
+                                let stream = session.into_stream();
                                 stream
                                     .for_each(|request| async {
                                         let request = request.expect("unexpected fidl error");

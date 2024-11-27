@@ -119,7 +119,7 @@ mod tests {
     ) -> (fuchsia_async::TestExecutor, M::Proxy, M::RequestStream) {
         let exec = fuchsia_async::TestExecutor::new();
         let (proxy, server) = fidl::endpoints::create_proxy::<M>().expect("creating proxy");
-        (exec, proxy, server.into_stream().expect("creating stream"))
+        (exec, proxy, server.into_stream())
     }
 
     fn fake_iface_query_response(

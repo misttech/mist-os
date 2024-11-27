@@ -643,7 +643,6 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
         server_end
             .into_stream()
-            .unwrap()
             .map(|result| result.context("failed fbinder::ContainerPowerControllerRequest request"))
             .try_for_each_concurrent(None, |event| {
                 handle_request(event, &proxy_event, &kernel, service_name)

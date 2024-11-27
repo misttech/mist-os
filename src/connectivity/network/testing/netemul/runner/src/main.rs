@@ -174,8 +174,7 @@ async fn handle_runner_request(
                 .context("serve connection on test component's outgoing dir")?
                 .collect::<()>();
 
-            let mut request_stream =
-                controller.into_stream().context("server end into request stream")?;
+            let mut request_stream = controller.into_stream();
 
             let request = futures::select! {
                 () = serve_test_suite.fuse() => panic!("service fs closed unexpectedly"),

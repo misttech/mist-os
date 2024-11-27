@@ -358,13 +358,13 @@ mod tests {
         let mut token_requests_1 = match exec.run_until_stalled(&mut allocator_requests.next()) {
             Poll::Ready(Some(Ok(AllocatorRequest::AllocateSharedCollection {
                 payload, ..
-            }))) => payload.token_request.unwrap().into_stream().expect("request into stream"),
+            }))) => payload.token_request.unwrap().into_stream(),
             x => panic!("Expected a shared allocation request, got {:?}", x),
         };
 
         let mut token_requests_2 = match exec.run_until_stalled(&mut token_requests_1.next()) {
             Poll::Ready(Some(Ok(BufferCollectionTokenRequest::Duplicate { payload, .. }))) => {
-                payload.token_request.unwrap().into_stream().expect("duplicate request into stream")
+                payload.token_request.unwrap().into_stream()
             }
             x => panic!("Expected a duplication request, got {:?}", x),
         };
@@ -374,11 +374,7 @@ mod tests {
         {
             Poll::Ready(Some(Ok(AllocatorRequest::BindSharedCollection { payload, .. }))) => (
                 payload.token.unwrap().into_proxy(),
-                payload
-                    .buffer_collection_request
-                    .unwrap()
-                    .into_stream()
-                    .expect("collection request into stream"),
+                payload.buffer_collection_request.unwrap().into_stream(),
             ),
             x => panic!("Expected Bind Shared Collection, got: {:?}", x),
         };

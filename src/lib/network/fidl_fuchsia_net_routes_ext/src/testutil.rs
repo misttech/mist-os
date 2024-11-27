@@ -167,7 +167,7 @@ pub mod admin {
         #[generic_over_ip(I, Ip)]
         struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .scan(false, |responded, item| {
                 let responded = std::mem::replace(responded, true);
@@ -195,7 +195,7 @@ pub mod admin {
                         req => unreachable!("unexpected request: {:?}", req),
                     },
                 );
-                route_set_server_end.into_stream().expect("into stream")
+                route_set_server_end.into_stream()
             })
             .fuse()
             .flatten_unordered(None)
@@ -228,7 +228,7 @@ pub mod admin {
         #[generic_over_ip(I, Ip)]
         struct Out<I: FidlRouteAdminIpExt>(Option<fidl::endpoints::ServerEnd<I::RouteSetMarker>>);
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .map(move |item| {
                 let Out(route_set_server_end) = I::map_ip(
@@ -270,9 +270,7 @@ pub mod admin {
                 );
                 match route_set_server_end {
                     None => futures::stream::empty().left_stream(),
-                    Some(route_set_server_end) => {
-                        route_set_server_end.into_stream().expect("into stream").right_stream()
-                    }
+                    Some(route_set_server_end) => route_set_server_end.into_stream().right_stream(),
                 }
             })
             .fuse()
@@ -285,7 +283,7 @@ pub mod admin {
         server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
         table_id: crate::TableId,
     ) {
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .try_for_each_concurrent(None, |item| async move {
                 let request = I::into_route_table_request(item);
@@ -323,7 +321,7 @@ pub mod admin {
             >::Item,
         );
 
-        let stream = server_end.into_stream().expect("into stream");
+        let stream = server_end.into_stream();
         stream
             .for_each(|item| async move {
                 let request: RouteSetRequest<I> = I::map_ip(

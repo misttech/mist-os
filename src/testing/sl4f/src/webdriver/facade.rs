@@ -188,7 +188,7 @@ impl DevToolsListener {
         listener: ServerEnd<DevToolsPerContextListenerMarker>,
     ) -> Result<(), Error> {
         info!("Chrome context created");
-        let listener_request_stream = listener.into_stream()?;
+        let listener_request_stream = listener.into_stream();
         let port_update_sender = mpsc::UnboundedSender::clone(&self.port_update_sender);
         fasync::Task::spawn(async move {
             let mut per_context_listener = DevToolsPerContextListener::new(port_update_sender);

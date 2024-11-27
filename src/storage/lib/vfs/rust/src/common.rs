@@ -128,16 +128,7 @@ pub async fn extended_attributes_sender(
     iterator: ServerEnd<fio::ExtendedAttributeIteratorMarker>,
     attributes: Vec<Vec<u8>>,
 ) {
-    let mut stream = match iterator.into_stream() {
-        Ok(stream) => stream,
-        Err(error) => {
-            tracing::error!(
-                ?error,
-                "failed to turn extended attributes iterator request into a stream!"
-            );
-            return;
-        }
-    };
+    let mut stream = iterator.into_stream();
 
     let mut chunks = attributes.chunks(fio::MAX_LIST_ATTRIBUTES_CHUNK as usize).peekable();
 

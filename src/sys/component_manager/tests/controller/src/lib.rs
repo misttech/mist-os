@@ -458,7 +458,7 @@ async fn start_with_dict() {
                     let mut task_group = task_group.lock().unwrap();
                     task_group.spawn(async move {
                         let server_end = ServerEnd::<fecho::EchoMarker>::new(channel);
-                        let mut stream = server_end.into_stream().unwrap();
+                        let mut stream = server_end.into_stream();
                         while let Some(fecho::EchoRequest::EchoString { value, responder }) =
                             stream.try_next().await.unwrap()
                         {

@@ -58,7 +58,7 @@ impl Stash {
     #[cfg(test)]
     fn new_mock() -> (Self, fidl_fuchsia_stash::StoreAccessorRequestStream) {
         let (proxy, server_end) = create_proxy::<StoreAccessorMarker>().unwrap();
-        (Stash { proxy: Some(proxy) }, server_end.into_stream().unwrap())
+        (Stash { proxy: Some(proxy) }, server_end.into_stream())
     }
 
     async fn get_value<'a>(&'a self, key: &'a str) -> Option<Box<Value>> {

@@ -26,9 +26,7 @@ pub async fn stop_listener(
     canceler: ServerEnd<fac::RecordCancelerMarker>,
     stop_signal: &AtomicBool,
 ) -> Result<(), Error> {
-    let mut stream = canceler
-        .into_stream()
-        .map_err(|e| anyhow!("Error turning canceler server into stream {}", e))?;
+    let mut stream = canceler.into_stream();
 
     let item = stream.try_next().await;
     stop_signal.store(true, Ordering::SeqCst);

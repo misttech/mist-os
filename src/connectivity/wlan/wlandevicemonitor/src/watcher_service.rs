@@ -62,7 +62,7 @@ impl<P, I> WatcherService<P, I> {
         &self,
         endpoint: ServerEnd<fidl_svc::DeviceWatcherMarker>,
     ) -> Result<(), fidl::Error> {
-        let stream = endpoint.into_stream()?;
+        let stream = endpoint.into_stream();
         let handle = stream.control_handle();
         let mut guard = self.inner.lock();
         let inner = &mut *guard;

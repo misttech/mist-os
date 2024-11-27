@@ -3456,15 +3456,9 @@ mod tests {
                 interface_provisioning_policy: Default::default(),
             },
             ServerEnds {
-                lookup_admin: lookup_admin_server
-                    .into_stream()
-                    .context("error converting lookup_admin server to stream")?,
-                dhcpv4_client_provider: dhcpv4_client_provider_server
-                    .into_stream()
-                    .context("error converting dhcpv4_client_provider server to stream")?,
-                dhcpv6_client_provider: dhcpv6_client_provider_server
-                    .into_stream()
-                    .context("error converting dhcpv6_client_provider server to stream")?,
+                lookup_admin: lookup_admin_server.into_stream(),
+                dhcpv4_client_provider: dhcpv4_client_provider_server.into_stream(),
+                dhcpv6_client_provider: dhcpv6_client_provider_server.into_stream(),
                 route_set_v4_provider: route_set_v4_provider_server,
                 dhcpv4_server: dhcp_server_server_end,
             },
@@ -3574,7 +3568,7 @@ mod tests {
                         }
                     );
 
-                    request.into_stream().context("error converting client server end to stream")?
+                    request.into_stream()
                 }
             };
         assert!(dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should have a watcher");
@@ -3639,8 +3633,7 @@ mod tests {
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
 
-        let mut control_request_stream =
-            control_server_end.into_stream().expect("get control request stream");
+        let mut control_request_stream = control_server_end.into_stream();
 
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
@@ -3793,8 +3786,7 @@ mod tests {
 
         // A future representing the DHCPv4 server. Must be polled while feeding
         // updates to Netcfg.
-        let mut dhcpv4_server_req_stream =
-            dhcpv4_server.into_stream().expect("dhcpv4 request stream");
+        let mut dhcpv4_server_req_stream = dhcpv4_server.into_stream();
         let start_serving_fut = dhcpv4_server_req_stream.next().map(|req| {
             match req.expect("dhcpv4 request stream ended").expect("dhcpv4 request") {
                 fnet_dhcp::Server_Request::StartServing { responder } => {
@@ -3900,7 +3892,7 @@ mod tests {
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
 
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
@@ -3981,7 +3973,7 @@ mod tests {
                 } => {
                     assert_eq!(interface_id, INTERFACE_ID.get());
                     assert_eq!(params, dhcpv4::new_client_params());
-                    request.into_stream().expect("error converting client server end to stream")
+                    request.into_stream()
                 }
                 fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                     unreachable!("only called at startup")
@@ -4212,7 +4204,7 @@ mod tests {
             None,
             interface::ProvisioningAction::Local,
         );
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
         let (new_host_result, ()) =
             futures::join!(new_host_fut, expect_get_interface_auth(&mut control));
 
@@ -4259,7 +4251,7 @@ mod tests {
             } => {
                 assert_eq!(interface_id, INTERFACE_ID.get());
                 assert_eq!(params, dhcpv4::new_client_params());
-                request.into_stream().expect("error converting client server end to stream")
+                request.into_stream()
             }
             fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
                 unreachable!("only called at startup")
@@ -4362,7 +4354,7 @@ mod tests {
             None,
             interface::ProvisioningAction::Local,
         );
-        let mut control = control_server_end.into_stream().expect("control request stream");
+        let mut control = control_server_end.into_stream();
         let (new_host_result, ()) =
             futures::join!(new_host_fut, expect_get_interface_auth(&mut control));
         assert_matches::assert_matches!(
@@ -4496,8 +4488,7 @@ mod tests {
         let (control, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
-        let mut control_request_stream =
-            control_server_end.into_stream().expect("get control request stream");
+        let mut control_request_stream = control_server_end.into_stream();
         let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
@@ -4816,8 +4807,7 @@ mod tests {
                         DISALLOWED_UPSTREAM_DEVICE_CLASS
                     };
 
-                    let mut control_request_stream =
-                        control_server_end.into_stream().expect("get control request stream");
+                    let mut control_request_stream = control_server_end.into_stream();
 
                     let (new_host_result, ()) = futures::join!(
                         InterfaceState::new_host(
@@ -4963,8 +4953,7 @@ mod tests {
                          request,
                          control_handle: _,
                      }| async move {
-                        let mut new_stream =
-                            request.into_stream().expect("fuchsia.net.dhcpv6/Client into_stream");
+                        let mut new_stream = request.into_stream();
                         // NetCfg always keeps the server hydrated with a pending hanging-get.
                         expect_watch_prefixes(&mut new_stream).await;
                         (interface_id, config, new_stream)
@@ -5236,8 +5225,7 @@ mod tests {
             } else {
                 DISALLOWED_UPSTREAM_DEVICE_CLASS
             };
-            let mut control_request_stream =
-                control_server_end.into_stream().expect("get control request stream");
+            let mut control_request_stream = control_server_end.into_stream();
 
             let (new_host_result, ()) = futures::join!(
                 InterfaceState::new_host(

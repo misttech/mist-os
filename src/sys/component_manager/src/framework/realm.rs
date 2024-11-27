@@ -54,7 +54,7 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         drop(model);
         let weak = WeakComponentInstance::new(&component);
         drop(component);
-        let serve_result = self.serve(weak, server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(weak, server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -184,7 +184,7 @@ impl RealmCapabilityProvider {
             Some(child) => {
                 child.nonblocking_task_group().spawn(framework::controller::run_controller(
                     child.as_weak(),
-                    controller.into_stream().unwrap(),
+                    controller.into_stream(),
                 ));
             }
             None => {
@@ -309,7 +309,7 @@ impl RealmCapabilityProvider {
                 cmp::Ordering::Greater
             }
         });
-        let stream = iter.into_stream().map_err(|_| fcomponent::Error::AccessDenied)?;
+        let stream = iter.into_stream();
         fasync::Task::spawn(async move {
             if let Err(error) = Self::serve_child_iterator(children, stream, batch_size).await {
                 // TODO: Set an epitaph to indicate this was an unexpected error.

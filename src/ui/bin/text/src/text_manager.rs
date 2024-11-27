@@ -72,13 +72,7 @@ impl TextManager {
         let client_proxy = client.into_proxy();
         let ime = LegacyIme::new(keyboard_type, action, initial_state, client_proxy, self.clone());
         let mut state = self.state.lock().await;
-        let editor_stream = match editor.into_stream() {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!("Failed to create stream: {}", e);
-                return;
-            }
-        };
+        let editor_stream = editor.into_stream();
         state.active_ime = Some(ime.downgrade());
         ime.bind_ime(editor_stream);
     }

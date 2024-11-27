@@ -129,13 +129,8 @@ impl InputDevice {
                 .next()
                 .await
                 .unwrap_or_else(|| panic!("stream ended without a call to GetInputReportsReader"));
-            InputReportsReader {
-                request_stream: reader_server_end.into_stream().unwrap_or_else(|e| {
-                    panic!("failed to convert ServerEnd<InputReportsReader>: {e}")
-                }),
-                report_receiver,
-            }
-            .into_future()
+            InputReportsReader { request_stream: reader_server_end.into_stream(), report_receiver }
+                .into_future()
         };
         pin_mut!(input_reports_reader_fut);
 

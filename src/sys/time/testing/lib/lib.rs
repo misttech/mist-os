@@ -367,10 +367,7 @@ impl PushSourcePuppetInner {
     fn serve_client(&mut self, server_end: ServerEnd<PushSourceMarker>) {
         let push_source_clone = Arc::clone(&self.push_source);
         self.tasks.push(fasync::Task::spawn(async move {
-            push_source_clone
-                .handle_requests_for_stream(server_end.into_stream().unwrap())
-                .await
-                .unwrap();
+            push_source_clone.handle_requests_for_stream(server_end.into_stream()).await.unwrap();
         }));
     }
 

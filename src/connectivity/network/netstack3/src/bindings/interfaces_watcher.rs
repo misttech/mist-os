@@ -60,7 +60,7 @@ pub(crate) async fn serve(
                 watcher,
                 control_handle: _,
             } = req;
-            let watcher = watcher.into_stream()?;
+            let watcher = watcher.into_stream();
             sink.add_watcher(
                 watcher,
                 WatcherOptions {

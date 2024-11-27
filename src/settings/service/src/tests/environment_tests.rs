@@ -190,7 +190,7 @@ async fn migration_error_does_not_cause_early_exit() {
             match request.unwrap() {
                 fidl_fuchsia_stash::StoreRequest::Identify { .. } => {}
                 fidl_fuchsia_stash::StoreRequest::CreateAccessor { accessor_request, .. } => {
-                    let mut stream = accessor_request.into_stream().unwrap();
+                    let mut stream = accessor_request.into_stream();
                     fasync::Task::local(async move {
                         if let Some(r) = stream.next().await {
                             panic!("unexpected call to store before migration id checked: {r:?}");

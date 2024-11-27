@@ -203,13 +203,8 @@ impl InputDevice {
                 .await
                 .ok_or_else(|| format_err!("stream ended without a call to GetInputReportsReader"))?
                 .context("handling InputDeviceRequest")?;
-            InputReportsReader {
-                request_stream: reader_server_end
-                    .into_stream()
-                    .context("converting ServerEnd<InputReportsReader>")?,
-                report_receiver,
-            }
-            .into_future()
+            InputReportsReader { request_stream: reader_server_end.into_stream(), report_receiver }
+                .into_future()
         };
         pin_mut!(input_reports_reader_fut);
 

@@ -385,7 +385,7 @@ pub async fn create_component_from_stream(
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let request_stream = controller.into_stream()?;
+                let request_stream = controller.into_stream();
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
                 let container = create_container(&mut config, sender, structured_config)

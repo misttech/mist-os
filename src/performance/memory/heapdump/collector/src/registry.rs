@@ -120,7 +120,7 @@ impl Registry {
                 }
                 fheapdump_client::CollectorRequest::ListStoredSnapshots { payload, .. } => {
                     let mut iterator =
-                        payload.iterator.context("missing required iterator")?.into_stream()?;
+                        payload.iterator.context("missing required iterator")?.into_stream();
                     let process_selector = payload.process_selector.as_ref();
 
                     let filter: Result<Box<dyn Fn(Koid, &str) -> bool>, _> = match process_selector

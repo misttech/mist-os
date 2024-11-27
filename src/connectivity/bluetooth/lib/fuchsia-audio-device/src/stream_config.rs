@@ -344,7 +344,7 @@ impl SoftStreamConfig {
             }
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, control_handle: _ } => {
                 let pcm = format.pcm_format.ok_or_else(|| format_err!("No pcm_format included"))?;
-                self.ring_buffer_stream.set(ring_buffer.into_stream()?);
+                self.ring_buffer_stream.set(ring_buffer.into_stream());
                 let current = (pcm.frame_rate, pcm.into(), pcm.number_of_channels.into());
                 self.inspect.record_current_format(&current);
                 self.current_format = Some(current);

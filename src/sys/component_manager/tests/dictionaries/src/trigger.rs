@@ -105,7 +105,7 @@ async fn handle_receiver(mut receiver_stream: fsandbox::ReceiverRequestStream) {
                 task_group.spawn(async move {
                     let server_end =
                         endpoints::ServerEnd::<ftest::TriggerMarker>::new(channel.into());
-                    run_trigger_service("Triggered d", server_end.into_stream().unwrap()).await;
+                    run_trigger_service("Triggered d", server_end.into_stream()).await;
                 });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => {

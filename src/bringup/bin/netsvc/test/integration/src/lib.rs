@@ -189,7 +189,6 @@ where
             fidl_fuchsia_paver::PaverRequest::FindDataSink { data_sink, control_handle: _ } => {
                 data_sink
                     .into_stream()
-                    .expect("failed to get request stream")
                     .for_each(|r| async move {
                         match r.expect("data sink request error") {
                             fidl_fuchsia_paver::DataSinkRequest::WriteAsset {
@@ -228,7 +227,6 @@ where
             } => {
                 boot_manager
                     .into_stream()
-                    .expect("failed to get request stream")
                     .for_each(|r| {
                         match r.expect("boot manager request error") {
                             fidl_fuchsia_paver::BootManagerRequest::QueryActiveConfiguration {
@@ -1425,7 +1423,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
     let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
         match r.expect("connector error") {
             fnetemul_network::DeviceProxy_Request::ServeDevice { req, control_handle: _ } => {
-                let rs = req.into_stream().expect("into request stream");
+                let rs = req.into_stream();
                 rs.for_each(|req| async move {
                     match req.expect("request error") {
                         fidl_fuchsia_hardware_network::DeviceInstanceRequest::GetDevice {
@@ -1437,7 +1435,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
                 .await
             }
             fnetemul_network::DeviceProxy_Request::ServeController { req, control_handle: _ } => {
-                let rs = req.into_stream().expect("into request stream");
+                let rs = req.into_stream();
                 rs.for_each(|req| async move {
                     match req.expect("request error") {
                         fidl_fuchsia_device::ControllerRequest::GetTopologicalPath {

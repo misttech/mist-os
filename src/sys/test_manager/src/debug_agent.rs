@@ -470,8 +470,7 @@ mod test {
     async fn serve_process_info_iterator(
         server_end: fidl::endpoints::ServerEnd<fdbg::ProcessInfoIteratorMarker>,
     ) {
-        let mut request_stream =
-            server_end.into_stream().expect("process info server end into stream");
+        let mut request_stream = server_end.into_stream();
 
         // Expect a request and respond with two process infos.
         let request =

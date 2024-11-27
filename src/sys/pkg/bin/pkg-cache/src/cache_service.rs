@@ -118,13 +118,13 @@ pub(crate) async fn serve(
                     )?;
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     let () =
                         serve_package_index(base_packages.root_package_urls_and_hashes(), stream)
                             .await;
                 }
                 PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     let () =
                         serve_package_index(cache_packages.root_package_urls_and_hashes(), stream)
                             .await;
@@ -288,7 +288,7 @@ async fn get_impl(
     let () = node.record_uint("meta-far-length", meta_far_blob.length);
     let () = node.record_string("gc-protection", format!("{gc_protection:?}"));
 
-    let needed_blobs = needed_blobs.into_stream().map_err(|_| Status::INTERNAL)?;
+    let needed_blobs = needed_blobs.into_stream();
     let pkg: Hash = meta_far_blob.blob_id.into();
 
     let root_dir = match gc_protection {
@@ -587,7 +587,7 @@ async fn handle_get_missing_blobs(
         None => Err(ServeNeededBlobsError::UnexpectedClose("handle_get_missing_blobs")),
     }?;
 
-    let iter_stream = iterator.into_stream().map_err(ServeNeededBlobsError::ReceiveRequest)?;
+    let iter_stream = iterator.into_stream();
 
     // Start serving the iterator in the background and internally move on to the next state. If
     // this foreground task decides to bail out, this spawned task will be dropped which will abort

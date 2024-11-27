@@ -242,7 +242,7 @@ mod tests {
             .context("failed to make EventStream proxy")?;
         Ok((
             EventStream::new(proxy),
-            fuchsia_async::Task::spawn(run_server(events, server.into_stream()?)),
+            fuchsia_async::Task::spawn(run_server(events, server.into_stream())),
         ))
     }
 

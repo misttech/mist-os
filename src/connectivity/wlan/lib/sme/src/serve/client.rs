@@ -193,7 +193,7 @@ async fn connect(
 ) -> Result<(), anyhow::Error> {
     let handle = match txn {
         None => None,
-        Some(txn) => Some(txn.into_stream()?.control_handle()),
+        Some(txn) => Some(txn.into_stream().control_handle()),
     };
     let connect_txn_stream = sme.lock().unwrap().on_connect_command(req);
     serve_connect_txn_stream(handle, connect_txn_stream).await?;

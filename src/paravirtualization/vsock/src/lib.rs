@@ -47,7 +47,7 @@ mod tests {
 
     async fn common_setup() -> Result<(MockDriver, Vsock), anyhow::Error> {
         let (driver_client, driver_server) = endpoints::create_endpoints::<DeviceMarker>();
-        let mut driver_server = driver_server.into_stream()?;
+        let mut driver_server = driver_server.into_stream();
 
         // Vsock::new expects to be able to communication with a running driver instance.
         // As we don't have a driver instance we spin up an asynchronous thread that will
@@ -85,7 +85,7 @@ mod tests {
         let app_client = app_client.into_proxy();
         // Run the client
         fasync::Task::local(
-            Vsock::run_client_connection(service.clone(), app_remote.into_stream()?)
+            Vsock::run_client_connection(service.clone(), app_remote.into_stream())
                 .then(|_| future::ready(())),
         )
         .detach();
@@ -111,7 +111,7 @@ mod tests {
         // Listen on a reasonable value.
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
         assert_eq!(app_client.listen(8000, acceptor_remote).await?, Ok(()));
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         // Validate that we cannot listen twice
         {
@@ -223,7 +223,7 @@ mod tests {
         // Start a listener
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
         assert_eq!(app_client.listen(9000, acceptor_remote).await?, Ok(()));
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         // Perform a transport reset
         drop(server_data_socket_request);

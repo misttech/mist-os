@@ -197,8 +197,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                                 fposix_socket::ProviderRequest::DatagramSocketDeprecated {
                                     domain: _,
@@ -218,8 +217,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                                 fposix_socket::ProviderRequest::DatagramSocket {
                                     domain: _,
@@ -243,12 +241,8 @@ async fn inner_provider_mock(
                                             responder
                                                 .send(Ok(DatagramSocket(client)))
                                                 .expect("could not respond to StreamSocket call");
-                                            run_stream_socket(
-                                                server.into_stream()?,
-                                                mark_1,
-                                                mark_2,
-                                            )
-                                            .await?;
+                                            run_stream_socket(server.into_stream(), mark_1, mark_2)
+                                                .await?;
                                         }
                                         fposix_socket::DatagramSocketProtocol::IcmpEcho => {
                                             let (client, server) = create_endpoints::<
@@ -258,12 +252,8 @@ async fn inner_provider_mock(
                                             responder
                                                 .send(Ok(SynchronousDatagramSocket(client)))
                                                 .expect("could not respond to StreamSocket call");
-                                            run_stream_socket(
-                                                server.into_stream()?,
-                                                mark_1,
-                                                mark_2,
-                                            )
-                                            .await?;
+                                            run_stream_socket(server.into_stream(), mark_1, mark_2)
+                                                .await?;
                                         }
                                     }
                                 }
@@ -298,8 +288,7 @@ async fn inner_provider_mock(
                                     responder
                                         .send(Ok(client))
                                         .expect("could not respond to StreamSocket call");
-                                    run_stream_socket(server.into_stream()?, mark_1, mark_2)
-                                        .await?;
+                                    run_stream_socket(server.into_stream(), mark_1, mark_2).await?;
                                 }
                             }
                             Ok(())

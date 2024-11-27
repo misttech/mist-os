@@ -354,7 +354,7 @@ mod tests {
         status_callback: Option<&'a dyn StatusCallback>,
     ) -> Result<(PayloadStreamProxy, impl Future<Output = Result<(), Error>> + 'a), Error> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<PayloadStreamMarker>();
-        let stream = server_end.into_stream()?;
+        let stream = server_end.into_stream();
 
         // Do not await as we return this Future so that the caller can run the client and server
         // concurrently.

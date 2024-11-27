@@ -343,7 +343,7 @@ mod test_apply_system_update_impl {
         assert_matches!(stream.next().now_or_never(), None);
 
         let mut reboot_stream =
-            update_installer.reboot_controller_server_end.unwrap().unwrap().into_stream().unwrap();
+            update_installer.reboot_controller_server_end.unwrap().unwrap().into_stream();
         assert_matches!(
             reboot_stream.next().await,
             Some(Ok(RebootControllerRequest::Unblock { .. }))
@@ -364,7 +364,7 @@ mod test_apply_system_update_impl {
             _options: Options,
             reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
         ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
-            let mut stream = reboot_controller_server_end.unwrap().into_stream().unwrap();
+            let mut stream = reboot_controller_server_end.unwrap().into_stream();
             // Assert that reboot controller isn't dropped or called.
             assert_matches!(stream.next().now_or_never(), None);
             future::ok(futures::stream::once(future::err(MonitorUpdateAttemptError::FIDL(

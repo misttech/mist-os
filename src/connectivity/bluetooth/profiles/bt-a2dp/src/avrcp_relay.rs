@@ -575,9 +575,7 @@ mod tests {
                 client,
                 responder,
                 ..
-            })) => {
-                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
-            }
+            })) => responder.send(Ok(())).map(|_| client.into_stream()).expect("should have sent"),
             x => panic!("Expected a GetController request, got {:?}", x),
         };
 
@@ -591,9 +589,7 @@ mod tests {
                 client,
                 responder,
                 ..
-            })) => {
-                responder.send(Ok(())).and_then(|_| client.into_stream()).expect("should have sent")
-            }
+            })) => responder.send(Ok(())).map(|_| client.into_stream()).expect("should have sent"),
             x => panic!("Expected a GetBrowseController request, got {:?}", x),
         };
 

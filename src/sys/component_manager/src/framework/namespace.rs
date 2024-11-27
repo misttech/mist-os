@@ -33,7 +33,7 @@ struct NamespaceCapabilityProvider {
 impl InternalCapabilityProvider for NamespaceCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fcomponent::NamespaceMarker>::new(server_end);
-        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -239,7 +239,7 @@ mod tests {
                 loop {
                     let msg = receiver.receive().await.unwrap();
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream();
                     handle_echo_request_stream(response, stream).await;
                 }
             });
@@ -306,7 +306,7 @@ mod tests {
             tasks.spawn(async move {
                 while let Some(msg) = receiver.receive().await {
                     let stream: fecho::EchoRequestStream =
-                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
+                        ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream();
                     handle_echo_request_stream("hello", stream).await;
                 }
             });

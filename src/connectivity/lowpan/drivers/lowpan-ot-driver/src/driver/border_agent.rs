@@ -152,7 +152,7 @@ async fn publish_border_agent_service(
     let publication =
         ServiceInstancePublication { port: Some(port), text: Some(txt), ..Default::default() };
 
-    let publish_responder_future = server.into_stream().unwrap().map_err(Into::into).try_for_each(
+    let publish_responder_future = server.into_stream().map_err(Into::into).try_for_each(
         move |ServiceInstancePublicationResponder_Request::OnPublication {
                   publication_cause,
                   subtype,

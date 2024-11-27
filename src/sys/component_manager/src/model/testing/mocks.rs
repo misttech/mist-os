@@ -471,7 +471,7 @@ impl MockController {
     ) -> MockController {
         MockController {
             messages: messages,
-            request_stream: server_end.into_stream().expect("stream conversion failed"),
+            request_stream: server_end.into_stream(),
             koid: koid,
             stop_resp: stop_response,
             kill_resp: kill_response,

@@ -84,7 +84,7 @@ async fn handler(
         }
         AccessRequest::MakeDiscoverable { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.MakeDiscoverable()");
-            let stream = token.into_stream().unwrap(); // into_stream never fails
+            let stream = token.into_stream(); // into_stream never fails
             let result = hd
                 .set_discoverable()
                 .await
@@ -97,7 +97,7 @@ async fn handler(
         }
         AccessRequest::StartDiscovery { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
-            let stream = token.into_stream().unwrap(); // into_stream never fails
+            let stream = token.into_stream(); // into_stream never fails
             let result = hd.start_discovery().await.map(|discovery_session| {
                 debug!("StartDiscovery: discovery started");
                 let mut wait_for_discovery_end = discovery_session.on_discovery_end();

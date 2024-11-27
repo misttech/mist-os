@@ -579,14 +579,14 @@ mod tests {
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("error creating proxy");
         let iface_manager = FakeIfaceManager::new(client_sme);
         let iface_manager = Arc::new(Mutex::new(iface_manager));
-        (iface_manager, remote.into_stream().expect("failed to create stream"))
+        (iface_manager, remote.into_stream())
     }
 
     /// Creates an SME proxy for tests.
     async fn create_sme_proxy() -> (fidl_sme::ClientSmeProxy, fidl_sme::ClientSmeRequestStream) {
         let (client_sme, remote) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("error creating proxy");
-        (client_sme, remote.into_stream().expect("failed to create stream"))
+        (client_sme, remote.into_stream())
     }
 
     struct MockScanResultConsumer {

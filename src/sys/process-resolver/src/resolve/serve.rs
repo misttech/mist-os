@@ -95,7 +95,7 @@ mod tests {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, dir, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } =
                     stream.next().await.unwrap().unwrap()
@@ -125,7 +125,7 @@ mod tests {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, dir, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } =
                     stream.next().await.unwrap().unwrap()
@@ -155,7 +155,7 @@ mod tests {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fpkg::PackageResolverMarker>().unwrap();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let (package_url, responder) =
                 if let fpkg::PackageResolverRequest::Resolve { package_url, responder, .. } =
                     stream.next().await.unwrap().unwrap()

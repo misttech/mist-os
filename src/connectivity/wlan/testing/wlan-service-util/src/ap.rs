@@ -174,7 +174,7 @@ mod tests {
     fn create_ap_sme_proxy() -> (fidl_sme::ApSmeProxy, ApSmeRequestStream) {
         let (proxy, server) =
             endpoints::create_proxy::<ApSmeMarker>().expect("failed to create sme ap channel");
-        let server = server.into_stream().expect("failed to create ap sme response stream");
+        let server = server.into_stream();
         (proxy, server)
     }
 

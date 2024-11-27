@@ -40,7 +40,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                 RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
                     match create_realm(options).await {
                         Ok(realm) => {
-                            let request_stream = realm_server.into_stream()?;
+                            let request_stream = realm_server.into_stream();
                             task_group.spawn(async move {
                                 realm_proxy::service::serve(realm, request_stream).await.unwrap();
                             });

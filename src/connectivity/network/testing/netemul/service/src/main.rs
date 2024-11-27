@@ -691,7 +691,7 @@ impl vfs::directory::entry::GetEntryInfo for DevfsDevice {
 impl ManagedRealm {
     async fn run_service(self) -> Result {
         let Self { server_end, realm, devfs, capability_from_children } = self;
-        let mut stream = server_end.into_stream().context("failed to acquire request stream")?;
+        let mut stream = server_end.into_stream();
         while let Some(request) = stream.try_next().await.context("FIDL error")? {
             match request {
                 ManagedRealmRequest::GetMoniker { responder } => {

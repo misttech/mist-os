@@ -507,8 +507,7 @@ mod tests {
                             iterator,
                             control_handle: _control_handle,
                         } => {
-                            let mut stream =
-                                iterator.into_stream().expect("list iterator into_stream");
+                            let mut stream = iterator.into_stream();
                             let mut sent = false;
                             while let Some(RepositoryIteratorRequest::Next { responder }) =
                                 stream.try_next().await.expect("next try_next")
@@ -559,7 +558,7 @@ mod tests {
                             let rules = Arc::clone(&rules);
 
                             Task::local(async move {
-                                let mut stream = transaction.into_stream().unwrap();
+                                let mut stream = transaction.into_stream();
                                 while let Some(request) = stream.next().await {
                                     let request = request.unwrap();
                                     match request {
@@ -568,7 +567,7 @@ mod tests {
                                             iterator,
                                             control_handle: _,
                                         } => {
-                                            let mut stream = iterator.into_stream().unwrap();
+                                            let mut stream = iterator.into_stream();
 
                                             let mut rules =
                                                 rules.lock().unwrap().clone().into_iter();
@@ -620,16 +619,14 @@ mod tests {
                             fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
                                 server_channel,
                             )
-                            .into_stream()
-                            .unwrap(),
+                            .into_stream(),
                         );
                         responder.send(Ok(())).expect("Could not send response")
                     }
                     EngineMarker::PROTOCOL_NAME => {
                         engine.spawn(
                             fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                .into_stream()
-                                .unwrap(),
+                                .into_stream(),
                         );
                         responder.send(Ok(())).expect("Could not send response")
                     }

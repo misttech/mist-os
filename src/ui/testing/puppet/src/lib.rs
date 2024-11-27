@@ -115,11 +115,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                         })
                         .expect("failed to respond to PuppetFactoryRequest::Create");
 
-                    run_puppet(
-                        puppet_server.into_stream().expect("failed to bind puppet server endpoint"),
-                        view,
-                    )
-                    .await;
+                    run_puppet(puppet_server.into_stream(), view).await;
                 }
             }
 

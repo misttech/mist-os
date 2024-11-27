@@ -208,7 +208,7 @@ impl<SM: SessionManager> BlockServer<SM> {
                 return Ok(Some(
                     self.session_manager
                         .clone()
-                        .open_session(session.into_stream()?, self.block_size),
+                        .open_session(session.into_stream(), self.block_size),
                 ));
             }
             fvolume::VolumeRequest::GetTypeGuid { responder } => {

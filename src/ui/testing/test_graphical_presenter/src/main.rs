@@ -246,7 +246,7 @@ impl TestGraphicalPresenter {
                 responder.send(Ok(()))?;
 
                 let view_controller_request_stream =
-                    view_controller_request.map(|s| s.into_stream().ok()).flatten();
+                    view_controller_request.map(|s| s.into_stream());
 
                 // If we have a view already, first detach and destroy the viewport.
                 if let Some(_) = self.child_view.take() {

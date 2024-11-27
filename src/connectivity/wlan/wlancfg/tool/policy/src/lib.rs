@@ -964,10 +964,7 @@ mod tests {
             wlan_policy::ClientControllerRequest::ScanForNetworks {
                 iterator,
                 control_handle: _,
-            } => match iterator.into_stream() {
-                Ok(stream) => stream,
-                Err(e) => panic!("could not convert iterator into stream: {}", e),
-            },
+            } => iterator.into_stream(),
             _ => panic!("expecting a ScanForNetworks"),
         }
     }
@@ -1010,10 +1007,7 @@ mod tests {
             wlan_policy::ClientControllerRequest::GetSavedNetworks {
                 iterator,
                 control_handle: _,
-            } => match iterator.into_stream() {
-                Ok(stream) => stream,
-                Err(e) => panic!("could not convert iterator into stream: {}", e),
-            },
+            } => iterator.into_stream(),
             _ => panic!("expecting a ScanForNetworks"),
         }
     }

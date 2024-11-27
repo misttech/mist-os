@@ -134,7 +134,7 @@ pub async fn collect_listener_event(
                 let name = invocation.name.unwrap();
                 ret.push(ListenerEvent::StartTest(name.clone()));
                 loggers.push(std_handles);
-                let mut listener = listener.into_stream()?;
+                let mut listener = listener.into_stream();
                 // We want exhaustive match, and if we add more variants in the future we'd need to
                 // handle the requests in a loop, so allow this lint violation.
                 #[allow(clippy::never_loop)]

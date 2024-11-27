@@ -831,8 +831,7 @@ mod tests {
             _ = connect_fut =>  panic!("connect_fut completed prematurely (characteristics haven't been discovered)"),
             result = expect_connect_fut => result.expect("expect connect failed"),
         };
-        let service_stream =
-            service_server.into_stream().expect("failed to turn server into stream");
+        let service_stream = service_server.into_stream();
         let mut service_mock =
             RemoteServiceMock::from_stream(service_stream, zx::MonotonicDuration::from_seconds(20));
 

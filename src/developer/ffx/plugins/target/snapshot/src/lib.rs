@@ -288,8 +288,7 @@ mod test {
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {
             let data: [u8; 3] = [1, 2, 3];
-            let mut stream =
-                server.into_stream().expect("converting fake file server proxy to stream");
+            let mut stream = server.into_stream();
 
             let mut cc: u32 = 0;
             while let Ok(Some(req)) = stream.try_next().await {

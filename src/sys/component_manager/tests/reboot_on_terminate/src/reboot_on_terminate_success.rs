@@ -21,8 +21,7 @@ async fn main() {
             ))
             .unwrap(),
         )
-        .into_stream()
-        .unwrap();
+        .into_stream();
 
     let Some(req) = lifecycle_request_stream.try_next().await.unwrap() else {
         panic!("lifecycle request stream closed before stop was called");

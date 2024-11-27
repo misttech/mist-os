@@ -202,7 +202,7 @@ async fn handle_receiver(
         match request {
             fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                 let server_end = endpoints::ServerEnd::<fecho::EchoMarker>::new(channel.into());
-                let stream = server_end.into_stream().unwrap();
+                let stream = server_end.into_stream();
                 futures.push(fasync::Task::spawn(run_echo_service(stream)));
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => unimplemented!(),

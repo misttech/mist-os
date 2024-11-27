@@ -152,8 +152,7 @@ mod tests {
         mut specs: Vec<fdf::CompositeInfo>,
         iterator: ServerEnd<fdd::CompositeNodeSpecIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {

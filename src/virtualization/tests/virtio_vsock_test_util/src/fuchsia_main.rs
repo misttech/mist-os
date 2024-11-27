@@ -68,9 +68,9 @@ async fn main() -> Result<(), Error> {
     vsock.listen(8002, acceptor_client2).await?.map_err(zx::Status::from_raw)?;
     let (acceptor_client3, acceptor3) = endpoints::create_endpoints::<AcceptorMarker>();
     vsock.listen(8003, acceptor_client3).await?.map_err(zx::Status::from_raw)?;
-    let mut acceptor = acceptor.into_stream()?;
-    let mut acceptor2 = acceptor2.into_stream()?;
-    let mut acceptor3 = acceptor3.into_stream()?;
+    let mut acceptor = acceptor.into_stream();
+    let mut acceptor2 = acceptor2.into_stream();
+    let mut acceptor3 = acceptor3.into_stream();
 
     let (mut data_stream, client_end, con) = make_con()?;
     let _port = vsock.connect(2, 8000, con).await?.map_err(zx::Status::from_raw)?;

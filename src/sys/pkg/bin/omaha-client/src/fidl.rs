@@ -1088,7 +1088,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [
@@ -1199,7 +1199,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [
@@ -1221,7 +1221,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::Service));
 
-        let events = next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let events = next_n_on_state_events(monitor.into_stream(), 2).await;
         assert_eq!(
             events,
             [

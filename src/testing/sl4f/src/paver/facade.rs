@@ -359,7 +359,7 @@ mod tests {
             self.push(move |req| match req {
                 PaverRequest::FindBootManager { boot_manager, .. } => {
                     if let Some(mock) = mock {
-                        let stream = boot_manager.into_stream().unwrap();
+                        let stream = boot_manager.into_stream();
                         fuchsia_async::Task::spawn(async move {
                             mock.build(stream).await;
                         })
@@ -375,7 +375,7 @@ mod tests {
         fn expect_find_data_sink(self, mock: MockDataSinkBuilder) -> Self {
             self.push(move |req| match req {
                 PaverRequest::FindDataSink { data_sink, .. } => {
-                    let stream = data_sink.into_stream().unwrap();
+                    let stream = data_sink.into_stream();
                     fuchsia_async::Task::spawn(async move {
                         mock.build(stream).await;
                     })

@@ -50,12 +50,9 @@ async fn run_virtio_input(
     );
 
     let mut input_handler: Box<dyn InputHandler> = match input_type {
-        InputType::Keyboard(keyboard_listener) => Box::new(KeyboardDevice::new(
-            input_device,
-            keyboard_listener
-                .into_stream()
-                .context("Failed to create stream from KeyboardListener server end")?,
-        )),
+        InputType::Keyboard(keyboard_listener) => {
+            Box::new(KeyboardDevice::new(input_device, keyboard_listener.into_stream()))
+        }
         InputType::Mouse(mouse_source) => {
             Box::new(MouseDevice::new(input_device, mouse_source.into_proxy()))
         }

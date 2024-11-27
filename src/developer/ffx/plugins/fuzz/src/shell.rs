@@ -808,7 +808,7 @@ mod test_fixtures {
     }
 
     async fn serve_rcs(server_end: ServerEnd<rcs::RemoteControlMarker>, test: Test) -> Result<()> {
-        let mut stream = server_end.into_stream()?;
+        let mut stream = server_end.into_stream();
         let mut task = None;
         while let Some(request) = stream.next().await {
             match request {

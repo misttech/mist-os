@@ -23,7 +23,7 @@ pub async fn get_client_controller(
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::ClientStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;
-    let update_stream = update_server_end.into_stream()?;
+    let update_stream = update_server_end.into_stream();
 
     Ok((client_controller, update_stream))
 }
@@ -40,7 +40,7 @@ pub fn get_ap_controller() -> Result<
     let (update_client_end, update_server_end) =
         create_endpoints::<wlan_policy::AccessPointStateUpdatesMarker>();
     let () = policy_provider.get_controller(server_end, update_client_end)?;
-    let update_stream = update_server_end.into_stream()?;
+    let update_stream = update_server_end.into_stream();
 
     Ok((ap_controller, update_stream))
 }
@@ -50,7 +50,7 @@ pub fn get_listener_stream() -> Result<wlan_policy::ClientStateUpdatesRequestStr
     let listener = connect_to_protocol::<wlan_policy::ClientListenerMarker>()?;
     let (client_end, server_end) = create_endpoints::<wlan_policy::ClientStateUpdatesMarker>();
     listener.get_listener(client_end)?;
-    let server_stream = server_end.into_stream()?;
+    let server_stream = server_end.into_stream();
     Ok(server_stream)
 }
 
@@ -60,7 +60,7 @@ pub fn get_ap_listener_stream() -> Result<wlan_policy::AccessPointStateUpdatesRe
     let listener = connect_to_protocol::<wlan_policy::AccessPointListenerMarker>()?;
     let (client_end, server_end) = create_endpoints::<wlan_policy::AccessPointStateUpdatesMarker>();
     listener.get_listener(client_end)?;
-    let server_stream = server_end.into_stream()?;
+    let server_stream = server_end.into_stream();
     Ok(server_stream)
 }
 

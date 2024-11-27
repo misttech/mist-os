@@ -2238,9 +2238,9 @@ mod tests {
 
         let ServerEnds { routes_state, routes_set_provider, route_table_provider } = server_ends;
 
-        let state_stream = routes_state.into_stream().expect("into stream").boxed_local();
+        let state_stream = routes_state.into_stream().boxed_local();
 
-        let interfaces_request_stream = interfaces.into_stream().expect("into stream");
+        let interfaces_request_stream = interfaces.into_stream();
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -2263,7 +2263,7 @@ mod tests {
                             options: _,
                             watcher,
                             control_handle: _,
-                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream() },
                         fnet_routes::StateV4Request::GetRuleWatcherV4 {
                             options: _,
                             watcher: _,
@@ -2275,7 +2275,7 @@ mod tests {
                             options: _,
                             watcher,
                             control_handle: _,
-                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream() },
                         fnet_routes::StateV6Request::GetRuleWatcherV6 {
                             options: _,
                             watcher: _,
@@ -2327,8 +2327,7 @@ mod tests {
             )
             .map(|item| (MAIN_FIDL_TABLE_ID, item));
 
-        let route_table_provider_request_stream =
-            route_table_provider.into_stream().expect("into stream should succeed");
+        let route_table_provider_request_stream = route_table_provider.into_stream();
 
         let table_id = AtomicU32::new(OTHER_FIDL_TABLE_ID.get());
 
@@ -3193,7 +3192,7 @@ mod tests {
                                 control_handle: _,
                             } => {
                                 pretty_assertions::assert_eq!(id, DEV1 as u64);
-                                Some(control.into_stream().unwrap())
+                                Some(control.into_stream())
                             }
                             req => unreachable!("unexpected interfaces request: {req:?}"),
                         })
@@ -4298,7 +4297,7 @@ mod tests {
                                     control_handle: _,
                                 } => {
                                     pretty_assertions::assert_eq!(id, DEV1 as u64);
-                                    let control = control.into_stream().unwrap();
+                                    let control = control.into_stream();
                                     let control = control.control_handle();
                                     control.shutdown();
                                 }
@@ -4805,10 +4804,8 @@ mod tests {
             .fuse());
 
         let mut watcher_stream = pin!(watcher_stream.fuse());
-        let mut route_table_provider_stream = pin!(route_table_provider_server_end
-            .into_stream()
-            .expect("into stream should succeed")
-            .fuse());
+        let mut route_table_provider_stream =
+            pin!(route_table_provider_server_end.into_stream().fuse());
 
         let mut event_loop = {
             let included_workers = match I::VERSION {
@@ -4895,8 +4892,7 @@ mod tests {
                         route_table_provider_stream.next().await.expect("should not have ended"),
                     )
                     .expect("should not get error");
-                let mut route_table_stream =
-                    server_end.into_stream().expect("into stream should succeed").boxed().fuse();
+                let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
                 let request = I::into_route_table_request_result(
                     route_table_stream.by_ref().next().await.expect("should not have ended"),
@@ -4918,8 +4914,7 @@ mod tests {
                     RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => route_set,
                     _ => panic!("should be NewRouteSet"),
                 };
-                let mut route_set_stream =
-                    server_end.into_stream().expect("into stream should succeed").boxed().fuse();
+                let mut route_set_stream = server_end.into_stream().boxed().fuse();
 
                 let request = I::into_route_set_request_result(
                     route_set_stream.by_ref().next().await.expect("should not have ended"),

@@ -104,7 +104,7 @@ mod tests {
                 peer_id,
             }))) => {
                 assert_eq!(peer_id, expected_peer.map(Into::into).map(Box::new));
-                (responder, token.into_stream().unwrap())
+                (responder, token.into_stream())
             }
             x => panic!("Expected a ready controller suspend, got {:?}", x),
         }

@@ -666,7 +666,7 @@ mod tests {
 
         // Verify there is an open message for "abc" with `flags_for_abc` on `server_end`.
         let server_end: ServerEnd<fio::DirectoryMarker> = server_end.into();
-        let mut stream = server_end.into_stream().unwrap();
+        let mut stream = server_end.into_stream();
         let request = exec.run_singlethreaded(&mut stream.try_next()).unwrap().unwrap();
         assert_matches!(
             &request,

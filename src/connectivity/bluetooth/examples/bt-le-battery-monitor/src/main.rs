@@ -366,7 +366,7 @@ mod tests {
         let mut gatt_connection_server = match central_result {
             Ok(CentralRequest::Connect { id: received_id, handle, .. }) => {
                 assert_eq!(received_id, id.into());
-                handle.into_stream().expect("valid FIDL server")
+                handle.into_stream()
             }
             x => panic!("Expected Connect got: {x:?}"),
         };
@@ -377,7 +377,7 @@ mod tests {
             run_while(&mut exec, connect_fut, gatt_connect_fut);
         let (gatt_server, _) =
             gatt_connect_result.unwrap().into_request_gatt_client().expect("only request");
-        let mut gatt_server = gatt_server.into_stream().unwrap();
+        let mut gatt_server = gatt_server.into_stream();
 
         // Expect a request to watch GATT services - send back the example service.
         let gatt_fut = gatt_server.select_next_some();
@@ -389,7 +389,7 @@ mod tests {
         let gatt_fut = gatt_server.select_next_some();
         let (gatt_result, connect_fut) = run_while(&mut exec, connect_fut, gatt_fut);
         let (_, remote_service_server, _) = gatt_result.unwrap().into_connect_to_service().unwrap();
-        let mut remote_service_server = remote_service_server.into_stream().unwrap();
+        let mut remote_service_server = remote_service_server.into_stream();
         let discover_fut = remote_service_server.select_next_some();
         let (discover_result, connect_fut) = run_while(&mut exec, connect_fut, discover_fut);
         let responder = discover_result.unwrap().into_discover_characteristics().unwrap();

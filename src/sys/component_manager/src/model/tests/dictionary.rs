@@ -1262,7 +1262,7 @@ async fn dictionary_from_program() {
             match request {
                 fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
                     let channel: ServerEnd<EchoMarker> = channel.into();
-                    task_group.spawn(OutDir::echo_protocol_fn(channel.into_stream().unwrap()));
+                    task_group.spawn(OutDir::echo_protocol_fn(channel.into_stream()));
                 }
                 fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
                     unimplemented!()
@@ -1280,7 +1280,7 @@ async fn dictionary_from_program() {
         vfs::service::endpoint(move |scope, channel| {
             let server_end: ServerEnd<fsandbox::DictionaryRouterMarker> =
                 channel.into_zx_channel().into();
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let store = dict_store2.clone();
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {

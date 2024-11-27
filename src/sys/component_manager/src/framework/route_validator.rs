@@ -538,7 +538,7 @@ struct RouteValidatorCapabilityProvider {
 impl InternalCapabilityProvider for RouteValidatorCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
-        self.serve(server_end.into_stream().unwrap()).await;
+        self.serve(server_end.into_stream()).await;
     }
 }
 

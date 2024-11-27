@@ -262,9 +262,7 @@ impl RealmBuilderFactory {
         let runner_proxy_placeholder = Arc::new(Mutex::new(None));
         let realm_contents = Arc::new(Mutex::new(ManagedRealmContents::default()));
 
-        let realm_stream = realm_server_end
-            .into_stream()
-            .context("Failed to convert `realm_server_end` to stream.")?;
+        let realm_stream = realm_server_end.into_stream();
 
         let realm_has_been_built = Arc::new(AtomicBool::new(false));
 
@@ -286,9 +284,7 @@ impl RealmBuilderFactory {
             }
         });
 
-        let builder_stream = builder_server_end
-            .into_stream()
-            .context("Failed to convert `builder_server_end` to stream.")?;
+        let builder_stream = builder_server_end.into_stream();
 
         let builder = Builder {
             pkg_dir: Clone::clone(&pkg_dir),
@@ -729,9 +725,7 @@ impl Realm {
 
         async move {
             let name: LongName = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
-            let child_realm_stream = child_realm_server_end
-                .into_stream()
-                .map_err(|e| RealmBuilderError::InvalidChildRealmHandle(name.to_string(), e))?;
+            let child_realm_stream = child_realm_server_end.into_stream();
             self_realm_node.add_child(name, options, child_realm_node).await?;
 
             self_execution_scope.spawn(async move {

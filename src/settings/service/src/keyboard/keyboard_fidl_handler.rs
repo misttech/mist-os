@@ -156,8 +156,7 @@ mod tests {
             keymap: Some(fidl_fuchsia_input::KeymapId::FrAzerty),
             ..Default::default()
         });
-        let mut request_stream: KeyboardRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: KeyboardRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -174,8 +173,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
             .expect("should be able to create proxy");
         let _fut = proxy.watch();
-        let mut request_stream: KeyboardRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: KeyboardRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

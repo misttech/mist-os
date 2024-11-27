@@ -52,7 +52,7 @@ mod tests {
     async fn v1653667208_light_migration_teardown_test() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
-        let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
+        let mut request_stream = server_end.into_stream();
         let commit_called = Rc::new(AtomicBool::new(false));
         let task = fasync::Task::local({
             let commit_called = Rc::clone(&commit_called);
@@ -60,8 +60,7 @@ mod tests {
                 let mut tasks = vec![];
                 while let Some(Ok(request)) = request_stream.next().await {
                     if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
-                        let mut request_stream =
-                            accessor_request.into_stream().expect("should be able to get stream");
+                        let mut request_stream = accessor_request.into_stream();
                         tasks.push(fasync::Task::local({
                             let commit_called = Rc::clone(&commit_called);
                             async move {
@@ -109,13 +108,12 @@ mod tests {
     async fn v1653667208_light_migration_teardown_commit_fails() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
-        let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
+        let mut request_stream = server_end.into_stream();
         let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
-                    let mut request_stream =
-                        accessor_request.into_stream().expect("should be able to get stream");
+                    let mut request_stream = accessor_request.into_stream();
                     tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             match request {

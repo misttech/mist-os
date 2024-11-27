@@ -666,7 +666,7 @@ impl StorageAdmin {
         }
 
         const MAX_MONIKERS_RETURNED: usize = 10;
-        let mut iterator_stream = iterator.into_stream()?;
+        let mut iterator_stream = iterator.into_stream();
         // TODO(https://fxbug.dev/42157052): This currently returns monikers with instance ids, even though
         // the ListStorageUsers method takes monikers without instance id as arguments. This is done
         // as the Open and Delete methods take monikers with instance id. Once these are updated,

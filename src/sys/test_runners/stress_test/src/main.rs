@@ -31,7 +31,7 @@ async fn serve_runner(mut stream: fcrunner::ComponentRunnerRequestStream) -> Res
     while let Some(fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. }) =
         stream.try_next().await?
     {
-        let controller_stream = controller.into_stream()?;
+        let controller_stream = controller.into_stream();
         fasync::Task::spawn(
             serve_controller(controller_stream).map(|r| info!("Serving controller: {:?}", r)),
         )
@@ -118,7 +118,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
 }
 
 async fn serve_case_iterator(iterator: ServerEnd<ftest::CaseIteratorMarker>) -> Result<()> {
-    let mut stream = iterator.into_stream()?;
+    let mut stream = iterator.into_stream();
     let cases = &[ftest::Case {
         name: Some("stress_test".to_string()),
         enabled: Some(true),

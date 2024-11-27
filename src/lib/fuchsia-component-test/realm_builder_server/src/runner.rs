@@ -179,7 +179,7 @@ impl Runner {
             }
             ComponentImplementer::Builtin(implementation) => {
                 self.execution_scope.spawn(run_builtin_controller(
-                    controller.into_stream()?,
+                    controller.into_stream(),
                     fasync::Task::local((*implementation)(start_info.outgoing_dir.unwrap())),
                 ));
             }

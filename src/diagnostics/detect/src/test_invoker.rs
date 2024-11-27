@@ -24,11 +24,7 @@ pub(crate) async fn run_test_service(
             DetectControllerRequest::EnterTestMode { test_controller, responder } => {
                 let mut detection_runner = detection_runner.lock().await;
                 let _: Result<_, _> = responder.send();
-                run_test_case_service(
-                    test_controller.into_stream().unwrap(),
-                    &mut *detection_runner,
-                )
-                .await;
+                run_test_case_service(test_controller.into_stream(), &mut *detection_runner).await;
             }
         }
     }
@@ -96,10 +92,7 @@ mod test {
     ) -> DetectControllerProxy {
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<DetectControllerMarker>();
-        scope.spawn(run_test_service(
-            server_end.into_stream().expect("convert to stream"),
-            detection_runner,
-        ));
+        scope.spawn(run_test_service(server_end.into_stream(), detection_runner));
         client_end.into_proxy()
     }
 

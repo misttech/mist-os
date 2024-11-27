@@ -227,7 +227,7 @@ impl Default for MockRealmQuery {
 impl MockRealmQuery {
     /// Serves the `RealmQuery` interface asynchronously and runs until the program terminates.
     pub async fn serve(self: Rc<Self>, object: ServerEnd<fsys2::RealmQueryMarker>) {
-        let mut stream = object.into_stream().unwrap();
+        let mut stream = object.into_stream();
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsys2::RealmQueryRequest::GetInstance { moniker, responder } => {
@@ -256,7 +256,7 @@ impl MockRealmQuery {
                         create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
 
                     fuchsia_async::Task::spawn(async move {
-                        let mut stream = server_end.into_stream().unwrap();
+                        let mut stream = server_end.into_stream();
                         let fsys2::ManifestBytesIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
                         responder.send(manifest.as_slice()).unwrap();
@@ -277,7 +277,7 @@ impl MockRealmQuery {
                         create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
 
                     fuchsia_async::Task::spawn(async move {
-                        let mut stream = server_end.into_stream().unwrap();
+                        let mut stream = server_end.into_stream();
                         let fsys2::ManifestBytesIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
                         responder.send(manifest.as_slice()).unwrap();
@@ -297,7 +297,7 @@ impl MockRealmQuery {
                         create_endpoints::<fsys2::InstanceIteratorMarker>();
 
                     fuchsia_async::Task::spawn(async move {
-                        let mut stream = server_end.into_stream().unwrap();
+                        let mut stream = server_end.into_stream();
                         let fsys2::InstanceIteratorRequest::Next { responder } =
                             stream.next().await.unwrap().unwrap();
                         responder.send(&instances).unwrap();
@@ -352,7 +352,7 @@ impl MockDir {
     }
 
     async fn serve(self: Rc<Self>, object: ServerEnd<fio::DirectoryMarker>) {
-        let mut stream = object.into_stream().unwrap();
+        let mut stream = object.into_stream();
         let _ = stream.control_handle().send_on_open_(
             Status::OK.into_raw(),
             Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {})),
@@ -483,7 +483,7 @@ impl Entry for MockFile {
 }
 
 fn send_error(object: ServerEnd<fio::NodeMarker>, status: Status) {
-    let stream = object.into_stream().expect("failed to create stream");
+    let stream = object.into_stream();
     let control_handle = stream.control_handle();
     let _ = control_handle.send_on_open_(status.into_raw(), None);
     control_handle.shutdown_with_epitaph(status);

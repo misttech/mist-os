@@ -202,7 +202,7 @@ impl<D: Directory + AsRefDirectory + Clone + Send + Sync> ProgramContext<D> {
                         return;
                     }
                 }
-                let mut stream = watcher.into_stream().unwrap();
+                let mut stream = watcher.into_stream();
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
                         RebootMethodsWatcherRequest::OnReboot { reason, responder } => {

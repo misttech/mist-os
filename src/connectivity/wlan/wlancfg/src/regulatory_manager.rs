@@ -124,9 +124,7 @@ mod tests {
             let iface_manager = Arc::new(Mutex::new(iface_manager));
             let regulatory_manager =
                 RegulatoryManager::new(regulatory_region_proxy, iface_manager.clone());
-            let regulatory_region_requests = regulatory_region_server_channel
-                .into_stream()
-                .expect("failed to create RegulatoryRegionWatcher stream");
+            let regulatory_region_requests = regulatory_region_server_channel.into_stream();
 
             let (regulatory_sender, regulatory_receiver) = oneshot::channel();
             Self {

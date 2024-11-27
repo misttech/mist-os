@@ -86,8 +86,7 @@ mod tests {
     {
         let (client_end, server_end) = create_endpoints::<ClientProviderMarker>();
         let client_provider_proxy = client_end.into_proxy();
-        let client_provider_stream =
-            server_end.into_stream().expect("failed to create test request stream");
+        let client_provider_stream = server_end.into_stream();
 
         let test_fut = async {
             for interface_id in 0..10 {

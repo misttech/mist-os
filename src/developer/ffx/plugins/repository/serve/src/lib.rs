@@ -703,13 +703,11 @@ mod test {
                                 fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
                                     server_channel,
                                 )
-                                .into_stream()
-                                .unwrap(),
+                                .into_stream(),
                             ),
                             EngineMarker::PROTOCOL_NAME => engine.spawn(
                                 fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                    .into_stream()
-                                    .unwrap(),
+                                    .into_stream(),
                             ),
                             _ => {
                                 unreachable!();
@@ -753,7 +751,7 @@ mod test {
                     .detach();
                 }
                 TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                    let mut s = remote_control.into_stream().unwrap();
+                    let mut s = remote_control.into_stream();
                     let knock_skip = knock_skip.clone();
                     fasync::Task::local(async move {
                         if let Ok(Some(req)) = s.try_next().await {
@@ -781,8 +779,7 @@ mod test {
                                                 >::new(
                                                     server_channel
                                                 )
-                                                .into_stream()
-                                                .unwrap();
+                                                .into_stream();
                                                 fasync::Task::local(async move {
                                                     while let Some(Ok(_)) = stream.next().await {
                                                         // Do nada, just await the request, this is required for target knocking
@@ -911,7 +908,7 @@ mod test {
                             let events_closure = Arc::clone(&events_closure);
 
                             fasync::Task::local(async move {
-                                let mut stream = transaction.into_stream().unwrap();
+                                let mut stream = transaction.into_stream();
                                 while let Some(request) = stream.next().await {
                                     let request = request.unwrap();
                                     match request {
@@ -929,7 +926,7 @@ mod test {
                                                 .lock()
                                                 .unwrap()
                                                 .push(RewriteEngineEvent::ListDynamic);
-                                            let mut stream = iterator.into_stream().unwrap();
+                                            let mut stream = iterator.into_stream();
 
                                             let mut rules =
                                                 rules.lock().unwrap().clone().into_iter();

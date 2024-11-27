@@ -43,7 +43,7 @@ pub trait FacadeProvider {
 
         // Wrap operation in an async block in order to capture any error.
         let get_facades_fut = async {
-            let mut iterator = iterator.into_stream()?;
+            let mut iterator = iterator.into_stream();
             if let Some(FacadeIteratorRequest::GetNext { responder }) = iterator.try_next().await? {
                 // NOTE: if the list of facade names would exceed the channel buffer size,
                 // they should be split over back-to-back responses to GetNext().

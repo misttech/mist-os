@@ -364,7 +364,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
 
         assert_eq!(
             events,
@@ -415,8 +415,7 @@ mod tests {
 
         assert_matches!(responder.send(), Ok(()));
 
-        let (_, attempt_monitor_events) =
-            next_n_on_state_events(monitor.into_stream().unwrap(), 2).await;
+        let (_, attempt_monitor_events) = next_n_on_state_events(monitor.into_stream(), 2).await;
         let (_, events) = next_n_on_state_events(request_stream, 2).await;
 
         assert_eq!(events, attempt_monitor_events);
@@ -526,7 +525,7 @@ mod tests {
         // When we resume, attempt_monitor should see the on state events
         assert_matches!(unblocker.send(()), Ok(()));
         assert_eq!(
-            collect_all_on_state_events(monitor.into_stream().unwrap()).await,
+            collect_all_on_state_events(monitor.into_stream()).await,
             vec![
                 State::CheckingForUpdates,
                 State::InstallingUpdate(InstallingData {
@@ -587,7 +586,7 @@ mod tests {
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
         assert_matches!(unblocker.send(()), Ok(()));
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![
@@ -642,7 +641,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![
@@ -672,7 +671,7 @@ mod tests {
         assert_matches!(responder.send(), Ok(()));
         assert_matches!(options.initiator, Some(fidl_fuchsia_update::Initiator::User));
 
-        let (_, events) = next_n_on_state_events(monitor.into_stream().unwrap(), 3).await;
+        let (_, events) = next_n_on_state_events(monitor.into_stream(), 3).await;
         assert_eq!(
             events,
             vec![

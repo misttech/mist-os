@@ -109,10 +109,7 @@ mod tests {
         let iface_ref = IfaceRef::new();
         iface_ref.set_if_empty(iface);
 
-        TestValues {
-            iface: iface_ref,
-            sme_stream: server.into_stream().expect("failed to create ClientSmeRequestStream"),
-        }
+        TestValues { iface: iface_ref, sme_stream: server.into_stream() }
     }
 
     #[fuchsia::test]

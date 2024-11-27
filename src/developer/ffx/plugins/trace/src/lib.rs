@@ -908,7 +908,7 @@ mod tests {
                 )))
                 .expect("responder err"),
             ffx::TracingRequest::Status { responder, iterator } => {
-                let mut stream = iterator.into_stream().unwrap();
+                let mut stream = iterator.into_stream();
                 fuchsia_async::Task::local(async move {
                     let ffx::TracingStatusIteratorRequest::GetNext { responder, .. } =
                         stream.try_next().await.unwrap().unwrap();

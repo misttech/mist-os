@@ -55,7 +55,7 @@ impl Service for InputDeviceRegistryService {
 
         let mut manager_stream =
             ServerEnd::<fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker>::new(channel)
-                .into_stream()?;
+                .into_stream();
 
         let listeners_handle = self.listeners.clone();
         let last_event = self.last_sent_event.clone();

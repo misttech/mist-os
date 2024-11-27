@@ -42,7 +42,6 @@ async fn escrow_outgoing_dir_then_stop(user_0: zx::Handle) {
     let lifecycle = ServerEnd::<flifecycle::LifecycleMarker>::from(lifecycle);
     lifecycle
         .into_stream()
-        .unwrap()
         .control_handle()
         .send_on_escrow(flifecycle::LifecycleOnEscrowRequest {
             outgoing_dir: Some(outgoing_dir),

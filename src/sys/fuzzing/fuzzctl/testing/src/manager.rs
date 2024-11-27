@@ -15,7 +15,7 @@ pub async fn serve_manager(
     server_end: ServerEnd<fuzz::ManagerMarker>,
     mut test: Test,
 ) -> Result<()> {
-    let mut stream = server_end.into_stream()?;
+    let mut stream = server_end.into_stream();
     let mut task = None;
     let url = test.url();
     let fake = test.controller();
@@ -25,7 +25,7 @@ pub async fn serve_manager(
         match request {
             fuzz::ManagerRequest::Connect { fuzzer_url, controller, responder } => {
                 test.record(format!("fuchsia.fuzzer/Manager.Connect({})", fuzzer_url));
-                let stream = controller.into_stream()?;
+                let stream = controller.into_stream();
                 {
                     let mut url_mut = url.borrow_mut();
                     *url_mut = Some(fuzzer_url);

@@ -488,7 +488,7 @@ mod test {
                     let events = suite_events
                         .remove(test_url.as_str())
                         .expect("Got a request for an unexpected test URL");
-                    suite_streams.push((controller.into_stream().expect("into stream"), events));
+                    suite_streams.push((controller.into_stream(), events));
                 }
                 ftest_manager::RunBuilderRequest::Build { controller, .. } => {
                     run_controller = Some(controller);
@@ -512,8 +512,7 @@ mod test {
             "Expected a RunController to be present. RunBuilder/Build() may not have been called."
         );
         assert!(suite_events.is_empty(), "Expected AddSuite to be called for all specified suites");
-        let mut run_stream =
-            run_controller.expect("controller present").into_stream().expect("into stream");
+        let mut run_stream = run_controller.expect("controller present").into_stream();
 
         // Each suite just reports that it started and passed.
         let mut suite_streams = suite_streams
@@ -833,7 +832,7 @@ mod test {
             let mut compressor = zstd::bulk::Compressor::new(0).unwrap();
             let bytes = compressor.compress(b"Not a real profile").unwrap();
             let _ = server.write(bytes.as_slice()).unwrap();
-            let mut service = debug_service.into_stream().unwrap();
+            let mut service = debug_service.into_stream();
             let mut data = vec![ftest_manager::DebugData {
                 name: Some("test_file.profraw".to_string()),
                 socket: Some(client.into()),

@@ -79,7 +79,7 @@ async fn start_runner(
                 // Return list of test cases from config
                 let names = names.clone();
                 fasync::Task::local(async move {
-                    start_case_iterator(names, iterator.into_stream().unwrap())
+                    start_case_iterator(names, iterator.into_stream())
                         .await
                         .expect("iterating test cases")
                 })

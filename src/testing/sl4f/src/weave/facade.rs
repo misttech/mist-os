@@ -208,7 +208,7 @@ mod tests {
                         watcher,
                         control_handle: _,
                     })) => {
-                        let mut into_stream = watcher.into_stream().unwrap();
+                        let mut into_stream = watcher.into_stream();
                         for expected in self.expected_pair {
                             expected(into_stream.next().await.unwrap().unwrap());
                         }

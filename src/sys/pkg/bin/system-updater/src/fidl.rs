@@ -114,7 +114,7 @@ impl FidlServer {
                 // If a reboot controller is specified, set up a task that fowards reboot controller
                 // requests to the update attempt task.
                 let reboot_controller = if let Some(server_end) = reboot_controller {
-                    let mut stream = server_end.into_stream()?;
+                    let mut stream = server_end.into_stream();
                     Some(RebootController::spawn(async move {
                         match stream.next().await {
                             None => {

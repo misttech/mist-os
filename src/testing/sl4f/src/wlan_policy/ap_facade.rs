@@ -44,7 +44,7 @@ impl WlanApPolicyFacade {
         let (update_client_end, update_listener) =
             create_endpoints::<AccessPointStateUpdatesMarker>();
         let () = policy_provider.get_controller(server_end, update_client_end)?;
-        let update_stream = update_listener.into_stream()?;
+        let update_stream = update_listener.into_stream();
         Ok(WlanApPolicyFacade { ap_controller, update_listener: Cell::new(Some(update_stream)) })
     }
 
@@ -59,7 +59,7 @@ impl WlanApPolicyFacade {
         let listener = connect_to_protocol::<AccessPointListenerMarker>()?;
         let (client_end, server_end) = create_endpoints::<AccessPointStateUpdatesMarker>();
         listener.get_listener(client_end)?;
-        let mut server_stream = server_end.into_stream()?;
+        let mut server_stream = server_end.into_stream();
 
         match server_stream.try_next().await? {
             Some(update) => {
@@ -172,7 +172,7 @@ impl WlanApPolicyFacade {
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<AccessPointStateUpdatesMarker>();
         listener.get_listener(client_end)?;
-        Ok(server_end.into_stream()?)
+        Ok(server_end.into_stream())
     }
 
     /// This function will set a new listener even if there is one because new listeners will get

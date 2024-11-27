@@ -1613,15 +1613,15 @@ pub(crate) mod testutil {
             unified_request_stream: request_stream,
         };
 
-        let interfaces_request_stream = interfaces.into_stream().unwrap();
-        let if_stream = interfaces_state.into_stream().unwrap();
+        let interfaces_request_stream = interfaces.into_stream();
+        let if_stream = interfaces_state.into_stream();
         let watcher_stream = if_stream
             .and_then(|req| match req {
                 fnet_interfaces::StateRequest::GetWatcher {
                     options: _,
                     watcher,
                     control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
+                } => futures::future::ready(Ok(watcher.into_stream())),
             })
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
@@ -2717,7 +2717,7 @@ mod tests {
                                 control_handle: _,
                             } => {
                                 pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
-                                Some(control.into_stream().unwrap())
+                                Some(control.into_stream())
                             }
                             req => {
                                 handle_get_mac_root_request_or_panic(req);
@@ -3064,7 +3064,7 @@ mod tests {
                                         control_handle: _,
                                     } => {
                                         pretty_assertions::assert_eq!(id, LO_INTERFACE_ID);
-                                        let control = control.into_stream().unwrap();
+                                        let control = control.into_stream();
                                         let control = control.control_handle();
                                         if let Some(reason) = removal_reason {
                                             control.send_on_interface_removed(reason).unwrap()
@@ -3195,7 +3195,7 @@ mod tests {
                             control_handle: _,
                         } => {
                             pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
-                            Some(control.into_stream().unwrap())
+                            Some(control.into_stream())
                         }
                         req => {
                             handle_get_mac_root_request_or_panic(req);
@@ -3277,7 +3277,7 @@ mod tests {
                             ..fnet_interfaces_admin::AddressParameters::default()
                         },
                     );
-                    asp_handler(address_state_provider.into_stream().unwrap())
+                    asp_handler(address_state_provider.into_stream())
                 }
                 req => panic!("unexpected request {req:?}"),
             },

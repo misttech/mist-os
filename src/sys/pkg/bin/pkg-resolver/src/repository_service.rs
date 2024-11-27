@@ -54,7 +54,7 @@ impl RepositoryService {
                     responder.send(response)?;
                 }
                 RepositoryManagerRequest::List { iterator, control_handle: _ } => {
-                    let stream = iterator.into_stream()?;
+                    let stream = iterator.into_stream();
                     self.serve_list(stream).await;
                 }
             }

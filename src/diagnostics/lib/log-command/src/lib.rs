@@ -597,7 +597,7 @@ mod test {
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             // The channel should be closed without sending any requests.
             assert_matches!(request, None);
         }));
@@ -641,7 +641,7 @@ ffx log --force-set-severity.
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
@@ -681,7 +681,7 @@ ffx log --force-set-severity.
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
@@ -721,7 +721,7 @@ ffx log --force-set-severity.
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
-            let request = settings_server.into_stream().unwrap().next().await;
+            let request = settings_server.into_stream().next().await;
             let (selectors, responder) = assert_matches!(
                 request,
                 Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>

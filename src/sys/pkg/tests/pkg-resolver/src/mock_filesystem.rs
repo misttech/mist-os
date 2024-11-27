@@ -64,7 +64,7 @@ fn reopen_self_deprecated(
     flags: fio::OpenFlags,
     open_counts: OpenCounter,
 ) {
-    let stream = node.into_stream().unwrap().cast_stream();
+    let stream = node.into_stream().cast_stream();
     describe_dir(flags, &stream);
     fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
 }

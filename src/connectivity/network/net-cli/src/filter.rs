@@ -1426,7 +1426,7 @@ mod tests {
             let (_options, server_end, _state_control_handle) =
                 req.into_get_watcher().expect("request should be of type GetWatcher");
 
-            let mut watcher_request_stream = server_end.into_stream().expect("watcher FIDL error");
+            let mut watcher_request_stream = server_end.into_stream();
 
             let events = [
                 // controller a, namespace a

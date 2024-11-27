@@ -1528,7 +1528,7 @@ mod tests {
                 }
                 CodecRequest::SignalProcessingConnect { protocol, control_handle } => {
                     if with_signal {
-                        self.signal_stream = Some(protocol.into_stream()?);
+                        self.signal_stream = Some(protocol.into_stream());
                     } else {
                         control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
                     }

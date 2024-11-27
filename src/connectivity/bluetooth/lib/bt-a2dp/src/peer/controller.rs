@@ -16,7 +16,7 @@ use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::peer::Peer;
 
@@ -273,17 +273,13 @@ async fn start_control_service(
                     Some(peer) => peer.clone(),
                 };
                 info!("GetPeer: Creating peer controller for peer with id {}.", peer_id);
-                match handle_to_client.into_stream() {
-                    Err(err) => {
-                        warn!("Error. Unable to create server endpoint from stream: {:?}.", err);
-                    }
-                    Ok(client_stream) => fasync::Task::local(async move {
-                        Controller::process_requests(client_stream, peer, peer_id)
-                            .await
-                            .unwrap_or_else(|e| error!("Requests failed: {:?}", e))
-                    })
-                    .detach(),
-                };
+                let client_stream = handle_to_client.into_stream();
+                fasync::Task::local(async move {
+                    Controller::process_requests(client_stream, peer, peer_id)
+                        .await
+                        .unwrap_or_else(|e| error!("Requests failed: {:?}", e))
+                })
+                .detach();
             }
             PeerManagerRequest::ConnectedPeers { responder } => {
                 let connected_peers: Vec<fidl_fuchsia_bluetooth::PeerId> =

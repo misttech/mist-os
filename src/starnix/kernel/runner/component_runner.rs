@@ -264,7 +264,7 @@ pub async fn start_component(
         },
         None,
     )?;
-    let controller = controller.into_stream()?;
+    let controller = controller.into_stream();
     fasync::Task::local(serve_component_controller(controller, weak_task, task_complete)).detach();
 
     Ok(())

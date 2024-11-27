@@ -1035,8 +1035,7 @@ async fn run_invocations(
                     for event in events {
                         sender_clone.send(event).await.unwrap();
                     }
-                    let listener =
-                        listener.into_stream().context("Cannot convert listener to stream")?;
+                    let listener = listener.into_stream();
                     running_test_cases.lock().await.insert(identifier);
                     let running_test_cases = running_test_cases.clone();
                     let mut sender = sender_clone.clone();

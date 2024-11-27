@@ -141,7 +141,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
     ) {
         if self.should_fail() {
             if path == "." {
-                let stream = object.into_stream().unwrap().cast_stream();
+                let stream = object.into_stream().cast_stream();
                 mock_filesystem::describe_dir(flags, &stream);
                 fasync::Task::spawn(parent.handle_stream(stream)).detach();
             } else {
@@ -265,7 +265,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
         parent: Arc<DirectoryStreamHandler<Self>>,
     ) {
         if path == "." && self.should_fail() {
-            let stream = object.into_stream().unwrap().cast_stream();
+            let stream = object.into_stream().cast_stream();
             mock_filesystem::describe_dir(flags, &stream);
             fasync::Task::spawn(parent.handle_stream(stream)).detach();
             return;
@@ -531,7 +531,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         // Prepare to handle the directory requests. We must call describe_dir, which sends an
         // OnOpen if OPEN_FLAG_DESCRIBE is set. Otherwise, the code will hang when reading from
         // the stream.
-        let mut stream = object.into_stream().unwrap().cast_stream();
+        let mut stream = object.into_stream().cast_stream();
         mock_filesystem::describe_dir(flags, &stream);
         let fail_count = Arc::clone(&self.fail_count);
         let files_to_fail_renames = Clone::clone(&self.files_to_fail_renames);

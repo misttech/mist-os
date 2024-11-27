@@ -75,7 +75,7 @@ fn process_volume_control_stream(
     audio_core_request_sender: Sender<AudioCoreRequest>,
     usages_to_report: Vec<AudioRenderUsage>,
 ) {
-    let mut stream = volume_control.into_stream().expect("volume control stream error");
+    let mut stream = volume_control.into_stream();
     let mut audio_core_request_sender = audio_core_request_sender.clone();
     let usages_to_report = usages_to_report.clone();
     fasync::Task::spawn(async move {

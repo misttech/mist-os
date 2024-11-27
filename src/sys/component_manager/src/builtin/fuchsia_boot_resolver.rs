@@ -272,7 +272,7 @@ impl ComponentResolverCapabilityProvider {
 impl InternalCapabilityProvider for ComponentResolverCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
-        if let Err(error) = self.component_resolver.serve(server_end.into_stream().unwrap()).await {
+        if let Err(error) = self.component_resolver.serve(server_end.into_stream()).await {
             tracing::warn!(%error, "FuchsiaBootResolver::serve failed");
         }
     }

@@ -1070,7 +1070,7 @@ mod tests {
         let (monitor_proxy, monitor_requests) =
             endpoints::create_proxy::<fidl_service::DeviceMonitorMarker>()
                 .expect("failed to create DeviceMonitor proxy");
-        let monitor_stream = monitor_requests.into_stream().expect("failed to create stream");
+        let monitor_stream = monitor_requests.into_stream();
 
         let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("phy_manager");
@@ -1150,7 +1150,7 @@ mod tests {
                 feature_support_server
             }
         );
-        feature_support_server.into_stream().expect("extracting feature support request stream")
+        feature_support_server.into_stream()
     }
 
     /// Serve the given security support for unit testing.
@@ -4398,7 +4398,7 @@ mod tests {
 
         // Next, the disconnect will be requested.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
@@ -4481,7 +4481,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
@@ -4519,7 +4519,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{
@@ -4827,7 +4827,7 @@ mod tests {
 
         // Next, the disconnect will be requested.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Disconnect{
@@ -4880,7 +4880,7 @@ mod tests {
 
         // Expect the stop AP request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let mut sme_stream = sme_server.into_stream().unwrap().into_future();
+        let mut sme_stream = sme_server.into_stream().into_future();
         assert_variant!(
             poll_ap_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ApSmeRequest::Stop{

@@ -52,7 +52,7 @@ impl ProxyServer {
         let app_client = connect_to_protocol::<ConnectorMarker>()?;
 
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
-        let mut acceptor_client = acceptor_client.into_stream()?;
+        let mut acceptor_client = acceptor_client.into_stream();
 
         app_client.listen(port, acceptor_remote).await?.map_err(zx::Status::from_raw)?;
 

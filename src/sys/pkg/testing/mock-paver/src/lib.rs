@@ -756,7 +756,7 @@ impl MockPaverService {
             return Ok(());
         };
 
-        let mut stream = boot_manager.into_stream()?;
+        let mut stream = boot_manager.into_stream();
 
         'req_stream: while let Some(mut request) = stream.try_next().await? {
             self.push_event(PaverEvent::from_boot_manager_request(&request));
@@ -838,7 +838,7 @@ impl MockPaverService {
                     let paver_service_clone = self.clone();
                     fasync::Task::spawn(
                         paver_service_clone
-                            .run_data_sink_service(data_sink.into_stream()?)
+                            .run_data_sink_service(data_sink.into_stream())
                             .unwrap_or_else(|e| panic!("error running data sink service: {e:?}")),
                     )
                     .detach();

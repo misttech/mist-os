@@ -419,9 +419,8 @@ pub fn build_storage_admin_dictionary(
                     "storage admin protocol",
                     Some(component.context.policy().clone()),
                     Arc::new(move |channel, _target| {
-                        let stream = ServerEnd::<fsys::StorageAdminMarker>::new(channel)
-                            .into_stream()
-                            .unwrap();
+                        let stream =
+                            ServerEnd::<fsys::StorageAdminMarker>::new(channel).into_stream();
                         StorageAdmin::new()
                             .serve(storage_decl.clone(), weak_component.clone(), stream)
                             .boxed()

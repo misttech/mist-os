@@ -97,8 +97,7 @@ macro_rules! impl_service_marker {
     };
     ($proto:ty, $svc:ident, stream) => {
         impl_service_marker!($proto, $svc, |server: fidl::endpoints::ServerEnd<Self>| server
-            .into_stream()
-            .unwrap());
+            .into_stream());
     };
     ($proto:ty, $svc:ident, server_end) => {
         impl_service_marker!($proto, $svc, |server: fidl::endpoints::ServerEnd<Self>| server);

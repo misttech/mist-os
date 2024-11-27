@@ -119,7 +119,7 @@ async fn main() -> Result<(), Error> {
                                 fasync::Task::spawn(
                                     async move {
                                         info!("new session to the mock input device");
-                                        let mut stream = session.into_stream()?;
+                                        let mut stream = session.into_stream();
 
                                         while let Some(req) = stream.try_next().await? {
                                             match req {

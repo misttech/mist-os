@@ -189,7 +189,7 @@ mod tests {
                             responder.send(&object.children.iter().cloned().collect::<Vec<_>>())?;
                         }
                         InspectRequest::OpenChild { child_name, child_channel, responder } => {
-                            let stream = child_channel.into_stream()?;
+                            let stream = child_channel.into_stream();
                             if object.children.contains(&child_name) {
                                 spawn_server(stream, child_name);
                                 responder.send(true)?;

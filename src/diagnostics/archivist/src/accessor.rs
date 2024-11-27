@@ -480,7 +480,7 @@ impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
                 result_stream,
                 stream_parameters,
             })) => Some(ArchiveIteratorRequest {
-                iterator: result_stream.into_stream().unwrap().peekable(),
+                iterator: result_stream.into_stream().peekable(),
                 parameters: stream_parameters,
             }),
             _ => None,

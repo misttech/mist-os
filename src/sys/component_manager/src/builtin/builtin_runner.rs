@@ -539,7 +539,7 @@ impl ElfRunnerProgram {
     }
 
     async fn wait_for_shutdown(self, lifecycle: ServerEnd<fprocess_lifecycle::LifecycleMarker>) {
-        let mut stream = lifecycle.into_stream().unwrap();
+        let mut stream = lifecycle.into_stream();
         #[allow(clippy::never_loop)]
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -720,7 +720,7 @@ mod tests {
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
                       _program: Option<Dictionary>| {
                     async move {
-                        let mut stream = lifecycle_server.into_stream().unwrap();
+                        let mut stream = lifecycle_server.into_stream();
                         #[allow(clippy::never_loop)]
                         while let Ok(Some(request)) = stream.try_next().await {
                             match request {

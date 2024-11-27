@@ -125,7 +125,7 @@ mod test {
     fn fake_repo_list_handler(iterator: fidl::endpoints::ServerEnd<RepositoryIteratorMarker>) {
         fuchsia_async::Task::spawn(async move {
             let mut sent = false;
-            let mut iterator = iterator.into_stream().unwrap();
+            let mut iterator = iterator.into_stream();
             while let Some(Ok(req)) = iterator.next().await {
                 match req {
                     RepositoryIteratorRequest::Next { responder } => {

@@ -259,7 +259,7 @@ mod tests {
                             let _ = receiver.await;
                         };
                         let receiver_fut = receiver_fut().fuse();
-                        let controller = controller.into_stream().expect("failed to create stream");
+                        let controller = controller.into_stream();
                         let controller_fut = serve_controller(controller).fuse();
                         pin_mut!(receiver_fut, controller_fut);
                         select! {

@@ -77,7 +77,7 @@ async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
                 payload: ProtocolRequest::Gatt2Server(server), ..
             } => {
                 info!("RequestGatt2Server request");
-                let mut gatt_server = server.into_stream().unwrap();
+                let mut gatt_server = server.into_stream();
                 match gatt_server.next().await {
                     Some(Ok(Server_Request::PublishService { responder, .. })) => {
                         info!("PublishService request");

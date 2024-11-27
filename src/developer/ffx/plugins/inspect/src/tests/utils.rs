@@ -210,7 +210,7 @@ fn handle_remote_control_connect(
     responder.send(Ok(())).unwrap();
     fuchsia_async::Task::local(async move {
         let server_end = ServerEnd::<ArchiveAccessorMarker>::new(service_chan);
-        let mut diagnostics_stream = server_end.into_stream().unwrap();
+        let mut diagnostics_stream = server_end.into_stream();
         while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
             parameters,
             stream,

@@ -793,7 +793,7 @@ mod test {
         let local_node = overnet_core::Router::new(None).unwrap();
 
         fn start_target_task(target_handle: ServerEnd<TargetMarker>) -> Task<()> {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
 
             Task::local(async move {
                 while let Some(request) = stream.try_next().await.unwrap() {
@@ -899,7 +899,7 @@ mod test {
             target_handle: ServerEnd<TargetMarker>,
             errors: Arc<Mutex<Vec<TargetConnectionError>>>,
         ) -> Task<()> {
-            let mut stream = target_handle.into_stream().unwrap();
+            let mut stream = target_handle.into_stream();
 
             let errors = errors.clone();
             Task::local(async move {
@@ -919,7 +919,7 @@ mod test {
                                 continue;
                             }
                             Task::local(async move {
-                                let mut stream = remote_control.into_stream().unwrap();
+                                let mut stream = remote_control.into_stream();
                                 while let Ok(Some(request)) = stream.try_next().await {
                                     eprintln!("Got a request for RCS proxy: {request:?}");
                                 }

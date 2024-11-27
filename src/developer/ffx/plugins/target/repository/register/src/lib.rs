@@ -350,13 +350,13 @@ mod test {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
                 let expected_rule = expected_rule.clone();
                 fuchsia_async::Task::local(async move {
-                    let mut tx_stream = transaction.into_stream().unwrap();
+                    let mut tx_stream = transaction.into_stream();
 
                     while let Some(req) = tx_stream.try_next().await.unwrap() {
                         match req {
                             EditTransactionRequest::ResetAll { control_handle: _ } => (),
                             EditTransactionRequest::ListDynamic { iterator, control_handle: _ } => {
-                                let mut stream = iterator.into_stream().unwrap();
+                                let mut stream = iterator.into_stream();
 
                                 while let Some(req) = stream.try_next().await.unwrap() {
                                     let RuleIteratorRequest::Next { responder } = req;

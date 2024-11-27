@@ -552,9 +552,7 @@ pub(crate) mod tests {
 
         let _ = buffers[0].write(&[0], 0).expect_err("Write should fail");
 
-        let sink_request_stream = stream_sink_request
-            .into_stream()
-            .expect("a sink request stream to be created from the request");
+        let sink_request_stream = stream_sink_request.into_stream();
 
         (sink_request_stream, buffers)
     }
@@ -582,8 +580,7 @@ pub(crate) mod tests {
 
         assert_eq!(session_id, expected_session_id);
 
-        let mut audio_consumer_request_stream =
-            audio_consumer_create_request.into_stream().expect("audio consumer stream");
+        let mut audio_consumer_request_stream = audio_consumer_create_request.into_stream();
 
         let expect_compression = codec_type == MediaCodecType::AUDIO_AAC;
 

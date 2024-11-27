@@ -88,7 +88,7 @@ pub trait SuiteServer: Sized + Sync + Send {
                         // no component object, return, test has ended.
                         break;
                     }
-                    let mut stream = iterator.into_stream().map_err(SuiteServerError::Stream)?;
+                    let mut stream = iterator.into_stream();
                     let tests = self.enumerate_tests(component.unwrap()).await?;
 
                     fasync::Task::spawn(

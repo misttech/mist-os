@@ -295,13 +295,7 @@ async fn serve_fidl_endpoint<
     endpoint: ServerEnd<T>,
     event_handler: impl Fn(C, fidl::endpoints::Request<T>) -> Fut + Copy,
 ) {
-    let stream = match endpoint.into_stream() {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to create a stream from a zircon channel: {}", e);
-            return;
-        }
-    };
+    let stream = endpoint.into_stream();
     const MAX_CONCURRENT_REQUESTS: usize = 1000;
     let handler = &event_handler;
     let r = stream

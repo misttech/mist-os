@@ -474,12 +474,11 @@ impl<T> ServerEnd<T> {
     /// # Panics
     ///
     /// If called outside the context of an active async executor.
-    // TODO(https://fxbug.dev/319159026) this should be infallible
-    pub fn into_stream(self) -> Result<T::RequestStream, Error>
+    pub fn into_stream(self) -> T::RequestStream
     where
         T: ProtocolMarker,
     {
-        Ok(T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner)))
+        T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner))
     }
 
     /// Soft-transition affordance for https://fxbug.dev/319159026.
@@ -488,7 +487,7 @@ impl<T> ServerEnd<T> {
     where
         T: ProtocolMarker,
     {
-        self.into_stream()
+        Ok(self.into_stream())
     }
 
     /// Create a stream of requests and an event-sending handle
@@ -504,7 +503,7 @@ impl<T> ServerEnd<T> {
     where
         T: ProtocolMarker,
     {
-        let stream = self.into_stream()?;
+        let stream = self.into_stream();
         let control_handle = stream.control_handle();
         Ok((stream, control_handle))
     }
@@ -603,7 +602,7 @@ pub fn create_sync_proxy<T: ProtocolMarker>() -> (T::SynchronousProxy, ServerEnd
 pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::RequestStream), Error>
 {
     let (client, server) = create_endpoints();
-    Ok((client, server.into_stream()?))
+    Ok((client, server.into_stream()))
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
@@ -624,7 +623,7 @@ pub fn try_create_request_stream<T: ProtocolMarker>(
 // TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_proxy(), server.into_stream()?))
+    Ok((client.into_proxy(), server.into_stream()))
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
@@ -647,7 +646,7 @@ pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
 pub fn create_sync_proxy_and_stream<T: ProtocolMarker>(
 ) -> Result<(T::SynchronousProxy, T::RequestStream), Error> {
     let (client, server) = create_endpoints::<T>();
-    Ok((client.into_sync_proxy(), server.into_stream()?))
+    Ok((client.into_sync_proxy(), server.into_stream()))
 }
 
 /// The type of a client-initiated method.

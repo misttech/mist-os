@@ -77,7 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let invocation: Invocation = argh::from_env();
     let discovery = client::connect_to_protocol::<DiscoveryMarker>()?;
     let (watcher_client, watcher_server) = create_endpoints();
-    let mut watcher_requests = watcher_server.into_stream()?;
+    let mut watcher_requests = watcher_server.into_stream();
 
     match invocation.command {
         Command::Ls(_) => {

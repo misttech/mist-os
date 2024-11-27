@@ -195,8 +195,7 @@ mod tests {
         mut device_infos: Vec<fdd::NodeInfo>,
         iterator: ServerEnd<fdd::NodeInfoIteratorMarker>,
     ) -> Result<()> {
-        let mut iterator =
-            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        let mut iterator = iterator.into_stream();
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {

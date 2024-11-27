@@ -1012,8 +1012,7 @@ mod tests {
                     let (proxy, server_end) =
                         fidl::endpoints::create_proxy::<fnetemul::ConfigurableNetstackMarker>()
                             .context("create proxy")?;
-                    let stream =
-                        server_end.into_stream().context("server end into request stream")?;
+                    let stream = server_end.into_stream();
                     tx.unbounded_send((name, stream))
                         .expect("request stream receiver should not be closed");
                     Ok(proxy)

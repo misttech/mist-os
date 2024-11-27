@@ -1649,7 +1649,7 @@ mod tests {
                         } => {
                             let read_from_stash = read_from_stash.clone();
                             fuchsia_async::EHandle::local().spawn_detached(async move {
-                                let mut request_stream = accessor_request.into_stream().unwrap();
+                                let mut request_stream = accessor_request.into_stream();
                                 while let Some(request) = request_stream.next().await {
                                     match request.unwrap() {
                                         fidl_stash::StoreAccessorRequest::ListPrefix { .. } => {

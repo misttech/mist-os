@@ -214,7 +214,7 @@ async fn handle_inspect_puppet_request(
         } => {
             let (client_end, server_end) = fidl::endpoints::create_endpoints();
             server.published_inspectors.lock().await.spawn(async move {
-                handle_inspect_writer(server_end.into_stream().unwrap(), name).await.unwrap()
+                handle_inspect_writer(server_end.into_stream(), name).await.unwrap()
             });
 
             responder.send(client_end).expect("response succeeds");
@@ -235,7 +235,7 @@ async fn handle_puppet_request(
         } => {
             let (client_end, server_end) = fidl::endpoints::create_endpoints();
             server.published_inspectors.lock().await.spawn(async move {
-                handle_inspect_writer(server_end.into_stream().unwrap(), name).await.unwrap()
+                handle_inspect_writer(server_end.into_stream(), name).await.unwrap()
             });
 
             responder.send(client_end).expect("response succeeds");

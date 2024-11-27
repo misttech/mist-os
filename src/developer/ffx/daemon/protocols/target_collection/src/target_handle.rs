@@ -33,7 +33,7 @@ impl TargetHandle {
         let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
         let keep_alive = target.keep_alive();
         let inner = TargetHandleInner { target, reboot_controller };
-        let stream = handle.into_stream()?;
+        let stream = handle.into_stream();
         let fut = Box::pin(async move {
             let _ = stream
                 .map_err(|err| anyhow!("{}", err))
@@ -305,7 +305,7 @@ mod tests {
             while let Some(chan) = receiver.next().await {
                 let server_end =
                     fidl::endpoints::ServerEnd::<fidl_rcs::RemoteControlMarker>::new(chan);
-                let mut stream = server_end.into_stream().unwrap();
+                let mut stream = server_end.into_stream();
                 let nodename = nodename.clone();
                 Task::local(async move {
                     let mut knock_channels = Vec::new();

@@ -188,7 +188,7 @@ struct RealmQueryCapabilityProvider {
 impl InternalCapabilityProvider for RealmQueryCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
-        self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
+        self.query.serve(self.scope_moniker, server_end.into_stream()).await;
     }
 }
 
@@ -630,9 +630,8 @@ async fn connect_to_storage_admin(
     };
 
     task_group.spawn(async move {
-        if let Err(error) = storage_admin
-            .serve(storage_decl, instance.as_weak(), server_end.into_stream().unwrap())
-            .await
+        if let Err(error) =
+            storage_admin.serve(storage_decl, instance.as_weak(), server_end.into_stream()).await
         {
             warn!(
                 %moniker, %error, "StorageAdmin created by LifecycleController failed to serve",
@@ -729,7 +728,7 @@ async fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) {
     let mut remaining_instances = &instances[..];
-    let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
+    let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream();
     while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await {
         let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
         let mut instance_count = 0;
@@ -762,7 +761,7 @@ async fn serve_manifest_bytes_iterator(
     server_end: ServerEnd<fsys::ManifestBytesIteratorMarker>,
     mut bytes: Vec<u8>,
 ) {
-    let mut stream: fsys::ManifestBytesIteratorRequestStream = server_end.into_stream().unwrap();
+    let mut stream: fsys::ManifestBytesIteratorRequestStream = server_end.into_stream();
 
     while let Some(Ok(fsys::ManifestBytesIteratorRequest::Next { responder })) = stream.next().await
     {

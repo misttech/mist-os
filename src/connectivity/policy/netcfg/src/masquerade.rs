@@ -694,7 +694,6 @@ pub mod test {
                     let client = client.into_proxy();
                     let server_fut = server
                         .into_stream()
-                        .expect("failed to get request stream")
                         .fold(state, |state, req| {
                             state
                                 .lock()
@@ -714,8 +713,7 @@ pub mod test {
                     >();
                     let client_fut = FilterControl::new(None, Some(control_client.into_proxy()))
                         .map(|result| result.expect("error creating controller"));
-                    let mut control_stream =
-                        control_server.into_stream().expect("failed to get request stream");
+                    let mut control_stream = control_server.into_stream();
                     let control_server_fut = control_stream.next().map(|req| {
                         match req
                             .expect("stream shouldn't close")

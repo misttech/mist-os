@@ -325,7 +325,7 @@ impl BrokerSvc {
                                         });
                                 }
                                 if let Some(element_control) = element_control {
-                                    let element_control_stream = element_control.into_stream()?;
+                                    let element_control_stream = element_control.into_stream();
                                     tracing::debug!(
                                         "Spawning element control task for {:?}",
                                         &element_id
@@ -352,7 +352,7 @@ impl BrokerSvc {
                                 }
                                 if let Some(lessor_channel) = lessor_channel {
                                     tracing::debug!("Spawning lessor task for {:?}", &element_id);
-                                    let lessor_stream = lessor_channel.into_stream()?;
+                                    let lessor_stream = lessor_channel.into_stream();
                                     Task::local({
                                         let svc = self.clone();
                                         let element_id = element_id.clone();
@@ -392,7 +392,7 @@ impl BrokerSvc {
         let required_level_subscriber =
             self.broker.borrow_mut().new_required_level_subscriber(&element_id);
         let mut handler = RequiredLevelHandler::new(element_id.clone());
-        let stream = server_end.into_stream().unwrap();
+        let stream = server_end.into_stream();
         handler.start(stream, required_level_subscriber);
         handler
     }
@@ -403,7 +403,7 @@ impl BrokerSvc {
         server_end: ServerEnd<fpb::CurrentLevelMarker>,
     ) -> Rc<CurrentLevelHandler> {
         let handler = Rc::new(CurrentLevelHandler::new(self.broker.clone(), element_id));
-        let stream = server_end.into_stream().unwrap();
+        let stream = server_end.into_stream();
         handler.clone().start(stream);
         handler
     }
@@ -416,7 +416,7 @@ impl BrokerSvc {
         let current_level_subscriber =
             self.broker.borrow_mut().new_current_level_subscriber(&element_id);
         let mut handler = StatusChannelHandler::new(element_id.clone());
-        let stream = server_end.into_stream()?;
+        let stream = server_end.into_stream();
         handler.start(stream, current_level_subscriber);
         self.element_handlers
             .borrow_mut()

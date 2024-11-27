@@ -611,7 +611,7 @@ mod tests {
 
         let (vmm_side, device_side) = fidl::endpoints::create_endpoints::<VirtioDeviceMarker>();
         let vmm_side = vmm_side.into_proxy();
-        let mut device_side = device_side.into_stream()?;
+        let mut device_side = device_side.into_stream();
 
         let device_fut = config_builder_from_stream(builder, &mut device_side, &(0..=1), &mem);
 
@@ -636,7 +636,7 @@ mod tests {
 
         let (vmm_side, device_side) = fidl::endpoints::create_endpoints::<VirtioDeviceMarker>();
         let vmm_side = vmm_side.into_proxy();
-        let mut device_side = device_side.into_stream()?;
+        let mut device_side = device_side.into_stream();
 
         let device_fut = config_builder_from_stream(builder, &mut device_side, &(0..=1), &mem)
             .map_ok(|(device, responder)| {

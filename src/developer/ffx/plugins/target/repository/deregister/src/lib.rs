@@ -241,7 +241,7 @@ mod test {
     fn fake_repo_list_handler(iterator: fidl::endpoints::ServerEnd<RepositoryIteratorMarker>) {
         fuchsia_async::Task::spawn(async move {
             let mut sent = false;
-            let mut iterator = iterator.into_stream().unwrap();
+            let mut iterator = iterator.into_stream();
             while let Some(Ok(req)) = iterator.next().await {
                 match req {
                     RepositoryIteratorRequest::Next { responder } => {
@@ -356,13 +356,13 @@ mod test {
         transaction: ServerEnd<fidl_fuchsia_pkg_rewrite::EditTransactionMarker>,
     ) {
         fuchsia_async::Task::spawn(async move {
-            let mut tx_stream = transaction.into_stream().unwrap();
+            let mut tx_stream = transaction.into_stream();
 
             while let Some(Ok(req)) = tx_stream.next().await {
                 match req {
                     EditTransactionRequest::ResetAll { control_handle: _ } => {}
                     EditTransactionRequest::ListDynamic { iterator, control_handle: _ } => {
-                        let mut stream = iterator.into_stream().unwrap();
+                        let mut stream = iterator.into_stream();
 
                         let mut rules = vec![
                             rule!("fuchsia.com" => "example.com", "/" => "/"),

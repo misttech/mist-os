@@ -511,7 +511,7 @@ pub(crate) mod test {
                              Some(Ok(HostRequest::StartDiscovery { payload, .. })) => {
                                  assert!(!self.host_info.read().discovering);
                                  self.host_info.write().discovering = true;
-                                 self.discovery_stream.set(payload.token.unwrap().into_stream().unwrap());
+                                 self.discovery_stream.set(payload.token.unwrap().into_stream());
                              }
                              Some(Ok(HostRequest::WatchState { responder })) => {
                                  assert_matches::assert_matches!(
@@ -523,11 +523,11 @@ pub(crate) mod test {
                              }
                              Some(Ok(HostRequest::SetPeerWatcher {peer_watcher, ..})) => {
                                 assert!(!self.peer_watcher_stream.is_some());
-                                self.peer_watcher_stream.set(peer_watcher.into_stream().unwrap());
+                                self.peer_watcher_stream.set(peer_watcher.into_stream());
                              }
                              Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
                                 assert!(!self.bonding_delegate_stream.is_some());
-                                self.bonding_delegate_stream.set(delegate.into_stream().unwrap());
+                                self.bonding_delegate_stream.set(delegate.into_stream());
                              }
                              None => {
                                  return Ok(());

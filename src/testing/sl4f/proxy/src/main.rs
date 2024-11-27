@@ -77,7 +77,7 @@ impl TcpProxyControl {
         proxy_port: u16,
         tcp_proxy_token: ServerEnd<TcpProxy_Marker>,
     ) -> Result<u16, Error> {
-        let mut tcp_proxy_stream = tcp_proxy_token.into_stream()?;
+        let mut tcp_proxy_stream = tcp_proxy_token.into_stream();
         let mut proxy_handles_lock = self.proxy_handles.lock().await;
 
         if let Some(proxy_handle) = proxy_handles_lock.get(&target_port) {

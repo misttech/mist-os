@@ -180,7 +180,7 @@ impl DiscoveryProxy {
             bail!("Unable to subscribe to {:?}({:?}): {:?}", name, name_local_domain, err);
         }
 
-        let stream = server.into_stream().unwrap();
+        let stream = server.into_stream();
 
         let update_sender_clone = update_sender.clone();
         let name_srp_domain_copy = name_srp_domain.clone();
@@ -306,7 +306,7 @@ impl DiscoveryProxy {
             bail!("Unable to subscribe to {:?}({:?}): {:?}", service_name, name_local_domain, err);
         }
 
-        let stream = server.into_stream().unwrap();
+        let stream = server.into_stream();
 
         let update_sender_clone = update_sender.clone();
         let future = stream

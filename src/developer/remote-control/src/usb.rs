@@ -51,16 +51,7 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                                 break;
                             }
 
-                            let callback = match callback.into_stream() {
-                                Ok(callback) => callback,
-                                Err(error) => {
-                                    tracing::warn!(
-                                        error = ?error,
-                                        "Could not establish request stream USB driver"
-                                    );
-                                    return;
-                                }
-                            };
+                            let callback = callback.into_stream();
 
                             let router = router.clone();
                             callback

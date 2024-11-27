@@ -252,8 +252,7 @@ mod test {
 
         routing_manager.add_forwarding_route(&GROUP_DEST_ADDR1).await;
 
-        let mut req_stream =
-            multicast_routing_server_end.into_stream().expect("Convert to request stream");
+        let mut req_stream = multicast_routing_server_end.into_stream();
 
         let responder = assert_matches!(
             req_stream.try_next().await.context("error running multicast_routing_server"),
@@ -326,8 +325,7 @@ mod test {
         // add_route
         routing_manager.add_forwarding_route(&GROUP_DEST_ADDR1).await;
 
-        let mut req_stream =
-            multicast_routing_server_end.into_stream().expect("Convert to request stream");
+        let mut req_stream = multicast_routing_server_end.into_stream();
 
         let responder = assert_matches!(
             req_stream.try_next().await.context("error running multicast_routing_server"),

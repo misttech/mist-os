@@ -81,8 +81,7 @@ async fn test_delete_on_startup() {
         .await
         .expect("FIDL error on create_fullmac")
         .expect("TestController returned an error on create fullmac");
-    let mut fullmac_bridge_stream =
-        fullmac_bridge_server.into_stream().expect("Could not create stream");
+    let mut fullmac_bridge_stream = fullmac_bridge_server.into_stream();
     let config = FullmacDriverConfig { ..Default::default() };
 
     let delete_fut = realm.testcontroller_proxy().delete_fullmac(fullmac_id);

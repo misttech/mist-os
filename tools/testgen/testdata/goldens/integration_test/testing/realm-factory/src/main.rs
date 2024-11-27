@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl_test_examplecomponent::*,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-};
+use anyhow::{Error, Result};
+use fidl_test_examplecomponent::*;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -33,7 +31,7 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
         match request {
             RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
                 let realm = create_realm(options).await?;
-                let request_stream = realm_server.into_stream()?;
+                let request_stream = realm_server.into_stream();
                 task_group.spawn(async move {
                     realm_proxy::service::serve(realm, request_stream).await.unwrap();
                 });

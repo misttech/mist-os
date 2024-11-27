@@ -74,7 +74,7 @@ pub async fn handle_suite_requests(
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
                 debug!("enumerating test cases");
-                let stream = iterator.into_stream()?;
+                let stream = iterator.into_stream();
 
                 let test_cases = match test_type {
                     TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
@@ -342,7 +342,6 @@ mod tests {
                 ..
             }) => match listener
                 .into_stream()
-                .expect("Failed to get case listener stream")
                 .try_next()
                 .await
                 .expect("Failed to get case listener stream request")

@@ -35,7 +35,7 @@ pub async fn serve_cache(
     cache: Arc<LibraryLoaderCache>,
     server_end: ServerEnd<LibraryLoaderCacheMarker>,
 ) -> Result<(), anyhow::Error> {
-    let mut stream = server_end.into_stream()?;
+    let mut stream = server_end.into_stream();
     while let Some(event) = stream.try_next().await? {
         match event {
             ftestrunner::LibraryLoaderCacheRequest::Serve { loader, .. } => {
@@ -74,7 +74,7 @@ fn serve_lib_loader(
 ) -> fasync::Task<()> {
     fasync::Task::spawn(
         async move {
-            let mut stream = loader.into_stream()?;
+            let mut stream = loader.into_stream();
             let (mut search_dirs, mut current_response_map) = match lib_loader_cache.upgrade() {
                 Some(obj) => (
                     vec![obj.lib_proxy.clone()],

@@ -218,7 +218,7 @@ mod tests {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
         fasync::Task::spawn(async move {
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             let request = stream.next().await.unwrap().unwrap();
             let (moniker, responder) = match request {
                 fsys::RealmQueryRequest::Open { moniker, responder, .. } => (moniker, responder),

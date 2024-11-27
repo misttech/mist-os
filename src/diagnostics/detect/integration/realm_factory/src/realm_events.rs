@@ -53,10 +53,7 @@ impl TriageDetectEventSender {
 
 impl From<ServerEnd<TriageDetectEventsMarker>> for TriageDetectEventSender {
     fn from(value: ServerEnd<TriageDetectEventsMarker>) -> Self {
-        let control_handle = value
-            .into_stream()
-            .expect("convert ServerEnd<TriageDetectEventsMarker> into stream")
-            .control_handle();
+        let control_handle = value.into_stream().control_handle();
         Self::new(control_handle)
     }
 }

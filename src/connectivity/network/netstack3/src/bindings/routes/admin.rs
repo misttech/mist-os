@@ -101,7 +101,7 @@ pub(crate) async fn serve_route_table_provider_v4(
                         break;
                     }
                 };
-                let stream = provider.into_stream()?;
+                let stream = provider.into_stream();
                 spawner.spawn(serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(
                     stream,
                     spawner.clone(),
@@ -136,7 +136,7 @@ pub(crate) async fn serve_route_table_provider_v6(
                         break;
                     }
                 };
-                let stream = provider.into_stream()?;
+                let stream = provider.into_stream();
                 spawner.spawn(serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(
                     stream,
                     spawner.clone(),
@@ -171,7 +171,7 @@ async fn serve_route_table_inner<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt, R
     while let Some(request) = stream.try_next().await? {
         match I::into_route_table_request(request) {
             RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
-                let set_request_stream = route_set.into_stream()?;
+                let set_request_stream = route_set.into_stream();
                 route_table.serve_user_route_set(spawner.clone(), set_request_stream);
             }
             RouteTableRequest::GetTableId { responder } => {

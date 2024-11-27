@@ -427,7 +427,7 @@ where
 
         fasync::Task::spawn(
             async move {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 while let Some(request) = stream.try_next().await? {
                     match request {
                         fonts_exp::ListTypefacesIteratorRequest::GetNext { responder } => {

@@ -943,7 +943,7 @@ async fn create_child_with_dict() {
                 return;
             };
             let server_end = ServerEnd::<echo::EchoMarker>::new(message.channel);
-            let stream: echo::EchoRequestStream = server_end.into_stream().unwrap();
+            let stream: echo::EchoRequestStream = server_end.into_stream();
             tasks.spawn(async move {
                 EchoProtocol::serve(stream).await.expect("failed to serve Echo");
             });
@@ -3815,7 +3815,7 @@ fn capability_requested_protocol_on_delivery_readable() {
         // Reply to the echo call to test connectivity.
         let server_end: ServerEnd<echo::EchoMarker> = server_end.into();
         TestExecutor::poll_until_stalled(Box::pin(OutDir::echo_protocol_fn(
-            server_end.into_stream().unwrap(),
+            server_end.into_stream(),
         )))
         .await
         .expect_pending("Server should not finish");

@@ -175,7 +175,7 @@ impl DaemonProtocolProvider for FakeDaemon {
         if let Some(rcs_handler) = self.rcs_handler.clone() {
             let (client, server) = fidl::endpoints::create_endpoints::<rcs::RemoteControlMarker>();
             fuchsia_async::Task::local(async move {
-                let mut server = server.into_stream().unwrap();
+                let mut server = server.into_stream();
 
                 while let Some(Ok(e)) = server.next().await {
                     rcs_handler(e, target_identifier.clone());

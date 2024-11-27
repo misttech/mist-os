@@ -352,7 +352,7 @@ mod tests {
     async fn test_socket_provider(channel: fidl::Channel) {
         println!("Spawning test provider");
         let channel = fidl::endpoints::ServerEnd::<fsock::ProviderMarker>::from(channel);
-        let mut stream = channel.into_stream().unwrap();
+        let mut stream = channel.into_stream();
 
         while let Some(Ok(request)) = stream.next().await {
             match request {
@@ -383,7 +383,7 @@ mod tests {
             assert_eq!(target_identifier, Some("dummy_target".to_owned()));
 
             fuchsia_async::Task::local(async move {
-                let mut server = server.into_stream().unwrap();
+                let mut server = server.into_stream();
                 while let Some(request) = server.next().await {
                     match request.unwrap() {
                         rcs::RemoteControlRequest::DeprecatedOpenCapability {
@@ -446,7 +446,7 @@ mod tests {
         let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>();
 
         fuchsia_async::Task::local(async move {
-            let mut server = server.into_stream().unwrap();
+            let mut server = server.into_stream();
             while let Some(request) = server.next().await {
                 let request = request.unwrap();
                 forward.handle(&context, request).await.unwrap();
@@ -469,7 +469,7 @@ mod tests {
         let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>();
 
         fuchsia_async::Task::local(async move {
-            let mut server = server.into_stream().unwrap();
+            let mut server = server.into_stream();
             while let Some(request) = server.next().await {
                 let request = request.unwrap();
                 forward.handle(&context, request).await.unwrap();

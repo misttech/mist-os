@@ -36,7 +36,7 @@ pub async fn create_proxy<F: FidlProtocol + 'static>(
     let svc = f.clone();
     svc.borrow_mut().start(&cx).await.unwrap();
     let task = Task::local(async move {
-        let stream = server.into_stream().unwrap();
+        let stream = server.into_stream();
         svc.borrow().serve(&cx, stream).await.unwrap();
         svc.borrow_mut().stop(&cx).await.unwrap();
     });

@@ -103,12 +103,8 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
                 device_control,
                 control_handle: _,
             } => futures::future::ready(Some(fasync::Task::spawn(
-                run_device_control(
-                    ns.clone(),
-                    device,
-                    device_control.into_stream().expect("failed to obtain stream"),
-                )
-                .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
+                run_device_control(ns.clone(), device, device_control.into_stream())
+                    .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
             ))),
         }
     })

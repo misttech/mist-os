@@ -346,8 +346,7 @@ pub(crate) async fn serve_state(
                     request,
                     control_handle: _,
                 } => {
-                    let requests =
-                        request.into_stream().expect("get request stream from server end");
+                    let requests = request.into_stream();
                     serve_watcher(requests, dispatcher).await.unwrap_or_else(|e| {
                         warn!("error serving {}: {e:?}", fnet_filter::WatcherMarker::DEBUG_NAME)
                     });

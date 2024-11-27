@@ -181,8 +181,7 @@ mod tests {
             },
             SHOULD_REBOOT,
         );
-        let mut request_stream: SetupRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: SetupRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -199,8 +198,7 @@ mod tests {
         let (proxy, server) =
             fidl::endpoints::create_proxy::<SetupMarker>().expect("should be able to create proxy");
         let _fut = proxy.watch();
-        let mut request_stream: SetupRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: SetupRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

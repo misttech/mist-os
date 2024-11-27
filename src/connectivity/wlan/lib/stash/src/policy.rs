@@ -584,7 +584,7 @@ mod tests {
                         SecureStoreRequest::CreateAccessor { accessor_request, .. } => {
                             let read_from_stash = read_from_stash.clone();
                             fuchsia_async::Task::spawn(async move {
-                                let mut request_stream = accessor_request.into_stream().unwrap();
+                                let mut request_stream = accessor_request.into_stream();
                                 while let Some(request) = request_stream.next().await {
                                     match request.unwrap() {
                                         StoreAccessorRequest::ListPrefix { .. } => {
@@ -689,7 +689,7 @@ mod tests {
             exec.run_until_stalled(&mut stash_stream.next()),
             Poll::Ready(Some(Ok(SecureStoreRequest::CreateAccessor { accessor_request, .. }))) =>
         {
-            accessor_request.into_stream().unwrap()
+            accessor_request.into_stream()
         });
 
         accessor_req_stream
@@ -706,7 +706,7 @@ mod tests {
         });
         match request.unwrap() {
             StoreAccessorRequest::ListPrefix { it, .. } => {
-                let mut iter = it.into_stream().expect("failed to make iterator into stream");
+                let mut iter = it.into_stream();
                 assert_variant!(
                     exec.run_until_stalled(&mut iter.try_next()),
                     Poll::Ready(Ok(Some(fidl_stash::ListIteratorRequest::GetNext { responder }))) => {

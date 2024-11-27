@@ -65,8 +65,7 @@ pub async fn create_fullmac_driver(
         .expect("FIDL error on create_fullmac")
         .expect("TestController returned an error on create fullmac");
 
-    let mut fullmac_bridge_stream =
-        fullmac_bridge_server.into_stream().expect("Could not create stream");
+    let mut fullmac_bridge_stream = fullmac_bridge_server.into_stream();
 
     // Fullmac MLME queries driver before starting
     let (fullmac_ifc_proxy, generic_sme_proxy) =

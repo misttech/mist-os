@@ -150,13 +150,7 @@ async fn register_touch_screen(
     let device_id = device.device_id;
 
     task_group.spawn(async move {
-        handle_touchscreen_request_stream(
-            device,
-            device_server_end
-                .into_stream()
-                .expect("failed to convert touchscreen device to stream"),
-        )
-        .await;
+        handle_touchscreen_request_stream(device, device_server_end.into_stream()).await;
     });
 
     info!("wait for input-pipeline setup input-reader");
@@ -179,13 +173,7 @@ async fn register_media_button(
     let device_id = device.device_id;
 
     task_group.spawn(async move {
-        handle_media_buttons_device_request_stream(
-            device,
-            device_server_end
-                .into_stream()
-                .expect("failed to convert media buttons device to stream"),
-        )
-        .await;
+        handle_media_buttons_device_request_stream(device, device_server_end.into_stream()).await;
     });
 
     info!("wait for input-pipeline setup input-reader");
@@ -205,11 +193,7 @@ async fn register_keyboard(
     let device_id = device.device_id;
 
     task_group.spawn(async move {
-        handle_keyboard_request_stream(
-            device,
-            device_server_end.into_stream().expect("failed to convert keyboard to stream"),
-        )
-        .await;
+        handle_keyboard_request_stream(device, device_server_end.into_stream()).await;
     });
 
     info!("wait for input-pipeline setup input-reader");
@@ -229,11 +213,7 @@ async fn register_mouse(
     let device_id = device.device_id;
 
     task_group.spawn(async move {
-        handle_mouse_request_stream(
-            device,
-            device_server_end.into_stream().expect("failed to convert media mouse to stream"),
-        )
-        .await;
+        handle_mouse_request_stream(device, device_server_end.into_stream()).await;
     });
 
     info!("wait for input-pipeline setup input-reader");

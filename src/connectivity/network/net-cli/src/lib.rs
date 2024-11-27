@@ -2166,8 +2166,7 @@ mod tests {
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
 
-        let mut control: finterfaces_admin::ControlRequestStream =
-            control.into_stream().expect("control request stream");
+        let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
         let (configuration, responder) = control
             .next()
             .await
@@ -2195,8 +2194,7 @@ mod tests {
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
 
-        let mut control: finterfaces_admin::ControlRequestStream =
-            control.into_stream().expect("control request stream");
+        let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
         let responder = control
             .next()
             .await
@@ -2365,7 +2363,7 @@ mod tests {
                     ) = request.into_get_watcher().expect("request type should be GetWatcher");
 
                     let mut watcher_request_stream: finterfaces::WatcherRequestStream =
-                        server_end.into_stream().expect("watcher FIDL error");
+                        server_end.into_stream();
 
                     for event in interfaces
                         .into_iter()
@@ -2452,8 +2450,7 @@ mod tests {
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
 
-            let mut control: finterfaces_admin::ControlRequestStream =
-                control.into_stream().expect("control request stream");
+            let mut control: finterfaces_admin::ControlRequestStream = control.into_stream();
             let (
                 addr,
                 addr_params,
@@ -2475,9 +2472,8 @@ mod tests {
                 }
             );
 
-            let mut address_state_provider_request_stream = address_state_provider_server_end
-                .into_stream()
-                .expect("address state provider FIDL error");
+            let mut address_state_provider_request_stream =
+                address_state_provider_server_end.into_stream();
             async fn next_request(
                 stream: &mut finterfaces_admin::AddressStateProviderRequestStream,
             ) -> finterfaces_admin::AddressStateProviderRequest {
@@ -2572,7 +2568,7 @@ mod tests {
                 .into_get_admin()
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
-            let mut control = control.into_stream().expect("control request stream");
+            let mut control = control.into_stream();
             let (addr, responder) = control
                 .next()
                 .await
@@ -2624,7 +2620,7 @@ mod tests {
                     .into_get_admin()
                     .expect("get admin request");
                 assert_eq!(id, interface2.nicid);
-                let mut control = control.into_stream().expect("control request stream");
+                let mut control = control.into_stream();
                 let (addr, responder) = control
                     .next()
                     .await
@@ -2727,8 +2723,7 @@ mod tests {
                     .into_get_watcher()
                     .expect("request should be GetWatcher");
             assert_eq!(include_non_assigned_addresses, Some(false));
-            let mut request_stream: finterfaces::WatcherRequestStream =
-                server_end.into_stream().expect("server end into request stream");
+            let mut request_stream: finterfaces::WatcherRequestStream = server_end.into_stream();
             for event in events {
                 request_stream
                     .next()
@@ -2926,7 +2921,7 @@ mac               -
                     options: _,
                     watcher,
                     control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
+                } => futures::future::ready(Ok(watcher.into_stream())),
             })
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
@@ -3402,7 +3397,7 @@ mac               -
                 requested_ifs,
                 bridge_ifs.iter().map(|interface| interface.nicid).collect::<Vec<_>>()
             );
-            let mut bridge_requests = bridge_server_end.into_stream().expect("bridge stream");
+            let mut bridge_requests = bridge_server_end.into_stream();
             let responder = bridge_requests
                 .try_next()
                 .await

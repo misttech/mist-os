@@ -143,7 +143,7 @@ mod tests {
                 while let Some(req) = engine_stream.try_next().await.unwrap() {
                     match req {
                         EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
-                            let mut tx_stream = transaction.into_stream().unwrap();
+                            let mut tx_stream = transaction.into_stream();
 
                             while let Some(req) = tx_stream.try_next().await.unwrap() {
                                 match req {
@@ -155,7 +155,7 @@ mod tests {
                                         control_handle: _,
                                     } => {
                                         events_task.lock().unwrap().push(Event::ListDynamic);
-                                        let mut stream = iterator.into_stream().unwrap();
+                                        let mut stream = iterator.into_stream();
 
                                         let mut rules = vec![
                                             rule!("fuchsia.com" => "example.com", "/" => "/"),

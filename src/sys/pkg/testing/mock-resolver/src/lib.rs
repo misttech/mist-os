@@ -52,7 +52,7 @@ impl TestPackage {
         // asking to resolve the package, but proxy it through our handler so that we can
         // intercept requests for /meta.
         fasync::Task::spawn(handle_package_directory_stream(
-            dir_request.into_stream().unwrap(),
+            dir_request.into_stream(),
             backing_dir_proxy,
         ))
         .detach();

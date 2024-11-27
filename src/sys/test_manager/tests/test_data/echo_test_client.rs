@@ -48,7 +48,7 @@ async fn run_test_suite(mut stream: ftest::SuiteRequestStream) -> Result<(), Err
     while let Some(event) = stream.try_next().await? {
         match event {
             ftest::SuiteRequest::GetTests { iterator, control_handle: _ } => {
-                let mut stream = iterator.into_stream()?;
+                let mut stream = iterator.into_stream();
                 fasync::Task::spawn(
                     async move {
                         let case = ftest::Case {

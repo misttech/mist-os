@@ -520,12 +520,9 @@ impl ElementManager {
         };
 
         let element_controller_stream = match element_controller {
-            Some(controller) => match controller.into_stream() {
-                Ok(stream) => Ok(Some(stream)),
-                Err(_) => Err(felement::ManagerError::InvalidArgs),
-            },
-            None => Ok(None),
-        }?;
+            Some(controller) => Some(controller.into_stream()),
+            None => None,
+        };
 
         let (sender, receiver) = oneshot::channel();
         self.running_elements.lock().unwrap().insert(child_name.to_string(), sender);

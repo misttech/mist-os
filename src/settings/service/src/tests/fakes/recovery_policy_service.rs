@@ -33,7 +33,7 @@ impl Service for RecoveryPolicy {
         }
 
         let mut manager_stream =
-            ServerEnd::<fidl_fuchsia_recovery_policy::DeviceMarker>::new(channel).into_stream()?;
+            ServerEnd::<fidl_fuchsia_recovery_policy::DeviceMarker>::new(channel).into_stream();
 
         let local_reset_allowed_handle = self.is_local_reset_allowed.clone();
 

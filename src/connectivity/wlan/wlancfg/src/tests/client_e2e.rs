@@ -167,8 +167,7 @@ fn test_setup(
     let (monitor_service_proxy, monitor_service_requests) =
         create_proxy::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
             .expect("failed to create SeviceService proxy");
-    let monitor_service_stream =
-        monitor_service_requests.into_stream().expect("failed to create stream");
+    let monitor_service_stream = monitor_service_requests.into_stream();
 
     let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
     let saved_networks = Arc::new(saved_networks);
@@ -224,8 +223,7 @@ fn test_setup(
     let (client_provider_proxy, client_provider_requests) =
         create_proxy::<fidl_policy::ClientProviderMarker>()
             .expect("failed to create ClientProvider proxy");
-    let client_provider_requests =
-        client_provider_requests.into_stream().expect("failed to create stream");
+    let client_provider_requests = client_provider_requests.into_stream();
 
     let (client_update_sender, client_update_receiver) = mpsc::unbounded();
     let (ap_update_sender, _ap_update_receiver) = mpsc::unbounded();
@@ -486,8 +484,7 @@ fn prepare_client_interface(
         }
     );
 
-    let iface_sme_stream =
-        sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+    let iface_sme_stream = sme_server.into_stream();
 
     // There will be another security support query as part of adding the interface to iface_manager
     let feature_support_req = run_while(
@@ -536,7 +533,7 @@ fn prepare_client_interface(
             sme_server
         }
     );
-    let mut sme_stream = sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+    let mut sme_stream = sme_server.into_stream();
 
     // State machine does an initial disconnect
     let sme_req =
@@ -751,8 +748,7 @@ fn save_and_connect(
             sme_server
         }
     );
-    let mut state_machine_sme_stream =
-        sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+    let mut state_machine_sme_stream = sme_server.into_stream();
 
     // State machine does an initial disconnect. Ack.
     let next_sme_req = run_while(
@@ -1426,8 +1422,7 @@ fn test_autoconnect_to_saved_network() {
             sme_server
         }
     );
-    let mut state_machine_sme_stream =
-        sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+    let mut state_machine_sme_stream = sme_server.into_stream();
 
     // State machine does an initial disconnect. Ack.
     let next_sme_req = run_while(
@@ -1654,8 +1649,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 sme_server
             }
         );
-        let mut state_machine_sme_stream =
-            sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+        let mut state_machine_sme_stream = sme_server.into_stream();
 
         // State machine does an initial disconnect. Ack.
         let next_sme_req = run_while(
@@ -1959,7 +1953,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
             sme_server
         }
     );
-    let sme_stream = sme_server.into_stream().expect("failed to create SME stream");
+    let sme_stream = sme_server.into_stream();
 
     // There will be another security support query as part of adding the interface to iface_manager
     let feature_support_req = run_while(
@@ -2105,8 +2099,7 @@ fn reject_connect_requests(
                     },
                 )) => {
                     assert!(responder.send(Ok(())).is_ok());
-                    *state_machine_sme_stream =
-                        Some(sme_server.into_stream().expect("failed to create new SME stream"));
+                    *state_machine_sme_stream = Some(sme_server.into_stream());
                 }
                 other => panic!("Unexpected DeviceMonitor operation: {:?}", other),
             }

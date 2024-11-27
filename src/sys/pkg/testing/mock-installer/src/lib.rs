@@ -128,7 +128,7 @@ impl MockUpdateInstallerService {
                     if let Some(reboot_controller) = reboot_controller {
                         let service = Arc::clone(&self);
                         fasync::Task::spawn(async move {
-                            let mut stream = reboot_controller.into_stream().unwrap();
+                            let mut stream = reboot_controller.into_stream();
 
                             while let Some(request) = stream.try_next().await.unwrap() {
                                 let request = match request {

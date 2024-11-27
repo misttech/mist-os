@@ -7,7 +7,6 @@
 use anyhow::{format_err, Error};
 use async_utils::stream::{StreamItem, StreamWithEpitaph, Tagged, WithEpitaph, WithTag};
 use fidl::endpoints::ClientEnd;
-use fidl::prelude::*;
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fuchsia_bluetooth::profile::Psm;
 use fuchsia_bluetooth::types::PeerId;
@@ -193,21 +192,11 @@ impl MockPiconetServer {
         info!("Received mock peer request for peer {:?}: {:?}", id, request.method_name());
         match request {
             bredr_test::MockPeerRequest::ConnectProxy_ { interface, responder, .. } => {
-                match interface.into_stream() {
-                    Ok(stream) => {
-                        profile_requests.push(stream.tagged(id).with_epitaph(id));
-                        info!(
-                            "Added ProfileRequestStream from MockPeer request for peer: {:?}",
-                            id
-                        );
-                        if let Err(e) = responder.send() {
-                            warn!("Error sending on responder: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Peer {} unable to connect ProfileProxy: {:?}", id, e);
-                        responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                    }
+                let stream = interface.into_stream();
+                profile_requests.push(stream.tagged(id).with_epitaph(id));
+                info!("Added ProfileRequestStream from MockPeer request for peer: {:?}", id);
+                if let Err(e) = responder.send() {
+                    warn!("Error sending on responder: {:?}", e);
                 }
             }
         }
@@ -241,13 +230,7 @@ impl MockPiconetServer {
                     let bredr_test::ProfileTestRequest::RegisterPeer { peer_id, peer, observer, responder, .. } = test_request;
                     let id = peer_id.into();
                     info!("Received ProfileTest request to register peer: {:?}", id);
-                    let request_stream = match peer.into_stream() {
-                        Ok(stream) => stream,
-                        Err(_) => {
-                            responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_HANDLE);
-                            continue;
-                        }
-                    };
+                    let request_stream = peer.into_stream();
                     let registration =
                         self.register_peer(id, observer, profile_stream_sender.clone());
 

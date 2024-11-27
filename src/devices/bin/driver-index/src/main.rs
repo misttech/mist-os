@@ -163,7 +163,7 @@ async fn run_driver_development_server(
                         return Ok(());
                     }
                     let driver_info = Arc::new(Mutex::new(driver_info));
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     fasync::Task::spawn(async move {
                         run_driver_info_iterator_server(driver_info, iterator)
                             .await
@@ -181,7 +181,7 @@ async fn run_driver_development_server(
                         return Ok(());
                     }
                     let specs = Arc::new(Mutex::new(specs));
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     fasync::Task::spawn(async move {
                         run_composite_node_specs_iterator_server(specs, iterator)
                             .await

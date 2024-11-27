@@ -886,7 +886,7 @@ mod test {
     }
 
     async fn fake_debug_data_iterator(iterator: ServerEnd<DebugDataIteratorMarker>) {
-        let mut stream = iterator.into_stream().unwrap();
+        let mut stream = iterator.into_stream();
 
         // we just need to send once sample file and not test full logic as that is tested inside the library.
         let (s1, s2) = fidl::Socket::create_stream();

@@ -235,7 +235,7 @@ impl FakeTestManager {
         let receiver = self.receiver.borrow_mut().take().unwrap();
         receiver
             .for_each_concurrent(MAX_CONCURRENT, |server_end| async {
-                let stream = server_end.into_stream().expect("failed to create stream");
+                let stream = server_end.into_stream();
                 serve_run_builder(stream, Rc::clone(&test_realm))
                     .await
                     .expect("failed to serve run builder");
@@ -282,8 +282,7 @@ async fn serve_run_builder(
             controller,
             control_handle: _,
         })) => {
-            let suite_stream =
-                controller.into_stream().context("invalid suite controller stream")?;
+            let suite_stream = controller.into_stream();
             (test_url, suite_stream)
         }
         _ => unreachable!(),
@@ -291,7 +290,7 @@ async fn serve_run_builder(
 
     let run_stream = match stream.next().await {
         Some(Ok(RunBuilderRequest::Build { controller, control_handle: _ })) => {
-            let run_stream = controller.into_stream().context("invalid run controller stream")?;
+            let run_stream = controller.into_stream();
             run_stream
         }
         _ => unreachable!(),

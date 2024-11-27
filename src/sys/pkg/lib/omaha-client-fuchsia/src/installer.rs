@@ -738,7 +738,7 @@ mod tests {
                         .unwrap();
 
                     let mut reboot_controller_request_stream =
-                        reboot_controller.unwrap().into_stream().unwrap();
+                        reboot_controller.unwrap().into_stream();
                     assert_matches!(
                         reboot_controller_request_stream.next().await.unwrap(),
                         Ok(RebootControllerRequest::Detach { .. })

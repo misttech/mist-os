@@ -218,7 +218,6 @@ impl ExpectationsComparer {
                                     CaseStart { invocation, std_handles },
                                     listener
                                         .into_stream()
-                                        .context("error getting CaseListener request stream")?
                                         .map_ok(
                                             |fidl_fuchsia_test::CaseListenerRequest::Finished {
                                                  result,

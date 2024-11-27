@@ -57,7 +57,7 @@ impl ProcessV1 {
             process,
             allocations_vmo,
             resources_vmo: Arc::new(resources_vmo),
-            snapshot_stream: Mutex::new(snapshot_sink.into_stream()?),
+            snapshot_stream: Mutex::new(snapshot_sink.into_stream()),
             snapshot_storage,
         })
     }

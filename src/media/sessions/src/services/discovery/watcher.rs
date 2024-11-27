@@ -118,7 +118,7 @@ mod test {
     async fn back_pressure_when_acks_behind() -> Result<()> {
         let (watcher_client, watcher_server) = create_endpoints::<SessionsWatcherMarker>();
         let mut under_test: FlowControlledProxySink = watcher_client.into_proxy().into();
-        let mut watcher_requests = watcher_server.into_stream()?;
+        let mut watcher_requests = watcher_server.into_stream();
 
         let mut ctx = noop_context();
         let ready_when_empty = Pin::new(&mut under_test).poll_ready(&mut ctx);

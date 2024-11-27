@@ -410,9 +410,7 @@ enum AspServerEnd {
 impl AspServerEnd {
     fn into_stream(self) -> fnet_interfaces_admin::AddressStateProviderRequestStream {
         match self {
-            AspServerEnd::ServerEnd(server_end) => {
-                server_end.into_stream().expect("into_stream should succeed")
-            }
+            AspServerEnd::ServerEnd(server_end) => server_end.into_stream(),
             AspServerEnd::Stream(stream) => stream,
         }
     }
@@ -581,7 +579,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
 
     // The client should fail to renew and have the lease expire, causing it to
     // remove the address.
-    let request_stream = address_state_provider.into_stream().expect("should succeed");
+    let request_stream = address_state_provider.into_stream();
     let mut request_stream = pin!(request_stream);
 
     let control_handle = assert_matches!(
@@ -683,7 +681,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
         .await;
 
     // The client should successfully renew without ever removing the address.
-    let mut request_stream = address_state_provider.into_stream().expect("should succeed");
+    let mut request_stream = address_state_provider.into_stream();
 
     {
         let request_stream = &mut request_stream;

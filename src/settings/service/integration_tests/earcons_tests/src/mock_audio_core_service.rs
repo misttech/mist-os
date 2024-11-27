@@ -28,8 +28,7 @@ pub(crate) async fn audio_core_service_mock(
                             volume_control,
                             control_handle: _,
                         } => {
-                            let mut stream =
-                                volume_control.into_stream().expect("volume control stream error");
+                            let mut stream = volume_control.into_stream();
                             let mut usage_control_bound_sender = usage_control_bound_sender.clone();
                             fasync::Task::spawn(async move {
                                 while let Some(_) = stream.try_next().await.unwrap() {

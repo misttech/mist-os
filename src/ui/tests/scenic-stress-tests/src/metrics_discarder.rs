@@ -35,9 +35,8 @@ async fn handle_metric_event_logger_factory_request_stream(
                 ..
             }) => {
                 // `ok()`: Bad logger channel is fine.
-                logger.into_stream().ok().map(|s| {
-                    fuchsia_async::Task::local(handle_metric_event_logger_client(s)).detach();
-                });
+                let s = logger.into_stream();
+                fuchsia_async::Task::local(handle_metric_event_logger_client(s)).detach();
                 responder.send(Ok(())).ok();
             }
             Ok(MetricEventLoggerFactoryRequest::CreateMetricEventLoggerWithExperiments {
@@ -46,9 +45,8 @@ async fn handle_metric_event_logger_factory_request_stream(
                 ..
             }) => {
                 // `ok()`: Bad logger channel is fine.
-                logger.into_stream().ok().map(|s| {
-                    fuchsia_async::Task::local(handle_metric_event_logger_client(s)).detach();
-                });
+                let s = logger.into_stream();
+                fuchsia_async::Task::local(handle_metric_event_logger_client(s)).detach();
                 responder.send(Ok(())).ok();
             }
             Err(_) => (), // Causing errors on the metrics logger factory is fine

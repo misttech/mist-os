@@ -543,7 +543,7 @@ mod tests {
                         watcher,
                         control_handle: _,
                     } => {
-                        let mut stream = watcher.into_stream().unwrap();
+                        let mut stream = watcher.into_stream();
                         let mut first = true;
                         while let Ok(Some(req)) = stream.try_next().await {
                             match req {

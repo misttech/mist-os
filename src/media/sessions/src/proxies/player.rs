@@ -524,7 +524,7 @@ mod test {
     #[fuchsia::test]
     async fn update_stream_relays_player_state() -> Result<()> {
         let (_inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         let waker = noop_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -573,7 +573,7 @@ mod test {
     #[fuchsia::test]
     async fn update_stream_terminates_on_invalid_delta() -> Result<()> {
         let (_inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         let waker = noop_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -604,7 +604,7 @@ mod test {
     #[fuchsia::test]
     async fn inspect_node() -> Result<()> {
         let (inspector, mut player, player_server) = test_player();
-        let mut requests = player_server.into_stream()?;
+        let mut requests = player_server.into_stream();
 
         assert_data_tree!(inspector, root: {
             test_player: {state: {}},

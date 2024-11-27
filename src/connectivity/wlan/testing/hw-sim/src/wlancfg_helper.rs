@@ -107,8 +107,7 @@ pub async fn start_ap_and_wait_for_confirmation(
 
     // Clear the initial update to ensure that the 'Active' update is received once the AP is
     // started.
-    let mut update_stream =
-        update_server_end.into_stream().expect("could not create update stream");
+    let mut update_stream = update_server_end.into_stream();
     let initial_update = update_stream.next().await.expect("AP update stream failed");
 
     // The initial update is empty since no AP ifaces have been created yet.  All that is required
@@ -172,7 +171,7 @@ pub async fn get_client_controller(
     let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy().unwrap();
     let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints();
     provider.get_controller(controller_server_end, listener_client_end).unwrap();
-    let client_state_update_stream = listener_server_end.into_stream().unwrap();
+    let client_state_update_stream = listener_server_end.into_stream();
 
     (controller_client_end, client_state_update_stream)
 }

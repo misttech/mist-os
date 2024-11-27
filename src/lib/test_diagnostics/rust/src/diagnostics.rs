@@ -147,7 +147,7 @@ mod tests {
             server_end: ServerEnd<BatchIteratorMarker>,
             opts: BatchIteratorOpts,
         ) {
-            let mut request_stream = server_end.into_stream().expect("got stream");
+            let mut request_stream = server_end.into_stream();
             let mut values = vec![1i64, 2, 3].into_iter();
             while let Some(request) = request_stream.try_next().await.expect("get next request") {
                 match request {

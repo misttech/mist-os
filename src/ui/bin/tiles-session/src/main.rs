@@ -431,16 +431,8 @@ fn handle_graphical_presenter_request(
             // "Unwrap" the optional element::AnnotationControllerProxy.
             let annotation_controller = annotation_controller.map(|proxy| proxy.into_proxy());
             // "Unwrap" the optional element::ViewControllerRequestStream.
-            let view_controller_request_stream = match view_controller_request {
-                Some(request_stream) => match request_stream.into_stream() {
-                    Ok(request_stream) => Some(request_stream),
-                    Err(e) => {
-                        warn!("Failed to obtain ViewControllerRequestStream: {}", e);
-                        None
-                    }
-                },
-                None => None,
-            };
+            let view_controller_request_stream =
+                view_controller_request.map(|request_stream| request_stream.into_stream());
             internal_sender
                 .unbounded_send(
                     MessageInternal::GraphicalPresenterPresentView {

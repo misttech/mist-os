@@ -110,8 +110,7 @@ impl TestHelper {
                     responder,
                     ..
                 } => {
-                    let telemetry_stream =
-                        telemetry_server.into_stream().expect("Failed to create telemetry stream");
+                    let telemetry_stream = telemetry_server.into_stream();
                     responder.send(Ok(())).expect("Failed to respond to telemetry request");
                     self.telemetry_svc_stream = Some(telemetry_stream);
                     self.exec.run_until_stalled(test_fut)

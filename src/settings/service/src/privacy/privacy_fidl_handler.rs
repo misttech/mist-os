@@ -111,8 +111,7 @@ mod tests {
             .expect("should be able to create proxy");
         let _fut = proxy
             .set(&PrivacySettings { user_data_sharing_consent: Some(true), ..Default::default() });
-        let mut request_stream: PrivacyRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: PrivacyRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await
@@ -129,8 +128,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>()
             .expect("should be able to create proxy");
         let _fut = proxy.watch();
-        let mut request_stream: PrivacyRequestStream =
-            server.into_stream().expect("should be able to convert to stream");
+        let mut request_stream: PrivacyRequestStream = server.into_stream();
         let request = request_stream
             .next()
             .await

@@ -323,8 +323,7 @@ pub mod testing {
                             let mut stream = fidl::endpoints::ServerEnd::<
                                 rcs_fidl::RemoteControlMarker,
                             >::new(server_channel)
-                            .into_stream()
-                            .unwrap();
+                            .into_stream();
                             while let Ok(Some(request)) = stream.try_next().await {
                                 match request {
                                     rcs_fidl::RemoteControlRequest::EchoString {

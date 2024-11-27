@@ -54,39 +54,25 @@ where
                 let peer_id = peer_id.into();
                 info!("Received client request for browse controller for peer {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take client stream: {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // BrowseController can remain connected after PeerManager disconnects.
-                        spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // BrowseController can remain connected after PeerManager disconnects.
+                spawn_browse_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerRequest::GetControllerForTarget { peer_id, client, responder } => {
                 let peer_id = peer_id.into();
                 info!("Received client request for controller for peer {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take client stream: {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // Controller can remain connected after PeerManager disconnects.
-                        spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // Controller can remain connected after PeerManager disconnects.
+                spawn_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerRequest::SetAbsoluteVolumeHandler { handler, responder } => {
                 info!("Received client request to set absolute volume handler");
@@ -151,39 +137,25 @@ where
                 let peer_id: PeerId = peer_id.into();
                 info!("New test connection request for {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take test client stream {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // BrowseControllerExt can remain connected after PeerManager disconnects.
-                        spawn_browse_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // BrowseControllerExt can remain connected after PeerManager disconnects.
+                spawn_browse_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
             PeerManagerExtRequest::GetControllerForTarget { peer_id, client, responder } => {
                 let peer_id: PeerId = peer_id.into();
                 info!("New test connection request for {}", peer_id);
 
-                match client.into_stream() {
-                    Err(err) => {
-                        warn!("Unable to take test client stream {:?}", err);
-                        responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?;
-                    }
-                    Ok(client_stream) => {
-                        let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
-                        sender.try_send(pcr)?;
-                        let controller = response.into_future().await?;
-                        // ControllerExt can remain connected after PeerManager disconnects.
-                        spawn_controller_fn(controller, client_stream).detach();
-                        responder.send(Ok(()))?;
-                    }
-                }
+                let client_stream = client.into_stream();
+                let (response, pcr) = ServiceRequest::new_controller_request(peer_id);
+                sender.try_send(pcr)?;
+                let controller = response.into_future().await?;
+                // ControllerExt can remain connected after PeerManager disconnects.
+                spawn_controller_fn(controller, client_stream).detach();
+                responder.send(Ok(()))?;
             }
         }
     }

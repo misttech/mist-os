@@ -50,12 +50,12 @@ pub async fn handle_request_stream(
             }
             TreeRequest::ListChildNames { tree_iterator, .. } => {
                 let values = inspector.tree_names().await?;
-                let request_stream = tree_iterator.into_stream()?;
+                let request_stream = tree_iterator.into_stream();
                 spawn_tree_name_iterator_server(values, request_stream)
             }
             TreeRequest::OpenChild { child_name, tree, .. } => {
                 if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream()?)
+                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream())
                         .detach()
                 }
             }
@@ -92,7 +92,7 @@ pub fn spawn_tree_server(
     settings: TreeServerSendPreference,
 ) -> Result<(fasync::Task<()>, fidl::endpoints::ClientEnd<TreeMarker>), Error> {
     let (tree, server_end) = fidl::endpoints::create_endpoints::<TreeMarker>();
-    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream()?);
+    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream());
     Ok((task, tree))
 }
 

@@ -784,7 +784,7 @@ mod tests {
             let (launcher_proxy, server_end) = create_proxy::<fproc::LauncherMarker>()?;
             let (sender, receiver) = oneshot::channel();
             fasync::Task::local(async move {
-                let stream = server_end.into_stream().expect("error making stream");
+                let stream = server_end.into_stream();
                 run_launcher_service(stream, sender)
                     .await
                     .expect("error running fake launcher service");

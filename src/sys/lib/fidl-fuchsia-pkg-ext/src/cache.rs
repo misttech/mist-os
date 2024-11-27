@@ -724,8 +724,8 @@ mod tests {
                 })) => {
                     assert_eq!(BlobInfo::from(meta_far_blob), blob_info);
                     assert_eq!(gc_protection, expected_gc_protection);
-                    let needed_blobs = needed_blobs.into_stream().unwrap();
-                    let dir = dir.into_stream().unwrap();
+                    let needed_blobs = needed_blobs.into_stream();
+                    let dir = dir.into_stream();
 
                     PendingGet { stream: needed_blobs, dir, responder }
                 }
@@ -804,7 +804,7 @@ mod tests {
         async fn expect_get_missing_blobs(mut self, response_chunks: Vec<Vec<BlobInfo>>) -> Self {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {
@@ -837,7 +837,7 @@ mod tests {
         ) -> Self {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::GetMissingBlobs { iterator, control_handle: _ })) => {
-                    let mut stream = iterator.into_stream().unwrap();
+                    let mut stream = iterator.into_stream();
 
                     // Respond to each next request with the next chunk.
                     for chunk in response_chunks {

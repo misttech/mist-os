@@ -284,7 +284,7 @@ impl BlockServer {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             VolumeRequest::OpenSession { session, control_handle: _ } => {
-                let stream = session.into_stream()?;
+                let stream = session.into_stream();
                 let () = stream
                     .try_for_each(|request| async {
                         let () = match request {
@@ -413,7 +413,7 @@ impl BlockServer {
         server: fidl::endpoints::ServerEnd<VolumeMarker>,
     ) -> Result<(), Error> {
         server
-            .into_stream()?
+            .into_stream()
             .map_err(|e| e.into())
             .try_for_each_concurrent(None, |request| self.handle_request(request))
             .await?;

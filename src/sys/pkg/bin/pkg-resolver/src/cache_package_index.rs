@@ -75,7 +75,7 @@ mod tests {
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
-                        let iterator = iterator.into_stream().unwrap();
+                        let iterator = iterator.into_stream();
                         self.serve_package_iterator(iterator);
                     }
                     _ => panic!("unexpected PackageCache request: {req:?}"),

@@ -87,7 +87,7 @@ impl DirectoryWithFileCreateOverride {
                     let is_create = flags.intersects(fio::OpenFlags::CREATE);
 
                     if path == "." {
-                        let stream = object.into_stream().unwrap().cast_stream();
+                        let stream = object.into_stream().cast_stream();
                         self.clone().spawn(stream);
                     } else if path == self.target.0 && is_create {
                         let server_end = ServerEnd::<fio::FileMarker>::new(object.into_channel());

@@ -123,8 +123,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 .capability
                                 .ok_or(EventError::MissingField("capability"))?;
                             let request_stream =
-                                ServerEnd::<flogger::LogSinkMarker>::new(capability)
-                                    .into_stream()?;
+                                ServerEnd::<flogger::LogSinkMarker>::new(capability).into_stream();
                             Ok(Event {
                                 timestamp: event.header.timestamp,
                                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
@@ -138,7 +137,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 .ok_or(EventError::MissingField("capability"))?;
                             let request_stream =
                                 ServerEnd::<finspect::InspectSinkMarker>::new(capability)
-                                    .into_stream()?;
+                                    .into_stream();
                             Ok(Event {
                                 timestamp: event.header.timestamp,
                                 payload: EventPayload::InspectSinkRequested(

@@ -1395,7 +1395,7 @@ pub(crate) mod test {
                 })) => {
                     // don't respond at all on the server side.
                     info!("Storing Gatt Server");
-                    let mut gatt_server = server.into_stream().unwrap();
+                    let mut gatt_server = server.into_stream();
                     info!("GAS Server was started, waiting for publish");
                     // The Generic Access Service now publishes itself.
                     match gatt_server.next().await {
@@ -1414,7 +1414,7 @@ pub(crate) mod test {
                 }
                 Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
                     info!("Storing Bonding Delegate");
-                    bonding_delegate = Some(delegate.into_stream().unwrap());
+                    bonding_delegate = Some(delegate.into_stream());
                 }
                 Some(Ok(req)) => info!("Unhandled Host Request in add: {:?}", req),
                 Some(Err(e)) => error!("Error in host server: {:?}", e),

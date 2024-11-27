@@ -169,7 +169,7 @@ mod test {
                 let mut sent = false;
                 match req {
                     RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
-                        let mut iterator = iterator.into_stream().unwrap();
+                        let mut iterator = iterator.into_stream();
                         while let Some(Ok(req)) = iterator.next().await {
                             match req {
                                 RepositoryIteratorRequest::Next { responder } => {

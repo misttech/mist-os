@@ -789,7 +789,7 @@ impl TestCallManager {
         while let Some(CallManagerRequest::PeerConnected { id, handle, responder }) =
             stream.try_next().await?
         {
-            let stream = handle.into_stream()?;
+            let stream = handle.into_stream();
             info!("Handling Peer: {:?}", id);
             {
                 let mut inner = self.inner.lock().await;

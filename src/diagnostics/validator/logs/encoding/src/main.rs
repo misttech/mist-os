@@ -31,7 +31,7 @@ async fn serve_requests(mut stream: EncodingValidatorRequestStream) {
     while let Some(Ok(request)) = stream.next().await {
         match request {
             EncodingValidatorRequest::Validate { results, control_handle: _ } => {
-                let stream = results.into_stream().expect("stream");
+                let stream = results.into_stream();
                 fasync::Task::spawn(async move {
                     serve_results(stream).await;
                 })

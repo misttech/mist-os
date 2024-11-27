@@ -110,7 +110,7 @@ impl WlanPolicyFacade {
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<fidl_policy::ClientStateUpdatesMarker>();
         listener.get_listener(client_end)?;
-        Ok(server_end.into_stream()?)
+        Ok(server_end.into_stream())
     }
 
     /// This function will set a new listener even if there is one because new listeners will get

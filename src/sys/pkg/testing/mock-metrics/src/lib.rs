@@ -70,8 +70,7 @@ impl MockMetricEventLoggerFactory {
                     assert_eq!(project_spec.project_id, Some(self.project_id));
                     let mock_logger = Arc::new(MockMetricEventLogger::new());
                     self.loggers.lock().push(mock_logger.clone());
-                    fasync::Task::spawn(mock_logger.run_logger(logger.into_stream().unwrap()))
-                        .detach();
+                    fasync::Task::spawn(mock_logger.run_logger(logger.into_stream())).detach();
                     let _ = responder.send(Ok(()));
                 }
                 _ => {

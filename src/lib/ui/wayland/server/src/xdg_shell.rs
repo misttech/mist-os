@@ -1153,7 +1153,7 @@ impl XdgToplevel {
         let surface_ref = this.get(client)?.surface_ref;
         let xdg_surface_ref = this.get(client)?.xdg_surface_ref;
         let task_queue = client.task_queue();
-        let mut stream = server_end.into_stream().unwrap();
+        let mut stream = server_end.into_stream();
         let control_handle = stream.control_handle();
         fasync::Task::local(
             async move {

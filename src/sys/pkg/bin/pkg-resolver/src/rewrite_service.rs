@@ -32,18 +32,18 @@ impl RewriteService {
         while let Some(request) = stream.try_next().await? {
             match request {
                 EngineRequest::List { iterator, control_handle: _control_handle } => {
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     self.serve_list(iterator).await;
                 }
                 EngineRequest::ListStatic { iterator, control_handle: _control_handle } => {
-                    let iterator = iterator.into_stream()?;
+                    let iterator = iterator.into_stream();
                     self.serve_list_static(iterator).await;
                 }
                 EngineRequest::StartEditTransaction {
                     transaction,
                     control_handle: _control_handle,
                 } => {
-                    let transaction = transaction.into_stream()?;
+                    let transaction = transaction.into_stream();
                     self.serve_edit_transaction(transaction).await;
                 }
                 EngineRequest::TestApply { url, responder } => {
@@ -99,7 +99,7 @@ impl RewriteService {
                             control_handle: _control_handle,
                         } => {
                             let rules = transaction.list_dynamic().cloned().collect();
-                            let iterator = iterator.into_stream()?;
+                            let iterator = iterator.into_stream();
                             Self::serve_rule_iterator(rules, iterator);
                         }
                         EditTransactionRequest::ResetAll { control_handle: _control_handle } => {

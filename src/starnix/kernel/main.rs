@@ -53,16 +53,14 @@ fn maybe_serve_lifecycle() {
         fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::Lifecycle, 0))
     {
         fasync::Task::local(async move {
-            if let Ok(mut stream) =
+            let mut stream =
                 fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(lifecycle.into())
-                    .into_stream()
-            {
-                if let Ok(Some(request)) = stream.try_next().await {
-                    match request {
-                        flifecycle::LifecycleRequest::Stop { control_handle } => {
-                            control_handle.shutdown();
-                            std::process::exit(0);
-                        }
+                    .into_stream();
+            if let Ok(Some(request)) = stream.try_next().await {
+                match request {
+                    flifecycle::LifecycleRequest::Stop { control_handle } => {
+                        control_handle.shutdown();
+                        std::process::exit(0);
                     }
                 }
             }

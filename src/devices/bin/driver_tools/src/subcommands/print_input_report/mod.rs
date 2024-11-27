@@ -102,7 +102,7 @@ mod tests {
         input_reports: Vec<fir::InputReport>,
         reader: ServerEnd<fir::InputReportsReaderMarker>,
     ) -> Result<()> {
-        let reader = reader.into_stream().context("Failed to convert reader into a stream")?;
+        let reader = reader.into_stream();
         Task::spawn(async move {
             if let Err(e) = reader
                 .map(|result| result.context("Failed input report reader request"))

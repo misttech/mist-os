@@ -184,7 +184,7 @@ pub mod test {
         async fn serve_partition(self) {
             let server_end: ServerEnd<PartitionMarker> =
                 ServerEnd::new(fidl::Channel::from(self.channel));
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             while let Some(req) = stream.try_next().await.unwrap() {
                 match req {
                     PartitionRequest::GetTypeGuid { responder } => {
@@ -200,7 +200,7 @@ pub mod test {
         async fn serve_block(self) {
             let server_end: ServerEnd<BlockMarker> =
                 ServerEnd::new(fidl::Channel::from(self.channel));
-            let mut stream = server_end.into_stream().unwrap();
+            let mut stream = server_end.into_stream();
             if let Ok(Some(_)) = stream.try_next().await {
                 panic!("Did not expect to get any requests!");
             }
