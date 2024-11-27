@@ -227,6 +227,7 @@ build_api_module("api") {
     ":product_bundles",
     ":product_size_checker_output",
     ":rbe_config",
+    ":rules_fuchsia_info",
     ":rust_target_mapping",
     ":sdk_archives",
     ":test_components",
@@ -357,6 +358,34 @@ build_api_module("bazel_sdk_info") {
   testonly = true
   data_keys = [ "bazel_sdk_info" ]
   deps = [ "//sdk:final_fuchsia_sdk" ]
+}
+
+# Describes the location where the Bazel rules are.
+#
+# Type: list(scope)
+#
+#  location
+#    Required: Directory where the rules are located
+#    Type: string
+#
+#
+build_api_module("rules_fuchsia_info") {
+  testonly = true
+  data_keys = [ "rules_fuchsia_info" ]
+  deps = [ ":rules_fuchsia_info.metadata" ]
+}
+
+group("rules_fuchsia_info.metadata") {
+  testonly = true
+  visibility = [ ":rules_fuchsia_info" ]
+  metadata = {
+    rules_fuchsia_info = [
+      {
+        location =
+            rebase_path("//build/bazel_sdk/bazel_rules_fuchsia", root_build_dir)
+      },
+    ]
+  }
 }
 
 # Describes the location of Bazel build events log files
