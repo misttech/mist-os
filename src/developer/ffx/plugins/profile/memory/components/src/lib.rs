@@ -484,7 +484,43 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> PluginOutput {
         mmu: raw_kernel_stats.memory_stats.as_ref().unwrap().mmu_overhead_bytes.unwrap(),
         ipc: raw_kernel_stats.memory_stats.as_ref().unwrap().ipc_bytes.unwrap(),
         other: raw_kernel_stats.memory_stats.as_ref().unwrap().other_bytes.unwrap(),
-        zram_compressed_total: raw_kernel_stats.compression_stats.unwrap().compressed_storage_bytes,
+        zram_compressed_total: raw_kernel_stats.memory_stats.as_ref().unwrap().zram_bytes.unwrap(),
+        vmo_reclaim_total_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_reclaim_total_bytes
+            .unwrap(),
+        vmo_reclaim_newest_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_reclaim_newest_bytes
+            .unwrap(),
+        vmo_reclaim_oldest_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_reclaim_oldest_bytes
+            .unwrap(),
+        vmo_reclaim_disabled_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_reclaim_disabled_bytes
+            .unwrap(),
+        vmo_discardable_locked_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_discardable_locked_bytes
+            .unwrap(),
+        vmo_discardable_unlocked_bytes: raw_kernel_stats
+            .memory_stats
+            .as_ref()
+            .unwrap()
+            .vmo_discardable_unlocked_bytes
+            .unwrap(),
     };
     PluginOutput::build(principals, resources, kernel_stats)
 }
