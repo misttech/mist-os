@@ -20,7 +20,7 @@ class event final : public object<event> {
 
   constexpr event() = default;
 
-  explicit event(Handle* value) : object(value) {}
+  explicit event(fbl::RefPtr<Value> value) : object(value) {}
 
   explicit event(handle&& h) : object(h.release()) {}
 

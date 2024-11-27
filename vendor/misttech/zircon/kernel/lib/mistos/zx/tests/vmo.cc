@@ -307,6 +307,34 @@ bool vmo_unbounded() {
   END_TEST;
 }
 
+bool rights_exec() {
+  BEGIN_TEST;
+
+  size_t len = zx_system_get_page_size() * 4;
+  zx_status_t status;
+  zx::vmo vmo;
+
+  // allocate an object
+  status = zx::vmo::create(len, 0, &vmo);
+  EXPECT_OK(status, "zx::vmo::create");
+
+  // Check that the handle has at least the expected rights.
+  // This list should match the list in docs/syscalls/vmo_create.md.
+  static const zx_rights_t kExpectedRights =
+      ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_READ | ZX_RIGHT_WRITE |
+      ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
+
+  EXPECT_EQ(kExpectedRights, kExpectedRights & vmo.get()->get()->rights());
+
+  status = vmo.replace_as_executable(zx::resource(), &vmo);
+  EXPECT_OK(status, "vmo_replace_as_executable");
+
+  EXPECT_EQ(kExpectedRights | ZX_RIGHT_EXECUTE,
+            (kExpectedRights | ZX_RIGHT_EXECUTE) & vmo.get()->get()->rights());
+
+  END_TEST;
+}
+
 }  // namespace
 }  // namespace unit_testing
 
@@ -315,4 +343,5 @@ UNITTEST("child resize right", unit_testing::child_resize_right)
 UNITTEST("content size", unit_testing::content_size)
 UNITTEST("no write resizable", unit_testing::no_write_resizable)
 UNITTEST("vmo unbounded", unit_testing::vmo_unbounded)
+UNITTEST("rights exec", unit_testing::rights_exec)
 UNITTEST_END_TESTCASE(mistos_zx_vmo, "mistos_zx_vmo", "mistos vmo test")

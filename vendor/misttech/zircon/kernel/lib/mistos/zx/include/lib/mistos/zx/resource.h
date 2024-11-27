@@ -17,7 +17,7 @@ class resource final : public object<resource> {
 
   constexpr resource() = default;
 
-  explicit resource(Handle* handle) : object(handle) {}
+  explicit resource(fbl::RefPtr<Value> handle) : object(handle) {}
 
   explicit resource(handle&& h) : object(h.release()) {}
 

@@ -17,7 +17,6 @@ bool usable_in_containers() {
   BEGIN_TEST;
 
   std::set<zx::unowned_event, std::less<>, util::Allocator<zx::unowned_event>> set;
-
   zx::event event;
   ASSERT_OK(zx::event::create(0u, &event));
   set.emplace(event);

@@ -19,7 +19,7 @@ class vmar final : public object<vmar> {
 
   constexpr vmar() = default;
 
-  explicit vmar(Handle* value) : object(value) {}
+  explicit vmar(fbl::RefPtr<Value> value) : object(value) {}
 
   explicit vmar(handle&& h) : object(h.release()) {}
 
@@ -46,9 +46,6 @@ class vmar final : public object<vmar> {
                        uintptr_t* child_addr) const;
 
   static inline unowned<vmar> root_self() { return unowned<vmar>(); }
-
- private:
-  explicit vmar(HandleOwner value) : object(ktl::move(value)) {}
 };
 
 using unowned_vmar = unowned<vmar>;

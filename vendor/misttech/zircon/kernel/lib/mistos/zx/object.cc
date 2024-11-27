@@ -89,11 +89,18 @@ zx_status_t single_record_result(void* dst_buffer, size_t dst_buffer_size, size_
 
 }  // namespace
 
-zx_status_t object_base::get_info(uint32_t topic, void* buffer, size_t buffer_size,
-                                  size_t* actual_count, size_t* avail_count) const {
-  LTRACEF("handle %p topic %u\n", handle_, topic);
+zx_status_t object_base::get_info(uint32_t topic, void* _buffer, size_t buffer_size,
+                                  size_t* _actual, size_t* _avail) const {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
 
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  LTRACEF("handle %p topic %u\n", current_handle, topic);
+
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   switch (topic) {
     case ZX_INFO_HANDLE_VALID: {
       return is_valid();
@@ -102,7 +109,7 @@ zx_status_t object_base::get_info(uint32_t topic, void* buffer, size_t buffer_si
       // TODO(https://fxbug.dev/42105279): Handle forward/backward compatibility issues
       // with changes to the struct.
 
-      zx_rights_t rights = handle_->rights();
+      zx_rights_t rights = current_handle->rights();
 
       // build the info structure
       zx_info_handle_basic_t info = {
@@ -114,30 +121,30 @@ zx_status_t object_base::get_info(uint32_t topic, void* buffer, size_t buffer_si
           .padding1 = {},
       };
 
-      return single_record_result(buffer, buffer_size, actual_count, avail_count, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
     case ZX_INFO_VMO_V1:
     case ZX_INFO_VMO_V2:
     case ZX_INFO_VMO: {
       // lookup the dispatcher from handle
       auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
-      zx_rights_t rights = handle_->rights();
+      zx_rights_t rights = current_handle->rights();
       zx_info_vmo_t entry = vmo->GetVmoInfo(rights);
       if (topic == ZX_INFO_VMO_V1) {
         zx_info_vmo_v1_t versioned_vmo = VmoInfoToVersion<zx_info_vmo_v1_t>(entry);
         // The V1 layout is a subset of V2
-        return single_record_result(buffer, buffer_size, actual_count, avail_count, versioned_vmo);
+        return single_record_result(_buffer, buffer_size, _actual, _avail, versioned_vmo);
       } else if (topic == ZX_INFO_VMO_V2) {
         zx_info_vmo_v2_t versioned_vmo = VmoInfoToVersion<zx_info_vmo_v2_t>(entry);
         // The V2 layout is a subset of V3
-        return single_record_result(buffer, buffer_size, actual_count, avail_count, versioned_vmo);
+        return single_record_result(_buffer, buffer_size, _actual, _avail, versioned_vmo);
       } else {
-        return single_record_result(buffer, buffer_size, actual_count, avail_count, entry);
+        return single_record_result(_buffer, buffer_size, _actual, _avail, entry);
       }
     }
     case ZX_INFO_VMAR: {
       auto vmar = DownCastDispatcher<VmAddressRegionDispatcher>(&dispatcher);
-      if (!handle_->HasRights(ZX_RIGHT_INSPECT)) {
+      if (!current_handle->HasRights(ZX_RIGHT_INSPECT)) {
         return ZX_ERR_ACCESS_DENIED;
       }
 
@@ -147,7 +154,16 @@ zx_status_t object_base::get_info(uint32_t topic, void* buffer, size_t buffer_si
           .len = real_vmar->size(),
       };
 
-      return single_record_result(buffer, buffer_size, actual_count, avail_count, info);
+      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+    }
+    case ZX_INFO_HANDLE_COUNT: {
+      if (!current_handle->HasRights(ZX_RIGHT_INSPECT)) {
+        return ZX_ERR_ACCESS_DENIED;
+      }
+
+      zx_info_handle_count_t info = {.handle_count = Handle::Count(ktl::move(dispatcher))};
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
     default:
       return ZX_ERR_NOT_SUPPORTED;
@@ -158,13 +174,30 @@ zx_status_t object_base::get_property(uint32_t property, void* _value, size_t si
   if (!_value)
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t status = handle_->HasRights(ZX_RIGHT_GET_PROPERTY) ? ZX_OK : ZX_ERR_ACCESS_DENIED;
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  zx_status_t status =
+      current_handle->HasRights(ZX_RIGHT_GET_PROPERTY) ? ZX_OK : ZX_ERR_ACCESS_DENIED;
   if (status != ZX_OK)
     return status;
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
+
   switch (property) {
     case ZX_PROP_NAME: {
-      return ZX_ERR_NOT_SUPPORTED;
+      if (size < ZX_MAX_NAME_LEN)
+        return ZX_ERR_BUFFER_TOO_SMALL;
+      char name[ZX_MAX_NAME_LEN] = {};
+      status = dispatcher->get_name(name);
+      if (status != ZX_OK) {
+        return status;
+      }
+      memcpy(_value, name, ZX_MAX_NAME_LEN);
+      return ZX_OK;
     }
     case ZX_PROP_PROCESS_DEBUG_ADDR: {
       return ZX_ERR_NOT_SUPPORTED;
@@ -227,14 +260,26 @@ zx_status_t object_base::set_property(uint32_t property, const void* _value, siz
   if (!_value)
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t status = handle_->HasRights(ZX_RIGHT_SET_PROPERTY) ? ZX_OK : ZX_ERR_ACCESS_DENIED;
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  zx_status_t status =
+      current_handle->HasRights(ZX_RIGHT_SET_PROPERTY) ? ZX_OK : ZX_ERR_ACCESS_DENIED;
   if (status != ZX_OK)
     return status;
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
 
   switch (property) {
     case ZX_PROP_NAME: {
-      return ZX_ERR_NOT_SUPPORTED;
+      if (size >= ZX_MAX_NAME_LEN)
+        size = ZX_MAX_NAME_LEN - 1;
+      char name[ZX_MAX_NAME_LEN - 1];
+      memcpy(name, _value, size);
+      return dispatcher->set_name(name, size);
     }
 #if ARCH_X86
     case ZX_PROP_REGISTER_FS: {
@@ -273,9 +318,9 @@ zx_status_t object_base::set_property(uint32_t property, const void* _value, siz
       if (!vmo) {
         return ZX_ERR_WRONG_TYPE;
       }
-      uint64_t value = 0;
-      memcpy(&value, _value, sizeof(value));
-      return vmo->SetContentSize(value);
+      uint64_t dst_value = 0;
+      memcpy(&dst_value, _value, sizeof(uint64_t));
+      return vmo->SetContentSize(dst_value);
     }
     case ZX_PROP_STREAM_MODE_APPEND: {
       return ZX_ERR_NOT_SUPPORTED;
@@ -285,6 +330,10 @@ zx_status_t object_base::set_property(uint32_t property, const void* _value, siz
   }
 
   __UNREACHABLE;
+}
+
+bool operator<(const fbl::RefPtr<Value>& a, const fbl::RefPtr<Value>& b) {
+  return (a->get() < b->get());
 }
 
 }  // namespace zx

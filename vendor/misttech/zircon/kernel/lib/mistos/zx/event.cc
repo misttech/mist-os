@@ -21,7 +21,13 @@ zx_status_t event::create(uint32_t options, event* out) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  out->reset(ktl::move(handle));
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(handle));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  out->reset(value);
 
   return ZX_OK;
 }

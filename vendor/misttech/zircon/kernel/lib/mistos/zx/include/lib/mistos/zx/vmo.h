@@ -18,7 +18,7 @@ class vmo final : public object<vmo> {
 
   constexpr vmo() = default;
 
-  explicit vmo(Handle* handle) : object(handle) {}
+  explicit vmo(fbl::RefPtr<Value> handle) : object(handle) {}
 
   explicit vmo(handle&& h) : object(h.release()) {}
 

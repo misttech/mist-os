@@ -112,28 +112,69 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
 zx_status_t vmar::map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo_handle,
                       uint64_t vmo_offset, size_t len, zx_vaddr_t* ptr) const {
-  fbl::RefPtr<Dispatcher> vmar_dispatcher = handle_->dispatcher();
+  if (!value_) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  auto current_handle = value_->get();
+  if (!current_handle) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  fbl::RefPtr<Dispatcher> vmar_dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmAddressRegionDispatcher> vmar =
       DownCastDispatcher<VmAddressRegionDispatcher>(&vmar_dispatcher);
+  if (!vmar) {
+    return ZX_ERR_WRONG_TYPE;
+  }
 
-  auto handle = vmo_handle.get();
+  if (!vmo_handle.get()) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  auto handle = vmo_handle.get()->get();
+  if (!handle) {
+    return ZX_ERR_BAD_HANDLE;
+  }
   fbl::RefPtr<Dispatcher> vmo_dispatcher = handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&vmo_dispatcher);
+  if (!vmo) {
+    return ZX_ERR_WRONG_TYPE;
+  }
 
-  return vmar_map_common(options, ktl::move(vmar), vmar_offset, handle_->rights(), vmo->vmo(),
-                         vmo_offset, handle->rights(), len, ptr);
+  return vmar_map_common(options, ktl::move(vmar), vmar_offset, current_handle->rights(),
+                         vmo->vmo(), vmo_offset, handle->rights(), len, ptr);
 }
 
 zx_status_t vmar::unmap(uintptr_t address, size_t len) const {
-  fbl::RefPtr<Dispatcher> vmar_dispatcher = handle_->dispatcher();
+  if (!value_) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  auto current_handle = value_->get();
+  if (!current_handle) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+
+  fbl::RefPtr<Dispatcher> vmar_dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmAddressRegionDispatcher> vmar =
       DownCastDispatcher<VmAddressRegionDispatcher>(&vmar_dispatcher);
+  if (!vmar) {
+    return ZX_ERR_WRONG_TYPE;
+  }
 
   return vmar->Unmap(address, len,
-                     VmAddressRegionDispatcher::op_children_from_rights(handle_->rights()));
+                     VmAddressRegionDispatcher::op_children_from_rights(current_handle->rights()));
 }
 
 zx_status_t vmar::protect(zx_vm_option_t options, uintptr_t addr, size_t len) const {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
   if ((options & ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED)) {
     if (!(arch_vm_features() & ZX_VM_FEATURE_CAN_MAP_XOM)) {
       options |= ZX_VM_PERM_READ;
@@ -151,11 +192,11 @@ zx_status_t vmar::protect(zx_vm_option_t options, uintptr_t addr, size_t len) co
     vmar_rights |= ZX_RIGHT_EXECUTE;
   }
 
-  fbl::RefPtr<Dispatcher> vmar_dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> vmar_dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmAddressRegionDispatcher> vmar =
       DownCastDispatcher<VmAddressRegionDispatcher>(&vmar_dispatcher);
 
-  if (!handle_->HasRights(vmar_rights)) {
+  if (!current_handle->HasRights(vmar_rights)) {
     return ZX_ERR_ACCESS_DENIED;
   }
 
@@ -169,14 +210,28 @@ zx_status_t vmar::protect(zx_vm_option_t options, uintptr_t addr, size_t len) co
 
 zx_status_t vmar::op_range(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
                            size_t buffer_size) const {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t vmar::destroy() const {
-  if (!handle_->HasRights(ZX_RIGHT_OP_CHILDREN)) {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  if (!current_handle->HasRights(ZX_RIGHT_OP_CHILDREN)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmAddressRegionDispatcher> vmar =
       DownCastDispatcher<VmAddressRegionDispatcher>(&dispatcher);
 
@@ -185,6 +240,13 @@ zx_status_t vmar::destroy() const {
 
 zx_status_t vmar::allocate(uint32_t options, size_t offset, size_t size, vmar* child,
                            uintptr_t* child_addr) const {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
   // Compute needed rights from requested mapping protections.
   zx_rights_t vmar_rights = 0u;
   if (options & ZX_VM_CAN_MAP_READ) {
@@ -197,11 +259,11 @@ zx_status_t vmar::allocate(uint32_t options, size_t offset, size_t size, vmar* c
     vmar_rights |= ZX_RIGHT_EXECUTE;
   }
 
-  if (!handle_->HasRights(vmar_rights)) {
+  if (!current_handle->HasRights(vmar_rights)) {
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmAddressRegionDispatcher> vmar =
       DownCastDispatcher<VmAddressRegionDispatcher>(&dispatcher);
 
@@ -217,11 +279,18 @@ zx_status_t vmar::allocate(uint32_t options, size_t offset, size_t size, vmar* c
   auto cleanup_handler = fit::defer([&vmar_dispatcher]() { vmar_dispatcher->Destroy(); });
 
   // Create a handle and attach the dispatcher to it
-  HandleOwner handle = Handle::Make(ktl::move(kernel_handle), new_rights);
-  if (!handle) {
+  HandleOwner h = Handle::Make(ktl::move(kernel_handle), new_rights);
+  if (!h) {
     return ZX_ERR_NO_MEMORY;
   }
-  child->reset(ktl::move(handle));
+
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(h));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  child->reset(value);
 
   *child_addr = vmar_dispatcher->vmar()->base();
 

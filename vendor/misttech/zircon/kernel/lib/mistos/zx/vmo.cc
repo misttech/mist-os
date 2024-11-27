@@ -55,25 +55,52 @@ zx_status_t vmo::create(uint64_t size, uint32_t options, vmo* out) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  out->reset(ktl::move(handle));
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(handle));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  out->reset(value);
 
   return ZX_OK;
 }
 
 zx_status_t vmo::read(void* data, uint64_t offset, size_t len) const {
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
   return vmo->vmo()->Read(data, offset, len);
 }
 
 zx_status_t vmo::write(const void* data, uint64_t offset, size_t len) const {
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
   return vmo->vmo()->Write(data, offset, len);
 }
 
 zx_status_t vmo::transfer_data(uint32_t options, uint64_t offset, uint64_t length, vmo* src_vmo,
                                uint64_t src_offset) {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
   if (options) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -82,17 +109,17 @@ zx_status_t vmo::transfer_data(uint32_t options, uint64_t offset, uint64_t lengt
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!handle_->HasRights(ZX_RIGHT_WRITE)) {
+  if (!current_handle->HasRights(ZX_RIGHT_WRITE)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  fbl::RefPtr<Dispatcher> dst_dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dst_dispatcher = current_handle->dispatcher();
   fbl::RefPtr<VmObjectDispatcher> dst_vmo_dispatcher =
       DownCastDispatcher<VmObjectDispatcher>(&dst_dispatcher);
 
-  if (!src_vmo->get()->HasRights(ZX_RIGHT_READ | ZX_RIGHT_WRITE)) {
+  if (!src_vmo->get()->get()->HasRights(ZX_RIGHT_READ | ZX_RIGHT_WRITE)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  fbl::RefPtr<Dispatcher> src_dispatcher = src_vmo->get()->dispatcher();
+  fbl::RefPtr<Dispatcher> src_dispatcher = src_vmo->get()->get()->dispatcher();
   fbl::RefPtr<VmObjectDispatcher> src_vmo_dispatcher =
       DownCastDispatcher<VmObjectDispatcher>(&src_dispatcher);
 
@@ -114,37 +141,58 @@ zx_status_t vmo::transfer_data(uint32_t options, uint64_t offset, uint64_t lengt
 }
 
 zx_status_t vmo::get_size(uint64_t* size) const {
-  LTRACEF("handle %p, sizep %p\n", handle_, size);
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
 
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  LTRACEF("handle %p, sizep %p\n", current_handle, size);
+
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
 
   return vmo->GetSize(size);
 }
 
 zx_status_t vmo::set_size(uint64_t size) const {
-  LTRACEF("handle %p, size %#" PRIx64 "\n", handle_, size);
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
 
-  if (!handle_->HasRights(ZX_RIGHT_WRITE)) {
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  LTRACEF("handle %p, size %#" PRIx64 "\n", current_handle, size);
+
+  if (!current_handle->HasRights(ZX_RIGHT_WRITE)) {
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
 
   // VMOs that are not resizable should fail with ZX_ERR_UNAVAILABLE for backwards compatibility,
   // which will be handled by the SetSize call below. Only validate the RESIZE right if the VMO is
   // resizable.
-  if (vmo->vmo()->is_resizable() && (handle_->rights() & ZX_RIGHT_RESIZE) == 0) {
+  if (vmo->vmo()->is_resizable() && (current_handle->rights() & ZX_RIGHT_RESIZE) == 0) {
     return ZX_ERR_ACCESS_DENIED;
   }
   // do the operation
   return vmo->SetSize(size);
 }
 
-zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* out) const {
-  LTRACEF("handle %p options %#x offset %#" PRIx64 " size %#" PRIx64 "\n", handle_, options, offset,
-          size);
+zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, vmo* result) const {
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  LTRACEF("handle %p options %#x offset %#" PRIx64 " size %#" PRIx64 "\n", current_handle, options,
+          offset, size);
 
   zx_status_t status;
   fbl::RefPtr<VmObject> child_vmo;
@@ -175,12 +223,12 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
   // vmo. Should the vmo destroyed between creating the child and setting the id in the dispatcher
   // the currently unset user_id may be used to re-attribute a parent. Holding the refptr prevents
   // any destruction from occurring.
-  if (!handle_->HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
+  if (!current_handle->HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
-  zx_rights_t in_rights = handle_->rights();
+  zx_rights_t in_rights = current_handle->rights();
 
   // clone the vmo into a new one
   status =
@@ -207,11 +255,11 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
 
   // A reference child shares the same content size manager as the parent.
   if (options & ZX_VMO_CHILD_REFERENCE) {
-    auto result = vmo->content_size_manager();
-    if (result.is_error()) {
-      return result.status_value();
+    auto csm = vmo->content_size_manager();
+    if (csm.is_error()) {
+      return csm.status_value();
     }
-    status = VmObjectDispatcher::CreateWithCsm(ktl::move(child_vmo), ktl::move(*result),
+    status = VmObjectDispatcher::CreateWithCsm(ktl::move(child_vmo), ktl::move(csm.value()),
                                                initial_mutability, &kernel_handle, &default_rights);
   } else {
     status = VmObjectDispatcher::Create(ktl::move(child_vmo), size, initial_mutability,
@@ -250,31 +298,61 @@ zx_status_t vmo::create_child(uint32_t options, uint64_t offset, uint64_t size, 
     return ZX_ERR_NO_MEMORY;
   }
 
-  out->reset(ktl::move(handle));
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(handle));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Allow for the caller aliasing |result| to |this|.
+  zx::vmo h;
+  *h.reset_and_get_address() = ktl::move(value);
+  result->reset(h.release());
 
   return ZX_OK;
 }
 
 zx_status_t vmo::op_range(uint32_t op, uint64_t offset, uint64_t size, void* buffer,
                           size_t buffer_size) const {
-  LTRACEF("handle %p op %u offset %#" PRIx64 " size %#" PRIx64 " buffer %p buffer_size %zu\n",
-          handle_, op, offset, size, buffer, buffer_size);
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
 
-  fbl::RefPtr<Dispatcher> dispatcher = handle_->dispatcher();
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  LTRACEF("handle %p op %u offset %#" PRIx64 " size %#" PRIx64 " buffer %p buffer_size %zu\n",
+          current_handle, op, offset, size, buffer, buffer_size);
+
+  fbl::RefPtr<Dispatcher> dispatcher = current_handle->dispatcher();
   auto vmo = DownCastDispatcher<VmObjectDispatcher>(&dispatcher);
 
   return vmo->RangeOp(op, offset, size, user_inout_ptr<void>(buffer), buffer_size,
-                      handle_->rights());
+                      current_handle->rights());
 }
 
 zx_status_t vmo::replace_as_executable(const resource& vmex, vmo* result) {
-  HandleOwner handle = Handle::Make(handle_->dispatcher(), (handle_->rights() | ZX_RIGHT_EXECUTE));
-  // We store ZX_HANDLE_INVALID to value_ before calling reset on result
-  // in case result == this.
-  handle_owner_.release();
-  handle_ = nullptr;
-  result->reset(ktl::move(handle));
-  return ZX_OK;
+  if (!value_)
+    return ZX_ERR_BAD_HANDLE;
+
+  auto current_handle = value_->get();
+  if (!current_handle)
+    return ZX_ERR_BAD_HANDLE;
+
+  zx_status_t status = ZX_OK;
+  HandleOwner h =
+      Handle::Make(current_handle->dispatcher(), (current_handle->rights() | ZX_RIGHT_EXECUTE));
+
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(h));
+  if (!ac.check()) {
+    status = ZX_ERR_NO_MEMORY;
+  }
+
+  value_ = nullptr;
+  result->reset(value);
+
+  return status;
 }
 
 }  // namespace zx
