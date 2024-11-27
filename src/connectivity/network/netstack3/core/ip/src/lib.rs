@@ -28,6 +28,7 @@ mod internal {
     pub(super) mod raw;
     pub(super) mod reassembly;
     pub(super) mod routing;
+    pub(super) mod sas;
     pub(super) mod socket;
     pub(super) mod types;
     pub(super) mod uninstantiable;
@@ -167,9 +168,6 @@ pub mod nud {
 
 /// IP Layer definitions supporting sockets.
 pub mod socket {
-    pub use crate::internal::socket::ipv6_source_address_selection::{
-        select_ipv6_source_address, SasCandidate,
-    };
     pub use crate::internal::socket::{
         DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
         DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
@@ -248,6 +246,7 @@ pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
     NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
+pub use internal::sas::IpSasHandler;
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
     InternalForwarding, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,

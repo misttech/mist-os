@@ -48,6 +48,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/reassembly.rs",
     "src/routing.rs",
     "src/routing/rules.rs",
+    "src/sas.rs",
     "src/socket.rs",
     "src/types.rs",
     "src/uninstantiable.rs",

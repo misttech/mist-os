@@ -15,15 +15,12 @@ use ip::device::RsTimerId;
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
 use log::debug;
-use net_types::ip::{
-    AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-};
+use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    InstantBindingsTypes, IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext,
+    IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -48,7 +45,6 @@ use netstack3_ip::gmp::{
     MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
-use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
     IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
@@ -327,13 +323,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
-        _remote: Option<SpecifiedAddr<Ipv4Addr>>,
+        remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<IpDeviceAddr<Ipv4Addr>> {
-        device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
-            self,
-            device_id,
-            |mut addrs, _core_ctx| addrs.next().as_ref().map(IpAddressId::addr),
-        )
+        ip::IpSasHandler::<Ipv4, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
@@ -388,39 +380,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     }
 }
 
-fn get_ipv6_sas_candidate<
-    BT: InstantBindingsTypes,
-    CC: device::IpDeviceAddressContext<Ipv6, BT>,
->(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-    addr_id: &CC::AddressId,
-) -> SasCandidate<CC::DeviceId> {
-    core_ctx.with_ip_address_state(
-        device_id,
-        &addr_id,
-        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config }| {
-            // Assume an address is deprecated if config is not available. That
-            // means the address is going away, so we should not prefer it.
-            const ASSUME_DEPRECATED: bool = true;
-            // Assume an address is not temporary if config is not available.
-            // That means the address is going away and we should remove any
-            // preference on it.
-            const ASSUME_TEMPORARY: bool = false;
-            let (deprecated, temporary) = config
-                .map(|c| (c.is_deprecated(), c.is_temporary()))
-                .unwrap_or((ASSUME_DEPRECATED, ASSUME_TEMPORARY));
-            SasCandidate {
-                addr_sub: addr_id.addr_sub(),
-                assigned: *assigned,
-                temporary,
-                deprecated,
-                device: device_id.clone(),
-            }
-        },
-    )
-}
-
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     ip::IpDeviceStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
@@ -433,17 +392,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<Ipv6Addr>>,
     ) -> Option<IpDeviceAddr<Ipv6Addr>> {
-        device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
-            self,
-            device_id,
-            |addrs, core_ctx| {
-                IpDeviceAddr::new_from_ipv6_source(ip::socket::select_ipv6_source_address(
-                    remote,
-                    device_id,
-                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
-                ))
-            },
-        )
+        ip::IpSasHandler::<Ipv6, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
@@ -899,22 +848,14 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         body: F,
     ) -> Result<(), IpSendFrameError<S>> {
         let Self { config: _, core_ctx } = self;
+
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
-        let src_ip = device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
+        let src_ip = ip::IpSasHandler::<Ipv6, _>::get_local_addr_for_remote(
             core_ctx,
             device_id,
-            |addrs, core_ctx| {
-                ip::socket::select_ipv6_source_address(
-                    Some(dst_ip),
-                    device_id,
-                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
-                )
-            },
-        );
-        let src_ip = match src_ip {
-            Ipv6SourceAddr::Unicast(addr) => Some(*addr),
-            Ipv6SourceAddr::Unspecified => None,
-        };
+            Some(dst_ip),
+        )
+        .and_then(|addr| UnicastAddr::new(addr.addr()));
         ip::icmp::send_ndp_packet(
             core_ctx,
             bindings_ctx,

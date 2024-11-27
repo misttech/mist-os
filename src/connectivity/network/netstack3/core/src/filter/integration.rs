@@ -9,7 +9,7 @@ use net_types::SpecifiedAddr;
 use netstack3_base::IpDeviceAddr;
 use netstack3_device::DeviceId;
 use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
-use netstack3_ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner};
+use netstack3_ip::{FilterHandlerProvider, IpLayerIpExt, IpSasHandler, IpStateInner};
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
@@ -19,7 +19,10 @@ use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterHandlerProvider<I, BC> for CoreCtx<'a, BC, L>
 {
-    type Handler<'b> = FilterImpl<'b, CoreCtx<'a, BC, L>> where Self: 'b;
+    type Handler<'b>
+        = FilterImpl<'b, CoreCtx<'a, BC, L>>
+    where
+        Self: 'b;
 
     fn filter_handler(&mut self) -> Self::Handler<'_> {
         FilterImpl(self)
@@ -50,7 +53,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
     ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
-        IpDeviceStateContext::<I>::get_local_addr_for_remote(self, device_id, remote)
+        IpSasHandler::<I, _>::get_local_addr_for_remote(self, device_id, remote)
     }
 }
 
