@@ -26,6 +26,7 @@ go_library("testsharder_lib") {
     "doc.go",
     "durations.go",
     "durations_test.go",
+    "emu_versions.go",
     "ffx_deps.go",
     "ffx_deps_test.go",
     "images.go",

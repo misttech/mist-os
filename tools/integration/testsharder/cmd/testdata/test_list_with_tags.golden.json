@@ -27,6 +27,9 @@
             "dimensions": {
                 "cpu": "x64",
                 "device_type": "AEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
             }
         },
         "deps": [
@@ -40,7 +43,19 @@
             "tests": null
         },
         "product_bundle": "core.x64",
-        "expects_ssh": true
+        "expects_ssh": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "version": "aemu_version",
+                "subdir": "aemu/bin"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ]
     },
     {
         "name": "hermetic:AEMU",
@@ -70,6 +85,9 @@
             "dimensions": {
                 "cpu": "x64",
                 "device_type": "AEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
             }
         },
         "deps": [
@@ -83,6 +101,18 @@
             "tests": null
         },
         "product_bundle": "core.x64",
-        "expects_ssh": true
+        "expects_ssh": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "version": "aemu_version",
+                "subdir": "aemu/bin"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ]
     }
 ]

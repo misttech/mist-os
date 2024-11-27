@@ -35,8 +35,6 @@ func GetPackageVersion(prebuiltVersions []PrebuiltVersion, packageName string) (
 }
 
 // LoadPrebuiltVersions loads the prebuilt_versions.json manifest at the provided path.
-// TODO(https://fxbug.dev/379192413): This will always return an error until the
-// script generating the prebuilt_versions manifest has been added as a jiri hook.
 func LoadPrebuiltVersions(prebuiltVersionsPath string) ([]PrebuiltVersion, error) {
 	var prebuiltVersions []PrebuiltVersion
 	err := jsonutil.ReadFromFile(prebuiltVersionsPath, &prebuiltVersions)

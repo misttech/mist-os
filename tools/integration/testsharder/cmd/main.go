@@ -125,6 +125,7 @@ type buildModules interface {
 	TestDurations() []build.TestDuration
 	Tools() build.Tools
 	PackageRepositories() []build.PackageRepo
+	PrebuiltVersions() ([]build.PrebuiltVersion, error)
 	ProductBundles() []build.ProductBundle
 }
 
@@ -322,6 +323,10 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		return err
 	}
 	ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
+	prebuiltVersions, err := m.PrebuiltVersions()
+	if err != nil {
+		return err
+	}
 	for _, s := range shards {
 		// Pave = false means netboot = true. We set this after creating the shards
 		// so that `netboot` doesn't get added to the shard names since this would
@@ -331,6 +336,9 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 		if s.Env.Dimensions.DeviceType() == "" {
 			continue
+		}
+		if err := testsharder.AddEmuVersion(s, prebuiltVersions); err != nil {
+			return err
 		}
 		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.Pave); err != nil {
 			return err

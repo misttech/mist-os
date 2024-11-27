@@ -656,7 +656,24 @@ func (m *fakeModules) TestListLocation() []string               { return []strin
 func (m *fakeModules) TestSpecs() []build.TestSpec              { return m.testSpecs }
 func (m *fakeModules) TestDurations() []build.TestDuration      { return m.testDurations }
 func (m *fakeModules) PackageRepositories() []build.PackageRepo { return m.packageRepositories }
-func (m *fakeModules) ProductBundles() []build.ProductBundle    { return m.productBundles }
+func (m *fakeModules) PrebuiltVersions() ([]build.PrebuiltVersion, error) {
+	return []build.PrebuiltVersion{
+		{
+			Name:    "fuchsia/third_party/android/aemu/release/${platform}",
+			Version: "aemu_version",
+		}, {
+			Name:    "fuchsia/third_party/qemu/${platform}",
+			Version: "qemu_version",
+		}, {
+			Name:    "fuchsia/third_party/crosvm/${platform}",
+			Version: "crosvm_version",
+		}, {
+			Name:    "fuchsia/third_party/edk2",
+			Version: "edk2_version",
+		},
+	}, nil
+}
+func (m *fakeModules) ProductBundles() []build.ProductBundle { return m.productBundles }
 func (m *fakeModules) Tools() build.Tools {
 	return build.Tools{
 		{
