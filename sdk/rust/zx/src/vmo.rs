@@ -399,8 +399,13 @@ bitflags! {
     pub struct VmoInfoFlags: u32 {
         const RESIZABLE = sys::ZX_INFO_VMO_RESIZABLE;
         const IS_COW_CLONE = sys::ZX_INFO_VMO_IS_COW_CLONE;
+        const VIA_HANDLE = sys::ZX_INFO_VMO_VIA_HANDLE;
+        const VIA_MAPPING = sys::ZX_INFO_VMO_VIA_MAPPING;
         const PAGER_BACKED = sys::ZX_INFO_VMO_PAGER_BACKED;
         const CONTIGUOUS = sys::ZX_INFO_VMO_CONTIGUOUS;
+        const DISCARDABLE = sys::ZX_INFO_VMO_DISCARDABLE;
+        const IMMUTABLE = sys::ZX_INFO_VMO_IMMUTABLE;
+        const VIA_IOB_HANDLE = sys::ZX_INFO_VMO_VIA_IOB_HANDLE;
     }
 }
 

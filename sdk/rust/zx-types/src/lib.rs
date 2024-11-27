@@ -155,8 +155,13 @@ multiconst!(u64, [
 multiconst!(u32, [
     ZX_INFO_VMO_RESIZABLE = 1 << 1;
     ZX_INFO_VMO_IS_COW_CLONE = 1 << 2;
+    ZX_INFO_VMO_VIA_HANDLE = 1 << 3;
+    ZX_INFO_VMO_VIA_MAPPING = 1 << 4;
     ZX_INFO_VMO_PAGER_BACKED = 1 << 5;
     ZX_INFO_VMO_CONTIGUOUS = 1 << 6;
+    ZX_INFO_VMO_DISCARDABLE = 1 << 7;
+    ZX_INFO_VMO_IMMUTABLE = 1 << 8;
+    ZX_INFO_VMO_VIA_IOB_HANDLE = 1 << 9;
 ]);
 
 // TODO: add an alias for this type in the C headers.
