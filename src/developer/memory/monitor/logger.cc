@@ -31,6 +31,9 @@ void Logger::SetPressureLevel(pressure_signaler::Level l) {
   if (config_->capture_on_pressure_change()) {
     task_.Cancel();
     task_.PostDelayed(dispatcher_, zx::usec(1));
+  } else if (task_.last_deadline() > zx::deadline_after(duration_)) {
+    task_.Cancel();
+    task_.PostDelayed(dispatcher_, duration_);
   }
 }
 

@@ -28,6 +28,7 @@ class Logger {
         digest_cb_(std::move(digest_cb)),
         config_(config) {}
 
+  // SetPressureLevel needs to be called at least once for the Logger to start.
   void SetPressureLevel(pressure_signaler::Level l);
 
  private:
