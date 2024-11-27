@@ -34,10 +34,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-    GmpBindingsTypes, GmpContext, GmpContextInner, GmpDelayedReportTimerId, GmpMessage,
-    GmpMessageType, GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt,
-    MulticastGroupSet, ProtocolSpecific, QueryTarget,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner,
+    GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpStateContext, GmpStateRef,
+    GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecificTypes,
 };
 
 /// The bindings types for MLD.
@@ -116,11 +115,11 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                 let body = msg.body();
                 let addr = body.group_addr();
                 SpecifiedAddr::new(addr)
-                    .map_or(Some(QueryTarget::Unspecified), |addr| {
-                        MulticastAddr::new(addr.get()).map(QueryTarget::Specified)
+                    .map_or(Some(gmp::v1::QueryTarget::Unspecified), |addr| {
+                        MulticastAddr::new(addr.get()).map(gmp::v1::QueryTarget::Specified)
                     })
                     .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        handle_query_message(
+                        gmp::v1::handle_query_message(
                             self,
                             bindings_ctx,
                             device,
@@ -135,10 +134,12 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
             }
             MldPacket::MulticastListenerReport(msg) => {
                 let addr = msg.body().group_addr();
-                MulticastAddr::new(msg.body().group_addr())
-                    .map_or(Err(MldError::NotAMember { addr }), |group_addr| {
-                        handle_report_message(self, bindings_ctx, device, group_addr)
-                    })
+                MulticastAddr::new(msg.body().group_addr()).map_or(
+                    Err(MldError::NotAMember { addr }),
+                    |group_addr| {
+                        gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
+                    },
+                )
             }
             MldPacket::MulticastListenerDone(_) => {
                 debug!("Hosts are not interested in Done messages");
@@ -297,10 +298,12 @@ impl Default for MldConfig {
     }
 }
 
-impl ProtocolSpecific for MldProtocolSpecific {
+impl ProtocolSpecificTypes for MldProtocolSpecific {
     type Actions = Never;
     type Config = MldConfig;
+}
 
+impl gmp::v1::ProtocolSpecific for MldProtocolSpecific {
     fn cfg_unsolicited_report_interval(cfg: &Self::Config) -> Duration {
         cfg.unsolicited_report_interval
     }
@@ -324,22 +327,24 @@ impl ProtocolSpecific for MldProtocolSpecific {
 
 /// The state on a multicast address.
 #[cfg_attr(test, derive(Debug))]
-pub struct MldGroupState<I: Instant>(GmpStateMachine<I, MldProtocolSpecific>);
+pub struct MldGroupState<I: Instant>(gmp::v1::GmpStateMachine<I, MldProtocolSpecific>);
 
-impl<I: Instant> From<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn from(state: GmpStateMachine<I, MldProtocolSpecific>) -> MldGroupState<I> {
+impl<I: Instant> From<gmp::v1::GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
+    fn from(state: gmp::v1::GmpStateMachine<I, MldProtocolSpecific>) -> MldGroupState<I> {
         MldGroupState(state)
     }
 }
 
-impl<I: Instant> From<MldGroupState<I>> for GmpStateMachine<I, MldProtocolSpecific> {
-    fn from(MldGroupState(state): MldGroupState<I>) -> GmpStateMachine<I, MldProtocolSpecific> {
+impl<I: Instant> From<MldGroupState<I>> for gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
+    fn from(
+        MldGroupState(state): MldGroupState<I>,
+    ) -> gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
         state
     }
 }
 
-impl<I: Instant> AsMut<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
-    fn as_mut(&mut self) -> &mut GmpStateMachine<I, MldProtocolSpecific> {
+impl<I: Instant> AsMut<gmp::v1::GmpStateMachine<I, MldProtocolSpecific>> for MldGroupState<I> {
+    fn as_mut(&mut self) -> &mut gmp::v1::GmpStateMachine<I, MldProtocolSpecific> {
         let Self(s) = self;
         s
     }
@@ -373,7 +378,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(id) = self;
-        gmp_handle_timer(core_ctx, bindings_ctx, id);
+        gmp::v1::handle_timer(core_ctx, bindings_ctx, id);
     }
 }
 
@@ -445,10 +450,7 @@ mod tests {
     use super::*;
     use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
     use crate::internal::fragmentation::FragmentableIpSerializer;
-    use crate::internal::gmp::{
-        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-        QueryReceivedActions, QueryReceivedGenericAction,
-    };
+    use crate::internal::gmp::{GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult};
 
     /// Metadata for sending an MLD packet in an IP packet.
     #[derive(Debug, PartialEq)]
@@ -606,15 +608,15 @@ mod tests {
             // host should send the report immediately instead of setting a
             // timer.
             let mut rng = new_rng(seed);
-            let (mut s, _actions) = GmpStateMachine::<_, MldProtocolSpecific>::join_group(
+            let (mut s, _actions) = gmp::v1::GmpStateMachine::<_, MldProtocolSpecific>::join_group(
                 &mut rng,
                 FakeInstant::default(),
                 false,
             );
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default()),
-                QueryReceivedActions {
-                    generic: Some(QueryReceivedGenericAction::StopTimerAndSendReport(
+                gmp::v1::QueryReceivedActions {
+                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport(
                         MldProtocolSpecific
                     )),
                     protocol_specific: None
@@ -830,7 +832,7 @@ mod tests {
             // Member state.
             let MldGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
-                MemberState::Delaying(_) => {}
+                gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
@@ -867,7 +869,7 @@ mod tests {
             // and turn into Idle state again.
             let MldGroupState(group_state) = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
-                MemberState::Idle(_) => {}
+                gmp::v1::MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),
             }
 
