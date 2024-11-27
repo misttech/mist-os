@@ -160,8 +160,10 @@ impl StationaryMonitor {
             // Updated fields for tracking roam scan decisions and initiated roam search.
             self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
                 fasync::MonotonicInstant::now();
-            self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
+            self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan =
+                roam_reasons.clone();
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
+            info!("Initiating roam search for roam reasons: {:?}", roam_reasons);
             return RoamTriggerDataOutcome::RoamSearch(
                 self.connection_data.network_identifier.clone(),
                 self.connection_data.credential.clone(),

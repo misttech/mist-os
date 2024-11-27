@@ -126,7 +126,7 @@ pub async fn serve_roam_monitor(
                 }
             },
             complete => {
-                warn!("Roam monitor channels dropped, exiting monitor service loop.");
+                info!("Roam monitor channels dropped, exiting monitor service loop.");
                 break
             }
         }

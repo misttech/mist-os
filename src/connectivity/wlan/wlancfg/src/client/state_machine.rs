@@ -653,9 +653,7 @@ async fn connected_state(
                                 options.ess_connect_start_time = fasync::MonotonicInstant::now();
                                 options.bss_connect_start_time = fasync::MonotonicInstant::now();
                             }
-
                             notify_when_reconnect_detected(&common_options, &options, result);
-
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnRoamResult { result } => {
