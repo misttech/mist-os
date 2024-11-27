@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/starnix/kernel/args.gni")
 
 rustc_library("starnix-syscalls") {
   name = "starnix_syscalls"
@@ -19,11 +20,17 @@ rustc_library("starnix-syscalls") {
   ]
 
   deps = [
+    "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:paste",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
+
+  features = []
+  if (starnix_enable_arch32) {
+    features += [ "arch32" ]
+  }
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

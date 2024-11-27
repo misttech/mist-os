@@ -14,6 +14,7 @@ use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{Locked, Unlocked};
+use starnix_types::arch::ArchWidth;
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::errors::Errno;
@@ -26,6 +27,8 @@ use starnix_uapi::{
     AT_GID, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM, AT_SECURE, AT_SYSINFO_EHDR,
     AT_UID,
 };
+#[cfg(feature = "arch32")]
+use starnix_uapi::{AT_HWCAP, AT_PLATFORM};
 use std::ffi::{CStr, CString};
 use std::mem::size_of;
 use std::ops::Deref as _;
@@ -33,6 +36,10 @@ use std::sync::Arc;
 use zx::{
     HandleBased, {self as zx},
 };
+
+// TODO(https://fxbug.dev/380427153): move anything depending on this to arch/arm64, etc.
+#[cfg(feature = "arch32")]
+use starnix_uapi::uapi::arch32;
 
 #[derive(Debug)]
 struct StackResult {
@@ -52,13 +59,17 @@ fn get_initial_stack_size(
     argv: &Vec<CString>,
     environ: &Vec<CString>,
     auxv: &Vec<(u32, u64)>,
+    arch_width: ArchWidth,
 ) -> usize {
+    // Worst-case, we overspec the initial stack size.
+    let auxv_entry_size = if arch_width.is_arch32() { size_of::<u32>() } else { size_of::<u64>() };
+    let ptr_size = if arch_width.is_arch32() { size_of::<u32>() } else { size_of::<*const u8>() };
     argv.iter().map(|x| x.as_bytes_with_nul().len()).sum::<usize>()
         + environ.iter().map(|x| x.as_bytes_with_nul().len()).sum::<usize>()
         + path.to_bytes_with_nul().len()
         + RANDOM_SEED_BYTES
-        + (argv.len() + 1 + environ.len() + 1) * size_of::<*const u8>()
-        + auxv.len() * 2 * size_of::<u64>()
+        + (argv.len() + 1 + environ.len() + 1) * ptr_size
+        + (auxv.len() + 5) * 2 * auxv_entry_size
 }
 
 fn populate_initial_stack(
@@ -68,6 +79,7 @@ fn populate_initial_stack(
     environ: &Vec<CString>,
     mut auxv: Vec<(u32, u64)>,
     original_stack_start_addr: UserAddress,
+    arch_width: ArchWidth,
 ) -> Result<StackResult, Errno> {
     let mut stack_pointer = original_stack_start_addr;
     let write_stack = |data: &[u8], addr: UserAddress| ma.write_memory(addr, data);
@@ -84,6 +96,8 @@ fn populate_initial_stack(
         stack_pointer -= env.as_bytes_with_nul().len();
         write_stack(env.as_bytes_with_nul(), stack_pointer)?;
     }
+
+    // TODO(https://fxbug.dev/380427153): Get rid of this probably and roll back r0, r1, r2 setting.
     let environ_start = stack_pointer;
 
     // Write the path used with execve.
@@ -97,6 +111,32 @@ fn populate_initial_stack(
     let random_seed_addr = stack_pointer;
     write_stack(&random_seed, random_seed_addr)?;
 
+    // TODO(https://fxbug.dev/380427153): Move to arch specific inclusion
+    #[cfg(feature = "arch32")]
+    if arch_width.is_arch32() {
+        let platform = b"v7l\0";
+        stack_pointer -= platform.len();
+        let platform_addr = stack_pointer;
+        write_stack(platform, platform_addr)?;
+        // Write the platform to the stack too
+        // TODO(https://fxbug.dev/380427153): add arch helper
+        auxv.push((AT_PLATFORM, platform_addr.ptr() as u64));
+
+        auxv.push((
+            AT_HWCAP,
+            (arch32::HWCAP_HALF
+                | arch32::HWCAP_TLS
+                | arch32::HWCAP_FAST_MULT
+                | arch32::HWCAP_IDIVA
+                | arch32::HWCAP_IDIVT
+                | arch32::HWCAP_TLS
+                | arch32::HWCAP_THUMB
+                | arch32::HWCAP_SWP
+                | arch32::HWCAP_VFPv4
+                | arch32::HWCAP_NEON) as u64,
+        ));
+    }
+
     auxv.push((AT_EXECFN, execfn_addr.ptr() as u64));
     auxv.push((AT_RANDOM, random_seed_addr.ptr() as u64));
     auxv.push((AT_NULL, 0));
@@ -106,30 +146,45 @@ fn populate_initial_stack(
     // operations. But this can't be done after it's pushed, since it has to be right at the top of
     // the stack. So we collect it all, align the stack appropriately now that we know the size,
     // and push it all at once.
+    //
+    // Compatibility stacks use u32 rather than u64, so we wrap the extension in
+    // a macro to automatically truncate -- assuming all the values we made
+    // appropriate earlier.
+    fn extend_vec(data: &mut Vec<u8>, slice: &[u8; 8], arch_width: ArchWidth) {
+        if arch_width.is_arch32() {
+            let value = u64::from_ne_bytes(*slice);
+            let truncated_value = (value & (u32::MAX as u64)) as u32;
+            data.extend_from_slice(&truncated_value.to_ne_bytes());
+        } else {
+            data.extend_from_slice(slice);
+        }
+    }
+
     let mut main_data = vec![];
     // argc
     let argc: u64 = argv.len() as u64;
-    main_data.extend_from_slice(&argc.to_ne_bytes());
+    extend_vec(&mut main_data, &argc.to_ne_bytes(), arch_width);
+
     // argv
     const ZERO: [u8; 8] = [0; 8];
     let mut next_arg_addr = argv_start;
     for arg in argv {
-        main_data.extend_from_slice(&next_arg_addr.ptr().to_ne_bytes());
+        extend_vec(&mut main_data, &next_arg_addr.ptr().to_ne_bytes(), arch_width);
         next_arg_addr += arg.as_bytes_with_nul().len();
     }
-    main_data.extend_from_slice(&ZERO);
+    extend_vec(&mut main_data, &ZERO, arch_width);
     // environ
     let mut next_env_addr = environ_start;
     for env in environ {
-        main_data.extend_from_slice(&next_env_addr.ptr().to_ne_bytes());
+        extend_vec(&mut main_data, &next_env_addr.ptr().to_ne_bytes(), arch_width);
         next_env_addr += env.as_bytes_with_nul().len();
     }
-    main_data.extend_from_slice(&ZERO);
+    extend_vec(&mut main_data, &ZERO, arch_width);
     // auxv
     let auxv_start_offset = main_data.len();
     for (tag, val) in auxv {
-        main_data.extend_from_slice(&(tag as u64).to_ne_bytes());
-        main_data.extend_from_slice(&val.to_ne_bytes());
+        extend_vec(&mut main_data, &(tag as u64).to_ne_bytes(), arch_width);
+        extend_vec(&mut main_data, &val.to_ne_bytes(), arch_width);
     }
     let auxv_end_offset = main_data.len();
 
@@ -152,6 +207,7 @@ fn populate_initial_stack(
 }
 
 struct LoadedElf {
+    arch_width: ArchWidth,
     headers: elf_parse::Elf64Headers,
     file_base: usize,
     vaddr_bias: usize,
@@ -201,6 +257,7 @@ impl elf_load::Mapper for Mapper<'_> {
         let memory = Arc::new(MemoryObject::from(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?));
         self.mm
             .map_memory(
+                // TODO(https://fxbug.dev/380427153): This checked_add won't help with arch32.
                 DesiredAddress::Fixed(self.mm.base_addr.checked_add(vmar_offset).ok_or_else(
                     || {
                         log_error!(
@@ -242,14 +299,21 @@ fn load_elf(
     usage: LoadElfUsage,
 ) -> Result<LoadedElf, Errno> {
     let vmo = elf_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
-    let headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
+    let headers = if cfg!(feature = "arch32") {
+        elf_parse::Elf64Headers::from_vmo_with_arch32(vmo).map_err(elf_parse_error_to_errno)?
+    } else {
+        elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?
+    };
+    let arch_width = get_arch_width(&headers);
     let elf_info = elf_load::loaded_elf_info(&headers);
     let length = elf_info.high - elf_info.low;
     let file_base = match headers.file_header().elf_type() {
         Ok(elf_parse::ElfType::SharedObject) => {
             match usage {
                 // Location of main position-independent executable is subject to ASLR
-                LoadElfUsage::MainElf => mm.get_random_base_for_executable(length)?.ptr(),
+                LoadElfUsage::MainElf => {
+                    mm.get_random_base_for_executable(arch_width, length)?.ptr()
+                }
                 // Interpreter is mapped in the same range as regular `mmap` allocations.
                 LoadElfUsage::Interpreter => mm
                     .state
@@ -259,19 +323,29 @@ fn load_elf(
                     .ptr(),
             }
         }
-        Ok(elf_parse::ElfType::Executable) => elf_info.low,
+        Ok(elf_parse::ElfType::Executable) => {
+            if get_arch_width(&headers).is_arch32() {
+                mm.base_addr.ptr()
+            } else {
+                elf_info.low
+            }
+        }
         _ => return error!(EINVAL),
     };
+    // TODO(https://fxbug.dev/380427153): I think we need to do a 32-bit wrap here and then
+    // a 32-bit wrap at the wrapping addition.  The Mapper may need a checked_add as well.
     let vaddr_bias = file_base.wrapping_sub(elf_info.low);
     let mapper = Mapper { file: &elf, mm, file_write_guard };
     elf_load::map_elf_segments(vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
         .map_err(elf_load_error_to_errno)?;
-    Ok(LoadedElf { headers, file_base, vaddr_bias, length })
+    Ok(LoadedElf { arch_width, headers, file_base, vaddr_bias, length })
 }
 
 pub struct ThreadStartInfo {
     pub entry: UserAddress,
     pub stack: UserAddress,
+    pub environ: UserAddress,
+    pub arch_width: ArchWidth,
 }
 
 /// Holds a resolved ELF VMO and associated parameters necessary for an execve call.
@@ -290,6 +364,8 @@ pub struct ResolvedElf {
     pub security_state: security::ResolvedElfState,
     /// Exec/write lock.
     pub file_write_guard: FileWriteGuardRef,
+    /// Enum indicating the architecture width (32 or 64 bits).
+    pub arch_width: ArchWidth,
 }
 
 /// Holds a resolved ELF interpreter VMO.
@@ -461,7 +537,11 @@ fn resolve_elf(
     security_state: security::ResolvedElfState,
 ) -> Result<ResolvedElf, Errno> {
     let vmo = memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
-    let elf_headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
+    let elf_headers = if cfg!(feature = "arch32") {
+        elf_parse::Elf64Headers::from_vmo_with_arch32(vmo).map_err(elf_parse_error_to_errno)?
+    } else {
+        elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?
+    };
     let interp = if let Some(interp_hdr) = elf_headers
         .program_header_with_type(elf_parse::SegmentType::Interp)
         .map_err(|_| errno!(EINVAL))?
@@ -488,7 +568,17 @@ fn resolve_elf(
     };
     let file_write_guard =
         file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-    Ok(ResolvedElf { file, memory, interp, argv, environ, security_state, file_write_guard })
+    let arch_width = get_arch_width(&elf_headers);
+    Ok(ResolvedElf {
+        file,
+        memory,
+        interp,
+        argv,
+        environ,
+        security_state,
+        file_write_guard,
+        arch_width,
+    })
 }
 
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes
@@ -506,6 +596,7 @@ pub fn load_executable(
         LoadElfUsage::MainElf,
     )?;
     current_task.mm().initialize_brk_origin(
+        main_elf.arch_width,
         UserAddress::from_ptr(main_elf.file_base)
             .checked_add(main_elf.length)
             .ok_or_else(|| errno!(EINVAL))?,
@@ -524,12 +615,29 @@ pub fn load_executable(
         .transpose()?;
 
     let entry_elf = interp_elf.as_ref().unwrap_or(&main_elf);
-    let entry = UserAddress::from_ptr(
-        entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias),
-    );
+    // Do not allow mismatch of arch32 interpreter with a non-arch32 main elf,
+    // or vice versa.
+    if main_elf.arch_width != entry_elf.arch_width {
+        log_warn!("interpreter elf and main elf are different architectures!");
+        return Err(errno!(ENOEXEC));
+    }
+    let entry_addr = entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias);
+    let main_elf_entry = main_elf.headers.file_header().entry.wrapping_add(main_elf.vaddr_bias);
+    let main_phdr = main_elf.file_base.wrapping_add(main_elf.headers.file_header().phoff);
+    // For consistency with the loader, we wrap u64 then modulo the 3Gb limit
+    // even though entry points would normally all be in the lower 1Gb.
+    let entry = UserAddress::from_ptr(entry_addr);
 
-    let vdso_memory = &current_task.kernel().vdso.memory;
-    let vvar_memory = current_task.kernel().vdso.vvar_readonly.clone();
+    let vdso_memory = if main_elf.arch_width.is_arch32() {
+        &current_task.kernel().vdso_arch32.as_ref().expect("an arch32 VDSO").memory
+    } else {
+        &current_task.kernel().vdso.memory
+    };
+    let vvar_memory = if main_elf.arch_width.is_arch32() {
+        current_task.kernel().vdso_arch32.as_ref().unwrap().vvar_readonly.clone()
+    } else {
+        current_task.kernel().vdso.vvar_readonly.clone()
+    };
 
     let vdso_size = vdso_memory.get_size();
     const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
@@ -595,20 +703,17 @@ pub fn load_executable(
         let creds = current_task.creds();
         let secure = if creds.uid != creds.euid || creds.gid != creds.egid { 1 } else { 0 };
         vec![
+            (AT_PAGESZ, *PAGE_SIZE),
+            (AT_CLKTCK, SCHEDULER_CLOCK_HZ as u64),
             (AT_UID, creds.uid as u64),
             (AT_EUID, creds.euid as u64),
             (AT_GID, creds.gid as u64),
             (AT_EGID, creds.egid as u64),
-            (AT_BASE, interp_elf.map_or(0, |interp| interp.file_base as u64)),
-            (AT_PAGESZ, *PAGE_SIZE),
-            (AT_PHDR, main_elf.file_base.wrapping_add(main_elf.headers.file_header().phoff) as u64),
+            (AT_PHDR, main_phdr as u64),
             (AT_PHENT, main_elf.headers.file_header().phentsize as u64),
             (AT_PHNUM, main_elf.headers.file_header().phnum as u64),
-            (
-                AT_ENTRY,
-                main_elf.vaddr_bias.wrapping_add(main_elf.headers.file_header().entry) as u64,
-            ),
-            (AT_CLKTCK, SCHEDULER_CLOCK_HZ as u64),
+            (AT_BASE, interp_elf.map_or(0, |interp| interp.file_base as u64)),
+            (AT_ENTRY, main_elf_entry as u64),
             (AT_SYSINFO_EHDR, vdso_base.into()),
             (AT_SECURE, secure),
         ]
@@ -617,13 +722,17 @@ pub fn load_executable(
     // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
     // this is based on adding 0x1000 each time a segfault appears.
     let stack_size: usize = round_up_to_system_page_size(
-        get_initial_stack_size(original_path, &resolved_elf.argv, &resolved_elf.environ, &auxv)
-            + 0xf0000,
+        get_initial_stack_size(
+            original_path,
+            &resolved_elf.argv,
+            &resolved_elf.environ,
+            &auxv,
+            main_elf.arch_width,
+        ) + 0xf0000,
     )
     .expect("stack is too big");
 
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
-
     let stack_base = current_task.mm().map_stack(stack_size, prot_flags)?;
 
     let stack = stack_base + (stack_size - 8);
@@ -635,6 +744,7 @@ pub fn load_executable(
         &resolved_elf.environ,
         auxv,
         stack,
+        main_elf.arch_width,
     )?;
 
     let mut mm_state = current_task.mm().state.write();
@@ -649,7 +759,24 @@ pub fn load_executable(
 
     mm_state.vdso_base = vdso_base;
 
-    Ok(ThreadStartInfo { entry, stack: stack.stack_pointer })
+    let ptr_size: usize =
+        if main_elf.arch_width.is_arch32() { size_of::<u32>() } else { size_of::<*const u8>() };
+    let envp =
+        stack.stack_pointer + ((resolved_elf.argv.len() + 1 /* argc */ + 1/* NULL */) * ptr_size);
+    Ok(ThreadStartInfo {
+        entry,
+        stack: stack.stack_pointer,
+        environ: envp,
+        arch_width: main_elf.arch_width,
+    })
+}
+
+fn get_arch_width(#[allow(unused_variables)] headers: &elf_parse::Elf64Headers) -> ArchWidth {
+    #[cfg(feature = "arch32")]
+    if headers.file_header().ident.is_arch32() {
+        return ArchWidth::Arch32;
+    }
+    ArchWidth::Arch64
 }
 
 #[cfg(test)]
@@ -724,6 +851,7 @@ mod tests {
             environ,
             vec![],
             original_stack_start_addr,
+            ArchWidth::Arch64,
         )
         .expect("Populate initial stack should succeed.")
         .stack_pointer;
@@ -745,7 +873,9 @@ mod tests {
             + aux_random
             + aux_null
             + random_seed;
-        payload_size += payload_size % 16;
+        if payload_size % 16 > 0 {
+            payload_size += 16 - (payload_size % 16);
+        }
 
         assert_eq!(stack_start_addr, original_stack_start_addr - payload_size);
     }
