@@ -43,7 +43,7 @@ const REMOTE_BUNDLE_NODE_LRU_CAPACITY: usize = 1024;
 pub struct RemoteBundle {
     metadata: Metadata,
     root: fio::DirectorySynchronousProxy,
-    rights: fio::OpenFlags,
+    rights: fio::Flags,
 }
 
 impl RemoteBundle {
@@ -52,22 +52,21 @@ impl RemoteBundle {
         kernel: &Arc<Kernel>,
         base: &fio::DirectorySynchronousProxy,
         mut options: FileSystemOptions,
-        rights: fio::OpenFlags,
+        rights: fio::Flags,
     ) -> Result<FileSystemHandle, Error> {
-        let (root, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+        let (root, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
         let path =
             std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
-        base.open(rights, fio::ModeType::empty(), path, server_end)
+        base.open3(path, rights, &Default::default(), server_end.into_channel())
             .map_err(|e| anyhow!("Failed to open root: {}", e))?;
-        let root = fio::DirectorySynchronousProxy::new(root.into_channel());
 
         let metadata = {
-            let (file, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-            root.open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
+            let (file, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
+            root.open3(
                 "metadata.v1",
-                server_end,
+                fio::PERM_READABLE,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .source_context("open metadata file")?;
             let mut file: std::fs::File = fdio::create_fd(file.into_channel().into_handle())
@@ -84,7 +83,7 @@ impl RemoteBundle {
             "Root node does not exist in remote bundle"
         );
 
-        if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+        if !rights.contains(fio::PERM_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
         }
 
@@ -423,17 +422,16 @@ impl FsNodeOps for DirectoryObject {
                 Ok(fs.create_node_with_id(current_task, DirectoryObject, inode_num, info))
             }
             NodeInfo::File(_) => {
-                let (file, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+                let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
                     .root
-                    .open(
-                        bundle.rights,
-                        fio::ModeType::empty(),
+                    .open3(
                         &format!("{inode_num}"),
-                        server_end,
+                        bundle.rights,
+                        &Default::default(),
+                        server_end.into_channel(),
                     )
                     .map_err(|_| errno!(EIO))?;
-                let file = fio::FileSynchronousProxy::new(file.into_channel());
                 Ok(fs.create_node_with_id(
                     current_task,
                     File { inner: Mutex::new(Inner::NeedsVmo(file)) },
@@ -547,9 +545,9 @@ mod test {
     #[::fuchsia::test]
     async fn test_read_image() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let (server, client) = zx::Channel::create();
-        fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
+        fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),

@@ -15,6 +15,8 @@ use std::mem::size_of;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use fidl_fuchsia_io as fio;
+
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
 pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> = Lazy::new(|| {
     load_time_values_memory().expect(
@@ -150,13 +152,13 @@ fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<MemoryObject>) {
 
 fn sync_open_in_namespace(
     path: &str,
-    flags: fidl_fuchsia_io::OpenFlags,
-) -> Result<fidl_fuchsia_io::DirectorySynchronousProxy, Errno> {
+    flags: fio::Flags,
+) -> Result<fio::DirectorySynchronousProxy, Errno> {
     let (client, server) = fidl::Channel::create();
-    let dir_proxy = fidl_fuchsia_io::DirectorySynchronousProxy::new(client);
+    let dir_proxy = fio::DirectorySynchronousProxy::new(client);
 
     let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
-    namespace.open_deprecated(path, flags, server).map_err(|_| errno!(ENOENT))?;
+    namespace.open(path, flags, server).map_err(|_| errno!(ENOENT))?;
     Ok(dir_proxy)
 }
 
@@ -165,11 +167,11 @@ fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
-    let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
+    let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fio::PERM_READABLE)?;
     let vdso_vmo = syncio::directory_open_vmo(
         &dir_proxy,
         VDSO_FILENAME,
-        fidl_fuchsia_io::VmoFlags::READ,
+        fio::VmoFlags::READ,
         zx::MonotonicInstant::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
@@ -182,17 +184,15 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
     const DIR: &str = "/boot/kernel";
 
     let (client, server) = fidl::Channel::create();
-    let dir_proxy = fidl_fuchsia_io::DirectorySynchronousProxy::new(client);
+    let dir_proxy = fio::DirectorySynchronousProxy::new(client);
 
     let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
-    namespace
-        .open_deprecated(DIR, fuchsia_fs::OpenFlags::RIGHT_READABLE, server)
-        .map_err(|_| errno!(ENOENT))?;
+    namespace.open(DIR, fuchsia_fs::PERM_READABLE, server).map_err(|_| errno!(ENOENT))?;
 
     let vmo = syncio::directory_open_vmo(
         &dir_proxy,
         FILENAME,
-        fidl_fuchsia_io::VmoFlags::READ,
+        fio::VmoFlags::READ,
         zx::MonotonicInstant::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
