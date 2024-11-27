@@ -457,16 +457,6 @@ void Paver::FindPartitionTableManager(FindPartitionTableManagerRequestView reque
                         std::move(request->data_sink), context_);
 }
 
-void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
-                           UseBlockDeviceCompleter::Sync& _completer) {
-  DynamicDataSink::Bind(dispatcher_, devices_.Duplicate(), svc_root_.borrow(),
-                        std::move(request->data_sink), context_,
-                        BlockAndController{
-                            .device = std::move(request->block_device),
-                            .controller = std::move(request->block_controller),
-                        });
-}
-
 void Paver::FindBootManager(FindBootManagerRequestView request,
                             FindBootManagerCompleter::Sync& _completer) {
   BootManager::Bind(dispatcher_, devices_.Duplicate(), component::MaybeClone(svc_root_), context_,

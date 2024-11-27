@@ -92,9 +92,6 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
   void FindPartitionTableManager(FindPartitionTableManagerRequestView request,
                                  FindPartitionTableManagerCompleter::Sync& _completer) override;
 
-  void UseBlockDevice(UseBlockDeviceRequestView request,
-                      UseBlockDeviceCompleter::Sync& _completer) override;
-
   void FindBootManager(FindBootManagerRequestView request,
                        FindBootManagerCompleter::Sync& _completer) override;
 

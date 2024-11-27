@@ -35,9 +35,6 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
   void FindPartitionTableManager(FindPartitionTableManagerRequestView request,
                                  FindPartitionTableManagerCompleter::Sync& completer) override;
 
-  void UseBlockDevice(UseBlockDeviceRequestView request,
-                      UseBlockDeviceCompleter::Sync& completer) override;
-
   void FindBootManager(FindBootManagerRequestView request,
                        FindBootManagerCompleter::Sync& completer) override;
 

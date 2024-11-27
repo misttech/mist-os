@@ -30,24 +30,6 @@ void FakePaver::FindPartitionTableManager(FindPartitionTableManagerRequestView r
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(request->data_sink.TakeChannel()), this);
 }
 
-void FakePaver::UseBlockDevice(UseBlockDeviceRequestView request,
-                               UseBlockDeviceCompleter::Sync& _completer) {
-  auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                   request->block_controller.borrow().channel()))
-                    ->GetTopologicalPath();
-  if (!result.ok() || result->is_error()) {
-    return;
-  }
-  const auto& path = result->value()->path;
-  {
-    fbl::AutoLock al(&lock_);
-    if (std::string(path.data(), path.size()) != expected_block_device_) {
-      return;
-    }
-  }
-  fidl::BindServer(dispatcher_, std::move(request->data_sink), this);
-}
-
 void FakePaver::FindBootManager(FindBootManagerRequestView request,
                                 FindBootManagerCompleter::Sync& _completer) {
   fbl::AutoLock al(&lock_);

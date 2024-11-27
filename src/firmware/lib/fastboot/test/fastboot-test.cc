@@ -427,14 +427,6 @@ TEST(FastbootTest, DownloadFailsOnetDownloadBuffer) {
   ASSERT_EQ(fastboot.state(), FastbootBase::State::kCommand);
 }
 
-class TestPaver : public paver_test::FakePaver {
- public:
-  void UseBlockDevice(UseBlockDeviceRequestView request,
-                      UseBlockDeviceCompleter::Sync& completer) override {
-    fidl::BindServer(dispatcher(), std::move(request->data_sink), this);
-  }
-};
-
 class FastbootFlashTest : public FastbootDownloadTest {
  protected:
   FastbootFlashTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), vfs_(loop_.dispatcher()) {
@@ -540,7 +532,7 @@ class FastbootFlashTest : public FastbootDownloadTest {
 
   async::Loop loop_;
   fs::ManagedVfs vfs_;
-  TestPaver fake_paver_;
+  paver_test::FakePaver fake_paver_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
 
