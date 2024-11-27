@@ -283,8 +283,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");
@@ -306,8 +305,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");
@@ -350,8 +348,7 @@ mod tests {
                     cobalt_sender,
                 );
                 let (scan_result_reader, _scan_result_generator) =
-                    create_request_stream::<ScanResultIteratorMarker>()
-                        .expect("internal error: failed to create scan result iterator");
+                    create_request_stream::<ScanResultIteratorMarker>();
                 proxy
                     .report_current_stations(scan_result_reader)
                     .expect("internal error: proxy failed to send request");
@@ -390,8 +387,7 @@ mod tests {
                 cobalt_sender,
             );
             let (scan_result_reader, _scan_result_generator) =
-                create_request_stream::<ScanResultIteratorMarker>()
-                    .expect("internal error: failed to create scan result iterator");
+                create_request_stream::<ScanResultIteratorMarker>();
             proxy
                 .report_current_stations(scan_result_reader)
                 .expect("internal error: proxy failed to send request");

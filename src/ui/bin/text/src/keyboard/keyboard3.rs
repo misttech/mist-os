@@ -456,7 +456,7 @@ mod tests {
         /// Returns fake client viewref and keyboard listener.
         async fn create_fake_client(&self) -> Result<Client, Error> {
             let (listener_client_end, listener) =
-                fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>()?;
+                fidl::endpoints::create_request_stream::<ui_input3::KeyboardListenerMarker>();
             let view_ref = scenic::ViewRefPair::new()?.view_ref;
 
             self.keyboard_proxy

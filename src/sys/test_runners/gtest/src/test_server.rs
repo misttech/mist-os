@@ -830,11 +830,9 @@ mod tests {
         );
 
         let (run_listener_client, run_listener) =
-            fidl::endpoints::create_request_stream::<RunListenerMarker>()
-                .context("Failed to create run_listener")?;
+            fidl::endpoints::create_request_stream::<RunListenerMarker>();
         let (test_suite_client, test_suite) =
-            fidl::endpoints::create_request_stream::<SuiteMarker>()
-                .context("failed to create suite")?;
+            fidl::endpoints::create_request_stream::<SuiteMarker>();
 
         let suite_proxy = test_suite_client.into_proxy();
         fasync::Task::spawn(async move {

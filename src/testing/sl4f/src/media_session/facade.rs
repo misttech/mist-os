@@ -80,8 +80,7 @@ impl MediaSessionFacade {
             let publisher = fuchsia_component::client::connect_to_protocol::<PublisherMarker>()
                 .expect("Failed to connect to Publisher");
 
-            let (player_client, mut player_request_stream) =
-                create_request_stream().expect("Failed to create request stream");
+            let (player_client, mut player_request_stream) = create_request_stream();
 
             publisher
                 .publish(

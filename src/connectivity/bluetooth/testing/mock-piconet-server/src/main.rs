@@ -529,7 +529,7 @@ mod tests {
         let (client, mut server) = create_proxy_and_stream::<ProfileTestMarker>().unwrap();
 
         let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>();
-        let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>().unwrap();
+        let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>();
         let reg_fut = client.register_peer(&id.into(), mock_peer_server, observer);
         let mut reg_fut = pin!(reg_fut);
 
@@ -645,7 +645,7 @@ mod tests {
         assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_)));
 
         // Advertise - the request should be handled by the server and remain active.
-        let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>().unwrap();
+        let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>();
         let mut adv_fut = c.advertise(bredr::ProfileAdvertiseRequest {
             services: Some(vec![]),
             receiver: Some(target),

@@ -102,7 +102,7 @@ fn attribution_info_for_kernel(
     // a handle to get detailed attribution. We start a new task as each incoming connection is
     // independent.
     let (client_end, server_end) =
-        fidl::endpoints::create_request_stream::<fattribution::ProviderMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<fattribution::ProviderMarker>();
     fuchsia_async::Task::spawn(serve_memory_attribution_provider_container(server_end, kernel))
         .detach();
 

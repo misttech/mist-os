@@ -29,7 +29,7 @@ impl crate::RemotableCapability for Router<DirEntry> {
 impl From<Router<DirEntry>> for fsandbox::Capability {
     fn from(router: Router<DirEntry>) -> Self {
         let (client_end, sender_stream) =
-            fidl::endpoints::create_request_stream::<fsandbox::DirEntryRouterMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<fsandbox::DirEntryRouterMarker>();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
         fsandbox::Capability::DirEntryRouter(client_end)
     }

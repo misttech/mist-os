@@ -139,7 +139,7 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
     store.dictionary_create(svc_dict_id).await.unwrap().unwrap();
 
     let (echo_receiver_client, echo_receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = 100;
     store.connector_create(connector_id, echo_receiver_client).await.unwrap().unwrap();
     store

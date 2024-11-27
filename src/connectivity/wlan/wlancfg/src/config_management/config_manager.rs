@@ -1633,8 +1633,7 @@ mod tests {
         // Initialize stash proxies such that SavedNetworksManager initialize doesn't wait on
         // and doesn't load anything from the legacy stash.
         let (stash_client, mut request_stream) =
-            create_request_stream::<fidl_stash::SecureStoreMarker>()
-                .expect("create_request_stream failed");
+            create_request_stream::<fidl_stash::SecureStoreMarker>();
 
         let read_from_stash = Arc::new(AtomicBool::new(false));
 

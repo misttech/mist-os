@@ -508,7 +508,7 @@ async fn run_driver_service(
             }
             InspectPuppetRequest::InitializeTree { params, responder } => {
                 let actor = Actor::new(new_inspector(&params));
-                let (tree, request_stream) = create_request_stream::<TreeMarker>()?;
+                let (tree, request_stream) = create_request_stream::<TreeMarker>();
                 service::spawn_tree_server_with_stream(
                     actor.inspector.clone(),
                     TreeServerSendPreference::default(),

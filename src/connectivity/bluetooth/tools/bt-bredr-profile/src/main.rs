@@ -150,8 +150,7 @@ async fn advertise(
         ..Default::default()
     }];
 
-    let (connect_client, connect_requests) =
-        create_request_stream().context("ConnectionReceiver creation")?;
+    let (connect_client, connect_requests) = create_request_stream();
 
     let _ = profile_svc
         .advertise(ProfileAdvertiseRequest {

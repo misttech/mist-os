@@ -29,7 +29,7 @@ impl Interrupter {
             return Ok(());
         }
 
-        let (usage_watcher, usage_watcher_requests) = create_request_stream()?;
+        let (usage_watcher, usage_watcher_requests) = create_request_stream();
         self.usage_reporter.watch(&Usage::RenderUsage(usage), usage_watcher)?;
 
         self.usage_watcher_requests.insert(usage, usage_watcher_requests);
@@ -113,8 +113,7 @@ mod test {
 
     fn test_interrupter() -> (Interrupter, UsageReporterRequestStream) {
         let (usage_reporter, usage_reporter_requests) =
-            create_request_stream::<UsageReporterMarker>()
-                .expect("Creating usage reporter channel");
+            create_request_stream::<UsageReporterMarker>();
 
         let usage_reporter = usage_reporter.into_proxy();
         let interrupter = Interrupter::new(usage_reporter);

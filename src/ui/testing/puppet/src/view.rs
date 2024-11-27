@@ -775,8 +775,7 @@ impl View {
         keyboard_ready: AsyncEvent,
     ) {
         let (keyboard_client, mut keyboard_stream) =
-            create_request_stream::<ui_input3::KeyboardListenerMarker>()
-                .expect("failed to create keyboard source channel");
+            create_request_stream::<ui_input3::KeyboardListenerMarker>();
 
         keyboard
             .add_listener(view_ref, keyboard_client)

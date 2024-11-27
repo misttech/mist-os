@@ -279,8 +279,7 @@ struct TestPlayer {
 
 impl TestPlayer {
     async fn new(service: &TestService) -> Result<Self> {
-        let (player_client, requests) =
-            create_request_stream().context("Creating player request stream")?;
+        let (player_client, requests) = create_request_stream();
         let id = service
             .publisher
             .publish(

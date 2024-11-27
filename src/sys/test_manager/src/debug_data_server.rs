@@ -140,7 +140,7 @@ pub(crate) async fn serve_directory(
         drop(file_stream);
     }
 
-    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>()?;
+    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>();
     let _ = event_sender.send(RunEvent::debug_data(client).into()).await;
     event_sender.disconnect(); // No need to hold this open while we serve the iterator.
 
@@ -167,7 +167,7 @@ pub(crate) async fn serve_directory_for_suite(
         drop(file_stream);
     }
 
-    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>()?;
+    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>();
     let _ = event_sender.send(Ok(SuiteEvents::debug_data(client).into())).await;
     event_sender.disconnect(); // No need to hold this open while we serve the iterator.
 

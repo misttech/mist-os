@@ -729,8 +729,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
 
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
         .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
             listener: Some(listener_client_end),
@@ -901,8 +900,7 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
 
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
         .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
             listener: Some(listener_client_end),
@@ -970,8 +968,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     // Trigger "boot complete" logic.
     let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
 
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
         .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
             listener: Some(listener_client_end),
@@ -1151,8 +1148,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
     // Trigger "boot complete" logic.
     let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
 
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
         .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
             listener: Some(listener_client_end),

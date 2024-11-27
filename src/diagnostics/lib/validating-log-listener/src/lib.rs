@@ -72,7 +72,7 @@ impl ValidatingListener {
         dump_logs: bool,
     ) {
         let (client_end, stream) =
-            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>();
         let filter_options = filter_options.as_ref();
 
         if dump_logs {

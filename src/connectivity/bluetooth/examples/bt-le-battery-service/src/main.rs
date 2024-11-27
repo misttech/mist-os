@@ -157,8 +157,7 @@ async fn main() -> Result<(), Error> {
 
     // Connect to the gatt2.Server protocol to publish the service.
     let gatt_server = connect_to_protocol::<gatt::Server_Marker>()?;
-    let (service_client, service_stream) = create_request_stream::<gatt::LocalServiceMarker>()
-        .context("Can't create LocalService endpoints")?;
+    let (service_client, service_stream) = create_request_stream::<gatt::LocalServiceMarker>();
     let service_notification_handle = service_stream.control_handle();
 
     // Connect to the battery service and initialize the shared state.

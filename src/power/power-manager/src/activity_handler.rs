@@ -5,7 +5,7 @@
 use crate::log_if_err;
 use crate::message::Message;
 use crate::node::Node;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use fidl::endpoints::Proxy as _;
 use fuchsia_component::client::connect_to_protocol;
@@ -197,8 +197,7 @@ impl ActivityHandler {
             ));
         }
         let (client, stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()
-                .context("Failed to create request stream")?;
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         activity_provider
             .watch_state(client)
             .map_err(|e| format_err!("watch_state failed: {:?}", e))?;

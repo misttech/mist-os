@@ -26,7 +26,7 @@ async fn handle_check_now_cmd_impl(
     };
     let (monitor_client, monitor_server) = if monitor {
         let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream::<MonitorMarker>()?;
+            fidl::endpoints::create_request_stream::<MonitorMarker>();
         (Some(client_end), Some(request_stream))
     } else {
         (None, None)

@@ -74,10 +74,8 @@ impl DisplayProviderClient {
     async fn open_display_coordinator(self) -> Result<DisplayCoordinatorClient, Error> {
         let (display_coordinator, coordinator_server) =
             fidl::endpoints::create_proxy::<display::CoordinatorMarker>();
-        let (listener_client, listener_requests) = fidl::endpoints::create_request_stream::<
-            display::CoordinatorListenerMarker,
-        >()
-        .context("Failed to create fuchsia.hardware.display.CoordinatorListener request stream")?;
+        let (listener_client, listener_requests) =
+            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>();
 
         let payload = display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
             coordinator: Some(coordinator_server),

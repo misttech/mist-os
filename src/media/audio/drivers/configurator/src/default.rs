@@ -688,8 +688,7 @@ impl Configurator for DefaultConfigurator {
     async fn process_new_dai(&mut self, mut interface: DaiInterface) -> Result<(), Error> {
         let _ = interface.connect().context("Couldn't connect to DAI")?;
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         let dai_properties = interface.get_properties().await?;
         let mut inner = self.inner.lock().await;
         // Use an empty string if no manufacturer reported.
@@ -1305,8 +1304,7 @@ mod tests {
     {
         let exec = fasync::TestExecutor::new_with_fake_time();
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         let control_handle = request_stream.control_handle().clone();
         let mut stream_config_state: StreamConfigInner = Default::default();
         stream_config_state.dai_state = None;
@@ -1605,11 +1603,9 @@ mod tests {
         mut exec: fasync::TestExecutor,
         mut stream_config: StreamConfig,
     ) {
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1672,11 +1668,9 @@ mod tests {
         let mut configurator = DefaultConfigurator::new(config)?;
         for _ in 0..number_of_codecs {
             let (codec_client, codec_stream) =
-                fidl::endpoints::create_request_stream::<CodecMarker>()
-                    .expect("Error creating endpoint");
+                fidl::endpoints::create_request_stream::<CodecMarker>();
             let (_signal_client, signal_stream) =
-                fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                    .expect("Error creating endpoint");
+                fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
             let codec = TestCodec {
                 codec_stream: codec_stream,
                 signal_stream: Some(signal_stream),
@@ -1742,11 +1736,9 @@ mod tests {
         let mut configurator = DefaultConfigurator::new(config)?;
 
         // Add output device.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1759,11 +1751,9 @@ mod tests {
         configurator.process_new_codec(codec_interface).await?;
 
         // Add input device 1.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1776,11 +1766,9 @@ mod tests {
         configurator.process_new_codec(codec_interface).await?;
 
         // Add input device 2.
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1819,11 +1807,9 @@ mod tests {
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
         let mut configurator = DefaultConfigurator::new(config)?;
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let (_signal_client, signal_stream) =
-            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
-                .expect("Error creating endpoint");
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>();
         let codec = TestCodec {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
@@ -1914,8 +1900,7 @@ mod tests {
         mut exec: fasync::TestExecutor,
         mut stream_config: StreamConfig,
     ) {
-        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
-            .expect("Error creating endpoint");
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let codec = TestCodecBad { codec_stream: codec_stream };
         let _codec_task = fasync::Task::spawn(codec.process_codec_requests());
         let stream_config_inner = stream_config.inner.clone();

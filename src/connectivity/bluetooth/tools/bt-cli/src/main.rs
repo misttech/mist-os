@@ -394,7 +394,7 @@ fn create_pairing_task(
     pairing_svc: &PairingProxy,
 ) -> Result<(fasync::Task<()>, mpsc::Receiver<(PeerId, bool)>), Error> {
     let (pairing_delegate_client, delegate_stream) =
-        fidl::endpoints::create_request_stream::<PairingDelegateMarker>()?;
+        fidl::endpoints::create_request_stream::<PairingDelegateMarker>();
     let (sender, recv) = mpsc::channel(0);
     let pairing_delegate_server = pairing_delegate::handle_requests(delegate_stream, sender);
 

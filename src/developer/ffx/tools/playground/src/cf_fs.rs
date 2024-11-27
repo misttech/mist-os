@@ -543,7 +543,7 @@ mod test {
         instances: Vec<sys2::Instance>,
     ) -> fidl::endpoints::ClientEnd<sys2::InstanceIteratorMarker> {
         let (client, mut stream) =
-            fidl::endpoints::create_request_stream::<sys2::InstanceIteratorMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<sys2::InstanceIteratorMarker>();
         fuchsia_async::Task::spawn(async move {
             let sys2::InstanceIteratorRequest::Next { responder } =
                 stream.next().await.unwrap().unwrap();

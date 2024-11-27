@@ -100,8 +100,7 @@ pub(crate) mod tests {
         pub async fn make_enable_request(
         ) -> (QueryResponseFut<Result<(), i32>>, ServiceRequest, Self) {
             let (c, mut s) = create_proxy_and_stream::<ProviderMarker>().unwrap();
-            let (watcher_client, watcher_server) =
-                create_request_stream::<ProviderWatcherMarker>().unwrap();
+            let (watcher_client, watcher_server) = create_request_stream::<ProviderWatcherMarker>();
             let mock_client = Self { connection: watcher_server };
             let fut = c.enable(watcher_client);
             let (watcher, responder) =

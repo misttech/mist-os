@@ -456,7 +456,7 @@ impl GattClientFacade {
             }
 
             let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
+                fidl::endpoints::create_request_stream::<CharacteristicNotifierMarker>();
             let register_fut =
                 service.proxy.register_characteristic_notifier(&Handle { value: id }, client_end);
 

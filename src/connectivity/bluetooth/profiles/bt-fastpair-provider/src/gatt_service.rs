@@ -273,8 +273,7 @@ impl GattService {
     ) -> Result<LocalServiceRequestStream, Error> {
         // Build the GATT service.
         let info = Self::service_info();
-        let (service_client, service_stream) = create_request_stream::<LocalServiceMarker>()
-            .context("Can't create LocalService endpoints")?;
+        let (service_client, service_stream) = create_request_stream::<LocalServiceMarker>();
 
         if let Err(e) = server_svc.publish_service(&info, service_client).await? {
             warn!("Couldn't set up Fast Pair GATT Service: {:?}", e);

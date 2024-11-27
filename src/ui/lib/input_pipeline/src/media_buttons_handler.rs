@@ -457,8 +457,7 @@ mod tests {
 
         // Register a listener.
         let (listener, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let register_listener_fut = async {
             let res = device_listener_proxy.register_listener(listener).await;
             assert!(res.is_ok());
@@ -505,8 +504,7 @@ mod tests {
 
         // Register a listener.
         let (listener, listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(listener).await;
 
         // Setup events and expectations.
@@ -565,11 +563,9 @@ mod tests {
 
         // Register two listeners.
         let (first_listener, first_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let (second_listener, second_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(first_listener).await;
         let _ = device_listener_proxy.register_listener(second_listener).await;
 
@@ -627,15 +623,14 @@ mod tests {
 
             // Register three listeners.
             let (first_listener, mut first_listener_stream) =
-                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                    .unwrap();
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>(
+                );
             let (second_listener, mut second_listener_stream) =
-                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                    .unwrap();
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>(
+                );
             let (third_listener, third_listener_stream) = fidl::endpoints::create_request_stream::<
                 fidl_ui_policy::MediaButtonsListenerMarker,
-            >()
-            .unwrap();
+            >();
             let _ = device_listener_proxy.register_listener(first_listener).await;
             let _ = device_listener_proxy.register_listener(second_listener).await;
             let _ = device_listener_proxy.register_listener(third_listener).await;
@@ -726,11 +721,9 @@ mod tests {
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
         let (first_listener, mut first_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let (second_listener, mut second_listener_stream) =
-            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
-                .unwrap();
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>();
         let _ = device_listener_proxy.register_listener(first_listener).await;
         let _ = device_listener_proxy.register_listener(second_listener).await;
 

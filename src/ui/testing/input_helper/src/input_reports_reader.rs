@@ -232,8 +232,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_err_if_request_stream_yields_error() -> Result<(), Error> {
             let (client_end, request_stream) =
-                endpoints::create_request_stream::<InputReportsReaderMarker>()
-                    .context("creating InputReportsReader client_end and stream")?;
+                endpoints::create_request_stream::<InputReportsReaderMarker>();
             let (report_sender, report_receiver) =
                 futures::channel::mpsc::unbounded::<InputReport>();
             let reader_fut = InputReportsReader { request_stream, report_receiver }.into_future();

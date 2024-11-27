@@ -143,7 +143,7 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
 
     let _monitor_task = if notifications {
         let (notification_client, notification_server) =
-            fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>()?;
+            fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>();
         remote_client
             .register_characteristic_notifier(&battery_level_handle, notification_client)
             .await?

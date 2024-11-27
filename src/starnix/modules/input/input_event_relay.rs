@@ -275,8 +275,7 @@ impl InputEventsRelay {
                     open_files: default_keyboard_device_opened_files,
                 };
                 let (keyboard_listener, mut event_stream) =
-                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>()
-                        .expect("Failed to create keyboard proxy and stream");
+                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>();
                 if keyboard
                     .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
                     .is_err()
@@ -544,8 +543,7 @@ mod test {
             keyboard_device.open_test(locked, current_task).expect("Failed to create input file");
 
         let (touch_source_client_end, touch_source_stream) =
-            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
         let (keyboard_proxy, keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();

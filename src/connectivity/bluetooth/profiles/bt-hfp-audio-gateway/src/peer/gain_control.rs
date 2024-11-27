@@ -93,8 +93,7 @@ impl GainControl {
             true
         });
         let mut microphone_gain_hanging_get = HangingGet::new(0, f);
-        let (client_end, request_stream) = fidl::endpoints::create_request_stream()
-            .map_err(|e| Error::system("Could not create gain control fidl endpoints", e))?;
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         Ok(Self {
             client_end: Some(client_end),
             request_stream,

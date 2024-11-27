@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_from_proxy() {
         let _exec = fasync::TestExecutor::new();
-        let (client, _stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+        let (client, _stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snooper = Snooper::from_client(client, "c");
         assert_eq!(snooper.device_name, "c");
     }
@@ -280,7 +280,7 @@ mod tests {
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (snoop_client, mut req_stream) =
-            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snoop_control = req_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
         let req_0 = SnoopOnObservePacketRequest {
@@ -336,8 +336,7 @@ mod tests {
     #[test]
     fn test_snoop_stream_missing_sequence() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_client, snoop_stream) =
-            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+        let (snoop_client, snoop_stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
         let snoop_control = snoop_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
 

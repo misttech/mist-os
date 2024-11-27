@@ -161,7 +161,7 @@ impl UpdateTool {
         // until the update is completed.
         let (monitor_client, monitor_server) = if do_monitor {
             let (client_end, request_stream) =
-                fidl::endpoints::create_request_stream::<MonitorMarker>().map_err(|e| bug!(e))?;
+                fidl::endpoints::create_request_stream::<MonitorMarker>();
             (Some(client_end), Some(request_stream))
         } else {
             (None, None)

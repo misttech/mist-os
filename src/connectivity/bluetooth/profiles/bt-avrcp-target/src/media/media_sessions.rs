@@ -46,8 +46,7 @@ impl MediaSessions {
         // Set up the MediaSession Discovery service. Connect to the session watcher.
         let discovery = connect_to_protocol::<DiscoveryMarker>()
             .expect("Couldn't connect to discovery service.");
-        let (watcher_client, watcher_requests) =
-            create_request_stream().expect("Error creating watcher request stream");
+        let (watcher_client, watcher_requests) = create_request_stream();
 
         // Subscribe to all players. The active player is the player that has sent this
         // component the most recent SessionUpdate with an active status.

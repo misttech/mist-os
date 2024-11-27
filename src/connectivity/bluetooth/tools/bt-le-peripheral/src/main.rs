@@ -174,7 +174,7 @@ fn advertise(
     service_names: &[String],
 ) -> Result<(AdvertisedPeripheralRequestStream, QueryResponseFut<Result<(), PeripheralError>>), Error>
 {
-    let (client_end, server_stream) = create_request_stream::<AdvertisedPeripheralMarker>()?;
+    let (client_end, server_stream) = create_request_stream::<AdvertisedPeripheralMarker>();
     let name = match &parameters.data {
         Some(data) => data.name.clone(),
         None => None,

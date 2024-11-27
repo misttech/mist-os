@@ -74,7 +74,7 @@ impl GasProxy {
         gas_task_channel: mpsc::Sender<gatt::LocalServiceRequest>,
     ) -> Result<GasProxy, Error> {
         let (service_client, service_request_stream) =
-            create_request_stream::<gatt::LocalServiceMarker>()?;
+            create_request_stream::<gatt::LocalServiceMarker>();
         let service_info = build_generic_access_service_info();
         gatt_server.publish_service(&service_info, service_client).await?.map_err(|e| {
             format_err!("Failed to publish Generic Access Service to GATT server: {:?}", e)

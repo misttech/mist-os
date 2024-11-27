@@ -150,8 +150,7 @@ impl BatteryClient {
     pub fn register_updates(
         battery_svc: fpower::BatteryManagerProxy,
     ) -> Result<Self, BatteryClientError> {
-        let (watcher_client, watcher) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>()?;
+        let (watcher_client, watcher) = create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         battery_svc.watch(watcher_client)?;
 
         Ok(Self {

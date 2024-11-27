@@ -236,8 +236,7 @@ impl LocalComponentRunnerBuilder {
             .take()
             .ok_or(ftest::RealmBuilderError::BuildAlreadyCalled)?;
         let (runner_client_end, runner_request_stream) =
-            create_request_stream::<fcrunner::ComponentRunnerMarker>()
-                .expect("failed to create channel pair");
+            create_request_stream::<fcrunner::ComponentRunnerMarker>();
         let runner = LocalComponentRunner::new(local_component_implementations);
         let runner_task = fasync::Task::spawn(async move {
             if let Err(e) = runner.handle_stream(runner_request_stream).await {

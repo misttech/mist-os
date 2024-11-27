@@ -30,7 +30,7 @@ async fn main() {
     let mut receiver_tasks = fasync::TaskGroup::new();
     for i in 1..=3 {
         let (receiver, receiver_stream) =
-            endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+            endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
         let connector_id = id_gen.next();
         store.connector_create(connector_id, receiver).await.unwrap().unwrap();
         store

@@ -245,7 +245,7 @@ mod tests {
             inspector: Inspector,
             settings: TreeServerSendPreference,
         ) -> ClientEnd<TreeMarker> {
-            let (tree, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+            let (tree, request_stream) = create_request_stream::<TreeMarker>();
             let server = spawn_tree_server_with_stream(inspector, settings, request_stream);
             self.tree_pairs.push((component, Some(server)));
             tree

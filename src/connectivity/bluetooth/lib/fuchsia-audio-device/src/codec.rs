@@ -181,8 +181,7 @@ impl SoftCodec {
         formats: fidl_fuchsia_hardware_audio::DaiSupportedFormats,
         initially_plugged: bool,
     ) -> (Self, ClientEnd<CodecMarker>) {
-        let (client, codec_requests) =
-            fidl::endpoints::create_request_stream::<CodecMarker>().unwrap();
+        let (client, codec_requests) = fidl::endpoints::create_request_stream::<CodecMarker>();
         let is_input = match direction {
             CodecDirection::Input => Some(true),
             CodecDirection::Output => Some(false),

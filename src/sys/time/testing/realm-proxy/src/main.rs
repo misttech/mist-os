@@ -148,7 +148,7 @@ fn serve_realm_factory(mut stream: fttr::RealmFactoryRequestStream) -> BoxFuture
                         ) = realm_factory::create_realm(options, fake_utc_clock).await?;
 
                         let (push_source_puppet_client_end, push_source_request_stream) =
-                            endpoints::create_request_stream().expect("infallible");
+                            endpoints::create_request_stream();
                         task_group.spawn(async move {
                             serve_push_puppet(push_source_puppet, push_source_request_stream)
                                 .await
@@ -156,8 +156,7 @@ fn serve_realm_factory(mut stream: fttr::RealmFactoryRequestStream) -> BoxFuture
                         });
 
                         // Needs to be served by the test fixture.
-                        let (rtc_updates, rtc_updates_stream) =
-                            endpoints::create_request_stream().expect("infallible");
+                        let (rtc_updates, rtc_updates_stream) = endpoints::create_request_stream();
                         task_group.spawn(async move {
                             serve_rtc_updates(local_rtc_updates, rtc_updates_stream)
                                 .await

@@ -39,7 +39,7 @@ async fn snapshot(remote_control: RemoteControlProxy, cmd: SnapshotCommand) -> R
     let process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
     let contents_dir = cmd.output_contents_dir.as_ref().map(std::path::Path::new);
 
-    let (receiver_client, receiver_stream) = create_request_stream()?;
+    let (receiver_client, receiver_stream) = create_request_stream();
     let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
         process_selector: Some(process_selector),
         receiver: Some(receiver_client),

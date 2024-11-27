@@ -129,7 +129,7 @@ impl WebdriverFacadeInternal {
 
         // Create a DevToolsListener and channel, and enable DevTools.
         let (dev_tools_client, dev_tools_stream) =
-            create_request_stream::<DevToolsListenerMarker>()?;
+            create_request_stream::<DevToolsListenerMarker>();
         debug_proxy.enable_dev_tools(dev_tools_client).await?;
 
         // Spawn a task to process the DevToolsListener updates asynchronously.

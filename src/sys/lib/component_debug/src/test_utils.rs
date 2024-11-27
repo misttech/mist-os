@@ -26,7 +26,7 @@ pub enum SeedPath {
 fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) -> ClientEnd<fsys::InstanceIteratorMarker> {
-    let (client, mut stream) = create_request_stream::<fsys::InstanceIteratorMarker>().unwrap();
+    let (client, mut stream) = create_request_stream::<fsys::InstanceIteratorMarker>();
     Task::spawn(async move {
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();
@@ -43,8 +43,7 @@ fn serve_manifest_bytes_iterator(
     manifest: fcdecl::Component,
 ) -> ClientEnd<fsys::ManifestBytesIteratorMarker> {
     let bytes = fidl::persist(&manifest).unwrap();
-    let (client, mut stream) =
-        create_request_stream::<fsys::ManifestBytesIteratorMarker>().unwrap();
+    let (client, mut stream) = create_request_stream::<fsys::ManifestBytesIteratorMarker>();
     Task::spawn(async move {
         let fsys::ManifestBytesIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();

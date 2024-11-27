@@ -90,7 +90,7 @@ impl BrokerSvc {
                             Ok(lease) => {
                                 tracing::debug!("responder.send({:?})", &lease);
                                 let (client, stream) =
-                                    create_request_stream::<LeaseControlMarker>()?;
+                                    create_request_stream::<LeaseControlMarker>();
                                 tracing::debug!("Spawning lease control task for {:?}", &lease.id);
                                 Task::local({
                                     let svc = self.clone();

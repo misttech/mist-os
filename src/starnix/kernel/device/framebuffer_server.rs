@@ -375,7 +375,7 @@ pub fn start_presentation_loop(
 
             // TODO: b/307790211 - Service annotation controller stream.
             let (annotation_controller_client_end, _annotation_controller_stream) =
-                create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
+                create_request_stream::<felement::AnnotationControllerMarker>();
 
             // Wait for present_view before processing Flatland events.
             graphical_presenter

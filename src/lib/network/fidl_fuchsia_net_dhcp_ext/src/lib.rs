@@ -877,8 +877,7 @@ mod test {
         const ADDRESS: fnet::Ipv4AddressWithPrefix =
             net_declare::fidl_ip_v4_with_prefix!("192.0.2.1/32");
 
-        let (client, stream) = fidl::endpoints::create_request_stream::<fnet_dhcp::ClientMarker>()
-            .expect("create DHCP client client end and stream");
+        let (client, stream) = fidl::endpoints::create_request_stream::<fnet_dhcp::ClientMarker>();
 
         let server_fut = async move {
             pin_mut!(stream);

@@ -597,7 +597,7 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
 
 #[fasync::run_singlethreaded(test)]
 pub async fn test_blobfs_broken() -> Result<(), Error> {
-    let (client, server) = fidl::endpoints::create_request_stream().unwrap();
+    let (client, server) = fidl::endpoints::create_request_stream();
     let package = build_test_package().await?;
     let env = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())

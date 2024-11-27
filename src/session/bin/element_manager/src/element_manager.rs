@@ -492,7 +492,7 @@ impl ElementManager {
             })?;
 
         let (annotation_controller_client_end, annotation_controller_stream) =
-            create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
+            create_request_stream::<felement::AnnotationControllerMarker>();
         let initial_view_annotations = annotation_holder.get_annotations().unwrap();
 
         let view_controller_proxy = match element.use_view_provider() {

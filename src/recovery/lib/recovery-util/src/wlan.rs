@@ -43,8 +43,7 @@ fn get_client_controller(
     let policy_provider = connect_to_protocol::<wlan_policy::ClientProviderMarker>()?;
     let (client_controller, server_end) = create_proxy::<wlan_policy::ClientControllerMarker>();
     let (update_client_end, update_stream) =
-        create_request_stream::<wlan_policy::ClientStateUpdatesMarker>()
-            .context("create ClientStateUpdates request stream")?;
+        create_request_stream::<wlan_policy::ClientStateUpdatesMarker>();
     policy_provider
         .get_controller(server_end, update_client_end)
         .context("PolicyProvider.get_controller")?;

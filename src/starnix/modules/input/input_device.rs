@@ -259,8 +259,7 @@ mod test {
             input_device.open_test(locked, current_task).expect("Failed to create input file");
 
         let (touch_source_client_end, touch_source_stream) =
-            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
@@ -304,8 +303,7 @@ mod test {
             );
 
         let (touch_source_client_end, _touch_source_stream) =
-            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
         let relay = input_event_relay::InputEventsRelay::new();
         relay.start_relays(
@@ -343,8 +341,7 @@ mod test {
             );
 
         let (touch_source_client_end, _touch_source_stream) =
-            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =

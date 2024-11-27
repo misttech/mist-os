@@ -107,7 +107,7 @@ mod tests {
 
         // Call the server's `watch_state` method, providing a Listener client end
         let (listener_client, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         provider_client.watch_state(listener_client).unwrap();
 
         // Set `Active` state on the mock and verify the listener sees the correct state

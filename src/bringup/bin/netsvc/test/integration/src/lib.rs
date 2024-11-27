@@ -1411,8 +1411,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
     // Add the device to devfs and wait for netsvc to set it to multicast
     // promiscuous.
 
-    let (client_end, connector_stream) =
-        fidl::endpoints::create_request_stream().expect("create request stream");
+    let (client_end, connector_stream) = fidl::endpoints::create_request_stream();
     let () = netsvc_realm
         .add_raw_device(netemul::devfs_device_path("ep").as_path(), client_end)
         .await

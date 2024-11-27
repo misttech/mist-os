@@ -67,7 +67,7 @@ async fn wake_lease_blocks_system_suspend_until_release() -> Result<()> {
     let activity_lease = lease_helper.lease().await?;
 
     // Register a Listener on System Activity Governor to check for suspend callbacks.
-    let (client, stream) = create_request_stream::<fsystem::ActivityGovernorListenerMarker>()?;
+    let (client, stream) = create_request_stream::<fsystem::ActivityGovernorListenerMarker>();
     let (on_suspend_sender, mut on_suspend_receiver) = mpsc::unbounded();
     fasync::Task::local(async move {
         let listener = ActivityGovernorListener { on_suspend_sender };

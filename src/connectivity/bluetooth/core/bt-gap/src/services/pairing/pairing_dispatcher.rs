@@ -105,7 +105,7 @@ impl PairingDispatcher {
 
     /// Start relaying pairing requests from the host end of `host_proxy` to our upstream
     fn start_handling_host(&mut self, id: HostId, host_proxy: HostProxy) -> Result<(), Error> {
-        let (client, requests) = fidl::endpoints::create_request_stream()?;
+        let (client, requests) = fidl::endpoints::create_request_stream();
         host_proxy.set_pairing_delegate(self.input, self.output, client)?;
         // Historically we spawned a task to handle these requests
         // Instead, store a value that can be polled directly

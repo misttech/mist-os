@@ -118,7 +118,7 @@ pub fn create_proxy_and_mock(
     let (coordinator_proxy, coordinator_server) =
         fidl::endpoints::create_proxy::<CoordinatorMarker>();
     let (listener_client, listener_requests) =
-        fidl::endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+        fidl::endpoints::create_request_stream::<CoordinatorListenerMarker>();
     Ok((
         coordinator_proxy,
         listener_requests,

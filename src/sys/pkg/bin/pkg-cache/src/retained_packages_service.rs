@@ -73,7 +73,7 @@ mod tests {
         packages: Vec<fidl_fuchsia_pkg::BlobId>,
     ) -> Result<(impl Future<Output = ()>, ClientEnd<BlobIdIteratorMarker>), Error> {
         let (iterator_client_end, iterator_stream) =
-            fidl::endpoints::create_request_stream::<BlobIdIteratorMarker>()?;
+            fidl::endpoints::create_request_stream::<BlobIdIteratorMarker>();
         Ok((
             async { serve_fidl_iterator_from_slice(iterator_stream, packages).await.unwrap() },
             iterator_client_end,

@@ -86,8 +86,7 @@ impl BluetoothHandler {
         })?;
 
         // Create and handle the request stream of media sessions.
-        let (watcher_client, watcher_requests) = create_request_stream()
-            .map_err(|e| format_err!("Error creating watcher request stream: {:?}", e))?;
+        let (watcher_client, watcher_requests) = create_request_stream();
 
         call!(discovery_proxy =>
             watch_sessions(&WatchOptions::default(), watcher_client))

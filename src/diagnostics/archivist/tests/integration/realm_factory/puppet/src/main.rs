@@ -244,7 +244,7 @@ async fn handle_puppet_request(
             panic!("{message}");
         }
         fpuppet::PuppetRequest::RecordLazyValues { key, responder } => {
-            let (client, requests) = create_request_stream()?;
+            let (client, requests) = create_request_stream();
             responder.send(client).expect("response succeeds");
             record_lazy_values(key, requests).await?;
         }

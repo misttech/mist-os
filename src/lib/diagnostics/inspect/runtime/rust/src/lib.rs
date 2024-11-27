@@ -362,7 +362,7 @@ mod tests {
         let inspector = Inspector::default();
         inspector.root().record_string("hello", "world");
 
-        let (client, mut request_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client, mut request_stream) = fidl::endpoints::create_request_stream();
         let controller =
             publish(&inspector, PublishOptions::default().on_inspect_sink_client(client))
                 .expect("got controller");

@@ -103,7 +103,7 @@ impl Stream for MessagingClient {
             return Poll::Pending;
         };
         let (accessor_client, accessor_request_stream): (ClientEnd<AccessorMarker>, _) =
-            fidl::endpoints::create_request_stream().unwrap();
+            fidl::endpoints::create_request_stream();
         let watch_responder = self.accessor_request.take().unwrap();
         let _ = watch_responder.send(Ok(MessagingClientWatchAccessorResponse {
             peer_id: Some(accessor.peer_id.into()),
@@ -746,7 +746,7 @@ mod tests {
 
         // Case 1: SetNotificationRegistration with mas_instance_ids.
         let (relayer_client, _relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
 
         let request_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {
@@ -823,7 +823,7 @@ mod tests {
 
         // Case 2: SetNotificationRegistration without mas_instance_ids.
         let (relayer_client, _relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
 
         let request_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {

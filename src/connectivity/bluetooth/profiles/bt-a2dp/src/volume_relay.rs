@@ -306,7 +306,7 @@ where
 async fn connect_avrcp_volume(
     avrcp: &mut avrcp::PeerManagerProxy,
 ) -> Result<avrcp::AbsoluteVolumeHandlerRequestStream, Error> {
-    let (client, request_stream) = endpoints::create_request_stream()?;
+    let (client, request_stream) = endpoints::create_request_stream();
 
     if let Err(e) = avrcp.set_absolute_volume_handler(client).await? {
         info!("failed to set absolute volume handler");

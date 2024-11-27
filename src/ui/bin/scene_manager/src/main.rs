@@ -280,7 +280,7 @@ async fn inner_main() -> Result<(), Error> {
         ColorTransformManager::new(color_converter, Arc::clone(&scene_manager));
 
     let (color_transform_handler_client, color_transform_handler_server) =
-        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>()?;
+        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>();
     match connect_to_protocol::<ColorTransformMarker>() {
         Err(e) => {
             error!("Failed to connect to fuchsia.accessibility.color_transform: {:?}", e);

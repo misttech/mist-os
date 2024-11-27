@@ -2555,8 +2555,7 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let (supplicant_sta_iface_callback_client_end, supplicant_sta_iface_callback_stream) =
-            create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>()
-                .expect("create SupplicantStaIfaceCallback request stream should succeed");
+            create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>();
         let result = supplicant_sta_iface_proxy.register_callback(
             fidl_wlanix::SupplicantStaIfaceRegisterCallbackRequest {
                 callback: Some(supplicant_sta_iface_callback_client_end),
@@ -2606,8 +2605,7 @@ mod tests {
         group: &str,
     ) -> fidl_wlanix::Nl80211MulticastRequestStream {
         let (mcast_client, mcast_stream) =
-            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>()
-                .expect("Failed to create mcast request stream");
+            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>();
         nl80211_proxy
             .get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
                 group: Some(group.to_string()),

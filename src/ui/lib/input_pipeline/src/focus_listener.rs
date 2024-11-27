@@ -59,7 +59,7 @@ impl FocusListener {
         let text_manager = connect_to_protocol::<kbd_focus::ControllerMarker>()?;
 
         let (focus_chain_listener_client_end, focus_chain_listener) =
-            fidl::endpoints::create_request_stream::<focus::FocusChainListenerMarker>()?;
+            fidl::endpoints::create_request_stream::<focus::FocusChainListenerMarker>();
 
         let focus_chain_listener_registry: focus::FocusChainListenerRegistryProxy =
             connect_to_protocol::<focus::FocusChainListenerRegistryMarker>()?;

@@ -2643,7 +2643,7 @@ mod tests {
                 builder_task.await;
             });
             let (runner_client_end, runner_stream) =
-                create_request_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+                create_request_stream::<fcrunner::ComponentRunnerMarker>();
             Self {
                 realm_proxy,
                 builder_proxy,

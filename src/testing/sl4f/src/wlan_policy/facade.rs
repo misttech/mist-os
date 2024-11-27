@@ -81,7 +81,7 @@ impl WlanPolicyFacade {
         let (controller, req) =
             fidl::endpoints::create_proxy::<fidl_policy::ClientControllerMarker>();
         let (update_sink, update_stream) =
-            fidl::endpoints::create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()?;
+            fidl::endpoints::create_request_stream::<fidl_policy::ClientStateUpdatesMarker>();
         provider.get_controller(req, update_sink)?;
 
         // Sleep very briefly to introduce a yield point (with the await) so that in case the other

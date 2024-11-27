@@ -237,7 +237,7 @@ mod tests {
             ..Default::default()
         };
         let (monitor_client_end, stream) =
-            fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<MonitorMarker>();
         proxy
             .start_update(&url, &options, monitor_client_end, None)
             .await

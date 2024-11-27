@@ -112,8 +112,7 @@ pub(crate) async fn monitor_media_buttons(
 ) -> Result<(), Error> {
     let presenter_service =
         service_context_handle.connect::<DeviceListenerRegistryMarker>().await?;
-    let (client_end, mut stream) = create_request_stream::<MediaButtonsListenerMarker>()
-        .expect("failed to create request stream for media buttons listener");
+    let (client_end, mut stream) = create_request_stream::<MediaButtonsListenerMarker>();
 
     // TODO(https://fxbug.dev/42058092) This independent spawn is necessary! For some reason removing this or
     // merging it with the spawn below causes devices to lock up on input button events. Figure out

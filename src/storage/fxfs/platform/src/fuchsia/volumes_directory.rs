@@ -1240,8 +1240,8 @@ mod tests {
             .expect("add_wrapping_key failed");
         crypt_service.set_active_key(KeyPurpose::Data, 0).expect("set_active_key failed");
         crypt_service.set_active_key(KeyPurpose::Metadata, 1).expect("set_active_key failed");
-        let (client1, stream1) = create_request_stream().expect("create_endpoints failed");
-        let (client2, stream2) = create_request_stream().expect("create_endpoints failed");
+        let (client1, stream1) = create_request_stream();
+        let (client2, stream2) = create_request_stream();
 
         join!(
             async {
@@ -1354,8 +1354,8 @@ mod tests {
             .expect("add_wrapping_key failed");
         crypt_service.set_active_key(KeyPurpose::Data, 0).expect("set_active_key failed");
         crypt_service.set_active_key(KeyPurpose::Metadata, 1).expect("set_active_key failed");
-        let (client1, stream1) = create_request_stream().expect("create_endpoints failed");
-        let (client2, stream2) = create_request_stream().expect("create_endpoints failed");
+        let (client1, stream1) = create_request_stream();
+        let (client2, stream2) = create_request_stream();
         let crypt_service_clone = crypt_service.clone();
         let crypt_task1 = fasync::Task::spawn(async move {
             crypt_service_clone

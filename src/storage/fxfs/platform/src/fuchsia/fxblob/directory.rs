@@ -344,11 +344,7 @@ impl BlobDirectory {
         if blob_exists {
             return Err(CreateBlobError::AlreadyExists);
         }
-        let (client_end, request_stream) =
-            create_request_stream::<BlobWriterMarker>().map_err(|e| {
-                tracing::error!("Failed to create request stream for BlobWriter: {:?}", e);
-                CreateBlobError::Internal
-            })?;
+        let (client_end, request_stream) = create_request_stream::<BlobWriterMarker>();
         let writer = DeliveryBlobWriter::new(self, hash).await.map_err(|e| {
             tracing::error!("Failed to create blob writer: {:?}", e);
             CreateBlobError::Internal

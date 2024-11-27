@@ -230,8 +230,7 @@ async fn run_test_case_in_child(
         ..Default::default()
     };
     let (run_listener_client, mut run_listener) =
-        fidl::endpoints::create_request_stream::<ftest::RunListenerMarker>()
-            .context("creating RunListener for child")?;
+        fidl::endpoints::create_request_stream::<ftest::RunListenerMarker>();
     child_test_protocol.run(&child_invocation, &child_options, run_listener_client)?;
     let mut test_started = false;
     while let Some(result_event) = run_listener.try_next().await? {

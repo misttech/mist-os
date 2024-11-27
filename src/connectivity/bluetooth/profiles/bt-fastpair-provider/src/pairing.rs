@@ -447,7 +447,7 @@ impl PairingManager {
             }
         };
 
-        let (c, s) = fidl::endpoints::create_request_stream::<PairingDelegateMarker>()?;
+        let (c, s) = fidl::endpoints::create_request_stream::<PairingDelegateMarker>();
         self.pairing.set_pairing_delegate(input, output, c)?;
         self.pairing_requests.set(s);
         self.inspect_node.set_owner(&owner);

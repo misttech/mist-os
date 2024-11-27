@@ -87,7 +87,7 @@ async fn test_startup() -> Result<(), Error> {
 
     // Set up log listener to filter by system recovery logs only.
     fasync::Task::local(async move {
-        let (listener_client, listener_server) = fidl::endpoints::create_request_stream().unwrap();
+        let (listener_client, listener_server) = fidl::endpoints::create_request_stream();
         let log_proxy = connect_to_protocol::<LogMarker>().unwrap();
         let filter = LogFilterOptions {
             filter_by_pid: false,

@@ -1076,8 +1076,7 @@ mod tests {
             allow_attaching_to_existing_update_check: Some(false),
             ..Default::default()
         };
-        let (client_end, mut request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, mut request_stream) = fidl::endpoints::create_request_stream();
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
         assert_matches!(proxy.check_now(&options, None).await.unwrap(), Ok(()));
 
@@ -1101,7 +1100,7 @@ mod tests {
     async fn test_check_now_invalid_options() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(fidl, IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: None,
             allow_attaching_to_existing_update_check: None,
@@ -1152,7 +1151,7 @@ mod tests {
     async fn test_check_now_with_monitor() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),
@@ -1188,7 +1187,7 @@ mod tests {
         };
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
         assert_matches!(proxy.check_now(&check_options_1, None).await.unwrap(), Ok(()));
 
@@ -1234,7 +1233,7 @@ mod tests {
     async fn test_check_now_with_closed_monitor() {
         let fidl = FidlServerBuilder::new().build().await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, stream) = create_request_stream::<MonitorMarker>();
         drop(stream);
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
@@ -1254,7 +1253,7 @@ mod tests {
             .build()
             .await;
         let proxy = spawn_fidl_server::<ManagerMarker>(Rc::clone(&fidl), IncomingServices::Manager);
-        let (client_end, mut stream) = create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, mut stream) = create_request_stream::<MonitorMarker>();
         let options = update::CheckOptions {
             initiator: Some(Initiator::User),
             allow_attaching_to_existing_update_check: Some(true),

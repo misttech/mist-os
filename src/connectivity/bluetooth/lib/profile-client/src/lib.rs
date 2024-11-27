@@ -145,7 +145,7 @@ impl ProfileClient {
         if services.is_empty() {
             return Ok(Self::new(proxy));
         }
-        let (connect_client, connection_receiver) = create_request_stream()?;
+        let (connect_client, connection_receiver) = create_request_stream();
         let advertisement = proxy
             .advertise(bredr::ProfileAdvertiseRequest {
                 services: Some(services),
@@ -170,7 +170,7 @@ impl ProfileClient {
             return Err(Error::AlreadyTerminated);
         }
 
-        let (results_client, results_stream) = create_request_stream()?;
+        let (results_client, results_stream) = create_request_stream();
         self.proxy.search(bredr::ProfileSearchRequest {
             service_uuid: Some(service_uuid),
             attr_ids: attributes,

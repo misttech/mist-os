@@ -95,7 +95,7 @@ impl Coordinator {
         let (coordinator_proxy, coordinator_server_end) =
             fidl::endpoints::create_proxy::<display::CoordinatorMarker>();
         let (coordinator_listener_client_end, coordinator_listener_requests) =
-            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>()?;
+            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>();
 
         // TODO(https://fxbug.dev/42075865): Consider supporting virtcon client
         // connections.

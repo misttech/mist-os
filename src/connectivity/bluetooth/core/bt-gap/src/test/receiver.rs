@@ -116,7 +116,7 @@ async fn add_component_succeeds() {
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Mock the host server
-    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task = fasync::Task::spawn(handle_host_requests(HostId(1), host_server));
 
     // Add a host to dispatcher using host.Receiver API
@@ -162,7 +162,7 @@ async fn add_multiple_components_succeeds() {
     let _receiver_task = fasync::Task::spawn(run_receiver_server(hd.clone(), receiver_stream));
 
     // Create mock Host server
-    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client, host_server) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task = fasync::Task::spawn(handle_host_requests(HostId(1), host_server));
 
     // Add a host to dispatcher using host.Receiver API
@@ -174,7 +174,7 @@ async fn add_multiple_components_succeeds() {
     assert_matches!(hosts[0].active, Some(true));
 
     // Create second mock Host server
-    let (host_client2, host_server2) = endpoints::create_request_stream::<HostMarker>().unwrap();
+    let (host_client2, host_server2) = endpoints::create_request_stream::<HostMarker>();
     let _run_host_task2 = fasync::Task::spawn(handle_host_requests(HostId(2), host_server2));
 
     // Add another host to dispatcher using host.Receiver API

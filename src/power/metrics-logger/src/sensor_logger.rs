@@ -569,7 +569,7 @@ impl ActivityListener {
     pub fn new(provider: factivity::ProviderProxy) -> Result<Self> {
         let idleness = Rc::new(Cell::new(Idleness::Unknown));
         let (client_end, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()?;
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>();
         provider.watch_state(client_end)?;
 
         let self_idleness = idleness.clone();

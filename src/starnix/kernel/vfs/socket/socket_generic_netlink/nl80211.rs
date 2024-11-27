@@ -94,8 +94,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
         assigned_family_id: u16,
         message_sink: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
     ) {
-        let (client_end, mut stream) =
-            fidl::endpoints::create_request_stream().expect("Failed to create multicast stream");
+        let (client_end, mut stream) = fidl::endpoints::create_request_stream();
         if let Err(e) = self.nl80211_proxy.get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
             group: Some(group.clone()),
             multicast: Some(client_end),

@@ -200,10 +200,7 @@ impl BleAdvertiseFacade {
     ) {
         let tag = "BleAdvertiseFacade::advertise";
         let (client_end, server_request_stream) =
-            match create_request_stream::<AdvertisedPeripheralMarker>() {
-                Ok(value) => value,
-                Err(_) => return,
-            };
+            create_request_stream::<AdvertisedPeripheralMarker>();
 
         // advertise() only returns after advertising has been terminated, so we can't await here.
         let advertise_fut = peripheral.advertise(&parameters, client_end);

@@ -255,7 +255,7 @@ mod tests {
         let logs = stream::iter(message_vec);
 
         let (client_end, mut requests) =
-            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<LogListenerSafeMarker>();
         let mut listener = Listener::new(client_end, None).unwrap();
 
         let listener_task = fasync::Task::spawn(async move {

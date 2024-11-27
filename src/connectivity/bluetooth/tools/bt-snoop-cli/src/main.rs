@@ -198,7 +198,7 @@ fn main_res() -> Result<(), Error> {
 
         // Send request to start receiving snoop packets
         let (client, mut request_stream) =
-            fidl::endpoints::create_request_stream::<PacketObserverMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<PacketObserverMarker>();
 
         snoop_svc.start(SnoopStartRequest {
             follow: Some(follow),

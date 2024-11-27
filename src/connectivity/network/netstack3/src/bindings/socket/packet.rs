@@ -107,10 +107,7 @@ pub(crate) async fn serve(
             };
             match req {
                 fppacket::ProviderRequest::Socket { responder, kind } => {
-                    let (client, request_stream) = fidl::endpoints::create_request_stream()
-                        .unwrap_or_else(|e: fidl::Error| {
-                            panic!("failed to create a new request stream: {e}")
-                        });
+                    let (client, request_stream) = fidl::endpoints::create_request_stream();
                     spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
                         move |ctx, properties| BindingData::new(ctx, kind, properties),

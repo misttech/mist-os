@@ -238,7 +238,7 @@ fn serve_instance_iterator(
     instances: Vec<fsys::Instance>,
 ) -> fidl::endpoints::ClientEnd<fsys::InstanceIteratorMarker> {
     let (client, mut stream) =
-        fidl::endpoints::create_request_stream::<fsys::InstanceIteratorMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<fsys::InstanceIteratorMarker>();
     fasync::Task::local(async move {
         let fsys::InstanceIteratorRequest::Next { responder } =
             stream.next().await.unwrap().unwrap();

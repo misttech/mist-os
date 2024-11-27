@@ -44,8 +44,7 @@ async fn serve_stop_watcher(mut stream: StopWatcherRequestStream) {
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             StopWatcherRequest::WatchComponent { moniker, expected_exit, responder } => {
-                let (client_end, request_stream) =
-                    fidl::endpoints::create_request_stream().unwrap();
+                let (client_end, request_stream) = fidl::endpoints::create_request_stream();
                 let checker = StopChecker::new().await;
                 let fut = checker.wait_for_component(moniker, expected_exit);
                 scope.spawn(serve_stop_waiter(request_stream, fut));

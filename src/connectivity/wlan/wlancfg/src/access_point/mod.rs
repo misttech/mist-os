@@ -470,8 +470,7 @@ mod tests {
     {
         let (controller, requests) = create_proxy::<fidl_policy::AccessPointControllerMarker>();
         let (update_sink, update_stream) =
-            create_request_stream::<fidl_policy::AccessPointStateUpdatesMarker>()
-                .expect("failed to create ClientStateUpdates proxy");
+            create_request_stream::<fidl_policy::AccessPointStateUpdatesMarker>();
         provider.get_controller(requests, update_sink).expect("error getting controller");
         (controller, update_stream)
     }

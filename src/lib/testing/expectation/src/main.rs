@@ -181,8 +181,7 @@ impl ExpectationsComparer {
 
         if !not_skipped.is_empty() {
             let case_stream = {
-                let (listener, listener_request_stream) = fidl::endpoints::create_request_stream()
-                    .context("error creating run listener request stream")?;
+                let (listener, listener_request_stream) = fidl::endpoints::create_request_stream();
                 suite_proxy
                     .run(
                         &not_skipped

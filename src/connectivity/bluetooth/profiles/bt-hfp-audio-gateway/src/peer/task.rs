@@ -1389,7 +1389,7 @@ mod tests {
 
         // Send the incoming call
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, _call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, _call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -1433,7 +1433,7 @@ mod tests {
 
         // Send the incoming call
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -1618,7 +1618,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, _call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, _call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some(raw_number.to_string()),
@@ -1670,7 +1670,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -2038,7 +2038,7 @@ mod tests {
 
         // Send the incoming waiting call.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream();
         let next_call = NextCall {
             call: Some(client_end),
             remote: Some("1234567".to_string()),
@@ -2239,7 +2239,7 @@ mod tests {
 
             // Send the held call response
             let responder = stream.next().await.unwrap();
-            let (client_end, call_stream) = fidl::endpoints::create_request_stream().unwrap();
+            let (client_end, call_stream) = fidl::endpoints::create_request_stream();
             let next_call = NextCall {
                 call: Some(client_end),
                 remote: Some("1234567".to_string()),

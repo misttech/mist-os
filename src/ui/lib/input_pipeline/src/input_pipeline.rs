@@ -1194,7 +1194,7 @@ mod tests {
             create_proxy_and_stream::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>()
                 .unwrap();
         let (input_device_client_end, mut input_device_request_stream) =
-            create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>().unwrap();
+            create_request_stream::<fidl_fuchsia_input_report::InputDeviceMarker>();
 
         let device_types = vec![input_device::InputDeviceType::Mouse];
         let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();

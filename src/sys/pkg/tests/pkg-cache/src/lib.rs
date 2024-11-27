@@ -330,7 +330,7 @@ pub async fn replace_retained_packages(
 ) {
     let packages = packages.iter().cloned().map(Into::into).collect::<Vec<_>>();
     let (iterator_client_end, iterator_stream) =
-        fidl::endpoints::create_request_stream::<fpkg::BlobIdIteratorMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<fpkg::BlobIdIteratorMarker>();
     let serve_iterator_fut = async {
         fpkg_ext::serve_fidl_iterator_from_slice(iterator_stream, packages).await.unwrap();
     };

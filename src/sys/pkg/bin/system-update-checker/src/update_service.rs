@@ -237,8 +237,7 @@ mod tests {
         )
         .await
         .0;
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         let expected_update_info = Some(UpdateInfo {
             version_available: Some(LATEST_SYSTEM_IMAGE.to_string()),
             download_size: None,
@@ -285,10 +284,8 @@ mod tests {
         )
         .detach();
 
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -350,8 +347,7 @@ mod tests {
         .await
         .0;
 
-        let (client_end, mut request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, mut request_stream) = fidl::endpoints::create_request_stream();
         let check_options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(client_end), Ok(()));
@@ -401,9 +397,8 @@ mod tests {
         .0;
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder().initiator(Initiator::User).build();
 
         assert_matches!(proxy.monitor_all_update_checks(attempt_client_end), Ok(()));
@@ -435,10 +430,8 @@ mod tests {
             version_available: Some(LATEST_SYSTEM_IMAGE.to_string()),
             download_size: None,
         });
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(false)
@@ -492,12 +485,9 @@ mod tests {
             download_size: None,
         });
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>()
-                .expect("create_request_stream");
-        let (client_end0, _request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, _request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>();
+        let (client_end0, _request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, _request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(false)
@@ -550,10 +540,9 @@ mod tests {
         )
         .await;
 
-        let (monitor_client, monitor_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (monitor_client, monitor_request_stream) = fidl::endpoints::create_request_stream();
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -622,7 +611,7 @@ mod tests {
         .0;
 
         let (attempt_client_end, mut attempt_request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+            fidl::endpoints::create_request_stream();
         let check_options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -703,8 +692,7 @@ mod tests {
         )
         .await
         .0;
-        let (client_end, request_stream) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end, request_stream) = fidl::endpoints::create_request_stream();
 
         // Invalid because initiator is a required field.
         let invalid_options = fidl_fuchsia_update::CheckOptions {
@@ -731,10 +719,8 @@ mod tests {
         )
         .await
         .0;
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)
@@ -787,10 +773,8 @@ mod tests {
             download_size: None,
         });
 
-        let (client_end0, request_stream0) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
-        let (client_end1, request_stream1) =
-            fidl::endpoints::create_request_stream().expect("create_request_stream");
+        let (client_end0, request_stream0) = fidl::endpoints::create_request_stream();
+        let (client_end1, request_stream1) = fidl::endpoints::create_request_stream();
         let options = CheckOptions::builder()
             .initiator(Initiator::User)
             .allow_attaching_to_existing_update_check(true)

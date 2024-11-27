@@ -59,8 +59,7 @@ struct BlobFsWithFileCreateOverride {
 impl lib::Blobfs for BlobFsWithFileCreateOverride {
     fn root_dir_handle(&self) -> ClientEnd<fio::DirectoryMarker> {
         let inner = self.wrapped.root_dir_handle().unwrap().into_proxy();
-        let (client, server) =
-            fidl::endpoints::create_request_stream::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_request_stream::<fio::DirectoryMarker>();
         DirectoryWithFileCreateOverride { inner, target: self.target.clone() }.spawn(server);
         client
     }

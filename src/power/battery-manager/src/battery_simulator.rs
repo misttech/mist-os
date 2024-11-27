@@ -213,7 +213,7 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_observer_relationship() {
         let (watcher_client_end, mut stream) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         let watcher = watcher_client_end.into_proxy();
 
         let battery_manager = Arc::new(BatteryManager::new());

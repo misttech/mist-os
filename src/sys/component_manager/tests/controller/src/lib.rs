@@ -447,7 +447,7 @@ async fn start_with_dict() {
         .unwrap();
     // StartChild dictionary entries must be Sender capabilities.
     let (receiver_client, mut receiver_stream) =
-        create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        create_request_stream::<fsandbox::ReceiverMarker>();
 
     // Serve the `fidl.examples.routing.echo.Echo` protocol on the Sender.
     let task_group = Mutex::new(fasync::TaskGroup::new());

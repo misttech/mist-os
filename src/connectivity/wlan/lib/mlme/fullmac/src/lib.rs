@@ -262,8 +262,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     inspector: Inspector,
 ) -> Result<StartedDriver, FullmacMlmeError> {
     let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
-        fidl::endpoints::create_request_stream()
-            .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
+        fidl::endpoints::create_request_stream();
 
     let usme_bootstrap_protocol_channel =
         device.init(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;

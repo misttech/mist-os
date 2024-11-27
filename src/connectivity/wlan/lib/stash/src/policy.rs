@@ -564,8 +564,7 @@ mod tests {
     async fn test_migration_with_bad_stash() {
         let store_id = rand_string();
 
-        let (client, mut request_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
-            .expect("create_request_stream failed");
+        let (client, mut request_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>();
 
         // This will be set to true if stash is accessed, so that the test can check whether stash
         // was read by the migration code.
@@ -646,8 +645,7 @@ mod tests {
     }
 
     fn stash_for_test() -> (Result<StashStore, Error>, fidl_stash::SecureStoreRequestStream) {
-        let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
-            .expect("create_request_stream failed");
+        let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>();
         let proxy_fn = client.into_proxy();
         let id = rand_string();
         let legacy_stash = StashStore::from_secure_store_proxy(&id, proxy_fn);

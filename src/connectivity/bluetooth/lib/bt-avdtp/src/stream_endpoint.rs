@@ -913,7 +913,7 @@ mod tests {
 
         let (remote, local) = zx::Socket::create_datagram();
         let (client_end, mut direction_request_stream) =
-            create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
+            create_request_stream::<bredr::AudioDirectionExtMarker>();
         let ext = bredr::Channel {
             socket: Some(local),
             channel_mode: Some(fidl_bt::ChannelMode::Basic),
@@ -985,7 +985,7 @@ mod tests {
 
         let (remote, local) = zx::Socket::create_datagram();
         let (client_end, l2cap_params_requests) =
-            create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
+            create_request_stream::<bredr::L2capParametersExtMarker>();
         let ext = bredr::Channel {
             socket: Some(local),
             channel_mode: Some(fidl_bt::ChannelMode::Basic),

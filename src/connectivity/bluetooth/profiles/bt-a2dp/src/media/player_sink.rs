@@ -157,13 +157,7 @@ impl ConfiguredSinkTask {
             let inspect = self.inspect.clone_weak();
             let session_fut = async move {
                 let _ = &builder;
-                let (player_client, player_requests) = match create_request_stream() {
-                    Ok((client, requests)) => (client, requests),
-                    Err(e) => {
-                        warn!(%peer_id, ?e, "Couldn't create player FIDL client");
-                        return;
-                    }
-                };
+                let (player_client, player_requests) = create_request_stream();
 
                 let registration = sessions2::PlayerRegistration {
                     domain: Some(builder.domain),

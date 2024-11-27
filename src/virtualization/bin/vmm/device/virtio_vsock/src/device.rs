@@ -979,8 +979,7 @@ mod tests {
         let device = VsockDevice::new();
         let device_proxy = serve_host_vsock_endpoints(device.clone());
 
-        let (client_end, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>();
 
         device_proxy
             .listen(host_port, client_end)
@@ -1085,8 +1084,7 @@ mod tests {
         let device = VsockDevice::new();
         let device_proxy = serve_host_vsock_endpoints(device.clone());
 
-        let (client_end1, client_stream1) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end1, client_stream1) = create_request_stream::<HostVsockAcceptorMarker>();
 
         let result = device_proxy
             .listen(12345, client_end1)
@@ -1095,8 +1093,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Already listening on port 12345.
-        let (client_end2, _client_stream2) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end2, _client_stream2) = create_request_stream::<HostVsockAcceptorMarker>();
         let result = device_proxy
             .listen(12345, client_end2)
             .await
@@ -1108,8 +1105,7 @@ mod tests {
 
         // Now that the first client has stopped listening on the port, another client can register
         // as a listener.
-        let (client_end3, _client_stream3) = create_request_stream::<HostVsockAcceptorMarker>()
-            .expect("failed to create HostVsockAcceptor request stream");
+        let (client_end3, _client_stream3) = create_request_stream::<HostVsockAcceptorMarker>();
         let result = device_proxy
             .listen(12345, client_end3)
             .await

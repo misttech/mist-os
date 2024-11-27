@@ -74,8 +74,7 @@ fn fidl_endpoints() -> (SnoopProxy, SnoopRequestStream) {
 }
 
 fn client_request(host_device: Option<String>) -> (SnoopStartRequest, PacketObserverRequestStream) {
-    let (client, stream) =
-        fidl::endpoints::create_request_stream::<PacketObserverMarker>().unwrap();
+    let (client, stream) = fidl::endpoints::create_request_stream::<PacketObserverMarker>();
     (
         SnoopStartRequest {
             follow: Some(true),
@@ -329,7 +328,7 @@ fn test_handle_client_request() {
     // valid device returns no errors to a client requesting a dump
     let (proxy, mut request_stream) = fidl_endpoints();
     let (client, mut client_stream5) =
-        fidl::endpoints::create_request_stream::<PacketObserverMarker>().unwrap();
+        fidl::endpoints::create_request_stream::<PacketObserverMarker>();
     let client_req = SnoopStartRequest {
         host_device: Some(String::from("")),
         client: Some(client),
@@ -360,7 +359,7 @@ fn test_handle_bad_client_request() {
     let err = Some(Err(FidlError::Invalid));
     let (client, _client_req_stream) = fidl::endpoints::create_proxy::<PacketObserverMarker>();
     let request = (id, err);
-    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
     subscribers.register(id, client, None).unwrap();
     assert!(subscribers.is_registered(&id));
     pump_handle_client_request(&mut exec, request, stream, &mut requests, &mut subscribers, &logs);
@@ -372,7 +371,7 @@ fn test_handle_bad_client_request() {
     let request = (id, err);
     subscribers.register(id, client, None).unwrap();
     assert!(subscribers.is_registered(&id));
-    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>();
     pump_handle_client_request(&mut exec, request, stream, &mut requests, &mut subscribers, &logs);
     assert!(!subscribers.is_registered(&id));
 }

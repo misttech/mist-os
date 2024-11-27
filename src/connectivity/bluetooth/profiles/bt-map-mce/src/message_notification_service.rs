@@ -427,7 +427,7 @@ pub(crate) mod tests {
         let (accessor_proxy, mut accessor_requests) =
             create_proxy_and_stream::<AccessorMarker>().unwrap();
         let (relayer_client, relayer_request_stream) =
-            create_request_stream::<NotificationRegistrationMarker>().unwrap();
+            create_request_stream::<NotificationRegistrationMarker>();
         let register_fut = accessor_proxy.set_notification_registration(
             AccessorSetNotificationRegistrationRequest {
                 mas_instance_ids: Some(vec![TEST_MAS_ID_1, TEST_MAS_ID_2]),

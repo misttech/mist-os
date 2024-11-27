@@ -84,7 +84,7 @@ impl UpdateAttempt {
 impl UpdateAttemptMonitor {
     fn new() -> Result<(ClientEnd<MonitorMarker>, Self), fidl::Error> {
         let (monitor_client_end, stream) =
-            fidl::endpoints::create_request_stream::<MonitorMarker>()?;
+            fidl::endpoints::create_request_stream::<MonitorMarker>();
 
         Ok((monitor_client_end, Self { stream }))
     }

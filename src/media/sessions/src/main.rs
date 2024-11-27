@@ -63,7 +63,7 @@ async fn main() {
 
     let internal_discovery_request_sink = discovery_request_sink.clone();
     let connect_to_session = move |session_id| {
-        let (discovery, request_stream) = create_request_stream::<DiscoveryMarker>()?;
+        let (discovery, request_stream) = create_request_stream::<DiscoveryMarker>();
         let discovery = discovery.into_proxy();
         let (session, session_request) = create_endpoints();
         discovery.connect_to_session(session_id, session_request)?;

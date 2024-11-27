@@ -194,7 +194,7 @@ impl InputDeviceRegistry {
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
     async fn add_device(&self, descriptor: DeviceDescriptor) -> Result<InputDevice, Error> {
-        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
+        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>();
         let mut device: InputDevice =
             InputDevice::new(request_stream, descriptor, self.got_input_reports_reader.clone());
 

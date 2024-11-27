@@ -327,7 +327,7 @@ impl ProfileRegistrar {
         let id = self.get_next_id();
         trace!(?id, ?params, "Refreshing advertisement from registered services");
         let (connect_client, connect_requests) =
-            create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+            create_request_stream::<bredr::ConnectionReceiverMarker>();
         // The control handle will be used to revoke the advertisement any time a refresh is
         // requested.
         let connection_receiver_handle = connect_requests.control_handle();
@@ -661,7 +661,7 @@ mod tests {
         exec: &mut fasync::TestExecutor,
     ) -> (bredr::ProfileRequest, bredr::SearchResultsRequestStream) {
         let (c, mut s) = create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
-        let (results, server) = create_request_stream::<bredr::SearchResultsMarker>().unwrap();
+        let (results, server) = create_request_stream::<bredr::SearchResultsMarker>();
 
         let search_result = c.search(bredr::ProfileSearchRequest {
             service_uuid: Some(bredr::ServiceClassProfileIdentifier::AudioSink),
@@ -710,7 +710,7 @@ mod tests {
         impl Future<Output = Result<Vec<bredr::ServiceDefinition>, ErrorCode>>,
     ) {
         let (connection, connection_stream) =
-            create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
+            create_request_stream::<bredr::ConnectionReceiverMarker>();
         let request = bredr::ProfileAdvertiseRequest {
             services: Some(services),
             receiver: Some(connection),

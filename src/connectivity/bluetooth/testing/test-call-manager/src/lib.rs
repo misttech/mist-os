@@ -336,7 +336,7 @@ impl TestCallManager {
     }
 
     pub async fn register_manager(&self, proxy: HfpProxy) -> Result<(), Error> {
-        let (client_end, stream) = fidl::endpoints::create_request_stream::<CallManagerMarker>()?;
+        let (client_end, stream) = fidl::endpoints::create_request_stream::<CallManagerMarker>();
         proxy.register(client_end)?;
         self.set_request_stream(stream).await;
         Ok(())
@@ -358,7 +358,7 @@ impl TestCallManager {
                 })?);
 
             let (client_end, stream) =
-                fidl::endpoints::create_request_stream::<CallManagerMarker>()?;
+                fidl::endpoints::create_request_stream::<CallManagerMarker>();
             hfp_service_proxy.register(client_end)?;
 
             let task = fasync::Task::spawn(
@@ -406,8 +406,7 @@ impl TestCallManager {
         if let Some(peer_id) = inner.active_peer.clone() {
             let peer = inner.peers.get_mut(&peer_id).expect("Active peer must exist in peers map");
 
-            let (client_end, stream) = fidl::endpoints::create_request_stream::<CallMarker>()
-                .map_err(|e| format_err!("Error creating fidl endpoints: {}", e))?;
+            let (client_end, stream) = fidl::endpoints::create_request_stream::<CallMarker>();
             // This does not handle the case where there is no peer responder
             let responder = peer
                 .call_responder
@@ -564,9 +563,7 @@ impl TestCallManager {
                 let remote = call.remote.clone();
                 let state = call.state;
                 let direction = call.direction;
-                let (client_end, stream) =
-                    fidl::endpoints::create_request_stream::<CallMarker>()
-                        .map_err(|e| format_err!("Error creating fidl endpoints: {}", e))?;
+                let (client_end, stream) = fidl::endpoints::create_request_stream::<CallMarker>();
                 let peer = inner.peers.get_mut(&id).expect("peer just added");
                 let next_call = NextCall {
                     call: Some(client_end),

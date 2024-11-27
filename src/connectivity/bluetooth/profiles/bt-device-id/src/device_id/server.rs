@@ -135,7 +135,7 @@ impl DeviceIdServer {
         defs: Vec<bredr::ServiceDefinition>,
     ) -> Result<BrEdrProfileAdvertisement, Error> {
         let (connect_client, connect_stream) =
-            fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>()?;
+            fidl::endpoints::create_request_stream::<bredr::ConnectionReceiverMarker>();
         // The result of advertise (registered services) is not needed.
         let _advertise_fut = profile.advertise(bredr::ProfileAdvertiseRequest {
             services: Some(defs),

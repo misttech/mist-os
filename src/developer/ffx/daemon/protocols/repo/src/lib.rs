@@ -1583,8 +1583,7 @@ mod tests {
                 fsock::ProviderRequest::StreamSocket { domain: _, proto, responder } => {
                     assert_eq!(fsock::StreamSocketProtocol::Tcp, proto);
                     let (client, stream) =
-                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>()
-                            .unwrap();
+                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>();
                     fuchsia_async::Task::spawn(test_stream_socket(stream)).detach();
                     responder.send(Ok(client)).unwrap();
                 }

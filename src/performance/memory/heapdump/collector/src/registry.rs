@@ -566,7 +566,7 @@ mod tests {
         let (_registry, proxy) = create_registry_and_proxy([process1, process2, process3]);
 
         // Execute the request.
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
             process_selector,
             receiver: Some(receiver_client),
@@ -715,7 +715,7 @@ mod tests {
             "foobaz".to_string(),
             Box::new(FakeSnapshot { with_contents: false }),
         );
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
             snapshot_id: Some(snapshot_id),
             receiver: Some(receiver_client),
@@ -725,7 +725,7 @@ mod tests {
         FakeSnapshot::receive_and_assert_match(receiver_stream, false).await;
 
         // Attempt to request a non-existing snapshot and verify the returned error.
-        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let (receiver_client, receiver_stream) = create_request_stream();
         let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
             snapshot_id: Some(snapshot_id + 1), // bad snapshot ID
             receiver: Some(receiver_client),

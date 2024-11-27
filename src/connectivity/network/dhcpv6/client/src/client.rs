@@ -1132,8 +1132,7 @@ mod tests {
                         };
 
                     let (_, client_stream): (ClientEnd<ClientMarker>, _) =
-                        create_request_stream::<ClientMarker>()
-                            .expect("failed to create test fidl channel");
+                        create_request_stream::<ClientMarker>();
 
                     let (client_socket, client_addr) = create_test_socket();
                     let (server_socket, server_addr) = create_test_socket();
@@ -1837,8 +1836,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_schedule_and_cancel_timers() {
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let (client_socket, _client_addr) = create_test_socket();
         let (_server_socket, server_addr) = create_test_socket();
@@ -2114,8 +2112,7 @@ mod tests {
     #[fuchsia::test]
     #[should_panic]
     async fn test_handle_next_event_respects_timer_order() {
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
@@ -2206,8 +2203,7 @@ mod tests {
             }
         }
 
-        let (_client_end, client_stream) =
-            create_request_stream::<ClientMarker>().expect("failed to create test request stream");
+        let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
         let mut client = Client::<StubSocket>::start(
             None,

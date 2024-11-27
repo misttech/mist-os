@@ -201,13 +201,13 @@ mod tests {
         insp2.root().record_int("two", 2);
         insp3.root().record_int("three", 3);
 
-        let (tree1, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree1, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp1, TreeServerSendPreference::default(), request_stream)
             .detach();
-        let (tree2, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree2, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp2, TreeServerSendPreference::default(), request_stream)
             .detach();
-        let (tree3, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        let (tree3, request_stream) = create_request_stream::<TreeMarker>();
         spawn_tree_server_with_stream(insp3, TreeServerSendPreference::default(), request_stream)
             .detach();
 

@@ -406,7 +406,7 @@ mod tests {
 
         // Create the watcher proxy/stream to receive reboot notifications
         let (watcher_client, mut watcher_stream) =
-            fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>();
 
         // Call the Register API, passing in the watcher_client end
         assert_matches!(register_proxy.register_with_ack(watcher_client).await, Ok(()));

@@ -75,7 +75,7 @@ impl DaiAudioDevice {
         let (dai_format, pcm_format) =
             self.configured_formats.clone().ok_or_else(|| format_err!("formats not configured"))?;
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()?;
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
         self.config_stream_task =
             futures::future::maybe_done(fasync::Task::spawn(process_audio_requests(
                 request_stream,

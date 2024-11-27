@@ -155,8 +155,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
             .build()
             .await?;
 
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
         .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
             listener: Some(listener_client_end),

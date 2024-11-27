@@ -200,8 +200,7 @@ impl SoftStreamConfig {
             return Err(Error::InvalidArgs);
         }
         let (client, request_stream) =
-            fidl::endpoints::create_request_stream::<StreamConfigMarker>()
-                .expect("Error creating stream config endpoint");
+            fidl::endpoints::create_request_stream::<StreamConfigMarker>();
 
         let number_of_channels = pcm_format.channel_map.len();
         let attributes = vec![ChannelAttributes::default(); number_of_channels];

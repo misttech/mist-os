@@ -568,8 +568,7 @@ fn request_controller(
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let (controller, requests) = create_proxy::<fidl_policy::ClientControllerMarker>();
     let (update_sink, update_stream) =
-        create_request_stream::<fidl_policy::ClientStateUpdatesMarker>()
-            .expect("failed to create ClientStateUpdates proxy");
+        create_request_stream::<fidl_policy::ClientStateUpdatesMarker>();
     provider.get_controller(requests, update_sink).expect("error getting controller");
     (controller, update_stream)
 }

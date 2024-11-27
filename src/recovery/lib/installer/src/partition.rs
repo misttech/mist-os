@@ -254,7 +254,7 @@ impl Partition {
             }
         };
         let (client, server) =
-            fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>()?;
+            fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>();
 
         // Run the server and client ends of the PayloadStream concurrently.
         try_join(

@@ -131,8 +131,7 @@ impl<O: OutputSink> Controller<O> {
         corpus_type: fuzz::Corpus,
         corpus_dir: P,
     ) -> Result<corpus::Stats> {
-        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>()
-            .context("failed to create fuchsia.fuzzer.CorpusReader stream")?;
+        let (client_end, stream) = create_request_stream::<fuzz::CorpusReaderMarker>();
         let (_, corpus_stats) = try_join!(
             async { self.proxy.read_corpus(corpus_type, client_end).await.map_err(Error::msg) },
             async { corpus::read(stream, corpus_dir).await },

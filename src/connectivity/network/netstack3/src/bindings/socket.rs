@@ -168,7 +168,7 @@ pub(crate) async fn serve(
 
 pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
 ) -> (fidl::endpoints::ClientEnd<T>, T::RequestStream) {
-    fidl::endpoints::create_request_stream().expect("can't create stream")
+    fidl::endpoints::create_request_stream()
 }
 
 fn get_interface_addresses(ctx: &mut Ctx) -> Vec<psocket::InterfaceAddresses> {

@@ -302,8 +302,7 @@ async fn serve_run_builder(
         None => {
             fuzzers.launch(&url);
             let (batch_client, batch_stream) =
-                create_request_stream::<fdiagnostics::BatchIteratorMarker>()
-                    .context("failed to create fuchsia.diagnostics.BatchIterator stream")?;
+                create_request_stream::<fdiagnostics::BatchIteratorMarker>();
             let (syslog_sender, syslog_receiver) = mpsc::unbounded::<String>();
             (Some(batch_client), Some(batch_stream), Some(syslog_sender), Some(syslog_receiver))
         }

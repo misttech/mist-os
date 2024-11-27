@@ -596,18 +596,16 @@ pub fn create_sync_proxy<T: ProtocolMarker>() -> (T::SynchronousProxy, ServerEnd
 /// # Panics
 ///
 /// If called outside the context of an active async executor.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::RequestStream), Error>
-{
+pub fn create_request_stream<T: ProtocolMarker>() -> (ClientEnd<T>, T::RequestStream) {
     let (client, server) = create_endpoints();
-    Ok((client, server.into_stream()))
+    (client, server.into_stream())
 }
 
 /// Soft-transition affordance for https://fxbug.dev/319159026.
 // TODO(https://fxbug.dev/319159026) delete this function
 pub fn try_create_request_stream<T: ProtocolMarker>(
 ) -> Result<(ClientEnd<T>, T::RequestStream), Error> {
-    create_request_stream::<T>()
+    Ok(create_request_stream::<T>())
 }
 
 /// Create a request stream and proxy connected to one another.

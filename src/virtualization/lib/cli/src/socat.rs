@@ -92,7 +92,7 @@ async fn handle_socat_listen(
     host_port: u32,
 ) -> Result<SocatSuccess, SocatError> {
     let (vsock_accept_client, mut vsock_acceptor_stream) =
-        fidl::endpoints::create_request_stream::<HostVsockAcceptorMarker>()?;
+        fidl::endpoints::create_request_stream::<HostVsockAcceptorMarker>();
 
     vsock_endpoint
         .listen(host_port, vsock_accept_client)

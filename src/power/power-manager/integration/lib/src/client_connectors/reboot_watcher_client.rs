@@ -22,7 +22,7 @@ impl RebootWatcherClient {
         let watcher_register_proxy =
             test_env.connect_to_protocol::<fpower::RebootMethodsWatcherRegisterMarker>();
         let (watcher_client, mut watcher_request_stream) =
-            fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>();
         watcher_register_proxy
             .register_with_ack(watcher_client)
             .await

@@ -281,7 +281,7 @@ impl LowEnergyAdvertiser {
         };
 
         let (connect_client, connect_server) =
-            fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>()?;
+            fidl::endpoints::create_request_stream::<AdvertisedPeripheralMarker>();
         let advertise_fut = self.peripheral.advertise(&parameters, connect_client);
 
         let advertisement_stream = LowEnergyAdvertisement::new(advertise_fut, connect_server);
@@ -475,7 +475,7 @@ mod tests {
             ..Default::default()
         };
         let (connect_client1, connect_server1) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut1 = adv_peripheral_client.on_connected(&example_peer1, connect_client1);
         let mut connected_fut1 = pin!(connected_fut1);
         let _ = exec
@@ -488,7 +488,7 @@ mod tests {
             ..Default::default()
         };
         let (connect_client2, connect_server2) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut2 = adv_peripheral_client.on_connected(&example_peer2, connect_client2);
         let mut connected_fut2 = pin!(connected_fut2);
         let _ = exec
@@ -527,7 +527,7 @@ mod tests {
 
         // Upstream server notifies with an invalidly formatted peer (missing all mandatory data).
         let (connect_client, _connect_server) =
-            fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<ConnectionMarker>();
         let connected_fut =
             adv_peripheral_client.on_connected(&le::Peer::default(), connect_client);
         let mut connected_fut = pin!(connected_fut);

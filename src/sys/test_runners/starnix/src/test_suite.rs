@@ -273,8 +273,7 @@ mod tests {
     fn set_up_iterator(test_name: &str) -> ftest::CaseIteratorProxy {
         let cases = vec![ftest::Case { name: Some(test_name.to_string()), ..Default::default() }];
         let (iterator_client_end, iterator_stream) =
-            create_request_stream::<ftest::CaseIteratorMarker>()
-                .expect("Couldn't create case iterator");
+            create_request_stream::<ftest::CaseIteratorMarker>();
         fasync::Task::local(async move {
             let _ = handle_case_iterator(cases, iterator_stream).await;
         })
@@ -399,8 +398,7 @@ mod tests {
     async fn test_component_controller_epitaph_ok() {
         let component_runner = spawn_runner(zx::Status::OK);
         let (run_listener, run_listener_stream) =
-            create_request_stream::<ftest::RunListenerMarker>()
-                .expect("Couldn't create case listener");
+            create_request_stream::<ftest::RunListenerMarker>();
         spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Passed));
     }
@@ -411,8 +409,7 @@ mod tests {
     async fn test_component_controller_epitaph_not_ok() {
         let component_runner = spawn_runner(zx::Status::INTERNAL);
         let (run_listener, run_listener_stream) =
-            create_request_stream::<ftest::RunListenerMarker>()
-                .expect("Couldn't create case listener");
+            create_request_stream::<ftest::RunListenerMarker>();
         spawn_run_test_cases(run_listener, component_runner);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Failed));
     }

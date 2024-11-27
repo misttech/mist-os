@@ -67,7 +67,7 @@ pub async fn actor_loop<D>(mut data: D, actions: Vec<Action<D>>) -> Result<()> {
     {
         match request {
             ActorRequest::GetActions { responder } => {
-                let (client_end, mut stream) = create_request_stream::<ActionIteratorMarker>()?;
+                let (client_end, mut stream) = create_request_stream::<ActionIteratorMarker>();
                 responder.send(client_end)?;
 
                 let actions: Vec<_> = actions.iter().map(|c| c.to_fidl()).collect();

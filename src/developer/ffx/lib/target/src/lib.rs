@@ -515,8 +515,7 @@ pub async fn add_manual_target(
     };
 
     let (client, mut stream) =
-        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>()
-            .context("create endpoints")?;
+        fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy
         .add_target(
             &addr,

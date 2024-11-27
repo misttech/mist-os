@@ -668,7 +668,7 @@ async fn do_enable_notify<'a>(args: &'a [&'a str], client: &'a GattClientPtr) ->
     }
 
     let (notifier_client, mut notifier_req_stream) =
-        endpoints::create_request_stream::<CharacteristicNotifierMarker>()?;
+        endpoints::create_request_stream::<CharacteristicNotifierMarker>();
     let proxy = client.read().try_clone_proxy().unwrap();
     proxy
         .register_characteristic_notifier(&Handle { value: id }, notifier_client)

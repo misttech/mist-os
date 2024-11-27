@@ -1243,7 +1243,7 @@ async fn dictionary_from_program() {
     let dict_id = 1;
     store.dictionary_create(dict_id).await.unwrap().unwrap();
     let (receiver_client, mut receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = 10;
     store.connector_create(connector_id, receiver_client).await.unwrap().unwrap();
     store

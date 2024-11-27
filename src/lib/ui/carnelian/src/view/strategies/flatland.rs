@@ -648,7 +648,7 @@ impl FlatlandViewStrategy {
             .context("Failed to connect to Keyboard service")?;
 
         let (listener_client_end, mut listener_stream) =
-            create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>()?;
+            create_request_stream::<fidl_fuchsia_ui_input3::KeyboardListenerMarker>();
 
         let event_sender = app_sender.clone();
 

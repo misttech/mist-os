@@ -1048,7 +1048,7 @@ impl Component {
 
             impl BlockConnector for Server {
                 fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
-                    let (client, stream) = fidl::endpoints::create_request_stream()?;
+                    let (client, stream) = fidl::endpoints::create_request_stream();
                     let block_server = self.1.clone();
                     self.0.spawn(async move {
                         let _ = block_server.handle_requests(stream).await;
@@ -1703,7 +1703,7 @@ mod tests {
                 Fixture { component: Arc::new(Component::new()), outgoing_dir, fake_server };
             let fake_server = fixture.fake_server.clone();
             let (block_client, block_server) =
-                fidl::endpoints::create_request_stream::<BlockMarker>().unwrap();
+                fidl::endpoints::create_request_stream::<BlockMarker>();
             fasync::Task::spawn(async move {
                 let _ = fake_server.serve(block_server.cast_stream()).await;
             })

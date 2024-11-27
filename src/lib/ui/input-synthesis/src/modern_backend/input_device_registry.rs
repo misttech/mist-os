@@ -185,7 +185,7 @@ impl InputDeviceRegistry {
         &self,
         descriptor: DeviceDescriptor,
     ) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
-        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
+        let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>();
         self.proxy.register(client_end)?;
         Ok(Box::new(InputDevice::new(request_stream, descriptor)))
     }

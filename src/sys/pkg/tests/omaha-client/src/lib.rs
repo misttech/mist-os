@@ -605,8 +605,7 @@ impl TestEnv {
             allow_attaching_to_existing_update_check: Some(false),
             ..Default::default()
         };
-        let (client_end, stream) =
-            fidl::endpoints::create_request_stream::<MonitorMarker>().unwrap();
+        let (client_end, stream) = fidl::endpoints::create_request_stream::<MonitorMarker>();
         self.proxies
             .update_manager
             .check_now(&options, Some(client_end))
@@ -618,7 +617,7 @@ impl TestEnv {
 
     async fn monitor_all_update_checks(&self) -> AttemptsMonitorRequestStream {
         let (client_end, stream) =
-            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<AttemptsMonitorMarker>();
         self.proxies
             .update_manager
             .monitor_all_update_checks(client_end)

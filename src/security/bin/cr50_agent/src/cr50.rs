@@ -346,8 +346,7 @@ impl Cr50 {
         cmd: CcdCommand,
     ) -> Result<fidl::endpoints::ClientEnd<PhysicalPresenceNotifierMarker>, anyhow::Error> {
         let (client, server) =
-            fidl::endpoints::create_request_stream::<PhysicalPresenceNotifierMarker>()
-                .context("Creating request stream")?;
+            fidl::endpoints::create_request_stream::<PhysicalPresenceNotifierMarker>();
         let proxy = self.proxy.clone();
         let inhibitor =
             if let Some(power_button) = self.power_button.as_ref().map(|v| Arc::clone(v)) {

@@ -583,8 +583,7 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
         .await?
         .map_err(|err| anyhow!("failed to get HostVsockEndpoint: {:?}", err))?;
 
-    let (acceptor, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>()
-        .map_err(|err| anyhow!("failed to create vsock acceptor: {}", err))?;
+    let (acceptor, mut client_stream) = create_request_stream::<HostVsockAcceptorMarker>();
     vsock_endpoint
         .listen(HOST_PORT, acceptor)
         .await

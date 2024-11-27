@@ -23,7 +23,7 @@ impl crate::RemotableCapability for Router<Connector> {
 impl From<Router<Connector>> for fsandbox::Capability {
     fn from(router: Router<Connector>) -> Self {
         let (client_end, sender_stream) =
-            fidl::endpoints::create_request_stream::<fsandbox::ConnectorRouterMarker>().unwrap();
+            fidl::endpoints::create_request_stream::<fsandbox::ConnectorRouterMarker>();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
         fsandbox::Capability::ConnectorRouter(client_end)
     }

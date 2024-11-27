@@ -67,7 +67,7 @@ async fn create_child_with_specialized_name(
 ) {
     // Create our connector.
     let (receiver, receiver_stream) =
-        endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
     let connector_id = id_gen.next();
     store.connector_create(connector_id, receiver).await.unwrap().unwrap();
 

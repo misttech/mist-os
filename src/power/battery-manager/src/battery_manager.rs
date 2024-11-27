@@ -413,7 +413,7 @@ mod tests {
         battery_info.level_percent = Some(50.0);
 
         let (watcher_client_end, mut stream) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         let watcher = watcher_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher]));
@@ -446,11 +446,11 @@ mod tests {
         battery_info.level_percent = Some(50.0);
 
         let (watcher1_client_end, mut stream1) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         let watcher1 = watcher1_client_end.into_proxy();
 
         let (watcher2_client_end, mut stream2) =
-            create_request_stream::<fpower::BatteryInfoWatcherMarker>().unwrap();
+            create_request_stream::<fpower::BatteryInfoWatcherMarker>();
         let watcher2 = watcher2_client_end.into_proxy();
 
         let watchers = Arc::new(Mutex::new(vec![watcher1, watcher2]));

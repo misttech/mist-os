@@ -1002,8 +1002,7 @@ async fn run_invocations(
     sender: &mut mpsc::Sender<Result<SuiteEvents, LaunchError>>,
     timeout_fut: futures::future::Shared<fasync::Timer>,
 ) -> Result<SuiteStatus, anyhow::Error> {
-    let (run_listener_client, mut run_listener) =
-        fidl::endpoints::create_request_stream().expect("cannot create request stream");
+    let (run_listener_client, mut run_listener) = fidl::endpoints::create_request_stream();
     suite.run(&invocations, &run_options, run_listener_client)?;
 
     let tasks = Arc::new(lock::Mutex::new(vec![]));
