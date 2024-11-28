@@ -662,7 +662,7 @@ class EfiDevicePartitionerWithStorageHostTests : public EfiDevicePartitionerTest
       return controller.take_error();
     }
 
-    zx::result devices = paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir());
+    zx::result devices = paver::BlockDevices::CreateFromPartitionService(devmgr_.RealmExposedDir());
     if (devices.is_error()) {
       return devices.take_error();
     }

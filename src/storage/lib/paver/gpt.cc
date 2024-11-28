@@ -321,7 +321,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
   std::vector<std::unique_ptr<GptDevicePartitioner>> candidate_gpts;
   if (storage_host_enabled) {
     // Fshost takes care of finding the GPT block device.
-    zx::result gpt_device_source = BlockDevices::CreateStorageHost(svc_root);
+    zx::result gpt_device_source = BlockDevices::CreateFromPartitionService(svc_root);
     if (gpt_device_source.is_error()) {
       ERROR("Failed to connect to storage host: %s\n", gpt_device_source.status_string());
       return gpt_device_source.take_error();

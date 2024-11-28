@@ -64,8 +64,8 @@ class ServiceBasedVolumeConnector : public VolumeConnector {
   fbl::unique_fd service_dir_;
 };
 
-// An abstraction for accessing block devices, either via devfs or the partitions directory
-// exposed by storage-host.
+// An abstraction for accessing block devices, either via devfs or
+// fuchsia.storage.partitions.PartitionService.
 class BlockDevices {
  public:
   // Creates an instance that searches for devices in Devfs.
@@ -73,9 +73,9 @@ class BlockDevices {
   // /dev.
   static zx::result<BlockDevices> CreateDevfs(fbl::unique_fd devfs_root = {});
 
-  // Creates an instance that searches for devices in the partitions directory of storage-host.
+  // Creates an instance that searches for devices as instances of PartitionService.
   // `service_root` should contain the `fuchsia.storage.partitions.PartitionService` service.
-  static zx::result<BlockDevices> CreateStorageHost(
+  static zx::result<BlockDevices> CreateFromPartitionService(
       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
 
   // Creates an empty BlockDevices instance which never yields any partitions.  Useful for tests

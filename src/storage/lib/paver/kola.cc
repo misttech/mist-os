@@ -187,7 +187,7 @@ class KolaAbrManagerInterface {
   virtual zx::result<> Commit() = 0;
 };
 
-/// Implementation of A/B management which relies on APIs offered by storage-host.
+/// Implementation of A/B management using APIs offered by the storage stack.
 class KolaAbrManager : public KolaAbrManagerInterface {
  public:
   static zx::result<std::unique_ptr<KolaAbrManager>> Create(const KolaPartitioner* partitioner) {
@@ -589,7 +589,6 @@ class KolaLegacyAbrManager : public KolaAbrManagerInterface {
   uint32_t zircon_b_index_;
 };
 
-/// Implementation of A/B management which relies on APIs offered by storage-host.
 class KolaAbrClient : public abr::Client {
  public:
   explicit KolaAbrClient(std::unique_ptr<KolaAbrManagerInterface> abr)

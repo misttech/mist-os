@@ -92,7 +92,7 @@ TEST(BlockDevicesTests, TestPartitionsDir) {
   IsolatedDevmgr devmgr;
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
 
-  zx::result devices = paver::BlockDevices::CreateStorageHost(storage_host.svc_root());
+  zx::result devices = paver::BlockDevices::CreateFromPartitionService(storage_host.svc_root());
   ASSERT_OK(devices);
 
   {

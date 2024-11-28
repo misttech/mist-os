@@ -149,7 +149,7 @@ zx::result<BlockDevices> BlockDevices::CreateDevfs(fbl::unique_fd devfs_root) {
   return zx::ok(BlockDevices(std::move(devfs_root), {}));
 }
 
-zx::result<BlockDevices> BlockDevices::CreateStorageHost(
+zx::result<BlockDevices> BlockDevices::CreateFromPartitionService(
     fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {

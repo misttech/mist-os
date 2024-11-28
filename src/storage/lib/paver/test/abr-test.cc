@@ -149,7 +149,7 @@ class CurrentSlotUuidTest : public PaverTest {
 
   zx::result<paver::BlockDevices> CreateBlockDevices() {
     if (DevmgrArgs().enable_storage_host) {
-      return paver::BlockDevices::CreateStorageHost(devmgr_.RealmExposedDir().borrow());
+      return paver::BlockDevices::CreateFromPartitionService(devmgr_.RealmExposedDir().borrow());
     }
     return paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
   }
