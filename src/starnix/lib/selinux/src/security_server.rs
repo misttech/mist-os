@@ -441,39 +441,6 @@ impl SecurityServer {
         }
     }
 
-    /// Computes the appropriate security identifier (SID) for the security context of a file-like
-    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
-    pub fn compute_new_file_sid(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        file_class: FileClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
-        let active_policy = match &mut locked_state.active_policy {
-            Some(active_policy) => active_policy,
-            None => {
-                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
-            }
-        };
-
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        active_policy
-            .sid_table
-            .security_context_to_sid(
-                &active_policy.parsed.new_file_security_context(
-                    source_context,
-                    target_context,
-                    &file_class,
-                ), // TODO(http://b/334968228): check that transitions are allowed.
-            )
-            .map_err(anyhow::Error::from)
-            .context("computing new file security context from policy")
-    }
-
     pub fn compute_new_sid(
         &self,
         source_sid: SecurityId,
@@ -559,6 +526,37 @@ impl Query for SecurityServer {
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
         self.compute_access_vector(source_sid, target_sid, target_class)
+    }
+
+    fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut locked_state = self.state.lock();
+        let active_policy = match &mut locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            None => {
+                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
+            }
+        };
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        // TODO(http://b/334968228): check that transitions are allowed.
+        let new_file_context = active_policy.parsed.new_file_security_context(
+            source_context,
+            target_context,
+            &file_class,
+        );
+
+        active_policy
+            .sid_table
+            .security_context_to_sid(&new_file_context)
+            .map_err(anyhow::Error::from)
+            .context("computing new file security context from policy")
     }
 }
 

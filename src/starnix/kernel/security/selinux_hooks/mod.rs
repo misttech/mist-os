@@ -262,6 +262,7 @@ fn compute_new_fs_node_sid(
             } else {
                 let parent_sid = fs_node_effective_sid(parent);
                 let sid = security_server
+                    .as_permission_check()
                     .compute_new_file_sid(current_task_sid, parent_sid, new_node_class)
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
