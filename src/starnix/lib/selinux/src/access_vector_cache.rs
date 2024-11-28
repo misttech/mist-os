@@ -163,9 +163,6 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
     /// # Panics
     ///
     /// This will panic when `SIZE` is 0; i.e., for any `Fixed<D, 0>`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(delegate: D) -> Self {
         if SIZE == 0 {
             panic!("cannot instantiate fixed access vector cache of size 0");
@@ -285,9 +282,6 @@ impl<D> Clone for Locked<D> {
 
 impl<D> Locked<D> {
     /// Constructs a locked access vector cache that delegates to `delegate`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(delegate: D) -> Self {
         Self { delegate: Arc::new(Mutex::new(delegate)) }
     }
@@ -399,9 +393,6 @@ pub(super) struct ThreadLocalQuery<D = DenyAll> {
 
 impl<D> ThreadLocalQuery<D> {
     /// Constructs a [`ThreadLocalQuery`] that delegates to `delegate`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new(active_version: Arc<AtomicVersion>, delegate: D) -> Self {
         Self { delegate, current_version: Default::default(), active_version }
     }
@@ -445,9 +436,6 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
 {
     /// Constructs a [`Manager`] that initially has no security server delegate (i.e., will default
     /// to deny all requests).
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             shared_cache: Locked::new(Fixed::new(Weak::<SS>::new())),

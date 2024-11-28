@@ -400,7 +400,7 @@ impl SecurityServer {
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
-    pub fn compute_access_vector(
+    fn compute_access_vector(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -414,7 +414,6 @@ impl SecurityServer {
             None => return AccessDecision::allow(AccessVector::ALL),
         };
 
-        // Policy is loaded, so `sid_to_security_context()` will not panic.
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
