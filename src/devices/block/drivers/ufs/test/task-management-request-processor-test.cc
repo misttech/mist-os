@@ -32,7 +32,7 @@ TEST_F(TaskManagementRequestProcessorTest, RingRequestDoorbell) {
       RingRequestDoorbell<ufs::TaskManagementRequestProcessor>(slot_num.value()).status_value(),
       ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTaskManagementRequestProcessor().IoRequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTaskManagementRequestProcessor().IoRequestCompletion(), 1U);
   ASSERT_OK(slot.result);
 }
 
@@ -54,14 +54,14 @@ TEST_F(TaskManagementRequestProcessorTest, FillDescriptorAndSendRequest) {
             ZX_OK);
 
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTaskManagementRequestProcessor().IoRequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTaskManagementRequestProcessor().IoRequestCompletion(), 1U);
   ASSERT_OK(slot.result);
 
   // Check UTP Task Management Request Descriptor
   auto descriptor = dut_->GetTaskManagementRequestProcessor()
                         .GetRequestList()
                         .GetRequestDescriptor<TaskManagementRequestDescriptor>(slot_num.value());
-  EXPECT_EQ(descriptor->interrupt(), 1);
+  EXPECT_EQ(descriptor->interrupt(), 1U);
   EXPECT_EQ(descriptor->overall_command_status(), OverallCommandStatus::kSuccess);
 }
 

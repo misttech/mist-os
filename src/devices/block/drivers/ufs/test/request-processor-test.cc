@@ -49,7 +49,7 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorRingRequestDoorbell) {
   ASSERT_EQ(RingRequestDoorbell<ufs::TransferRequestProcessor>(slot_num.value()).status_value(),
             ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTransferRequestProcessor().AdminRequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().AdminRequestCompletion(), 1U);
   ASSERT_EQ(slot.state, SlotState::kFree);
 }
 
@@ -77,7 +77,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
             ZX_OK);
 
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTransferRequestProcessor().IoRequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().IoRequestCompletion(), 1U);
   ASSERT_EQ(slot.state, SlotState::kFree);
 
   // Check Utp Transfer Request Descriptor
@@ -86,11 +86,11 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
                         .GetRequestDescriptor<TransferRequestDescriptor>(slot_num.value());
   EXPECT_EQ(descriptor->command_type(), kCommandTypeUfsStorage);
   EXPECT_EQ(descriptor->data_direction(), data_dir);
-  EXPECT_EQ(descriptor->interrupt(), 1);
-  EXPECT_EQ(descriptor->ce(), 0);                      // Crypto is not supported
-  EXPECT_EQ(descriptor->cci(), 0);                     // Crypto is not supported
-  EXPECT_EQ(descriptor->data_unit_number_lower(), 0);  // Crypto is not supported
-  EXPECT_EQ(descriptor->data_unit_number_upper(), 0);  // Crypto is not supported
+  EXPECT_EQ(descriptor->interrupt(), 1U);
+  EXPECT_EQ(descriptor->ce(), 0U);                      // Crypto is not supported
+  EXPECT_EQ(descriptor->cci(), 0U);                     // Crypto is not supported
+  EXPECT_EQ(descriptor->data_unit_number_lower(), 0U);  // Crypto is not supported
+  EXPECT_EQ(descriptor->data_unit_number_upper(), 0U);  // Crypto is not supported
 
   zx_paddr_t paddr = dut_->GetTransferRequestProcessor()
                          .GetRequestList()
@@ -100,10 +100,10 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   EXPECT_EQ(descriptor->utp_command_descriptor_base_address_upper(),
             static_cast<uint32_t>(paddr >> 32));
   constexpr uint16_t kDwordSize = 4;
-  EXPECT_EQ(descriptor->response_upiu_offset(), response_offset / kDwordSize);
-  EXPECT_EQ(descriptor->response_upiu_length(), response_length / kDwordSize);
-  EXPECT_EQ(descriptor->prdt_offset(), prdt_offset / kDwordSize);
-  EXPECT_EQ(descriptor->prdt_length(), prdt_entry_count);
+  EXPECT_EQ(descriptor->response_upiu_offset(), uint32_t{response_offset / kDwordSize});
+  EXPECT_EQ(descriptor->response_upiu_length(), uint32_t{response_length / kDwordSize});
+  EXPECT_EQ(descriptor->prdt_offset(), uint32_t{prdt_offset / kDwordSize});
+  EXPECT_EQ(descriptor->prdt_length(), uint32_t{prdt_entry_count});
 }
 
 TEST_F(RequestProcessorTest, SendQueryUpiu) {

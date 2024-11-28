@@ -372,7 +372,7 @@ TEST_F(BlockOpTest, TransferSizeTest) {
 
   sync_completion_t done;
   auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
-    EXPECT_OK(status, "Failed with block_length = %u", op->rw.length);
+    EXPECT_OK(status) << "Failed with block_length";
     sync_completion_signal(static_cast<sync_completion_t*>(ctx));
   };
 
@@ -426,7 +426,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
   dut_->DisableCompletion();
 
   auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
-    EXPECT_OK(status, "op->rw.command.offset_vmo = %lu", op->rw.offset_vmo);
+    EXPECT_OK(status);
     sync_completion_signal(static_cast<sync_completion_t*>(ctx));
   };
 
@@ -444,7 +444,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
     FillRandom(mapped_vaddr, ufs_mock_device::kMockBlockSize * queue_depth);
 
     auto block_ops = std::make_unique<uint8_t[]>(op_size_ * queue_depth);
-    sync_completion_t done[queue_depth];
+    std::vector<sync_completion_t> done(queue_depth);
 
     for (uint32_t i = 0; i < queue_depth; ++i) {
       auto op = reinterpret_cast<block_op_t*>(block_ops.get() + (op_size_ * i));
@@ -492,10 +492,10 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
       sync_completion_reset(&done[i]);
     }
 
-    char buf[ufs_mock_device::kMockBlockSize * queue_depth];
-    ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, queue_depth, 0));
+    auto buf = std::make_unique<uint8_t[]>(ufs_mock_device::kMockBlockSize * queue_depth);
+    ASSERT_OK(mock_device_.BufferRead(kTestLun, buf.get(), queue_depth, 0));
 
-    ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
+    ASSERT_EQ(std::memcmp(buf.get(), mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
     ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
   }
 }

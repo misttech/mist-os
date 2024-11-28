@@ -408,9 +408,9 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultUnmapHandler(
   off_t start_lba =
       safemath::checked_cast<off_t>(betoh64(header->block_descriptors[0].logical_block_address));
 
-  uint8_t zero_buf[block_count * kMockBlockSize];
-  std::memset(zero_buf, 0, block_count * kMockBlockSize);
-  if (auto status = mock_device.BufferWrite(lun, zero_buf, block_count, start_lba);
+  auto zero_buf = std::make_unique<uint8_t[]>(block_count * kMockBlockSize);
+  std::memset(zero_buf.get(), 0, block_count * kMockBlockSize);
+  if (auto status = mock_device.BufferWrite(lun, zero_buf.get(), block_count, start_lba);
       status != ZX_OK) {
     return zx::error(status);
   }

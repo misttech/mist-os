@@ -13,7 +13,7 @@
 
 #include <bitset>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "fake-dma-handler.h"
 #include "query-request-processor.h"
@@ -52,12 +52,12 @@ constexpr uint32_t kGranularity = 6;
 class FakeRegisters final {
  public:
   FakeRegisters() {
-    ASSERT_OK(zx::vmo::create(RegisterMap::kRegisterSize, /*options=*/0, &registers_vmo_));
-    ASSERT_OK(registers_vmo_.set_cache_policy(ZX_CACHE_POLICY_UNCACHED));
-    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+    ZX_ASSERT(zx::vmo::create(RegisterMap::kRegisterSize, /*options=*/0, &registers_vmo_) == ZX_OK);
+    ZX_ASSERT(registers_vmo_.set_cache_policy(ZX_CACHE_POLICY_UNCACHED) == ZX_OK);
+    ZX_ASSERT(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
                                          /*vmar_offset=*/0, registers_vmo_,
                                          /*vmo_offset=*/0, /*len=*/RegisterMap::kRegisterSize,
-                                         reinterpret_cast<zx_vaddr_t *>(&registers_)));
+                                         reinterpret_cast<zx_vaddr_t *>(&registers_)) == ZX_OK);
   }
 
   template <typename T>
