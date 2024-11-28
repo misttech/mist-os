@@ -77,6 +77,9 @@ class ImportedImage {
     return *this;
   }
 
+  // Rounds up the given size to the system's page size.
+  static size_t RoundedUpImageSize(size_t original_image_size);
+
  private:
   // Creates an instance representing the image moved-out state.
   //

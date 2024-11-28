@@ -83,6 +83,7 @@ test("virtio-gpu-display-test") {
   }
   sources = [
     "display-engine-test.cc",
+    "imported-image-test.cc",
     "virtio-abi-test.cc",
   ]
   deps = [

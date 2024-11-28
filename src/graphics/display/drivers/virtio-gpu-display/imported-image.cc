@@ -12,10 +12,12 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <utility>
 
 #include "src/graphics/lib/virtio/virtio-abi.h"
@@ -25,10 +27,18 @@ namespace virtio_display {
 // static
 zx::result<ImportedImage> ImportedImage::Create(const zx::bti& bti, zx::vmo& image_vmo,
                                                 uint64_t image_vmo_offset, size_t image_size) {
+  ZX_DEBUG_ASSERT(bti.is_valid());
+  ZX_DEBUG_ASSERT(image_vmo.is_valid());
+  ZX_DEBUG_ASSERT(image_vmo_offset % zx_system_get_page_size() == 0);
+  ZX_DEBUG_ASSERT(image_size > 0);
+
+  // zx_bti_pin() requires an integer number of pages.
+  const size_t pinned_memory_size = ImportedImage::RoundedUpImageSize(image_size);
+
   zx::pmt pinned_memory_token;
   zx_paddr_t image_physical_address;
   zx_status_t pin_status = bti.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, image_vmo,
-                                   image_vmo_offset, image_size, &image_physical_address,
+                                   image_vmo_offset, pinned_memory_size, &image_physical_address,
                                    /*addrs_count=*/1, &pinned_memory_token);
   if (pin_status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to pin image VMO: %s", zx_status_get_string(pin_status));
@@ -60,6 +70,25 @@ ImportedImage::~ImportedImage() {
   if (unpin_status != ZX_OK) {
     FDF_LOG(WARNING, "Failed to unpin image memory: %s", zx_status_get_string(unpin_status));
   }
+}
+
+// static
+size_t ImportedImage::RoundedUpImageSize(size_t original_image_size) {
+  const uint32_t page_size = zx_system_get_page_size();
+  ZX_DEBUG_ASSERT(page_size > 0);
+  ZX_DEBUG_ASSERT_MSG((page_size & (page_size - 1)) == 0, "Page size must be a power of two");
+
+  ZX_DEBUG_ASSERT_MSG(size_t{page_size} <= std::numeric_limits<size_t>::max(),
+                      "size_t can't hold a single page");
+  ZX_DEBUG_ASSERT_MSG(original_image_size <= std::numeric_limits<size_t>::max() - (page_size - 1),
+                      "Rounding up the image size would overflow size_t");
+
+  const size_t page_size_mask = size_t{page_size - 1};
+  ZX_DEBUG_ASSERT((original_image_size & page_size_mask) == (original_image_size % page_size));
+
+  ZX_DEBUG_ASSERT(((original_image_size + page_size_mask) & ~page_size_mask) ==
+                  ((original_image_size + page_size - 1) / page_size) * page_size);
+  return (original_image_size + page_size_mask) & (~page_size_mask);
 }
 
 }  // namespace virtio_display
