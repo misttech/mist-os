@@ -8,7 +8,7 @@ use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use diagnostics_log_encoding::parse::parse_record;
 use diagnostics_log_encoding::{Argument, Record, Value};
-use futures::StreamExt;
+use futures::{future, StreamExt};
 use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 const PUPPET_NAME: &str = "puppet";
@@ -46,16 +46,22 @@ async fn listen_with_log_stream() {
         )
         .expect("connected socket");
 
-    let mut records = socket.as_datagram_stream().take(2).map(|result| {
-        let bytes = result.unwrap();
-        let record = match parse_record(&bytes) {
-            Ok((record, _)) => record,
-            Err(err) => {
-                panic!("Failed to parse record: {bytes:?}: {err:?}")
+    let mut records = socket
+        .into_datagram_stream()
+        .filter_map(|result| {
+            let bytes = result.unwrap();
+            if bytes.is_empty() {
+                return future::ready(None);
             }
-        };
-        record.into_owned()
-    });
+            let record = match parse_record(&bytes) {
+                Ok((record, _)) => record,
+                Err(err) => {
+                    panic!("Failed to parse record: {bytes:?}: {err:?}")
+                }
+            };
+            future::ready(Some(record.into_owned()))
+        })
+        .take(2);
 
     let record = records.next().await.unwrap();
     assert_eq!(record.severity, fdiagnostics::Severity::Info as u8);
