@@ -252,6 +252,14 @@
     {
       "kind": "Switch",
       "optionality": "optional",
+      "long": "--uefi",
+      "short": null,
+      "description": "create and start an emulator with a full GPT disk including UEFI boot environment and all partitions in one flat file. This approximates a physical device as closely as possible. Note that this is currently only enabled for x64 and arm64 targets. RISC-V is unsupported.",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
       "long": "--verbose",
       "short": "V",
       "description": "enables extra logging for debugging.",

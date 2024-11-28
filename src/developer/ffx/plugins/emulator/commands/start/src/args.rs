@@ -194,6 +194,12 @@ pub struct StartCommand {
     #[ffx_config_default(key = "emu.start.timeout", default = "60")]
     pub startup_timeout: Option<u64>,
 
+    /// create and start an emulator with a full GPT disk including UEFI boot environment and all
+    /// partitions in one flat file. This approximates a physical device as closely as possible.
+    /// Note that this is currently only enabled for x64 and arm64 targets. RISC-V is unsupported.
+    #[argh(switch)]
+    pub uefi: bool,
+
     /// enables extra logging for debugging.
     #[argh(switch, short = 'V')]
     pub verbose: bool,
