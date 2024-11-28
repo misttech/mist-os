@@ -522,7 +522,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
 
 TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
@@ -670,17 +670,20 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
     w_buf[i] = static_cast<char>(rand());
   }
 
+  // fill inline data
   FileTester::AppendToInline(inline_file_ptr, w_buf.get(), target_size);
   FileTester::CheckInlineFile(inline_vnode.get());
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
 
+  // fsync()
   ASSERT_EQ(inline_vnode->SyncFile(false), ZX_OK);
-
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);
   inline_vnode = nullptr;
   ASSERT_EQ(root_dir->Close(), ZX_OK);
   root_dir = nullptr;
+
   // SPO and remount with roll-forward recovery
+  // |inline_vnode| should be recovered with the inline data.
   FileTester::SuddenPowerOff(std::move(fs), &bc);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -693,34 +696,22 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   inline_file_ptr = static_cast<File *>(inline_vnode.get());
   FileTester::CheckInlineFile(inline_vnode.get());
 
-  // Check recovery inline data
+  // Files using pager migrate inline data to regular data blocks when they need to handle stream.
+  // Thus, |inline_vnode| moves inline data to data block during ReadFromFile().
   FileTester::ReadFromFile(inline_file_ptr, r_buf.get(), target_size, 0);
   ASSERT_EQ(memcmp(r_buf.get(), w_buf.get(), target_size), 0);
-  // As fuchsia f2fs doesn't use inlinedata, |inline_vnode| should move inline data to data block
-  // during read()
   FileTester::CheckNonInlineFile(inline_vnode.get());
 
-  // 2. remove inline_data, and then recover data blocks
-  // Write one more byte, then it should be converted to noinline
-  inline_vnode->Truncate(0);
-  inline_vnode->SetFlag(InodeInfoFlag::kInlineData);
-  FileTester::CheckInlineFile(inline_vnode.get());
-  FileTester::AppendToInline(inline_file_ptr, w_buf.get(), target_size);
-
-  target_size = inline_file_ptr->MaxInlineData();
-  FileTester::AppendToFile(inline_file_ptr, w_buf.get() + target_size - 1, 1);
-  FileTester::CheckNonInlineFile(inline_vnode.get());
+  // fsync()
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
-
   ASSERT_EQ(inline_vnode->SyncFile(false), ZX_OK);
-
-  inline_file_ptr = nullptr;
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);
   inline_vnode = nullptr;
   ASSERT_EQ(root_dir->Close(), ZX_OK);
   root_dir = nullptr;
 
   // SPO and remount with roll-forward recovery
+  // |inline_vnode| should be recovered without any inline data.
   FileTester::SuddenPowerOff(std::move(fs), &bc);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -736,7 +727,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   FileTester::ReadFromFile(inline_file_ptr, r_buf.get(), target_size, 0);
   ASSERT_EQ(memcmp(r_buf.get(), w_buf.get(), target_size), 0);
 
-  inline_file_ptr = nullptr;
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);
   inline_vnode = nullptr;
   ASSERT_EQ(root_dir->Close(), ZX_OK);
@@ -1137,7 +1127,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
 
 TEST(FsyncRecoveryTest, AtomicFsync) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};

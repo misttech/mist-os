@@ -30,9 +30,11 @@
 #include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
-
+constexpr uint64_t kSectorCount50MiB = 102400;
+constexpr uint64_t kSectorCount100MiB = 204800;
+constexpr uint64_t kDefaultSectorCount = kSectorCount50MiB;
 struct TestOptions {
-  uint64_t block_count = 819200;
+  uint64_t block_count = kDefaultSectorCount;
   uint64_t block_size = kDefaultSectorSize;
   MkfsOptions mkfs_options{};
   std::vector<std::pair<MountOption, size_t>> mount_options;
@@ -111,10 +113,12 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
 
 class FileTester {
  public:
-  static void MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc, uint64_t block_count = 819200,
+  static void MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc,
+                            uint64_t block_count = kDefaultSectorCount,
                             uint32_t block_size = kDefaultSectorSize, bool btrim = true);
   static void MkfsOnFakeDevWithOptions(std::unique_ptr<BcacheMapper> *bc,
-                                       const MkfsOptions &options, uint64_t block_count = 819200,
+                                       const MkfsOptions &options,
+                                       uint64_t block_count = kDefaultSectorCount,
                                        uint32_t block_size = kDefaultSectorSize, bool btrim = true);
   static void MountWithOptions(async_dispatcher_t *dispatcher, const MountOptions &options,
                                std::unique_ptr<BcacheMapper> *bc, std::unique_ptr<F2fs> *fs);

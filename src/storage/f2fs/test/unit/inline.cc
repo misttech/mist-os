@@ -253,7 +253,7 @@ TEST(InlineDirTest, NestedInlineDirectories) {
   // There was a reported malfunction of inline-directories when the volume size is small.
   // This test evaluates such case.
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc, 102400, 512);
+  FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};

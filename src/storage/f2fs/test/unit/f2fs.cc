@@ -226,9 +226,9 @@ using StorageTest = SingleFileTest;
 
 TEST_F(StorageTest, LargeIOs) {
   // Create a fake block for test
-  constexpr size_t kNumPages = 50 * 1024 * 1024 / Page::Size();
-  auto device = std::make_unique<block_client::FakeBlockDevice>(
-      block_client::FakeBlockDevice::Config{.block_count = kNumPages, .block_size = Page::Size()});
+  auto device =
+      std::make_unique<block_client::FakeBlockDevice>(block_client::FakeBlockDevice::Config{
+          .block_count = kDefaultSectorCount / kDefaultSectorsPerBlock, .block_size = kBlockSize});
   bool readonly_device = false;
   zx::result block_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(block_or.is_ok());
@@ -237,7 +237,7 @@ TEST_F(StorageTest, LargeIOs) {
   std::unique_ptr<StorageBufferPool> buffer_pool = std::make_unique<StorageBufferPool>(&**block_or);
   size_t large_buffer_size = buffer_pool->GetLargeBufferSize();
 
-  ASSERT_TRUE(kNumPages > large_buffer_size * 2);
+  ASSERT_TRUE(kDefaultSectorCount / kDefaultSectorsPerBlock > large_buffer_size * 2);
 
   std::unique_ptr<Reader> reader_ = std::make_unique<Reader>(std::move(buffer_pool));
   std::unique_ptr<Writer> writer_ =

@@ -20,6 +20,7 @@ class SegmentManagerTest : public F2fsFakeDevTestFixture {
  public:
   SegmentManagerTest()
       : F2fsFakeDevTestFixture(TestOptions{
+            .block_count = kSectorCount100MiB,
             .mount_options = {{MountOption::kInlineDentry, false}},
         }) {}
 
@@ -540,7 +541,8 @@ TEST(SegmentManagerOptionTest, Section) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.segs_per_sec = 4;
-  FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
+  FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options,
+                                       kDefaultSectorCount * mkfs_options.segs_per_sec);
 
   std::unique_ptr<F2fs> fs;
   MountOptions mount_options{};
@@ -586,9 +588,11 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = true;
-  mkfs_options.segs_per_sec = 4;
-  mkfs_options.secs_per_zone = 4;
-  FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
+  mkfs_options.segs_per_sec = 1;
+  mkfs_options.secs_per_zone = 2;
+  FileTester::MkfsOnFakeDevWithOptions(
+      &bc, mkfs_options,
+      kDefaultSectorCount * mkfs_options.segs_per_sec * mkfs_options.secs_per_zone);
 
   std::unique_ptr<F2fs> fs;
   MountOptions mount_options{};
@@ -600,9 +604,13 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
   superblock_info.ClearOpt(MountOption::kNoHeap);
   fs->GetSegmentManager().NewCurseg(CursegType::kCursegHotNode, false);
 
-  const uint32_t alloc_size = kDefaultBlocksPerSegment * mkfs_options.segs_per_sec;
-  uint32_t nwritten = alloc_size * mkfs_options.secs_per_zone * 3;
+  const uint32_t blocks_per_section = kDefaultBlocksPerSegment * mkfs_options.segs_per_sec;
+  uint32_t nwritten = blocks_per_section * mkfs_options.secs_per_zone * 2;
 
+  NodeInfo ni;
+  fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
+
+  size_t num_changes = 0;
   for (uint32_t i = 0; i < nwritten; ++i) {
     NodeInfo ni, new_ni;
     fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
@@ -622,11 +630,13 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
     ASSERT_NE(new_ni.blk_addr, kNewAddr);
 
-    // The heap style allocation tries to find a free node section from the end of main area
-    if ((i > alloc_size * 2 - 1) && (new_ni.blk_addr % alloc_size == 0)) {
-      ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
-    } else {
-      ASSERT_GT(new_ni.blk_addr, ni.blk_addr);
+    if (new_ni.blk_addr % blocks_per_section == 0) {
+      // The heap style allocation tries to find a free node section from the end of main area
+      if (++num_changes > mkfs_options.secs_per_zone) {
+        ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
+      } else {
+        ASSERT_GT(new_ni.blk_addr, ni.blk_addr);
+      }
     }
   }
 
@@ -637,9 +647,11 @@ TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) TA_NO_THREAD_SAFETY_ANALYSIS
   std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = false;
-  mkfs_options.segs_per_sec = 4;
-  mkfs_options.secs_per_zone = 4;
-  FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
+  mkfs_options.segs_per_sec = 1;
+  mkfs_options.secs_per_zone = 2;
+  FileTester::MkfsOnFakeDevWithOptions(
+      &bc, mkfs_options,
+      kDefaultSectorCount * mkfs_options.segs_per_sec * mkfs_options.secs_per_zone);
 
   std::unique_ptr<F2fs> fs;
   MountOptions mount_options;
@@ -652,7 +664,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) TA_NO_THREAD_SAFETY_ANALYSIS
   fs->GetSegmentManager().NewCurseg(CursegType::kCursegHotNode, false);
 
   uint32_t nwritten =
-      kDefaultBlocksPerSegment * mkfs_options.segs_per_sec * mkfs_options.secs_per_zone * 3;
+      kDefaultBlocksPerSegment * mkfs_options.segs_per_sec * mkfs_options.secs_per_zone * 2;
 
   for (uint32_t i = 0; i < nwritten; ++i) {
     NodeInfo ni, new_ni;

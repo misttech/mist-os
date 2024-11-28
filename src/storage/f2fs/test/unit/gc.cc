@@ -17,11 +17,9 @@ namespace f2fs {
 namespace {
 
 constexpr uint32_t kFileBlocks = kDefaultBlocksPerSegment;
-constexpr uint64_t kDefaultBlockCount = 131072;
 class GcTest : public F2fsFakeDevTestFixture {
  public:
-  GcTest(TestOptions options = TestOptions{.block_count = kDefaultBlockCount})
-      : F2fsFakeDevTestFixture(std::move(options)) {
+  GcTest(TestOptions options = {}) : F2fsFakeDevTestFixture(options) {
     // GcTest should run with MountOption::kForceLfs set.
     mount_options_.SetValue(MountOption::kForceLfs, true);
   }
@@ -426,7 +424,7 @@ TEST_P(GcTestWithLargeSec, GcConsistency) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 const std::array<std::pair<uint64_t, uint32_t>, 2> kSecParams = {
-    {{kDefaultBlockCount, 1}, {4 * kDefaultBlockCount, 4}}};
+    {{kDefaultSectorCount, 1}, {4 * kDefaultSectorCount, 4}}};
 INSTANTIATE_TEST_SUITE_P(GcTestWithLargeSec, GcTestWithLargeSec, ::testing::ValuesIn(kSecParams));
 
 }  // namespace

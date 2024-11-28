@@ -13,7 +13,7 @@ namespace {
 
 class MultiThreads : public F2fsFakeDevTestFixture {
  public:
-  MultiThreads() : F2fsFakeDevTestFixture(TestOptions{.block_count = 1048576}) {}
+  MultiThreads() : F2fsFakeDevTestFixture() {}
 };
 
 class MultiThreadsWithLFS : public MultiThreads, public testing::WithParamInterface<bool> {
@@ -56,40 +56,39 @@ TEST_P(MultiThreadsWithLFS, Write) {
   ASSERT_TRUE(test_file1.is_ok()) << test_file1.status_string();
   zx::result test_file2 = root_dir_->Create("test2", fs::CreationType::kFile);
   ASSERT_TRUE(test_file2.is_ok()) << test_file2.status_string();
-  {
-    fbl::RefPtr<f2fs::File> vn1 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file1));
-    fbl::RefPtr<f2fs::File> vn2 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file2));
+  fbl::RefPtr<f2fs::File> vn1 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file1));
+  fbl::RefPtr<f2fs::File> vn2 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file2));
 
-    constexpr int kNTry = 25600;
-    uint8_t buf[kPageSize * 2] = {1};
-    // 3 iterations are enough to touch every block and trigger gc.
-    for (int i = 0; i < 3; ++i) {
-      std::thread writer1 = std::thread([&]() {
-        for (int i = 0; i < kNTry; ++i) {
-          size_t out_actual;
-          ASSERT_EQ(FileTester::Write(vn1.get(), buf, sizeof(buf),
-                                      static_cast<size_t>(i * kBlockSize), &out_actual),
-                    ZX_OK);
-          ASSERT_EQ(out_actual, sizeof(buf));
-        }
-      });
+  constexpr uint32_t kNumFiles = 2;
+  uint32_t file_size =
+      (fs_->GetSuperblockInfo().GetTotalBlockCount() - kNrCursegType * kDefaultBlocksPerSegment) /
+      kNumFiles;
+  uint8_t buf[kBlockSize] = {1};
+  // 2 iterations are enough to touch every block and trigger gc.
+  for (int i = 0; i < 2; ++i) {
+    std::thread writer1 = std::thread([&]() {
+      for (uint32_t i = 0; i < file_size; ++i) {
+        size_t out_actual;
+        ASSERT_EQ(FileTester::Write(vn1.get(), buf, sizeof(buf), i * kBlockSize, &out_actual),
+                  ZX_OK);
+        ASSERT_EQ(out_actual, sizeof(buf));
+      }
+    });
 
-      std::thread writer2 = std::thread([&]() {
-        for (int i = 0; i < kNTry; ++i) {
-          size_t out_actual;
-          ASSERT_EQ(FileTester::Write(vn2.get(), buf, sizeof(buf),
-                                      static_cast<size_t>(i * kBlockSize), &out_actual),
-                    ZX_OK);
-          ASSERT_EQ(out_actual, sizeof(buf));
-        }
-      });
+    std::thread writer2 = std::thread([&]() {
+      for (uint32_t i = 0; i < file_size; ++i) {
+        size_t out_actual;
+        ASSERT_EQ(FileTester::Write(vn2.get(), buf, sizeof(buf), i * kBlockSize, &out_actual),
+                  ZX_OK);
+        ASSERT_EQ(out_actual, sizeof(buf));
+      }
+    });
 
-      writer1.join();
-      writer2.join();
-    }
-    vn1->Close();
-    vn2->Close();
+    writer1.join();
+    writer2.join();
   }
+  vn1->Close();
+  vn2->Close();
 }
 
 const std::array<bool, 2> kAllocParams = {false, true};

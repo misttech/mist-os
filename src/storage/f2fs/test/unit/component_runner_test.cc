@@ -18,19 +18,21 @@
 #include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/mkfs.h"
+#include "src/storage/f2fs/segment.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace f2fs {
 namespace {
 
+constexpr uint64_t kDefaultBlockCount =
+    (kMinMetaSegments + kMinReservedSectionsForGc + kNrCursegType) * kDefaultBlocksPerSegment;
 class F2fsComponentRunnerTest : public testing::Test {
  public:
   F2fsComponentRunnerTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
-    constexpr uint64_t kBlockCount = 409600;
-    auto device = std::make_unique<block_client::FakeBlockDevice>(kBlockCount, kBlockSize);
+    auto device = std::make_unique<block_client::FakeBlockDevice>(kDefaultBlockCount, kBlockSize);
     auto bc_or = CreateBcacheMapper(std::move(device));
     bc_or = Mkfs(MkfsOptions{}, std::move(*bc_or));
     ASSERT_TRUE(bc_or.is_ok());
