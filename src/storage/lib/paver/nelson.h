@@ -33,8 +33,6 @@ class NelsonPartitioner : public DevicePartitioner {
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
-  zx::result<> FinalizePartition(const PartitionSpec& spec) const override { return zx::ok(); }
-
   zx::result<> WipeFvm() const override;
 
   zx::result<> ResetPartitionTables() const override;

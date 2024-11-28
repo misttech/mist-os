@@ -314,7 +314,6 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
     abr_client_ = std::move(*abr_client);
   }
 
-  // TODO(https://fxbug.dev/371060853): Remove this; use fshost APIs.
   zx::result<std::unique_ptr<gpt::GptDevice>> OpenGptDevice() {
     zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
     if (new_connection.is_error()) {
@@ -332,143 +331,145 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
                                   /*blocks=*/disk_->block_count());
   }
 
-  zx::result<KolaGptEntryAttributes> CheckPartitionState(uint32_t index, std::string_view name,
-                                                         const uint8_t* type_guid) {
+  void CheckPartitionState(uint32_t index, std::string_view name, const uint8_t* type_guid,
+                           KolaGptEntryAttributes* out) {
     zx::result gpt_result = OpenGptDevice();
-    if (gpt_result.is_error()) {
-      return gpt_result.take_error();
-    }
+    ASSERT_OK(gpt_result);
     std::unique_ptr<gpt::GptDevice> gpt = std::move(gpt_result.value());
-    auto gpt_entry = gpt->GetPartition(index);
-    if (gpt_entry.is_error()) {
-      return gpt_entry.take_error();
-    }
+    zx::result gpt_entry = gpt->GetPartition(index);
+    ASSERT_OK(gpt_entry);
 
     char cstring_name[GPT_NAME_LEN / 2 + 1] = {0};
     ::utf16_to_cstring(cstring_name, reinterpret_cast<const uint16_t*>(gpt_entry->name),
                        sizeof(cstring_name));
     const std::string_view partition_name = cstring_name;
-    EXPECT_EQ(partition_name, name);
+    ASSERT_EQ(partition_name, name);
 
-    EXPECT_EQ(memcmp(gpt_entry->type, type_guid, GPT_GUID_LEN), 0);
+    ASSERT_EQ(uuid::Uuid(gpt_entry->type), uuid::Uuid(type_guid));
 
-    return zx::ok(KolaGptEntryAttributes{gpt_entry->flags});
+    *out = KolaGptEntryAttributes{gpt_entry->flags};
   }
 
   void AbrClientFlush() { ASSERT_OK(abr_client_->Flush()); }
+
+  void KolaTest();
 
   std::unique_ptr<paver::DevicePartitioner> partitioner_;
   std::unique_ptr<abr::Client> abr_client_;
 };
 
-TEST_F(KolaAbrClientTest, KolaTest) {
+void KolaAbrClientTest::KolaTest() {
   // Initial active slot A.
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
   AbrClientFlush();
 
-  zx::result<KolaGptEntryAttributes> attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), true);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  KolaGptEntryAttributes attributes{0};
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), true);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexB));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  ASSERT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexB));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
   AbrClientFlush();
 
-  attributes = CheckPartitionState(0, "boot_a", kZirconType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
-  EXPECT_EQ(attributes->active(), true);
-  EXPECT_EQ(attributes->retry_count(), 0);
-  EXPECT_EQ(attributes->boot_success(), true);
-  EXPECT_EQ(attributes->unbootable(), false);
-  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
-  ASSERT_OK(attributes);
-  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
-  EXPECT_EQ(attributes->active(), false);
-  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
-  EXPECT_EQ(attributes->boot_success(), false);
-  EXPECT_EQ(attributes->unbootable(), false);
-  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
-  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
-  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(0, "boot_a", kZirconType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes.active(), true);
+  EXPECT_EQ(attributes.retry_count(), 0);
+  EXPECT_EQ(attributes.boot_success(), true);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(1, "boot_b", kBootloaderType, &attributes));
+  EXPECT_EQ(attributes.priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes.active(), false);
+  EXPECT_EQ(attributes.retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes.boot_success(), false);
+  EXPECT_EQ(attributes.unbootable(), false);
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
 }
+
+class KolaAbrClientWithStorageHostTest : public KolaAbrClientTest {
+ protected:
+  IsolatedDevmgr::Args DevmgrArgs() override {
+    IsolatedDevmgr::Args args = KolaAbrClientTest::DevmgrArgs();
+    args.enable_storage_host = true;
+    return args;
+  }
+};
+
+TEST_F(KolaAbrClientTest, KolaTest) { ASSERT_NO_FATAL_FAILURE(KolaTest()); }
+
+TEST_F(KolaAbrClientWithStorageHostTest, KolaTest) { ASSERT_NO_FATAL_FAILURE(KolaTest()); }
 
 class FakePartitionClient final : public paver::PartitionClient {
  public:

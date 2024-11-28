@@ -815,23 +815,6 @@ TEST_F(FixedDevicePartitionerTests, WipeFvmTest) {
   ASSERT_OK(status->WipeFvm());
 }
 
-TEST_F(FixedDevicePartitionerTests, FinalizePartitionTest) {
-  zx::result devices = paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
-  ASSERT_OK(devices);
-  auto status = paver::FixedDevicePartitioner::Initialize(*devices, {});
-  ASSERT_OK(status);
-  auto& partitioner = status.value();
-
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kBootloaderA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconB)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconR)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
-}
-
 TEST_F(FixedDevicePartitionerTests, FindPartitionTest) {
   std::unique_ptr<BlockDevice> fvm, bootloader, zircon_a, zircon_b, zircon_r, vbmeta_a, vbmeta_b,
       vbmeta_r;

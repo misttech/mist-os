@@ -282,9 +282,13 @@ closed protocol DynamicDataSink {
 
 /// Protocol for managing boot configurations.
 ///
-/// All functions will first check the A/B/R metadata and reset it to
-/// the default state if it's invalid.
-/// The new configuration is not guaranteed to persist to storage before Flush() is called.
+/// All functions will first check the A/B/R metadata and reset it to the default state if it's
+/// invalid.
+///
+/// Operations which change the configuration are applied transactionally and will not be persisted
+/// to storage until Flush() is called, at which point they will *all* be applied (or none at all).
+/// If any of the operations fail (which is generally unexpected), the current set of changes may be
+/// discarded.
 ///
 /// The connection will be immediately closed with an epitaph of `ZX_ERR_NOT_SUPPORTED` if A/B/R is
 /// not supported.

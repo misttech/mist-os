@@ -128,9 +128,6 @@ class DevicePartitioner {
   virtual zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const = 0;
 
-  // Finalizes the PartitionClient matching |spec| after it has been written.
-  virtual zx::result<> FinalizePartition(const PartitionSpec& spec) const = 0;
-
   // Wipes Fuchsia Volume Manager partition.
   virtual zx::result<> WipeFvm() const = 0;
 
@@ -204,8 +201,6 @@ class FixedDevicePartitioner : public DevicePartitioner {
 
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
-
-  zx::result<> FinalizePartition(const PartitionSpec& spec) const override { return zx::ok(); }
 
   zx::result<> WipeFvm() const override;
 

@@ -33,8 +33,6 @@ class EfiDevicePartitioner : public DevicePartitioner {
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
-  zx::result<> FinalizePartition(const PartitionSpec& spec) const override;
-
   zx::result<> WipeFvm() const override;
 
   zx::result<> ResetPartitionTables() const override;

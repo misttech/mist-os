@@ -20,7 +20,7 @@ using FilterCallback = GptDevicePartitioner::FilterCallback;
 struct KolaGptEntryAttributes {
   static constexpr uint8_t kKolaMaxPriority = 3;
 
-  KolaGptEntryAttributes(uint64_t flags) : flags(flags) {}
+  explicit KolaGptEntryAttributes(uint64_t flags) : flags(flags) {}
 
   uint64_t flags;
   DEF_SUBFIELD(flags, 49, 48, priority);
@@ -49,8 +49,6 @@ class KolaPartitioner : public DevicePartitioner {
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
-  zx::result<> FinalizePartition(const PartitionSpec& spec) const override;
-
   zx::result<> WipeFvm() const override;
 
   zx::result<> ResetPartitionTables() const override;
@@ -66,13 +64,21 @@ class KolaPartitioner : public DevicePartitioner {
   zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> FindAllPartitions(
       FilterCallback filter) const;
 
+  // Like FindPartition() above, but returns a BlockPartitionClient instead, which has additional
+  // GPT-related methods.
+  zx::result<std::unique_ptr<BlockPartitionClient>> FindGptPartition(
+      const PartitionSpec& spec) const;
+
   // Like FindPartition() above, but also returns the GPT partition entry.
   zx::result<FindPartitionDetailsResult> FindPartitionDetails(const PartitionSpec& spec) const;
 
-  GptDevice* GetGpt() const { return gpt_->GetGpt(); }
+  // TODO(https://fxbug.dev/339491886): Remove when storage-host is enabled.
+  zx::result<std::unique_ptr<GptDevice>> ConnectToGpt() const { return gpt_->ConnectToGpt(); }
 
  private:
   explicit KolaPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
+
+  zx::result<std::string> PartitionNameForSpec(const PartitionSpec& spec) const;
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
 };

@@ -186,10 +186,6 @@ class FakeDevicePartitioner : public paver::DevicePartitioner {
     return zx::ok(nullptr);
   }
 
-  zx::result<> FinalizePartition(const paver::PartitionSpec& spec) const override {
-    return zx::ok();
-  }
-
   zx::result<> WipeFvm() const override { return zx::ok(); }
 
   zx::result<> ResetPartitionTables() const override { return zx::ok(); }
