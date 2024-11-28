@@ -160,7 +160,7 @@ class PageCache {
     PageList free_list;
 
     TA_GUARDED(cache_lock)
-    ktl::optional<uintptr_t> random_should_wait_state = 0;
+    ktl::optional<uintptr_t> random_should_wait_state = ktl::nullopt;
   };
 
   explicit PageCache(size_t reserve_pages, fbl::Array<CpuCache> entries)
