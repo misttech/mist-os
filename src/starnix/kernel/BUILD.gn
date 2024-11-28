@@ -181,6 +181,7 @@ rustc_library("starnix_core") {
     "power/wakeup_count.rs",
     "security/hooks.rs",
     "security/mod.rs",
+    "security/selinux_hooks/audit.rs",
     "security/selinux_hooks/mod.rs",
     "security/selinux_hooks/superblock.rs",
     "security/selinux_hooks/task.rs",

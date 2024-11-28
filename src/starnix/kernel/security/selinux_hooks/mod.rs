@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod audit;
 pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
@@ -13,16 +14,17 @@ use crate::vfs::{
     DirEntry, DirEntryHandle, FileHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
     PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
+use audit::{audit_log, AuditContext};
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
+use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
     ClassPermission, CommonFilePermission, DirPermission, FileClass, FileSystemLabel,
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
-use starnix_logging::{log_debug, log_warn, track_stub};
+use starnix_logging::{log_debug, log_warn, track_stub, BugRef, __track_stub_inner};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -204,21 +206,53 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
 #[macro_export]
 macro_rules! todo_check_permission {
     (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
-        use crate::security::selinux_hooks::check_permission_internal;
-        if check_permission_internal(
+        use crate::security::selinux_hooks::__todo_check_permission_inner;
+        use starnix_logging::bug_ref;
+        __todo_check_permission_inner(
+            bug_ref!($bug_url),
+            $todo_message,
+            std::panic::Location::caller(),
             $permission_check,
             $source_sid,
             $target_sid,
-            $permission,
-            "todo_deny",
-        )
-        .is_err()
-        {
-            use starnix_logging::track_stub;
-            track_stub!(TODO($bug_url), $todo_message);
-        }
+            $permission.into(),
+        );
         Ok(())
     }};
+}
+
+#[doc(hidden)]
+#[inline]
+pub(super) fn __todo_check_permission_inner(
+    bug_ref: BugRef,
+    message: &'static str,
+    location: &'static std::panic::Location<'static>,
+    permission_check: &PermissionCheck<'_>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: Permission,
+) {
+    let _ = check_permission_internal(
+        permission_check,
+        source_sid,
+        target_sid,
+        permission,
+        |mut context| {
+            if !context.result.permit {
+                // Audit-log the first few denials, but skip further denials to avoid logspamming.
+                const MAX_TODO_AUDIT_DENIALS: u64 = 5;
+
+                // Re-using the `track_stub!()` internals to track the denial, and determine whether
+                // too many denial audit logs have already been emit for this case.
+                if __track_stub_inner(bug_ref, message, None, location) > MAX_TODO_AUDIT_DENIALS {
+                    return;
+                }
+                context.set_decision("todo_deny");
+            }
+
+            audit_log(context);
+        },
+    );
 }
 
 /// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
@@ -861,7 +895,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     target_sid: SecurityId,
     permission: P,
 ) -> Result<(), Errno> {
-    check_permission_internal(permission_check, source_sid, target_sid, permission, "denied")
+    check_permission_internal(permission_check, source_sid, target_sid, permission, audit_log)
 }
 
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
@@ -878,34 +912,22 @@ fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'st
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
-    deny_result: &str,
+    audit_hook: impl FnOnce(AuditContext<'_>),
 ) -> Result<(), Errno> {
-    let PermissionCheckResult { permit, audit } =
-        permission_check.has_permission(source_sid, target_sid, permission.clone());
+    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
-    if audit {
-        use bstr::BStr;
-
-        // TODO: https://fxbug.dev/362707360 - Add details to audit logging.
-        let result = if permit { "allowed" } else { deny_result };
-        let tclass = permission.class().name();
-        let permission_name = permission.into().name();
-        let security_server = permission_check.security_server();
-        let scontext = security_server
-            .sid_to_security_context(source_sid)
-            .unwrap_or_else(|| b"<invalid>".to_vec());
-        let scontext = BStr::new(&scontext);
-        let tcontext = security_server
-            .sid_to_security_context(target_sid)
-            .unwrap_or_else(|| b"<invalid>".to_vec());
-        let tcontext = BStr::new(&tcontext);
-
-        // See the SELinux Project's "AVC Audit Events" description (at
-        // https://selinuxproject.org/page/NB_AL) for details of the format and fields.
-        log_warn!("avc: {result} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    if result.audit {
+        let context = AuditContext::new(
+            permission_check,
+            result.clone(),
+            source_sid,
+            target_sid,
+            permission.into(),
+        );
+        audit_hook(context);
     }
 
-    if permit {
+    if result.permit {
         Ok(())
     } else {
         error!(EACCES)
