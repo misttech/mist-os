@@ -9,10 +9,9 @@
 
 #include <lib/starnix_zircon/task_wrapper.h>
 #include <trace.h>
+#include <zircon/assert.h>
 
 #include <ktl/move.h>
-
-#include "zircon/assert.h"
 
 #define LOCAL_TRACE 0
 

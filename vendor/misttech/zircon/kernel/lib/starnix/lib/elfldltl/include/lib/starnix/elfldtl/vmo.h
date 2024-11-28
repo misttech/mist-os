@@ -6,25 +6,27 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_ELFLDLTL_INCLUDE_LIB_STARNIX_ELFLDTL_VMO_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_ELFLDLTL_INCLUDE_LIB_STARNIX_ELFLDTL_VMO_H_
 
-#include <lib/elfldltl/file.h>
-#include <lib/elfldltl/zircon.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
+#include <lib/mistos/zx/vmo.h>
 #include <zircon/errors.h>
 
-#include <fbl/ref_ptr.h>
-#include <vm/vm_object.h>
+#include <ktl/span.h>
+
+#include "lib/elfldltl/file.h"
+#include "lib/elfldltl/zircon.h"
 
 namespace elfldltl {
 
-// elfldltl::VmoFile is constructible from fbl::RefPtr<VmObject> and meets the File API
-// (see <lib/elfldltl/memory.h>) by calling read.
+// elfldltl::VmoFile is constructible from zx::vmo and meets the File API
+// (see <lib/elfldltl/memory.h>) by calling zx_vmo_read.  The counterpart
+// using zx::unowned_vmo is elfldltl::UnownedVmoFile.
 
 namespace internal {
 
-inline fit::result<ZirconError> ReadVmo(const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
+inline fit::result<ZirconError> ReadVmo(const zx::vmo& vmo, uint64_t offset,
                                         cpp20::span<std::byte> buffer) {
-  zx_status_t status = vmo->Read(buffer.data(), offset, buffer.size());
+  ZX_ASSERT(vmo.is_valid());
+  zx_status_t status = vmo.read(buffer.data(), offset, buffer.size());
   if (status == ZX_ERR_OUT_OF_RANGE) {
     return fit::error{ZirconError{}};  // This indicates EOF.
   }
@@ -34,10 +36,19 @@ inline fit::result<ZirconError> ReadVmo(const fbl::RefPtr<VmObject>& vmo, uint64
   return fit::ok();
 }
 
+inline fit::result<ZirconError> ReadUnownedVmo(const zx::unowned_vmo& vmo, uint64_t offset,
+                                               std::span<std::byte> buffer) {
+  ZX_ASSERT(vmo->is_valid());
+  return ReadVmo(*vmo, offset, buffer);
+}
+
 }  // namespace internal
 
 template <class Diagnostics>
-using VmoFileBase = File<Diagnostics, fbl::RefPtr<VmObject>, uint64_t, internal::ReadVmo>;
+using VmoFileBase = File<Diagnostics, zx::vmo, uint64_t, internal::ReadVmo>;
+
+template <class Diagnostics>
+using UnownedVmoFileBase = File<Diagnostics, zx::unowned_vmo, uint64_t, internal::ReadUnownedVmo>;
 
 template <class Diagnostics>
 class VmoFile : public VmoFileBase<Diagnostics> {
@@ -48,12 +59,32 @@ class VmoFile : public VmoFileBase<Diagnostics> {
 
   VmoFile& operator=(VmoFile&&) noexcept = default;
 
-  fbl::RefPtr<VmObject> borrow() const { return this->get(); }
+  zx::unowned_vmo borrow() const { return this->get().borrow(); }
 };
 
 // Deduction guide.
 template <class Diagnostics>
-VmoFile(fbl::RefPtr<VmObject>, Diagnostics&& diagnostics) -> VmoFile<Diagnostics>;
+VmoFile(zx::vmo vmo, Diagnostics&& diagnostics) -> VmoFile<Diagnostics>;
+
+template <class Diagnostics>
+class UnownedVmoFile : public UnownedVmoFileBase<Diagnostics> {
+ public:
+  using UnownedVmoFileBase<Diagnostics>::UnownedVmoFileBase;
+
+  UnownedVmoFile(const UnownedVmoFile&) noexcept = default;
+
+  UnownedVmoFile(UnownedVmoFile&&) noexcept = default;
+
+  UnownedVmoFile& operator=(const UnownedVmoFile&) noexcept = default;
+
+  UnownedVmoFile& operator=(UnownedVmoFile&&) noexcept = default;
+
+  zx::unowned_vmo borrow() const { return this->get()->borrow(); }
+};
+
+// Deduction guide.
+template <class Diagnostics>
+UnownedVmoFile(zx::unowned_vmo vmo, Diagnostics&& diagnostics) -> UnownedVmoFile<Diagnostics>;
 
 }  // namespace elfldltl
 

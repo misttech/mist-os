@@ -350,7 +350,7 @@ struct MemoryManagerState {
   ///
   /// We map userspace memory in this child VMAR so that we can destroy the
   /// entire VMAR during exec.
-  Vmar user_vmar_;
+  zx::vmar user_vmar_;
 
   /// Cached VmarInfo for vmar.
   zx_info_vmar_t user_vmar_info_;
@@ -521,28 +521,28 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   //
   // Instead of mapping memory directly in this VMAR, we map the memory in
   // `state.user_vmar`.
-  const Vmar root_vmar;
+  const zx::vmar root_vmar_;
 
   // The base address of the root_vmar.
-  UserAddress base_addr;
+  UserAddress base_addr_;
 
   /// The futexes in this address space.
   // pub futex: FutexTable<PrivateFutexKey>,
 
   // Mutable state for the memory manager.
-  mutable starnix_sync::RwLock<MemoryManagerState> state;
+  mutable starnix_sync::RwLock<MemoryManagerState> state_;
 
   /// Whether this address space is dumpable.
   // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
 
   /// Maximum valid user address for this vmar.
-  UserAddress maximum_valid_user_address;
+  UserAddress maximum_valid_user_address_;
 
-  static fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> New(Vmar root_vmar);
+  static fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> New(zx::vmar root_vmar);
 
   static fbl::RefPtr<MemoryManager> new_empty();
 
-  static fbl::RefPtr<MemoryManager> from_vmar(Vmar root_vmar, Vmar user_vmar,
+  static fbl::RefPtr<MemoryManager> from_vmar(zx::vmar root_vmar, zx::vmar user_vmar,
                                               zx_info_vmar_t user_vmar_info);
 
   fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
@@ -600,7 +600,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   /// impl MemoryManager
   bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
-    return root_vmar.vmar == other->root_vmar.vmar;
+    return root_vmar_ == other->root_vmar_;
   }
 
   fit::result<Errno, ktl::span<uint8_t>> unified_read_memory(const CurrentTask& current_task,
@@ -645,7 +645,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   friend bool unit_testing::test_read_write_crossing_mappings();
   friend bool unit_testing::test_read_write_errors();
 
-  MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar_info);
+  MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info);
 };
 
 // Creates a memory object that can be used in an anonymous mapping for the `mmap` syscall.

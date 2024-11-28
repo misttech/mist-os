@@ -65,7 +65,7 @@ fit::result<Errno, TaskInfo> create_zircon_process(
                           .memory_manager = ktl::move(mm.value())});
 }
 
-fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
+fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, zx::vmar>> create_process(
     fbl::RefPtr<JobDispatcher> parent, uint32_t options, const ktl::string_view& name) {
   KernelHandle<ProcessDispatcher> process_handle;
   KernelHandle<VmAddressRegionDispatcher> vmar_handle;
@@ -80,8 +80,14 @@ fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> creat
   KTRACE_KERNEL_OBJECT("kernel:meta", process_handle.dispatcher()->get_koid(), ZX_OBJ_TYPE_PROCESS,
                        name.data());
 
-  return fit::ok(ktl::pair(ktl::move(process_handle),
-                           Vmar{Handle::Make(ktl::move(vmar_handle), vmar_rights)}));
+  auto h = Handle::Make(ktl::move(vmar_handle), vmar_rights);
+  fbl::AllocChecker ac;
+  auto value = fbl::MakeRefCountedChecked<zx::Value>(&ac, ktl::move(h));
+  if (!ac.check()) {
+    return fit::error{ZX_ERR_NO_MEMORY};
+  }
+
+  return fit::ok(ktl::pair(ktl::move(process_handle), zx::vmar(value)));
 }
 
 fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(

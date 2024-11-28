@@ -7,6 +7,7 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("elfldltl") {
   public_deps = [
     "//src/lib/elfldltl:headers",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx:headers",
     "//zircon/kernel/object",
   ]
   deps = [ "//zircon/kernel/lib/ktl" ]

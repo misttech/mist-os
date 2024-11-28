@@ -13,6 +13,7 @@ zx_library("starnix-zircon") {
   deps = [
     "//vendor/misttech/third_party/linux_uapi",
     "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx:headers",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync:headers",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-syscalls:headers",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:headers",

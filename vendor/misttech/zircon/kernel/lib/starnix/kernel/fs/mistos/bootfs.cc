@@ -313,7 +313,14 @@ fit::result<Errno, fbl::RefPtr<MemoryObject>> BootFs::create_vmo_from_bootfs(
   // Set the VMO content size back to the original size.
   kernel_handle.dispatcher()->SetSize(original_size);
 
-  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
+  fbl::AllocChecker ac;
+  auto value =
+      fbl::MakeRefCountedChecked<zx::Value>(&ac, Handle::Make(ktl::move(kernel_handle), rights));
+  if (!ac.check()) {
+    return fit::error(errno(ENOMEM));
+  }
+
+  return fit::ok(MemoryObject::From(ktl::move(zx::vmo(value))));
 }
 
 BootFs::~BootFs() = default;
