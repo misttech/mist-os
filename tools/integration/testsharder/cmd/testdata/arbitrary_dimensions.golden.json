@@ -34,7 +34,8 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "build_metadata": {}
     },
     {
         "name": "Linux-other_dimension:foo",
@@ -71,6 +72,7 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "build_metadata": {}
     }
 ]

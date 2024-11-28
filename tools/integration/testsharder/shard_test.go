@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
@@ -31,6 +32,9 @@ func assertEqual(t *testing.T, expected, actual []*Shard) {
 		cmpopts.SortSlices(func(s1, s2 *Shard) bool {
 			return s1.Name < s2.Name
 		}),
+		cmp.FilterValues(func(s1, s2 fintpb.SetArtifacts_Metadata) bool {
+			return true
+		}, cmp.Ignore()),
 	}
 	if diff := cmp.Diff(expected, actual, opts...); diff != "" {
 		t.Fatalf("shards mismatch: (-want + got):\n%s", diff)

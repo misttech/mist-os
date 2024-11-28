@@ -54,6 +54,7 @@
             }
         },
         "deps": [
+            "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json",
@@ -76,7 +77,8 @@
                 "version": "edk2_version",
                 "subdir": "edk2"
             }
-        ]
+        ],
+        "build_metadata": {}
     },
     {
         "name": "affected:AEMU",
@@ -113,6 +115,7 @@
             }
         },
         "deps": [
+            "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json",
@@ -135,7 +138,8 @@
                 "version": "edk2_version",
                 "subdir": "edk2"
             }
-        ]
+        ],
+        "build_metadata": {}
     },
     {
         "name": "hermetic:AEMU",
@@ -196,6 +200,7 @@
                 }
             ]
         },
-        "expects_ssh": true
+        "expects_ssh": true,
+        "build_metadata": {}
     }
 ]

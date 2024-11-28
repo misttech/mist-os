@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -73,6 +74,12 @@ type Shard struct {
 
 	// CIPDPackages specifies the CIPD packages to install on the task that runs this shard.
 	CIPDPackages []CIPDPackage `json:"cipd_packages,omitempty"`
+
+	// BuildMetadata provides the fint set artifacts metadata needed to construct
+	// swarming task requests from the shards. This will only be populated if the
+	// `-deps-file` flag is provided meaning that local artifacts will be used and
+	// thus the builder itself won't have the fint set artifacts available.
+	BuildMetadata fintpb.SetArtifacts_Metadata `json:"build_metadata,omitempty"`
 }
 
 // CIPDPackage describes the CIPD package, version and subdir to download the package to

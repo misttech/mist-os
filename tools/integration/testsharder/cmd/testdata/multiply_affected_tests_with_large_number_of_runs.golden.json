@@ -70,6 +70,7 @@
             }
         },
         "deps": [
+            "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json",
@@ -92,6 +93,7 @@
                 "version": "edk2_version",
                 "subdir": "edk2"
             }
-        ]
+        ],
+        "build_metadata": {}
     }
 ]

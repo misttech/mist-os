@@ -32,25 +32,25 @@ func TestAddFFXDeps(t *testing.T) {
 			name:       "QEMU x64 deps",
 			targetCPU:  "x64",
 			deviceType: "QEMU",
-			want:       append(baseDeps, "host_x64/ffx-test", "host_x64/ffx-test.json", "host_x64/ffx-emu", "host_x64/ffx-emu.json"),
+			want:       append(baseDeps, "host_x64/ffx", "host_x64/ffx-test", "host_x64/ffx-test.json", "host_x64/ffx-emu", "host_x64/ffx-emu.json"),
 		},
 		{
 			name:       "NUC bootloader boot deps",
 			targetCPU:  "x64",
 			deviceType: "NUC",
-			want:       []string{"host_x64/ffx-test", "host_x64/ffx-test.json"},
+			want:       []string{"host_x64/ffx", "host_x64/ffx-test", "host_x64/ffx-test.json"},
 		},
 		{
 			name:       "AEMU x64 deps",
 			targetCPU:  "x64",
 			deviceType: "AEMU",
-			want:       append(baseDeps, "host_x64/ffx-test", "host_x64/ffx-test.json", "host_x64/ffx-emu", "host_x64/ffx-emu.json"),
+			want:       append(baseDeps, "host_x64/ffx", "host_x64/ffx-test", "host_x64/ffx-test.json", "host_x64/ffx-emu", "host_x64/ffx-emu.json"),
 		},
 		{
 			name:       "QEMU arm64 deps",
 			targetCPU:  "arm64",
 			deviceType: "QEMU",
-			want:       append(baseDeps, "host_arm64/ffx-emu", "host_arm64/ffx-emu.json"),
+			want:       append(baseDeps, "host_arm64/ffx", "host_arm64/ffx-emu", "host_arm64/ffx-emu.json"),
 		},
 	}
 	for _, tc := range testCases {
@@ -73,6 +73,8 @@ func TestAddFFXDeps(t *testing.T) {
 			}
 			hostOS := runtime.GOOS
 			if err := AddFFXDeps(s, buildDir, build.Tools{
+				{Name: "ffx", OS: hostOS, CPU: "x64", Path: "host_x64/ffx"},
+				{Name: "ffx", OS: hostOS, CPU: "arm64", Path: "host_arm64/ffx"},
 				{Name: "ffx-test", OS: hostOS, CPU: "x64", Path: "host_x64/ffx-test",
 					RuntimeFiles: []string{"host_x64/ffx-test.json"}},
 				{Name: "ffx-emu", OS: hostOS, CPU: "x64", Path: "host_x64/ffx-emu",
