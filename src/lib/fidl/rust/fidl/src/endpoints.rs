@@ -392,12 +392,6 @@ impl<T: ProtocolMarker> ClientEnd<T> {
         T::Proxy::from_channel(AsyncChannel::from_channel(self.inner))
     }
 
-    /// Soft-transition affordance for https://fxbug.dev/319159026.
-    // TODO(https://fxbug.dev/319159026) delete this function
-    pub fn try_into_proxy(self) -> Result<T::Proxy, Error> {
-        Ok(self.into_proxy())
-    }
-
     /// Convert the `ClientEnd` into a `SynchronousProxy` through which thread-blocking FIDL calls
     /// may be made.
     #[cfg(target_os = "fuchsia")]
@@ -477,15 +471,6 @@ impl<T> ServerEnd<T> {
         T: ProtocolMarker,
     {
         T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner))
-    }
-
-    /// Soft-transition affordance for https://fxbug.dev/319159026.
-    // TODO(https://fxbug.dev/319159026) delete this function
-    pub fn try_into_stream(self) -> Result<T::RequestStream, Error>
-    where
-        T: ProtocolMarker,
-    {
-        Ok(self.into_stream())
     }
 
     /// Create a stream of requests and an event-sending handle
@@ -570,12 +555,6 @@ pub fn create_proxy<T: ProtocolMarker>() -> (T::Proxy, ServerEnd<T>) {
     (client.into_proxy(), server)
 }
 
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
-    Ok(create_proxy::<T>())
-}
-
 /// Create a synchronous client proxy and a server endpoint connected to it by a channel.
 ///
 /// Useful for sending channel handles to calls that take arguments
@@ -599,13 +578,6 @@ pub fn create_request_stream<T: ProtocolMarker>() -> (ClientEnd<T>, T::RequestSt
     (client, server.into_stream())
 }
 
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_request_stream<T: ProtocolMarker>(
-) -> Result<(ClientEnd<T>, T::RequestStream), Error> {
-    Ok(create_request_stream::<T>())
-}
-
 /// Create a request stream and proxy connected to one another.
 ///
 /// Useful for testing where both the request stream and proxy are
@@ -617,13 +589,6 @@ pub fn try_create_request_stream<T: ProtocolMarker>(
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> (T::Proxy, T::RequestStream) {
     let (client, server) = create_endpoints::<T>();
     (client.into_proxy(), server.into_stream())
-}
-
-/// Soft-transition affordance for https://fxbug.dev/319159026.
-// TODO(https://fxbug.dev/319159026) delete this function
-pub fn try_create_proxy_and_stream<T: ProtocolMarker>(
-) -> Result<(T::Proxy, T::RequestStream), Error> {
-    Ok(create_proxy_and_stream::<T>())
 }
 
 /// Create a request stream and synchronous proxy connected to one another.
