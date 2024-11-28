@@ -1105,8 +1105,7 @@ mod tests {
                     r => panic!("unsupported request {:?}", r),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let (device_event_sender, _) = futures::channel::mpsc::unbounded();
 
@@ -1169,8 +1168,7 @@ mod tests {
                 }
                 r => panic!("unsupported request {:?}", r),
             }
-        })
-        .unwrap();
+        });
 
         let (device_event_sender, _) = futures::channel::mpsc::unbounded();
 

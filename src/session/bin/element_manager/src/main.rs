@@ -192,8 +192,7 @@ mod tests {
                     panic!("Realm handler received unexpected request");
                 }
             }
-        })
-        .unwrap();
+        });
 
         let graphical_presenter =
             spawn_stream_handler(move |graphical_presenter_request| async move {
@@ -207,8 +206,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                 }
-            })
-            .unwrap();
+            });
         let graphical_presenter_connector = Box::new(MockConnector::new(graphical_presenter));
 
         let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
@@ -291,8 +289,7 @@ mod tests {
                     }
                 }
             }
-        })
-        .unwrap();
+        });
 
         let graphical_presenter: felement::GraphicalPresenterProxy =
             spawn_stream_handler(move |graphical_presenter_request| async move {
@@ -306,8 +303,7 @@ mod tests {
                         let _ = responder.send(Ok(()));
                     }
                 }
-            })
-            .unwrap();
+            });
 
         {
             let element_manager: Box<ElementManager> = Box::new(ElementManager::new(

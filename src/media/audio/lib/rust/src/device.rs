@@ -871,7 +871,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     #[fuchsia::test]

@@ -357,7 +357,7 @@ mod tests {
                 _ => panic!("Realm handler received an unexpected request"),
             };
             NUM_REALM_REQUESTS.inc();
-        })?;
+        });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         let _controller = set_session(session_url, vec![], &realm, exposed_dir_server_end).await?;
@@ -404,7 +404,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })?;
+        });
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         let _controller = set_session(session_url, vec![], &realm, exposed_dir_server_end).await?;
@@ -431,7 +431,7 @@ mod tests {
                 _ => panic!("Realm handler received an unexpected request"),
             };
             NUM_DESTROY_CHILD_CALLS.inc();
-        })?;
+        });
 
         stop_session(&realm).await?;
         assert_eq!(NUM_DESTROY_CHILD_CALLS.get(), 1);

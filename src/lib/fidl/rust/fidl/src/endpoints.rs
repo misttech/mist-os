@@ -323,8 +323,7 @@ pub trait MemberOpener {
 
 /// Utility that spawns a new task to handle requests of a particular type, requiring a
 /// singlethreaded executor. The requests are handled one at a time.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn spawn_local_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
+pub fn spawn_local_stream_handler<P, F, Fut>(f: F) -> P
 where
     P: Proxy,
     F: FnMut(Request<P::Protocol>) -> Fut + 'static,
@@ -332,13 +331,12 @@ where
 {
     let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::local(for_each_or_log(stream, f)).detach();
-    Ok(proxy)
+    proxy
 }
 
 /// Utility that spawns a new task to handle requests of a particular type. The request handler
 /// must be threadsafe. The requests are handled one at a time.
-// TODO(https://fxbug.dev/319159026) this should be infallible
-pub fn spawn_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
+pub fn spawn_stream_handler<P, F, Fut>(f: F) -> P
 where
     P: Proxy,
     F: FnMut(Request<P::Protocol>) -> Fut + 'static + Send,
@@ -346,7 +344,7 @@ where
 {
     let (proxy, stream) = create_proxy_and_stream::<P::Protocol>();
     fasync::Task::spawn(for_each_or_log(stream, f)).detach();
-    Ok(proxy)
+    proxy
 }
 
 fn for_each_or_log<St, F, Fut>(stream: St, mut f: F) -> impl Future<Output = ()>

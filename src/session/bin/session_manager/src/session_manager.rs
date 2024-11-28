@@ -665,8 +665,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -709,8 +708,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -745,8 +743,7 @@ mod tests {
     async fn test_restarter_restart_error_not_running() {
         let realm = spawn_stream_handler(move |_realm_request| async move {
             panic!("Realm should not receive any requests as there is no session to launch")
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -783,8 +780,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -827,8 +823,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager =
@@ -874,8 +869,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -923,8 +917,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
-        })
-        .unwrap();
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -988,7 +981,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 };
             }
-        })?;
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);
@@ -1049,7 +1042,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 };
             }
-        })?;
+        });
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new_default(realm, &inspector);

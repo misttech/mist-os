@@ -442,8 +442,7 @@ mod test {
                     _ => unimplemented!(),
                 }
             }
-        })
-        .unwrap();
+        });
 
         (proxy, added_publisher, removed_publisher)
     }

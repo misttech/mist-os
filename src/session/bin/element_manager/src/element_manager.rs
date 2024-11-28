@@ -892,8 +892,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -946,8 +945,7 @@ mod tests {
                     _ => panic!("Realm handler received an unexpected request"),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -980,8 +978,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
@@ -1017,8 +1014,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
@@ -1059,8 +1055,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
 
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
@@ -1100,8 +1095,7 @@ mod tests {
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
-        })
-        .unwrap();
+        });
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let element = element_manager.launch_element(component_url, "").await.unwrap();
@@ -1117,8 +1111,7 @@ mod tests {
     async fn propose_persistent_element_with_bad_storage() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
 
-        let realm: fcomponent::RealmProxy =
-            spawn_stream_handler(|_| async { unreachable!() }).unwrap();
+        let realm: fcomponent::RealmProxy = spawn_stream_handler(|_| async { unreachable!() });
 
         let mut element_manager: Box<ElementManager> =
             Box::new(ElementManager::new(realm, None, example_collection_config()));

@@ -185,8 +185,7 @@ mod tests {
                     request => panic!("Unexpected request: {:?}", request),
                 }
             }
-        })
-        .unwrap();
+        });
 
         let _ = measure(proxy, Duration::from_secs(1), &mut std::io::stdout()).await.unwrap();
 
@@ -208,8 +207,7 @@ mod tests {
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }
-        })
-        .unwrap();
+        });
 
         let mut writer = Vec::new();
         let _ = measure(proxy, Duration::from_secs(1), &mut writer).await.unwrap();

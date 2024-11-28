@@ -1932,7 +1932,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn serve_responsive_rcs(server_end: ServerEnd<RemoteControlMarker>) {
@@ -2007,7 +2006,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_responsive_daemon_server_with_targets(
@@ -2116,7 +2114,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_daemon_server_list_fails() -> DaemonProxy {
@@ -2134,7 +2131,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn setup_daemon_server_echo_hangs(waiter: Shared<Receiver<()>>) -> DaemonProxy {
@@ -2151,7 +2147,6 @@ mod test {
                 }
             }
         })
-        .unwrap()
     }
 
     fn ffx_path() -> String {

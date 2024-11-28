@@ -254,7 +254,6 @@ mod tests {
                 _ => unimplemented!(),
             }
         })
-        .unwrap()
     }
 
     fn serve_hw_composite() -> fhaudio::CompositeProxy {
@@ -273,7 +272,6 @@ mod tests {
                 _ => unimplemented!(),
             }
         })
-        .unwrap()
     }
 
     fn serve_hw_dai() -> fhaudio::DaiProxy {
@@ -285,7 +283,6 @@ mod tests {
                 _ => unimplemented!(),
             }
         })
-        .unwrap()
     }
 
     fn serve_hw_streamconfig() -> fhaudio::StreamConfigProxy {
@@ -294,7 +291,6 @@ mod tests {
                 _ => unimplemented!(),
             }
         })
-        .unwrap()
     }
 
     #[derive(Default)]
@@ -385,7 +381,6 @@ mod tests {
                 }
             }
         })
-        .unwrap()
     }
 
     #[fuchsia::test]

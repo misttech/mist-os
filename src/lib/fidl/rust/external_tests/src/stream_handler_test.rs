@@ -13,8 +13,7 @@ async fn test_spawn_local_stream_handler() {
             responder.send(Some(&value.unwrap())).expect("responder failed");
         }
     };
-    let proxy: EchoProxy =
-        endpoints::spawn_local_stream_handler(f).expect("could not spawn handler");
+    let proxy: EchoProxy = endpoints::spawn_local_stream_handler(f);
     let res = proxy.echo_string(Some("hello world")).await.expect("echo failed");
     assert_eq!(res, Some("hello world".to_string()));
     let res = proxy.echo_string(Some("goodbye world")).await.expect("echo failed");
@@ -29,7 +28,7 @@ async fn test_spawn_stream_handler() {
             responder.send(Some(&value.unwrap())).expect("responder failed");
         }
     };
-    let proxy: EchoProxy = endpoints::spawn_stream_handler(f).expect("could not spawn handler");
+    let proxy: EchoProxy = endpoints::spawn_stream_handler(f);
     let res = proxy.echo_string(Some("hello world")).await.expect("echo failed");
     assert_eq!(res, Some("hello world".to_string()));
     let res = proxy.echo_string(Some("goodbye world")).await.expect("echo failed");

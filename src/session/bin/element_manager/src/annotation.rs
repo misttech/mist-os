@@ -837,8 +837,7 @@ mod tests {
                 )
                 .unwrap()
             }
-        })
-        .unwrap();
+        });
 
         let _ = proxy.update_annotations(
             vec![

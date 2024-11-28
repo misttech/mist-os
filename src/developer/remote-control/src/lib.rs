@@ -686,7 +686,6 @@ mod tests {
                 }
             },
         )
-        .unwrap()
     }
 
     fn setup_exposed_dir(server: ServerEnd<fio::DirectoryMarker>) {
@@ -732,7 +731,6 @@ mod tests {
                 _ => panic!("unexpected request: {:?}", request),
             }
         })
-        .unwrap()
     }
 
     #[fuchsia::test]

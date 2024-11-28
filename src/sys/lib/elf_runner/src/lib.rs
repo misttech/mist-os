@@ -1491,7 +1491,7 @@ mod tests {
             let sender = self.sender.clone();
             let payload = Arc::new(Mutex::new(LaunchPayload::default()));
 
-            spawn_stream_handler(move |launcher_request| {
+            Ok(spawn_stream_handler(move |launcher_request| {
                 let sender = sender.clone();
                 let payload = payload.clone();
                 async move {
@@ -1526,8 +1526,7 @@ mod tests {
                         }
                     }
                 }
-            })
-            .map_err(anyhow::Error::new)
+            }))
         }
     }
 

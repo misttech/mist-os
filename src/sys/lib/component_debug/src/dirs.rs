@@ -215,8 +215,7 @@ mod tests {
                 }
                 _ => unreachable!(),
             };
-        })
-        .unwrap();
+        });
 
         connect_to_instance_protocol_at_path::<fsys::RealmQueryMarker>(
             &Moniker::parse_str("moniker").unwrap(),
@@ -250,8 +249,7 @@ mod tests {
                 }
                 _ => unreachable!(),
             };
-        })
-        .unwrap();
+        });
 
         open_instance_subdir_readable(
             &Moniker::parse_str("moniker").unwrap(),

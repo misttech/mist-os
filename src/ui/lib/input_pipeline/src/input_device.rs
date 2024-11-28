@@ -675,8 +675,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -721,8 +720,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -756,8 +754,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -800,8 +797,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -835,8 +831,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -877,8 +872,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             is_device_type(
@@ -912,8 +906,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         assert!(
             !is_device_type(
@@ -983,8 +976,7 @@ mod tests {
                     }
                     _ => panic!("InputDevice handler received an unexpected request"),
                 }
-            })
-            .unwrap();
+            });
 
         let device_descriptor =
             &input_device_proxy.get_descriptor().await.expect("Failed to get device descriptor");
