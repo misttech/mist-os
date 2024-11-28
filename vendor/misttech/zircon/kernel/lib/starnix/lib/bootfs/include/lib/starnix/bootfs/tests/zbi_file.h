@@ -5,10 +5,9 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_BOOTFS_INCLUDE_LIB_STARNIX_BOOTFS_TESTS_ZBI_FILE_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_BOOTFS_INCLUDE_LIB_STARNIX_BOOTFS_TESTS_ZBI_FILE_H_
 
+#include <fbl/ref_ptr.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_object_paged.h>
-
-#include "fbl/ref_ptr.h"
 
 namespace bootfs::testing {
 
