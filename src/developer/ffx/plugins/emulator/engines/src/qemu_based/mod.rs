@@ -37,6 +37,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{env, str};
 use tempfile::NamedTempFile;
+use vbmeta::{HashDescriptor, Key, Salt, VBMeta};
 
 pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
     let sdk = ffx_config::global_env_context()
@@ -313,6 +314,36 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             );
         }
         Ok(())
+    }
+
+    // generate_vbmeta creates a signed vbmeta file for a given key, metadata and ZBI file
+    // TODO(https://fxbug.dev/369410009): Booting into a GPT with a motified ZBI needs a re-signed
+    // vbmeta image. This function will be used to generate the vbmeta.
+    #[allow(dead_code)]
+    async fn generate_vbmeta(
+        key_path: &PathBuf,
+        metadata_path: &PathBuf,
+        zbi_path: &PathBuf,
+        dest: &PathBuf,
+    ) -> Result<()> {
+        let private_key_pem = fs::read_to_string(key_path)
+            .map_err(|e| user_error!("Error reading PEM key file '{}': {e}", key_path.display()))?;
+        let public_key_metadata = fs::read(metadata_path).map_err(|e| {
+            user_error!("Error reading key  metadata file '{}': {e}", metadata_path.display())
+        })?;
+        let zbi_bytes = fs::read(zbi_path)
+            .map_err(|e| bug!("Error reading ZBI file '{}': {e}", zbi_path.display()))?;
+
+        let key =
+            Key::try_new(&private_key_pem, public_key_metadata).map_err(|e| user_error!("{e}"))?;
+        let salt = Salt::random().map_err(|e| bug!("{e}"))?;
+        // Create a hash descriptor of the same format as Fuchsia images assembly:
+        // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/assembly/vbmeta/src/main.rs;l=39;drc=4fcdaf5e61c518ac1bec7462f077f5e1ffd5ddab
+        let descriptor = HashDescriptor::new("zircon", &zbi_bytes, salt);
+        let descriptors = vec![descriptor];
+        let vbmeta = VBMeta::sign(descriptors, key).map_err(|e| user_error!("{e}"))?;
+
+        fs::write(dest, vbmeta.as_bytes()).map_err(|e| user_error!("{e}"))
     }
 
     fn validate_network_flags(&self, emu_config: &EmulatorConfiguration) -> Result<()> {
@@ -1326,6 +1357,33 @@ mod tests {
         let dest = root.join("dest.zbi");
 
         <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest).await?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_generate_vbmeta() -> Result<()> {
+        let test_key = include_str!("../../test_data/testkey_atx_psk.pem");
+        let test_key_metadata = include_bytes!("../../test_data/atx_metadata.bin");
+
+        let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
+        let temp = tempdir().expect("cannot get tempdir");
+        let mut emu_config = EmulatorConfiguration::default();
+
+        let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
+
+        let tempdir = temp.into_path();
+        let key_path = tempdir.join("atx_psk.pem");
+        let metadata_path = tempdir.join("avb_atx_metadata.bin");
+        std::fs::write(&key_path, test_key).expect("write test key file");
+        std::fs::write(&metadata_path, test_key_metadata).expect("write test key metadata");
+
+        let zbi = emu_config.guest.zbi_image.expect("zbi image path");
+        let dest = root.join("dest.zbi");
+
+        <TestEngine as QemuBasedEngine>::generate_vbmeta(&key_path, &metadata_path, &zbi, &dest)
+            .await?;
 
         Ok(())
     }
