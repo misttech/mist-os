@@ -17,8 +17,8 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpDelayedReportTimerId, GmpMessageType,
-    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpDelayedReportTimerId, GmpGroupState,
+    GmpMessageType, GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt,
 };
 
 /// Actions to take as a consequence of joining a group.
@@ -484,6 +484,7 @@ pub(super) fn handle_timer<I, BC, CC>(
             let ReportTimerExpiredActions {} = groups
                 .get_mut(&group_addr)
                 .expect("get state for group with expired report timer")
+                .v1_mut()
                 .report_timer_expired();
 
             core_ctx.send_message(bindings_ctx, &device, group_addr, GmpMessageType::Report);
@@ -503,10 +504,12 @@ where
     I: IpExt,
 {
     core_ctx.with_gmp_state_mut(device, |GmpStateRef { enabled: _, groups, gmp, config: _ }| {
+        // TODO(https://fxbug.dev/42071006): Ignore report messages if not in v1
+        // mode.
         let ReportReceivedActions { stop_timer } = groups
             .get_mut(&group_addr)
             .ok_or_else(|| CC::not_a_member_err(*group_addr))
-            .map(|a| a.report_received())?;
+            .map(|a| a.v1_mut().report_received())?;
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
         }
@@ -535,6 +538,8 @@ where
     core_ctx.with_gmp_state_mut_and_ctx(
         device,
         |mut core_ctx, GmpStateRef { enabled: _, groups, gmp, config }| {
+            // TODO(https://fxbug.dev/42071006): Enter compat mode when a v1
+            // query is received.
             let now = bindings_ctx.now();
 
             let iter = match target {
@@ -548,8 +553,9 @@ where
             };
 
             for (group_addr, state) in iter {
-                let QueryReceivedActions { generic, protocol_specific } =
-                    state.query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
+                let QueryReceivedActions { generic, protocol_specific } = state
+                    .v1_mut()
+                    .query_received(&mut bindings_ctx.rng(), max_response_time, now, config);
                 let send_msg = generic.and_then(|generic| match generic {
                     QueryReceivedGenericAction::ScheduleTimer(delay) => {
                         let _: Option<(BC::Instant, ())> =
@@ -600,7 +606,7 @@ pub(super) fn handle_enabled<I, CC, BC, T>(
         }
 
         let JoinGroupActions { send_report_and_schedule_timer } =
-            state.join_if_non_member(&mut bindings_ctx.rng(), now, config);
+            state.v1_mut().join_if_non_member(&mut bindings_ctx.rng(), now, config);
         let Some(delay) = send_report_and_schedule_timer else {
             continue;
         };
@@ -623,7 +629,7 @@ pub(super) fn handle_disabled<I, CC, BC, T>(
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
 
     for (group_addr, state) in groups.groups_mut() {
-        let LeaveGroupActions { send_leave, stop_timer } = state.leave_if_member(config);
+        let LeaveGroupActions { send_leave, stop_timer } = state.v1_mut().leave_if_member(config);
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, group_addr), Some(_));
         }
@@ -653,7 +659,7 @@ where
     let result = groups.join_group_with(group_addr, || {
         let (state, actions) =
             GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, gmp_disabled, config);
-        (state, actions)
+        (GmpGroupState::new_v1(state), actions)
     });
     result.map(|JoinGroupActions { send_report_and_schedule_timer }| {
         if let Some(delay) = send_report_and_schedule_timer {
@@ -680,7 +686,7 @@ where
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
 
     groups.leave_group(group_addr).map(|state| {
-        let LeaveGroupActions { send_leave, stop_timer } = state.leave_group(config);
+        let LeaveGroupActions { send_leave, stop_timer } = state.into_v1().leave_group(config);
         if stop_timer {
             assert_matches!(gmp.timers.cancel(bindings_ctx, &group_addr), Some(_));
         }

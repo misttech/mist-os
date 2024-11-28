@@ -30,7 +30,7 @@ macro_rules! assert_gmp_state {
         assert_gmp_state!(@inner $ctx, $group, crate::internal::gmp::v1::MemberState::Delaying(_));
     };
     (@inner $ctx:expr, $group:expr, $pattern:pat) => {
-        assert!(matches!($ctx.state.groups().get($group).unwrap().inner.as_ref().unwrap(), $pattern))
+        assert!(matches!($ctx.state.groups().get($group).unwrap().v1().inner.as_ref().unwrap(), $pattern))
     };
 }
 
@@ -361,8 +361,63 @@ pub trait GmpTypeLayout<I: IpExt, BT: GmpBindingsTypes>: DeviceIdContext<AnyDevi
 }
 
 /// The state kept by each muitlcast group the host is a member of.
-// TODO(https://fxbug.dev/42071006): Update to also carry v2 state.
-pub type GmpGroupState<BT> = v1::GmpStateMachine<<BT as InstantBindingsTypes>::Instant>;
+pub struct GmpGroupState<BT: GmpBindingsTypes> {
+    version_specific: GmpGroupStateByVersion<BT>,
+    // TODO(https://fxbug.dev/381241191): When we support SSM, each group should
+    // keep track of the source interest and filter modes.
+}
+
+impl<BT: GmpBindingsTypes> GmpGroupState<BT> {
+    /// Retrieves a mutable borrow to the v1 state machine value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the state machine is not in the v1 state. When switching
+    /// modes, GMP is responsible for updating all group states to the
+    /// appropriate version.
+    fn v1_mut(&mut self) -> &mut v1::GmpStateMachine<BT::Instant> {
+        match &mut self.version_specific {
+            GmpGroupStateByVersion::V1(v1) => return v1,
+            GmpGroupStateByVersion::V2 => {
+                panic!("expected GMP v1")
+            }
+        }
+    }
+
+    /// Like [`GmpGroupState::v1_mut`] but returns a non mutable borrow.
+    #[cfg(test)]
+    fn v1(&self) -> &v1::GmpStateMachine<BT::Instant> {
+        match &self.version_specific {
+            GmpGroupStateByVersion::V1(v1) => v1,
+            GmpGroupStateByVersion::V2 => panic!("group not in v1 mode"),
+        }
+    }
+
+    /// Equivalent to [`GmpGroupState::v1_mut`] but drops all remaining state.
+    ///
+    /// # Panics
+    ///
+    /// See [`GmpGroupState::v1`].
+    fn into_v1(self) -> v1::GmpStateMachine<BT::Instant> {
+        let Self { version_specific } = self;
+        match version_specific {
+            GmpGroupStateByVersion::V1(v1) => v1,
+            GmpGroupStateByVersion::V2 => panic!("expected GMP v1"),
+        }
+    }
+
+    /// Creates a new `GmpGroupState` with associated v1 state machine.
+    fn new_v1(v1: v1::GmpStateMachine<BT::Instant>) -> Self {
+        Self { version_specific: GmpGroupStateByVersion::V1(v1) }
+    }
+}
+
+enum GmpGroupStateByVersion<BT: GmpBindingsTypes> {
+    V1(v1::GmpStateMachine<BT::Instant>),
+    // TODO(https://fxbug.dev/42071006): Define v2 state.
+    #[allow(dead_code)]
+    V2,
+}
 
 /// Provides immutable access to GMP state.
 trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: GmpTypeLayout<I, BT> {

@@ -895,7 +895,7 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
+            let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap().v1();
             match group_state.get_inner() {
                 gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),

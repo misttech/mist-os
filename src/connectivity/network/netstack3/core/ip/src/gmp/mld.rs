@@ -792,7 +792,7 @@ mod tests {
             // We have received a query, hence we are falling back to Delay
             // Member state.
             let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
-            match group_state.get_inner() {
+            match group_state.v1().get_inner() {
                 gmp::v1::MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
             }
@@ -829,7 +829,7 @@ mod tests {
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
             let group_state = core_ctx.state.groups().get(&GROUP_ADDR).unwrap();
-            match group_state.get_inner() {
+            match group_state.v1().get_inner() {
                 gmp::v1::MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),
             }
