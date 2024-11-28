@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fidl/fuchsia.storagehost/cpp/markers.h>
+#include <fidl/fuchsia.storage.partitions/cpp/markers.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>

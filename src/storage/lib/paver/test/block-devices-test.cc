@@ -38,7 +38,7 @@ class FakeStorageHost {
         root_dir_(fbl::MakeRefCounted<fs::PseudoDir>()),
         servers_(std::move(servers)) {
     auto service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-    ASSERT_OK(root_dir_->AddEntry("fuchsia.storagehost.PartitionService", service_dir));
+    ASSERT_OK(root_dir_->AddEntry("fuchsia.storage.partitions.PartitionService", service_dir));
     for (unsigned i = 0; i < servers_.size(); ++i) {
       auto partition_dir = fbl::MakeRefCounted<fs::PseudoDir>();
       EXPECT_OK(service_dir->AddEntry("part-" + std::to_string(i), partition_dir));

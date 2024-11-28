@@ -15,25 +15,25 @@
         {
             protocol: [
                 "fuchsia.fs.startup.Startup",
-                "fuchsia.storagehost.PartitionsAdmin",
-                "fuchsia.storagehost.PartitionsManager",
+                "fuchsia.storage.partitions.PartitionsAdmin",
+                "fuchsia.storage.partitions.PartitionsManager",
             ],
         },
         {
-            service: [ "fuchsia.storagehost.PartitionService" ],
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
         },
     ],
     expose: [
         {
             protocol: [
                 "fuchsia.fs.startup.Startup",
-                "fuchsia.storagehost.PartitionsAdmin",
-                "fuchsia.storagehost.PartitionsManager",
+                "fuchsia.storage.partitions.PartitionsAdmin",
+                "fuchsia.storage.partitions.PartitionsManager",
             ],
             from: "self",
         },
         {
-            service: [ "fuchsia.storagehost.PartitionService" ],
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
             from: "self",
         },
     ],

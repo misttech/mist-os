@@ -4,7 +4,7 @@
 
 #include "src/storage/lib/paver/kola.h"
 
-#include <fidl/fuchsia.storagehost/cpp/wire_types.h>
+#include <fidl/fuchsia.storage.partitions/cpp/wire_types.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/result.h>
@@ -203,7 +203,8 @@ class KolaAbrManager : public KolaAbrManagerInterface {
       return zircon_b.take_error();
     }
 
-    auto [client, server] = fidl::Endpoints<fuchsia_storagehost::PartitionsManager>::Create();
+    auto [client, server] =
+        fidl::Endpoints<fuchsia_storage_partitions::PartitionsManager>::Create();
     zx::result result = component::ConnectAt(partitioner->SvcRoot(), std::move(server));
     if (result.is_error()) {
       return result.take_error();
@@ -362,7 +363,7 @@ class KolaAbrManager : public KolaAbrManagerInterface {
  private:
   KolaAbrManager(const KolaPartitioner* partitioner, std::unique_ptr<BlockPartitionClient> zircon_a,
                  std::unique_ptr<BlockPartitionClient> zircon_b,
-                 fidl::ClientEnd<fuchsia_storagehost::PartitionsManager> partitions_manager)
+                 fidl::ClientEnd<fuchsia_storage_partitions::PartitionsManager> partitions_manager)
       : partitioner_(partitioner),
         zircon_a_(std::move(zircon_a)),
         zircon_b_(std::move(zircon_b)),
@@ -375,7 +376,7 @@ class KolaAbrManager : public KolaAbrManagerInterface {
       return partition.take_error();
     }
     fidl::Arena arena;
-    auto request = fuchsia_storagehost::wire::PartitionUpdateMetadataRequest::Builder(arena);
+    auto request = fuchsia_storage_partitions::wire::PartitionUpdateMetadataRequest::Builder(arena);
     zx::result transaction = GetTransactionToken();
     if (transaction.is_error()) {
       return transaction.take_error();
@@ -390,8 +391,8 @@ class KolaAbrManager : public KolaAbrManagerInterface {
       memcpy(type.value.data(), type_guid->bytes(), uuid::kUuidSize);
       request.type_guid(type);
     }
-    fidl::WireResult result =
-        fidl::WireCall<fuchsia_storagehost::Partition>(*partition)->UpdateMetadata(request.Build());
+    fidl::WireResult result = fidl::WireCall<fuchsia_storage_partitions::Partition>(*partition)
+                                  ->UpdateMetadata(request.Build());
     if (!result.ok()) {
       ERROR("Failed to update metadata: %s\n", result.status_string());
       return zx::error(result.status());
@@ -419,7 +420,7 @@ class KolaAbrManager : public KolaAbrManagerInterface {
   const KolaPartitioner* partitioner_;
   std::unique_ptr<BlockPartitionClient> zircon_a_;
   std::unique_ptr<BlockPartitionClient> zircon_b_;
-  fidl::WireSyncClient<fuchsia_storagehost::PartitionsManager> partitions_manager_;
+  fidl::WireSyncClient<fuchsia_storage_partitions::PartitionsManager> partitions_manager_;
   zx::eventpair transaction_;
   std::optional<uint64_t> pending_zircon_a_flags_;
   std::optional<uint64_t> pending_zircon_b_flags_;

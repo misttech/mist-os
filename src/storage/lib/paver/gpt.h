@@ -4,7 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_GPT_H_
 #define SRC_STORAGE_LIB_PAVER_GPT_H_
 
-#include <fidl/fuchsia.storagehost/cpp/wire.h>
+#include <fidl/fuchsia.storage.partitions/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -101,7 +101,7 @@ class GptDevicePartitioner {
   };
 
   // Wipes the partition table and resets it to `partitions`.
-  // See fuchsia.storagehost.PartitionsManager/ResetPartitionTables.
+  // See fuchsia.storage.partitions.PartitionsManager/ResetPartitionTables.
   zx::result<> ResetPartitionTables(std::vector<PartitionInitSpec> partitions) const;
 
   const paver::BlockDevices& devices() { return devices_; }

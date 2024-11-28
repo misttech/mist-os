@@ -304,11 +304,11 @@ impl GptManager {
     pub async fn handle_partitions_requests(
         &self,
         gpt_index: usize,
-        mut requests: fidl_fuchsia_storagehost::PartitionRequestStream,
+        mut requests: fidl_fuchsia_storage_partitions::PartitionRequestStream,
     ) -> Result<(), zx::Status> {
         while let Some(request) = requests.try_next().await.unwrap() {
             match request {
-                fidl_fuchsia_storagehost::PartitionRequest::UpdateMetadata {
+                fidl_fuchsia_storage_partitions::PartitionRequest::UpdateMetadata {
                     payload,
                     responder,
                 } => {
@@ -330,7 +330,7 @@ impl GptManager {
     async fn update_partition_metadata(
         &self,
         gpt_index: usize,
-        request: fidl_fuchsia_storagehost::PartitionUpdateMetadataRequest,
+        request: fidl_fuchsia_storage_partitions::PartitionUpdateMetadataRequest,
     ) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().await;
         inner.ensure_transaction_matches(
@@ -402,7 +402,8 @@ mod tests {
     use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
-        fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
+        fuchsia_async as fasync,
     };
 
     async fn setup(
@@ -829,12 +830,12 @@ mod tests {
                 &mut ObjectRequest::new3(flags, &options, server_end_1.into_channel().into()),
             )
             .unwrap();
-        let part_0_proxy = connect_to_named_protocol_at_dir_root::<fstoragehost::PartitionMarker>(
+        let part_0_proxy = connect_to_named_protocol_at_dir_root::<fpartitions::PartitionMarker>(
             &part_0_dir,
             "partition",
         )
         .expect("Failed to open Partition service");
-        let part_1_proxy = connect_to_named_protocol_at_dir_root::<fstoragehost::PartitionMarker>(
+        let part_1_proxy = connect_to_named_protocol_at_dir_root::<fpartitions::PartitionMarker>(
             &part_1_dir,
             "partition",
         )
@@ -842,7 +843,7 @@ mod tests {
 
         let transaction = runner.create_transaction().await.expect("Failed to create transaction");
         part_0_proxy
-            .update_metadata(fstoragehost::PartitionUpdateMetadataRequest {
+            .update_metadata(fpartitions::PartitionUpdateMetadataRequest {
                 transaction: Some(transaction.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
                 type_guid: Some(fidl_fuchsia_hardware_block_partition::Guid {
                     value: [0xffu8; 16],
@@ -853,7 +854,7 @@ mod tests {
             .expect("FIDL error")
             .expect("Failed to update_metadata");
         part_1_proxy
-            .update_metadata(fstoragehost::PartitionUpdateMetadataRequest {
+            .update_metadata(fpartitions::PartitionUpdateMetadataRequest {
                 transaction: Some(transaction.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
                 flags: Some(u64::MAX),
                 ..Default::default()

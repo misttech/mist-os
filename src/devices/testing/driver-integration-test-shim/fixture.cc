@@ -171,8 +171,8 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
           {
               Protocol{"fuchsia.fshost.Admin"},
               Protocol{"fuchsia.fshost.Recovery"},
-              Protocol{"fuchsia.storagehost.PartitionsManager"},
-              Service{"fuchsia.storagehost.PartitionService"},
+              Protocol{"fuchsia.storage.partitions.PartitionsManager"},
+              Service{"fuchsia.storage.partitions.PartitionService"},
           },
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},

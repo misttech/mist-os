@@ -47,7 +47,7 @@
             ],
         },
         {
-            service: [ "fuchsia.storagehost.PartitionService" ],
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
         },
     ],
     expose: [

@@ -36,7 +36,7 @@ use {
 #[cfg(feature = "storage-host")]
 use {
     fidl::endpoints::ServiceMarker as _, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_storagehost as fstoragehost, fshost_test_fixture::TestFixture,
+    fidl_fuchsia_storage_partitions as fpartitions, fshost_test_fixture::TestFixture,
 };
 
 pub mod config;
@@ -1156,7 +1156,7 @@ async fn data_persists() {
 #[cfg(feature = "storage-host")]
 async fn gpt_num_partitions(fixture: &TestFixture) -> usize {
     let partitions = fixture.dir(
-        fidl_fuchsia_storagehost::PartitionServiceMarker::SERVICE_NAME,
+        fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
         fuchsia_fs::PERM_READABLE,
     );
     fuchsia_fs::directory::readdir(&partitions).await.expect("Failed to read partitions").len()
@@ -1201,7 +1201,7 @@ async fn reset_uninitialized_gpt() {
     let recovery =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
     recovery
-        .init_system_partition_table(&[fstoragehost::PartitionInfo {
+        .init_system_partition_table(&[fpartitions::PartitionInfo {
             name: "part".to_string(),
             type_guid: fpartition::Guid { value: [0xabu8; 16] },
             instance_guid: fpartition::Guid { value: [0xcdu8; 16] },
@@ -1233,7 +1233,7 @@ async fn reset_initialized_gpt() {
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
     recovery
         .init_system_partition_table(&[
-            fstoragehost::PartitionInfo {
+            fpartitions::PartitionInfo {
                 name: "part".to_string(),
                 type_guid: fpartition::Guid { value: [0xabu8; 16] },
                 instance_guid: fpartition::Guid { value: [0xcdu8; 16] },
@@ -1241,7 +1241,7 @@ async fn reset_initialized_gpt() {
                 num_blocks: 1,
                 flags: 0,
             },
-            fstoragehost::PartitionInfo {
+            fpartitions::PartitionInfo {
                 name: "part2".to_string(),
                 type_guid: fpartition::Guid { value: [0x11u8; 16] },
                 instance_guid: fpartition::Guid { value: [0x22u8; 16] },

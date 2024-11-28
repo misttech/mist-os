@@ -4,8 +4,8 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.storagehost") {
-  sources = [ "storagehost.fidl" ]
+fidl("fuchsia.storage.partitions") {
+  sources = [ "partitions.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block",
     "//sdk/fidl/fuchsia.hardware.block.partition",

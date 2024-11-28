@@ -372,10 +372,11 @@ class GptDevicePartitionerTests : public PaverTest {
     fbl::unique_fd fd;
     ASSERT_OK(fdio_fd_create(svc_root.TakeHandle().release(), fd.reset_and_get_address()));
     std::vector<std::string> entries;
-    ASSERT_TRUE(
-        files::ReadDirContentsAt(fd.get(), "fuchsia.storagehost.PartitionService", &entries));
+    ASSERT_TRUE(files::ReadDirContentsAt(fd.get(), "fuchsia.storage.partitions.PartitionService",
+                                         &entries));
     for (const auto& entry : entries) {
-      std::string path = std::format("fuchsia.storagehost.PartitionService/{}/volume", entry);
+      std::string path =
+          std::format("fuchsia.storage.partitions.PartitionService/{}/volume", entry);
       fdio_cpp::UnownedFdioCaller caller(fd.get());
       zx::result partition = component::ConnectAt<fuchsia_hardware_block_partition::Partition>(
           caller.directory(), path);

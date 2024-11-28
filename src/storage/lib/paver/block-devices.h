@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <fidl/fuchsia.storagehost/cpp/markers.h>
+#include <fidl/fuchsia.storage.partitions/cpp/markers.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
@@ -22,7 +22,7 @@ class VolumeConnector {
  public:
   virtual zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const = 0;
   // This method will assert if called on a non-PathBasedVolumeConnector.
-  virtual zx::result<fidl::ClientEnd<fuchsia_storagehost::Partition>> PartitionManagement()
+  virtual zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
       const = 0;
   // The following two methods will assert if called on a non-DevfsVolumeConnector.
   // TODO(https://fxbug.dev/339491886): Remove once remaining use-cases are ported to storage-host.
@@ -38,7 +38,8 @@ class DevfsVolumeConnector : public VolumeConnector {
   explicit DevfsVolumeConnector(fidl::ClientEnd<fuchsia_device::Controller>);
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const override;
-  zx::result<fidl::ClientEnd<fuchsia_storagehost::Partition>> PartitionManagement() const override;
+  zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
+      const override;
   fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override;
   fidl::ClientEnd<fuchsia_device::Controller> TakeController() override;
 
@@ -48,13 +49,14 @@ class DevfsVolumeConnector : public VolumeConnector {
 
 // A VolumeConnector backed by a service node relative to a directory (see fdio_service_connect_at).
 // It's expected that the service node at `path` has two nodes, "volume" and "partition".  See
-// fuchsia.storagehost.PartitionService.
+// fuchsia.storage.partitions.PartitionService.
 class ServiceBasedVolumeConnector : public VolumeConnector {
  public:
   explicit ServiceBasedVolumeConnector(fbl::unique_fd service_dir);
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const override;
-  zx::result<fidl::ClientEnd<fuchsia_storagehost::Partition>> PartitionManagement() const override;
+  zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
+      const override;
   fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override;
   fidl::ClientEnd<fuchsia_device::Controller> TakeController() override;
 
@@ -72,7 +74,7 @@ class BlockDevices {
   static zx::result<BlockDevices> CreateDevfs(fbl::unique_fd devfs_root = {});
 
   // Creates an instance that searches for devices in the partitions directory of storage-host.
-  // `service_root` should contain the `fuchsia.storagehost.PartitionService` service.
+  // `service_root` should contain the `fuchsia.storage.partitions.PartitionService` service.
   static zx::result<BlockDevices> CreateStorageHost(
       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
 

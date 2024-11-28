@@ -7,7 +7,7 @@
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
-#include <fidl/fuchsia.storagehost/cpp/wire.h>
+#include <fidl/fuchsia.storage.partitions/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
@@ -327,7 +327,8 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       return gpt_device_source.take_error();
     }
 
-    zx::result manager = component::ConnectAt<fuchsia_storagehost::PartitionsManager>(svc_root);
+    zx::result manager =
+        component::ConnectAt<fuchsia_storage_partitions::PartitionsManager>(svc_root);
     if (manager.is_error()) {
       return manager.take_error();
     }
@@ -605,14 +606,14 @@ zx::result<> GptDevicePartitioner::ResetPartitionTables(
     return ResetPartitionTablesLegacy(std::move(partitions));
   }
 
-  std::vector<fuchsia_storagehost::wire::PartitionInfo> infos{
-      partitions.size(), fuchsia_storagehost::wire::PartitionInfo{}};
+  std::vector<fuchsia_storage_partitions::wire::PartitionInfo> infos{
+      partitions.size(), fuchsia_storage_partitions::wire::PartitionInfo{}};
   for (size_t i = 0; i < partitions.size(); ++i) {
     const auto& partition = partitions[i];
     if (partition.size_bytes == 0) {
       continue;
     }
-    fuchsia_storagehost::wire::PartitionInfo info{
+    fuchsia_storage_partitions::wire::PartitionInfo info{
         .name = fidl::StringView::FromExternal(partition.name),
         .start_block = partition.start_block,
         .num_blocks = partition.size_bytes / block_size_,
@@ -629,7 +630,7 @@ zx::result<> GptDevicePartitioner::ResetPartitionTables(
     return recovery.take_error();
   }
   fidl::WireResult result = fidl::WireCall(*recovery)->InitSystemPartitionTable(
-      fidl::VectorView<fuchsia_storagehost::wire::PartitionInfo>::FromExternal(infos));
+      fidl::VectorView<fuchsia_storage_partitions::wire::PartitionInfo>::FromExternal(infos));
   if (result.status() != ZX_OK) {
     ERROR("Failed to reset partitions table: %s\n", result.FormatDescription().c_str());
     return zx::error(result.status());

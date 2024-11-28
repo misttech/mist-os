@@ -8,7 +8,7 @@ using zx;
 using fuchsia.fxfs;
 using fuchsia.hardware.block;
 using fuchsia.io;
-using fuchsia.storagehost;
+using fuchsia.storage.partitions;
 
 type MountOptions = resource table {
     1: read_only bool;
@@ -94,6 +94,7 @@ closed protocol Admin {
 closed protocol Recovery {
     /// Wipes and re-initializes the system partition table.  This is a destructive operation!
     strict InitSystemPartitionTable(struct {
-        partitions vector<fuchsia.storagehost.PartitionInfo>:fuchsia.storagehost.MAX_PARTITIONS;
+        partitions
+                vector<fuchsia.storage.partitions.PartitionInfo>:fuchsia.storage.partitions.MAX_PARTITIONS;
     }) -> () error zx.Status;
 };
