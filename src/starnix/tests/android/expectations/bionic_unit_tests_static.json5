@@ -188,6 +188,9 @@
 
                 // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
                 "properties.__system_property_reload_invalid",
+
+                // Causes a segfault.
+                "ifunc.hwcap",
             ],
         },
     ],
