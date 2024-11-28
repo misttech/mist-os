@@ -61,7 +61,7 @@ fbl::RefPtr<LocalVnode> LocalVnode::Intermediate::Lookup(const fbl::String& name
 }
 
 LocalVnode::~LocalVnode() {
-  std::visit(fdio::overloaded{
+  std::visit(fdio_internal::overloaded{
                  [](LocalVnode::Local& c) {},
                  [](LocalVnode::Intermediate& c) {},
                  [](LocalVnode::Remote& s) {
@@ -118,7 +118,7 @@ zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, std::string_view nam
   // object.
   path->Append(name);
 
-  std::visit(fdio::overloaded{
+  std::visit(fdio_internal::overloaded{
                  [](const LocalVnode::Local& c) {
                    // Nothing to do as the node has no children and is not a
                    // remote node.
@@ -154,14 +154,12 @@ zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) const {
 }
 
 zx::result<std::string_view> LocalVnode::Readdir(uint64_t* last_seen) const {
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [](const LocalVnode::Local&) -> zx::result<std::string_view> {
                           // Calling readdir on a Local node is invalid.
                           return zx::error(ZX_ERR_NOT_DIR);
                         },
-                        [&](const LocalVnode::Intermediate& c) {
-                          return c.Readdir(last_seen);
-                        },
+                        [&](const LocalVnode::Intermediate& c) { return c.Readdir(last_seen); },
                         [](const LocalVnode::Remote&) -> zx::result<std::string_view> {
                           // If we've called Readdir on a Remote node, the path
                           // was misconfigured.

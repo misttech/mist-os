@@ -80,7 +80,7 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
       // walking a path within the namespace, or a need to continue parsing the path to
       // find the end of the path within the namespace.
       std::optional walk_status_opt =
-          std::visit(fdio::overloaded{
+          std::visit(fdio_internal::overloaded{
                          [](LocalVnode::Local& c) -> std::optional<zx_status_t> {
                            // Local file are never directories.
                            return ZX_ERR_NOT_FOUND;
@@ -146,7 +146,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn
   }
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
           [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
           [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
@@ -175,7 +175,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::str
   }
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
           [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
           [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
@@ -241,7 +241,7 @@ zx_status_t fdio_namespace::OpenRemoteDeprecated(std::string_view path, fio::wir
     }
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [](LocalVnode::Local& l) {
                           // Cannot connect to non-mount-points.
                           return ZX_ERR_NOT_SUPPORTED;
@@ -283,7 +283,7 @@ zx_status_t fdio_namespace::OpenRemote(std::string_view path, fio::Flags flags,
     }
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [](LocalVnode::Local& l) {
                           // Cannot connect to non-mount-points.
                           return ZX_ERR_NOT_SUPPORTED;
@@ -318,7 +318,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
   if (path.empty()) {
     if (zx_status_t status =
-            std::visit(fdio::overloaded{
+            std::visit(fdio_internal::overloaded{
                            [&](LocalVnode::Local&) -> zx_status_t { return ZX_OK; },
                            [](LocalVnode::Intermediate&) -> zx_status_t {
                              // The node identified by the path is not a mount point,
@@ -350,7 +350,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
 
     // Check to see if the working node contains a child identified by the next path segment.
     zx::result next_vn =
-        std::visit(fdio::overloaded{
+        std::visit(fdio_internal::overloaded{
                        [](LocalVnode::Local&) -> zx::result<fbl::RefPtr<LocalVnode>> {
                          // At the end of each iteration, its considered a failure for the "next"
                          // working node to not be intermediate if more segments remain, so the only
@@ -404,7 +404,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // an unbind attempt, or a need to continue parsing the path to find the bind location.
     std::optional status_opt = std::visit(
-        fdio::overloaded{
+        fdio_internal::overloaded{
             [&handle_terminal_node](const LocalVnode::Local&) -> std::optional<zx_status_t> {
               return handle_terminal_node();
             },
@@ -459,7 +459,7 @@ bool fdio_namespace::IsBound(std::string_view path) {
     return false;
   }
 
-  return std::visit(fdio::overloaded{
+  return std::visit(fdio_internal::overloaded{
                         [&](LocalVnode::Local& l) { return path == "."; },
                         [](LocalVnode::Intermediate& c) { return false; },
                         [&](LocalVnode::Remote& s) { return path == "."; },
@@ -502,7 +502,7 @@ zx_status_t fdio_namespace::Bind(
     // bind root if:
     //   A) root was previously an intermediate node, and already has any children.
     //   B) root was previously a remote or local node.
-    return std::visit(fdio::overloaded{
+    return std::visit(fdio_internal::overloaded{
                           [](LocalVnode::Local& l) {
                             // Root is already a local node. Bind must fail.
                             return ZX_ERR_ALREADY_EXISTS;
@@ -568,7 +568,7 @@ zx_status_t fdio_namespace::Bind(
     // The outcome of this visit is a ternary that either communicates a success/failure in
     // a bind attempt, or a need to continue parsing the path to find the bind location.
     std::optional walk_status_opt = std::visit(
-        fdio::overloaded{
+        fdio_internal::overloaded{
             [](LocalVnode::Local& l) -> std::optional<zx_status_t> {
               // Encountering a valid storage end at any point in the bind path
               // implies shadowing, which is not supported.
@@ -630,7 +630,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenRoot() const {
   }();
 
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [&](LocalVnode::Local&) -> zx::result<fdio_ptr> {
             // The root node should never be a local node.
             return zx::error(ZX_ERR_NOT_SUPPORTED);

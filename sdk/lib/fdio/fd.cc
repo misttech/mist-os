@@ -66,7 +66,7 @@ zx_status_t fdio_fd_transfer_or_clone(int fd, zx_handle_t* out_handle) {
     return ZX_ERR_INVALID_ARGS;
   }
   return std::visit(
-      fdio::overloaded{
+      fdio_internal::overloaded{
           [out_handle](fdio::last_reference reference) { return reference.unwrap(out_handle); },
           [out_handle](const fdio_ptr& ptr) { return ptr->clone(out_handle); }},
       GetLastReference(std::move(io)));
